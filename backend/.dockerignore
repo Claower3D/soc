@@ -1,0 +1,5 @@
+dist
+*.exe
+.git
+.gitignore
+README.md

@@ -1,0 +1,8 @@
+/* index.css — минимальные базовые стили */
+:root {
+  color-scheme: light;
+}
+
+#root {
+  min-height: 100vh;
+}
