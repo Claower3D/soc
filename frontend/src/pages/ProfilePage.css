@@ -127,6 +127,18 @@
   border-color: var(--color-text-tertiary);
 }
 
+.btn-logout {
+  color: #DC2626 !important;
+  border-color: #FECACA !important;
+  background: #FEF2F2 !important;
+}
+
+.btn-logout:hover {
+  background: #FEE2E2 !important;
+  border-color: #FCA5A5 !important;
+  color: #B91C1C !important;
+}
+
 /* Identity */
 .profile-identity {
   margin-bottom: 1.5rem;

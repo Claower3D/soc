@@ -1,18 +1,22 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, Image as ImageIcon, Video, Headphones } from 'lucide-react';
+import { TrendingUp, Image as ImageIcon, Video, Headphones, Sparkles, LogIn, ArrowRight } from 'lucide-react';
 import { StoriesBar } from '../components/StoriesBar';
 import { PostCard } from '../components/PostCard';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { CreatePostModal } from '../components/CreatePostModal';
-import { stories, posts as mockPosts, initialUsers, currentUser, type Post } from '../data/mock';
+import { AuthModal } from '../components/AuthModal';
+import { stories, posts as mockPosts, initialUsers, type Post } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import './FeedPage.css';
 
 export function FeedPage() {
   const navigate = useNavigate();
+  const { currentUser, isAuthenticated } = useAuth();
   const [posts, setPosts] = useState<Post[]>(mockPosts);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [followedMap, setFollowedMap] = useState<Record<string, boolean>>({
     '2': false,
     '5': false,
@@ -68,26 +72,43 @@ export function FeedPage() {
       <div className="feed-main-col">
         <StoriesBar stories={stories} />
 
-        {/* Create Post Input Bar */}
-        <div className="feed-create-post-card">
-          <div className="create-post-trigger-top" onClick={() => setIsCreatePostOpen(true)}>
-            <img src={currentUser.avatar} alt={currentUser.name} className="create-my-avatar" />
-            <div className="create-post-fake-input">
-              Что у вас нового, {currentUser.name.split(' ')[0]}? Опубликовать новость...
+        {/* Create Post Input Bar or Guest Welcome Banner */}
+        {isAuthenticated ? (
+          <div className="feed-create-post-card">
+            <div className="create-post-trigger-top" onClick={() => setIsCreatePostOpen(true)}>
+              <img src={currentUser.avatar} alt={currentUser.name} className="create-my-avatar" />
+              <div className="create-post-fake-input">
+                Что у вас нового, {currentUser.name.split(' ')[0]}? Опубликовать новость...
+              </div>
+            </div>
+            <div className="create-post-quick-actions">
+              <button className="quick-post-action" onClick={() => setIsCreatePostOpen(true)}>
+                <ImageIcon size={17} color="#10B981" /> <span>Фото / Новость</span>
+              </button>
+              <button className="quick-post-action" onClick={() => navigate('/video')}>
+                <Video size={17} color="#EF4444" /> <span>Видео</span>
+              </button>
+              <button className="quick-post-action" onClick={() => navigate('/podcasts')}>
+                <Headphones size={17} color="var(--color-accent)" /> <span>Подкаст</span>
+              </button>
             </div>
           </div>
-          <div className="create-post-quick-actions">
-            <button className="quick-post-action" onClick={() => setIsCreatePostOpen(true)}>
-              <ImageIcon size={17} color="#10B981" /> <span>Фото / Новость</span>
-            </button>
-            <button className="quick-post-action" onClick={() => navigate('/video')}>
-              <Video size={17} color="#EF4444" /> <span>Видео</span>
-            </button>
-            <button className="quick-post-action" onClick={() => navigate('/podcasts')}>
-              <Headphones size={17} color="var(--color-accent)" /> <span>Подкаст</span>
-            </button>
+        ) : (
+          <div className="feed-guest-welcome-card">
+            <div className="guest-welcome-content">
+              <div className="guest-welcome-badge">
+                <Sparkles size={14} /> NEW AGE ЭКОСИСТЕМА
+              </div>
+              <h3>Добро пожаловать в единое пространство контента</h3>
+              <p>Создайте аккаунт или войдите, чтобы публиковать статьи, делиться видео, общаться в мессенджере и открывать сообщества.</p>
+              <div className="guest-welcome-actions">
+                <button className="guest-primary-btn" onClick={() => setAuthModalOpen(true)}>
+                  <LogIn size={16} /> Создать аккаунт или войти
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Feed Category Tabs */}
         <div className="feed-category-tabs">
@@ -131,43 +152,61 @@ export function FeedPage() {
 
       {/* Right Sidebar (Recommendations & Trends) */}
       <aside className="feed-side-col">
-        {/* Current User Hero Card */}
-        <div 
-          className="feed-current-user-card"
-          onClick={() => navigate('/profile/me')}
-        >
+        {/* Current User Hero Card or Guest Join Card */}
+        {isAuthenticated ? (
           <div 
-            className="feed-user-hero-cover" 
-            style={{ backgroundImage: `url(${currentUser.coverImage || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80'})` }} 
-          />
-          <div className="feed-user-hero-body">
-            <div className="feed-user-avatar-wrap">
-              <img src={currentUser.avatar} alt={currentUser.name} className="feed-my-avatar" />
-              <span className="feed-avatar-online-pip" />
-            </div>
-            <div className="feed-my-meta">
-              <span className="feed-my-name">{currentUser.name}</span>
-              <span className="feed-my-handle">@{currentUser.username}</span>
-            </div>
-            <div className="feed-user-stats-strip">
-              <div className="hero-stat-item">
-                <strong>{currentUser.postsCount || 24}</strong>
-                <span>постов</span>
+            className="feed-current-user-card"
+            onClick={() => navigate('/profile/me')}
+          >
+            <div 
+              className="feed-user-hero-cover" 
+              style={{ backgroundImage: `url(${currentUser.coverImage || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80'})` }} 
+            />
+            <div className="feed-user-hero-body">
+              <div className="feed-user-avatar-wrap">
+                <img src={currentUser.avatar} alt={currentUser.name} className="feed-my-avatar" />
+                <span className="feed-avatar-online-pip" />
               </div>
-              <div className="hero-stat-divider" />
-              <div className="hero-stat-item">
-                <strong>14.2K</strong>
-                <span>подписчиков</span>
+              <div className="feed-my-meta">
+                <span className="feed-my-name">{currentUser.name}</span>
+                <span className="feed-my-handle">@{currentUser.username}</span>
               </div>
-              <div className="hero-stat-divider" />
-              <div className="hero-stat-item">
-                <strong>{currentUser.followingCount || 382}</strong>
-                <span>подписок</span>
+              <div className="feed-user-stats-strip">
+                <div className="hero-stat-item">
+                  <strong>{currentUser.postsCount || 24}</strong>
+                  <span>постов</span>
+                </div>
+                <div className="hero-stat-divider" />
+                <div className="hero-stat-item">
+                  <strong>14.2K</strong>
+                  <span>подписчиков</span>
+                </div>
+                <div className="hero-stat-divider" />
+                <div className="hero-stat-item">
+                  <strong>{currentUser.followingCount || 382}</strong>
+                  <span>подписок</span>
+                </div>
               </div>
+              <button className="feed-switch-btn">Мой профиль</button>
             </div>
-            <button className="feed-switch-btn">Мой профиль</button>
           </div>
-        </div>
+        ) : (
+          <div className="feed-guest-join-card">
+            <div className="guest-join-header">
+              <div className="guest-join-icon-box">
+                <Sparkles size={20} color="#6366F1" />
+              </div>
+              <h4>Присоединяйтесь к New Age</h4>
+            </div>
+            <p className="guest-join-desc">
+              Общайтесь, создавайте закрытые конференции, запускайте подкасты и торгуйте на маркетплейсе без ограничений.
+            </p>
+            <button className="guest-join-cta-btn" onClick={() => setAuthModalOpen(true)}>
+              <span>Создать профиль</span>
+              <ArrowRight size={15} />
+            </button>
+          </div>
+        )}
 
         {/* Recommendations */}
         <div className="feed-recommendations-box">
@@ -252,6 +291,13 @@ export function FeedPage() {
         isOpen={isCreatePostOpen}
         onClose={() => setIsCreatePostOpen(false)}
         onCreatePost={handleCreatePost}
+      />
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={() => {}}
       />
     </div>
   );

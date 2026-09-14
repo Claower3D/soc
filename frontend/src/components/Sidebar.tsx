@@ -6,13 +6,15 @@ import {
   ChevronDown, ChevronRight, Layers, ExternalLink
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { AuthModal } from './AuthModal';
 import logoImg from '../assets/logo.png';
 import './Sidebar.css';
 
 export function Sidebar() {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, isAuthenticated } = useAuth();
   const [servicesExpanded, setServicesExpanded] = useState(true);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   return (
     <aside className="sidebar">
@@ -127,34 +129,70 @@ export function Sidebar() {
         <div className="nav-section-divider" />
         <div className="nav-section-title">Кабинет</div>
 
-        <NavLink to="/channel/me" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Tv className="nav-icon" size={19} />
-          <span className="nav-label">Мой канал</span>
-        </NavLink>
+        {isAuthenticated ? (
+          <>
+            <NavLink to="/channel/me" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <Tv className="nav-icon" size={19} />
+              <span className="nav-label">Мой канал</span>
+            </NavLink>
 
-        <NavLink to="/profile/me" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <UserIcon className="nav-icon" size={19} />
-          <span className="nav-label">Мой профиль</span>
-        </NavLink>
+            <NavLink to="/profile/me" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <UserIcon className="nav-icon" size={19} />
+              <span className="nav-label">Мой профиль</span>
+            </NavLink>
+          </>
+        ) : (
+          <div className="nav-item guest-nav-item" onClick={() => setAuthModalOpen(true)}>
+            <UserIcon className="nav-icon" size={19} />
+            <span className="nav-label">Войти в профиль</span>
+          </div>
+        )}
       </nav>
 
-      {/* FOOTER USER CARD */}
+      {/* FOOTER USER CARD / GUEST CARD */}
       <div className="sidebar-footer">
-        <div 
-          className="user-profile-card"
-          onClick={() => navigate('/profile/me')}
-          title="Перейти в Мой профиль"
-        >
-          <div className="footer-avatar-wrapper">
-            <img src={currentUser.avatar} alt={currentUser.name} className="footer-user-avatar" />
-            <span className="footer-online-dot" />
+        {isAuthenticated ? (
+          <div 
+            className="user-profile-card"
+            onClick={() => navigate('/profile/me')}
+            title="Перейти в Мой профиль"
+          >
+            <div className="footer-avatar-wrapper">
+              <img src={currentUser.avatar} alt={currentUser.name} className="footer-user-avatar" />
+              <span className="footer-online-dot" />
+            </div>
+            <div className="footer-user-info">
+              <span className="footer-user-name">{currentUser.name}</span>
+              <span className="footer-user-handle">@{currentUser.username}</span>
+            </div>
           </div>
-          <div className="footer-user-info">
-            <span className="footer-user-name">{currentUser.name}</span>
-            <span className="footer-user-handle">@{currentUser.username}</span>
+        ) : (
+          <div 
+            className="sidebar-guest-card"
+            onClick={() => setAuthModalOpen(true)}
+            title="Войти или зарегистрироваться в New Age"
+          >
+            <div className="guest-card-left">
+              <div className="guest-avatar-ring">
+                <UserIcon size={18} className="guest-icon" />
+              </div>
+              <div className="guest-text-block">
+                <span className="guest-title">Гостевой режим</span>
+                <span className="guest-subtitle">Нажмите для входа</span>
+              </div>
+            </div>
+            <button className="guest-login-arrow-btn">
+              Войти
+            </button>
           </div>
-        </div>
+        )}
       </div>
+
+      <AuthModal 
+        isOpen={authModalOpen} 
+        onClose={() => setAuthModalOpen(false)} 
+        onSuccess={() => {}}
+      />
     </aside>
   );
 }

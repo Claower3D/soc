@@ -4,19 +4,21 @@ import {
   Grid, Video as VideoIcon, Headphones, Bookmark, 
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Share2, Edit3, Heart, MessageSquare,
-  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame
+  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn
 } from 'lucide-react';
 import { initialUsers, posts, videos, podcasts, initialProducts, RELIGIONS_CATALOG, type User, type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { FollowersModal } from '../components/FollowersModal';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { EditProfileModal } from '../components/EditProfileModal';
+import { AuthModal } from '../components/AuthModal';
 import './ProfilePage.css';
 
 export function ProfilePage() {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const { currentUser, updateProfile } = useAuth();
+  const { currentUser, isAuthenticated, logout, updateProfile } = useAuth();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // Find user by id or 'me'
   const isMe = !userId || userId === 'me' || userId === currentUser.id;
@@ -111,19 +113,46 @@ export function ProfilePage() {
             {/* Action Buttons */}
             <div className="profile-actions-bar">
               {isMe ? (
-                <>
-                  <button className="btn btn-secondary" onClick={() => setIsEditProfileOpen(true)}>
-                    <Edit3 size={16} /> Редактировать
-                  </button>
-                  <button className="btn btn-secondary" onClick={handleShareProfile}>
-                    <Share2 size={16} /> {copiedLink ? 'Ссылка скопирована!' : 'Поделиться'}
-                  </button>
-                </>
+                isAuthenticated ? (
+                  <>
+                    <button className="btn btn-secondary" onClick={() => setIsEditProfileOpen(true)}>
+                      <Edit3 size={16} /> Редактировать
+                    </button>
+                    <button className="btn btn-secondary" onClick={handleShareProfile}>
+                      <Share2 size={16} /> {copiedLink ? 'Ссылка скопирована!' : 'Поделиться'}
+                    </button>
+                    <button 
+                      className="btn btn-secondary btn-logout" 
+                      onClick={() => {
+                        logout();
+                        navigate('/');
+                      }}
+                      title="Выйти из аккаунта"
+                    >
+                      <LogOut size={16} /> Выйти
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn btn-primary" onClick={() => setAuthModalOpen(true)}>
+                      <LogIn size={16} /> Войти в аккаунт
+                    </button>
+                    <button className="btn btn-secondary" onClick={handleShareProfile}>
+                      <Share2 size={16} /> Поделиться
+                    </button>
+                  </>
+                )
               ) : (
                 <>
                   <button
                     className={`btn ${isFollowing ? 'btn-following' : 'btn-primary'}`}
-                    onClick={handleToggleFollow}
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        setAuthModalOpen(true);
+                        return;
+                      }
+                      handleToggleFollow();
+                    }}
                   >
                     {isFollowing ? (
                       <>
@@ -139,6 +168,10 @@ export function ProfilePage() {
                   <button
                     className={`btn btn-critic-toggle ${isCritic ? 'active' : ''}`}
                     onClick={() => {
+                      if (!isAuthenticated) {
+                        setAuthModalOpen(true);
+                        return;
+                      }
                       if (isCritic) {
                         setIsCritic(false);
                         setCriticsCount(c => c - 1);
@@ -152,10 +185,22 @@ export function ProfilePage() {
                     <Flame size={15} /> {isCritic ? 'В критиках' : 'Стать критиком'}
                   </button>
 
-                  <button className="btn btn-secondary" onClick={handleSendMessage}>
+                  <button className="btn btn-secondary" onClick={() => {
+                    if (!isAuthenticated) {
+                      setAuthModalOpen(true);
+                      return;
+                    }
+                    handleSendMessage();
+                  }}>
                     <MessageCircle size={16} /> Сообщение
                   </button>
-                  <button className="btn btn-secondary" onClick={handleStartCall} title="Начать конференцию">
+                  <button className="btn btn-secondary" onClick={() => {
+                    if (!isAuthenticated) {
+                      setAuthModalOpen(true);
+                      return;
+                    }
+                    handleStartCall();
+                  }} title="Начать конференцию">
                     <Phone size={16} /> Позвонить
                   </button>
                 </>
@@ -531,6 +576,13 @@ export function ProfilePage() {
         onSave={(updated) => {
           updateProfile(updated);
         }}
+      />
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={() => {}}
       />
     </div>
   );

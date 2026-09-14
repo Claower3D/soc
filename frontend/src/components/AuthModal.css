@@ -1,28 +1,29 @@
 .auth-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(8px);
+  background: rgba(10, 15, 30, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  animation: fadeIn 0.2s ease-out;
+  padding: 1.25rem 1rem;
+  animation: fadeIn 0.25s ease-out;
 }
 
-.auth-modal-card {
+.auth-modal-card.luxury-auth-card {
   background: #FFFFFF;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-xl);
+  border-radius: 24px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(99, 102, 241, 0.08);
   width: 100%;
-  max-width: 540px;
-  max-height: 92vh;
+  max-width: 530px;
+  max-height: 94vh;
   overflow-y: auto;
   position: relative;
-  padding: 2rem 2.25rem;
-  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 2.25rem 2.25rem;
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   scrollbar-width: thin;
 }
 
@@ -30,7 +31,7 @@
   position: absolute;
   top: 1.25rem;
   right: 1.25rem;
-  background: var(--color-bg-secondary);
+  background: #F1F5F9;
   border: none;
   width: 34px;
   height: 34px;
@@ -38,44 +39,197 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-secondary);
+  color: #64748B;
   cursor: pointer;
   transition: all var(--transition-fast);
+  z-index: 10;
 }
 
 .auth-modal-close:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text);
+  background: #E2E8F0;
+  color: #0F172A;
+  transform: rotate(90deg);
 }
 
-.auth-header {
+/* LUXURY LOGO AND BRANDING */
+.luxury-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   margin-bottom: 1.5rem;
 }
 
-.auth-brand-badge {
-  display: inline-block;
-  font-size: 0.82rem;
-  font-weight: 900;
-  letter-spacing: 0.1em;
-  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 0.5rem;
+.luxury-logo-aura-wrapper {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.85rem;
 }
 
-.auth-header h2 {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--color-text);
+.luxury-logo-ring-pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.45) 0%, rgba(139, 92, 246, 0.45) 50%, rgba(236, 72, 153, 0.45) 100%);
+  filter: blur(10px);
+  opacity: 0.75;
+  animation: pulse-glow 3s infinite alternate;
+}
+
+@keyframes pulse-glow {
+  0% { transform: scale(0.95); opacity: 0.55; }
+  100% { transform: scale(1.08); opacity: 0.85; }
+}
+
+.luxury-auth-logo-img {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  object-fit: cover;
+  background: #080C1C;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35), 0 0 0 2px rgba(255, 255, 255, 0.9);
+  z-index: 2;
+  transition: transform 0.25s ease;
+}
+
+.luxury-header:hover .luxury-auth-logo-img {
+  transform: scale(1.04);
+}
+
+.auth-brand-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #6366F1;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  margin-bottom: 0.6rem;
+}
+
+.sparkle-icon {
+  color: #F59E0B;
+}
+
+.luxury-modal-title {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #0F172A;
   margin: 0 0 0.4rem 0;
+  letter-spacing: -0.02em;
 }
 
 .auth-subtitle {
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-  margin: 0;
-  line-height: 1.4;
+  font-size: 0.88rem;
+  color: #64748B;
+  margin: 0 0 1.25rem 0;
+  line-height: 1.45;
+  max-width: 440px;
+}
+
+/* SLEEK MODE TABS CONTAINER */
+.auth-mode-tabs-container {
+  display: flex;
+  background: #F1F5F9;
+  padding: 0.28rem;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 360px;
+  margin-top: 0.25rem;
+}
+
+.auth-mode-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1rem;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.auth-mode-tab-btn:hover {
+  color: #0F172A;
+}
+
+.auth-mode-tab-btn.active {
+  background: #FFFFFF;
+  color: #4F46E5;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+/* DEMO QUICK LOGIN BANNER */
+.demo-quick-login-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.07) 0%, rgba(236, 72, 153, 0.04) 100%);
+  border: 1px dashed rgba(99, 102, 241, 0.35);
+  border-radius: 14px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.15rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.demo-quick-login-banner:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(236, 72, 153, 0.08) 100%);
+  border-color: #6366F1;
+  transform: translateY(-1px);
+}
+
+.demo-login-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.demo-login-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.demo-login-text strong {
+  font-size: 0.84rem;
+  color: #1E293B;
+}
+
+.demo-login-text span {
+  font-size: 0.72rem;
+  color: #64748B;
+}
+
+.demo-arrow {
+  color: #6366F1;
+  transition: transform 0.2s ease;
+}
+
+.demo-quick-login-banner:hover .demo-arrow {
+  transform: translateX(3px);
 }
 
 /* Error banner */

@@ -358,75 +358,89 @@ export function Header() {
           <span className="btn-text">Конференция</span>
         </button>
 
-        {/* Auth Modal Trigger Button */}
-        <button
-          className="header-icon-btn"
-          onClick={() => setAuthModalOpen(true)}
-          title={isAuthenticated ? `Сменить аккаунт / Вход (Вы вошли как @${currentUser.username})` : "Вход / Регистрация в New Age"}
-        >
-          <LogIn size={18} />
-        </button>
+        {/* Auth / Profile Area */}
+        {isAuthenticated ? (
+          <>
+            <div className="notification-wrapper">
+              <button
+                className={`header-icon-btn ${notificationsOpen ? 'active' : ''}`}
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                title="Уведомления"
+              >
+                <Bell size={20} />
+                <span className="notification-badge" />
+              </button>
 
-        <div className="notification-wrapper">
-          <button
-            className={`header-icon-btn ${notificationsOpen ? 'active' : ''}`}
-            onClick={() => setNotificationsOpen(!notificationsOpen)}
-            title="Уведомления"
-          >
-            <Bell size={20} />
-            <span className="notification-badge" />
-          </button>
-
-          {notificationsOpen && (
-            <div className="notifications-popover">
-              <div className="notifications-header">
-                <h3>Уведомления</h3>
-                <span className="notifications-mark-read"><Check size={14} /> Все прочитаны</span>
-              </div>
-              <div className="notifications-list">
-                <div className="notification-item unread">
-                  <img src={initialUsers[1].avatar} alt="Алиса" />
-                  <div className="notif-content">
-                    <p><strong>Алиса Иванова</strong> оценила вашу публикацию</p>
-                    <span className="notif-time">5 минут назад</span>
+              {notificationsOpen && (
+                <div className="notifications-popover">
+                  <div className="notifications-header">
+                    <h3>Уведомления</h3>
+                    <span className="notifications-mark-read"><Check size={14} /> Все прочитаны</span>
+                  </div>
+                  <div className="notifications-list">
+                    <div className="notification-item unread">
+                      <img src={initialUsers[1].avatar} alt="Алиса" />
+                      <div className="notif-content">
+                        <p><strong>Алиса Иванова</strong> оценила вашу публикацию</p>
+                        <span className="notif-time">5 минут назад</span>
+                      </div>
+                    </div>
+                    <div className="notification-item unread">
+                      <img src={initialUsers[2].avatar} alt="Максим" />
+                      <div className="notif-content">
+                        <p><strong>Максим Петров</strong> пригласил вас в <strong>Конференцию</strong></p>
+                        <span className="notif-time">12 минут назад</span>
+                      </div>
+                    </div>
+                    <div className="notification-item">
+                      <img src={initialUsers[3].avatar} alt="Екатерина" />
+                      <div className="notif-content">
+                        <p><strong>Екатерина Смирнова</strong> подписалась на ваши обновления</p>
+                        <span className="notif-time">1 час назад</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="notification-item unread">
-                  <img src={initialUsers[2].avatar} alt="Максим" />
-                  <div className="notif-content">
-                    <p><strong>Максим Петров</strong> пригласил вас в <strong>Конференцию</strong></p>
-                    <span className="notif-time">12 минут назад</span>
-                  </div>
-                </div>
-                <div className="notification-item">
-                  <img src={initialUsers[3].avatar} alt="Екатерина" />
-                  <div className="notif-content">
-                    <p><strong>Екатерина Смирнова</strong> подписалась на ваши обновления</p>
-                    <span className="notif-time">1 час назад</span>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <button
-          className="header-profile-badge"
-          onClick={() => navigate('/profile/me')}
-          title="Открыть Мой профиль"
-        >
-          <img src={currentUser.avatar} alt={currentUser.name} className="header-avatar" />
-          <div className="header-profile-text">
-            <span className="header-user-name">Мой профиль</span>
-            <span className="header-user-handle">@{currentUser.username}</span>
+            <button
+              className="header-profile-badge"
+              onClick={() => navigate('/profile/me')}
+              title={`Мой профиль: ${currentUser.name} (@${currentUser.username})`}
+            >
+              <img src={currentUser.avatar} alt={currentUser.name} className="header-avatar" />
+              <div className="header-profile-text">
+                <span className="header-user-name">{currentUser.name.split(' ')[0]}</span>
+                <span className="header-user-handle">@{currentUser.username}</span>
+              </div>
+            </button>
+          </>
+        ) : (
+          <div className="header-guest-auth-buttons">
+            <button
+              className="header-login-btn"
+              onClick={() => setAuthModalOpen(true)}
+            >
+              <LogIn size={16} />
+              <span>Войти</span>
+            </button>
+
+            <button
+              className="header-register-btn"
+              onClick={() => setAuthModalOpen(true)}
+            >
+              <Plus size={16} />
+              <span>Регистрация</span>
+            </button>
           </div>
-        </button>
+        )}
       </div>
 
       <AuthModal 
         isOpen={authModalOpen} 
         onClose={() => setAuthModalOpen(false)} 
-        onSuccess={() => window.location.reload()}
+        onSuccess={() => {}}
       />
     </header>
   );

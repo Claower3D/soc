@@ -1,10 +1,11 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { 
   X, Mail, Lock, Phone, User as UserIcon, Shield, CheckCircle2, 
-  ShoppingBag, Video, ArrowRight, Check, Compass, Info, AlertCircle
+  ShoppingBag, Video, ArrowRight, Check, Compass, Info, AlertCircle, Sparkles, LogIn, UserPlus
 } from 'lucide-react';
 import { RELIGIONS_CATALOG, type UserRole, type BeliefPrivacy } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import logoImg from '../assets/logo.png';
 import './AuthModal.css';
 
 interface AuthModalProps {
@@ -97,27 +98,64 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div className="auth-modal-backdrop" onClick={onClose}>
-      <div className="auth-modal-card" onClick={e => e.stopPropagation()}>
-        <button className="auth-modal-close" onClick={onClose}>
-          <X size={20} />
+      <div className="auth-modal-card luxury-auth-card" onClick={e => e.stopPropagation()}>
+        <button className="auth-modal-close" onClick={onClose} title="Закрыть">
+          <X size={18} />
         </button>
 
-        <div className="auth-header">
-          <div className="auth-brand-badge">NEW AGE</div>
-          <h2>
+        {/* LUXURY LOGO & BRAND HEADER */}
+        <div className="auth-header luxury-header">
+          <div className="luxury-logo-aura-wrapper">
+            <div className="luxury-logo-ring-pulse" />
+            <img 
+              src={logoImg} 
+              alt="New Age Logo" 
+              className="luxury-auth-logo-img" 
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+          </div>
+
+          <div className="auth-brand-badge-pill">
+            <Sparkles size={13} className="sparkle-icon" />
+            <span>NEW AGE PLATFORM</span>
+          </div>
+
+          <h2 className="luxury-modal-title">
             {mode === 'login' 
-              ? 'Добро пожаловать!' 
+              ? 'Добро пожаловать в New Age' 
               : step === 1 
-                ? 'Создать аккаунт New Age' 
-                : 'Выбор мировоззрения и роли'}
+                ? 'Создать аккаунт в New Age' 
+                : 'Сакральный символ веры и роль'}
           </h2>
           <p className="auth-subtitle">
             {mode === 'login'
-              ? 'Войдите в мультифункциональную социальную сеть'
+              ? 'Единая мультифункциональная экосистема для общения, видео и творчества'
               : step === 1
-                ? 'Присоединяйтесь к единой экосистеме контента и общения'
-                : 'Выберите сакральный символ веры, роль и настройте приватность'}
+                ? 'Заполните основные данные для входа в цифровую вселенную'
+                : 'Выберите ваше мировоззрение, роль аккаунта и настройки приватности'}
           </p>
+
+          {/* SLEEK PILL TABS SWITCHER (ВХОД / РЕГИСТРАЦИЯ) */}
+          <div className="auth-mode-tabs-container">
+            <button
+              type="button"
+              className={`auth-mode-tab-btn ${mode === 'login' ? 'active' : ''}`}
+              onClick={() => { setMode('login'); setStep(1); setErrorMessage(null); }}
+            >
+              <LogIn size={15} />
+              <span>Вход</span>
+            </button>
+            <button
+              type="button"
+              className={`auth-mode-tab-btn ${mode === 'register' ? 'active' : ''}`}
+              onClick={() => { setMode('register'); setStep(1); setErrorMessage(null); }}
+            >
+              <UserPlus size={15} />
+              <span>Регистрация</span>
+            </button>
+          </div>
         </div>
 
         {errorMessage && (
@@ -130,13 +168,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {loginSuccessMessage ? (
           <div className="auth-success-screen">
             <div className="auth-success-icon">
-              <CheckCircle2 size={48} color="#10B981" />
+              <CheckCircle2 size={54} color="#10B981" />
             </div>
-            <h3>{mode === 'login' ? 'Успешный вход!' : 'Аккаунт успешно создан!'}</h3>
-            <p>Добро пожаловать в экосистему New Age, <b>{currentUser.name}</b></p>
+            <h3>{mode === 'login' ? 'Успешная авторизация!' : 'Добро пожаловать в New Age!'}</h3>
+            <p>Вы вошли как <b>{currentUser.name}</b> (@{currentUser.username})</p>
           </div>
         ) : (
           <>
+            {/* Quick Demo Login Option */}
+            {mode === 'login' && (
+              <div className="demo-quick-login-banner" onClick={() => {
+                login('alex_mironov');
+                setLoginSuccessMessage(true);
+                setTimeout(() => {
+                  onSuccess?.();
+                  onClose();
+                  setLoginSuccessMessage(false);
+                }, 600);
+              }}>
+                <div className="demo-login-badge">Быстрый тест</div>
+                <div className="demo-login-text">
+                  <strong>Войти как Алексей Миронов</strong>
+                  <span>Демо-аккаунт создателя с заполненными публикациями</span>
+                </div>
+                <ArrowRight size={16} className="demo-arrow" />
+              </div>
+            )}
+
             {/* OAuth Buttons */}
             {step === 1 && (
               <div className="oauth-row">
@@ -159,7 +217,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             )}
 
-            {step === 1 && <div className="auth-divider"><span>или через почту/телефон</span></div>}
+            {step === 1 && <div className="auth-divider"><span>или с логином и паролем</span></div>}
 
             <form onSubmit={handleNextOrSubmit} className="auth-form">
               {mode === 'login' && (

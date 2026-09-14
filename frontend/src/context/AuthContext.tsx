@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { currentUser as defaultCurrentUser, type User, type UserRole, type BeliefPrivacy } from '../data/mock';
 
 export interface RegisteredAccount {
@@ -45,11 +45,32 @@ interface AuthContextType {
 const STORAGE_KEY_USER = 'new_age_current_user';
 const STORAGE_KEY_ACCOUNTS = 'new_age_registered_accounts';
 
+export const GUEST_USER: User = {
+  id: 'guest',
+  name: 'Гость',
+  username: 'guest',
+  avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
+  coverImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+  bio: 'Гостевой просмотр New Age. Войдите или зарегистрируйтесь, чтобы создать профиль, публиковать контент и общаться.',
+  website: '',
+  location: 'Планета Земля',
+  online: false,
+  followersCount: 0,
+  followingCount: 0,
+  criticsCount: 0,
+  postsCount: 0,
+  role: 'user',
+  beliefType: 'Не указано',
+  beliefPrivacy: 'private',
+  verified: false
+};
+
 const defaultDemoAccount: RegisteredAccount = {
   id: 'me',
   name: defaultCurrentUser.name,
   username: defaultCurrentUser.username,
   emailOrPhone: 'alex@newage.com',
+  password: 'password123',
   avatar: defaultCurrentUser.avatar,
   coverImage: defaultCurrentUser.coverImage,
   bio: defaultCurrentUser.bio,
@@ -69,7 +90,12 @@ const defaultDemoAccount: RegisteredAccount = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // 1. Load registered accounts from localStorage or seed with default
+  // 1. Is Authenticated: defaults to false if not explicitly set to 'true'
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('new_age_is_auth') === 'true';
+  });
+
+  // 2. Load registered accounts from localStorage or seed with default demo account
   const [allAccounts, setAllAccounts] = useState<RegisteredAccount[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_ACCOUNTS);
@@ -83,23 +109,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return [defaultDemoAccount];
   });
 
-  // 2. Load active user
+  // 3. Load active user or Guest
   const [activeUser, setActiveUser] = useState<User>(() => {
+    const isAuth = localStorage.getItem('new_age_is_auth') === 'true';
+    if (!isAuth) {
+      return GUEST_USER;
+    }
     try {
       const saved = localStorage.getItem(STORAGE_KEY_USER);
       if (saved) {
         const parsed = JSON.parse(saved);
-        Object.assign(defaultCurrentUser, parsed);
-        return parsed;
+        if (parsed && parsed.id !== 'guest') {
+          Object.assign(defaultCurrentUser, parsed);
+          return parsed;
+        }
       }
     } catch {
       // ignore
     }
-    return defaultCurrentUser;
-  });
-
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('new_age_is_auth') !== 'false';
+    return defaultDemoAccount;
   });
 
   // Keep localStorage and mock defaultCurrentUser in sync
@@ -108,9 +136,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [allAccounts]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(activeUser));
-    localStorage.setItem('new_age_is_auth', isAuthenticated ? 'true' : 'false');
-    Object.assign(defaultCurrentUser, activeUser);
+    if (isAuthenticated) {
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(activeUser));
+      localStorage.setItem('new_age_is_auth', 'true');
+      Object.assign(defaultCurrentUser, activeUser);
+    } else {
+      localStorage.setItem('new_age_is_auth', 'false');
+      localStorage.removeItem(STORAGE_KEY_USER);
+    }
   }, [activeUser, isAuthenticated]);
 
   const register = (data: {
@@ -192,6 +225,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    setActiveUser(GUEST_USER);
     setIsAuthenticated(false);
   };
 
