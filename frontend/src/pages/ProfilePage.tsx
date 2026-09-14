@@ -248,7 +248,17 @@ export function ProfilePage() {
                 </span>
               )}
 
-              <span className="profile-username">@{activeUser.username}</span>
+              <button 
+                type="button"
+                className="profile-username-pill"
+                onClick={() => {
+                  navigator.clipboard?.writeText(`@${activeUser.username}`);
+                  alert(`Уникальный ID @${activeUser.username} скопирован в буфер!`);
+                }}
+                title="Уникальный ID пользователя. Нажмите, чтобы скопировать"
+              >
+                @{activeUser.username}
+              </button>
             </div>
 
             {activeUser.bio && <p className="profile-bio">{activeUser.bio}</p>}

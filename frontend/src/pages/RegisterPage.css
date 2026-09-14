@@ -461,6 +461,38 @@
   color: var(--color-text);
 }
 
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.username-status-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.username-status-badge.checking {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--color-accent);
+}
+
+.username-status-badge.available {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10B981;
+}
+
+.username-status-badge.taken,
+.username-status-badge.invalid {
+  background: rgba(239, 68, 68, 0.12);
+  color: #EF4444;
+}
+
 .form-input-box {
   display: flex;
   align-items: center;
@@ -472,10 +504,52 @@
   transition: all 0.2s ease;
 }
 
+.form-input-box.success {
+  border-color: #10B981;
+  background: rgba(16, 185, 129, 0.03);
+}
+
+.form-input-box.error {
+  border-color: #EF4444;
+  background: rgba(239, 68, 68, 0.03);
+}
+
 .form-input-box:focus-within {
   border-color: var(--color-accent);
   background: var(--color-bg-card);
   box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+
+.form-input-box.success:focus-within {
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.form-input-box.error:focus-within {
+  border-color: #EF4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.field-hint-text {
+  font-size: 0.74rem;
+  color: var(--color-text-tertiary);
+  margin-top: 0.15rem;
+  transition: color 0.15s ease;
+}
+
+.field-hint-text.available {
+  color: #10B981;
+  font-weight: 600;
+}
+
+.field-hint-text.taken,
+.field-hint-text.invalid {
+  color: #EF4444;
+  font-weight: 600;
+}
+
+.field-hint-text.checking {
+  color: var(--color-accent);
 }
 
 .field-icon {

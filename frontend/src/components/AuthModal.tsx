@@ -73,8 +73,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     // Mode: register
     if (step === 1) {
-      if (!name.trim() || !username.trim() || !emailOrPhone.trim() || !password) {
+      const cleanUser = username.trim().toLowerCase().replace(/^@/, '');
+      if (!name.trim() || !cleanUser || !emailOrPhone.trim() || !password) {
         setErrorMessage(t('auth.modal.err_fill_all'));
+        return;
+      }
+      if (!/^[a-z0-9_]{3,30}$/.test(cleanUser)) {
+        setErrorMessage('Уникальный ID должен содержать только латинские буквы, цифры и _ (от 3 до 30 символов)');
         return;
       }
       if (password.length < 6) {

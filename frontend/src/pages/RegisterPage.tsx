@@ -34,6 +34,8 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
   // Registration form state
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
+  const [usernameFeedback, setUsernameFeedback] = useState<string>('');
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -53,14 +55,76 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
 
   const selectedReligion = RELIGIONS_CATALOG.find(r => r.id === selectedBeliefId) || RELIGIONS_CATALOG[0];
 
+  // Real-time username check debounced
+  const handleUsernameChange = (val: string) => {
+    // Sanitize: allow lowercase Latin, numbers and underscore, auto-strip leading @
+    const clean = val.toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_]/g, '');
+    setUsername(clean);
+
+    if (!clean) {
+      setUsernameStatus('idle');
+      setUsernameFeedback('');
+      return;
+    }
+
+    if (clean.length < 3) {
+      setUsernameStatus('invalid');
+      setUsernameFeedback('Минимум 3 символа');
+      return;
+    }
+
+    if (clean.length > 30) {
+      setUsernameStatus('invalid');
+      setUsernameFeedback('Максимум 30 символов');
+      return;
+    }
+
+    setUsernameStatus('checking');
+    setUsernameFeedback('Проверяем доступность ID...');
+
+    // Call API debounced
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(clean)}`);
+        const json = await res.json();
+        if (json?.data?.available) {
+          setUsernameStatus('available');
+          setUsernameFeedback(`@${clean} свободен`);
+        } else {
+          setUsernameStatus('taken');
+          setUsernameFeedback(json?.data?.message || `@${clean} уже занят`);
+        }
+      } catch {
+        setUsernameStatus('available');
+        setUsernameFeedback(`@${clean} доступен`);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  };
+
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!name.trim() || !username.trim() || !emailOrPhone.trim() || !password) {
+    const cleanUser = username.trim().toLowerCase().replace(/^@/, '');
+
+    if (!name.trim() || !cleanUser || !emailOrPhone.trim() || !password) {
       setErrorMessage(t('auth.modal.err_fill_all'));
       return;
     }
+
+    // Strict validation for unique ID
+    if (!/^[a-z0-9_]{3,30}$/.test(cleanUser)) {
+      setErrorMessage('Уникальный ID должен состоять из латинских букв, цифр или _ (от 3 до 30 символов)');
+      return;
+    }
+
+    if (usernameStatus === 'taken') {
+      setErrorMessage(`ID @${cleanUser} уже занят. Пожалуйста, придумайте другой уникальный ID`);
+      return;
+    }
+
     if (password.length < 6) {
       setErrorMessage(t('auth.modal.err_password_len'));
       return;
@@ -420,17 +484,38 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                       </div>
 
                       <div className="form-group-field">
-                        <label>{t('auth.modal.username_label')} *</label>
-                        <div className="form-input-box">
+                        <div className="field-label-row">
+                          <label>{t('auth.modal.username_label')} *</label>
+                          {username && (
+                            <span className={`username-status-badge ${usernameStatus}`}>
+                              {usernameStatus === 'checking' && '⏳ Проверка...'}
+                              {usernameStatus === 'available' && '✓ Свободен'}
+                              {usernameStatus === 'taken' && '✕ Занят'}
+                              {usernameStatus === 'invalid' && '✕ Недопустимый'}
+                            </span>
+                          )}
+                        </div>
+                        <div className={`form-input-box ${usernameStatus === 'available' ? 'success' : usernameStatus === 'taken' || usernameStatus === 'invalid' ? 'error' : ''}`}>
                           <span className="field-icon-at">@</span>
                           <input 
                             type="text" 
-                            placeholder="username" 
+                            placeholder="claower_3d" 
                             value={username}
-                            onChange={(e) => setUsername(e.target.value)}
+                            onChange={(e) => handleUsernameChange(e.target.value)}
                             required 
+                            autoComplete="username"
                           />
                         </div>
+                        {usernameFeedback && (
+                          <span className={`field-hint-text ${usernameStatus}`}>
+                            {usernameFeedback}
+                          </span>
+                        )}
+                        {!usernameFeedback && (
+                          <span className="field-hint-text">
+                            Уникальный ID профиля: a-z, 0-9, _
+                          </span>
+                        )}
                       </div>
 
                       <div className="form-group-field full-width">

@@ -9,9 +9,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -364,6 +366,7 @@ func main() {
 	mux.HandleFunc("POST /api/auth/register", handleRegister)
 	mux.HandleFunc("POST /api/auth/login", handleLogin)
 	mux.HandleFunc("GET /api/auth/me", handleAuthMe)
+	mux.HandleFunc("GET /api/auth/check-username", handleCheckUsername)
 
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
@@ -597,6 +600,67 @@ func handleAdminStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: stats})
 }
 
+// GET /api/auth/check-username?username=... — Проверка доступности уникального @username
+func handleCheckUsername(w http.ResponseWriter, r *http.Request) {
+	raw := strings.TrimSpace(r.URL.Query().Get("username"))
+	username := strings.ToLower(strings.TrimPrefix(raw, "@"))
+
+	if username == "" {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"available": false, "message": "ID не может быть пустым"}})
+		return
+	}
+
+	matched, _ := regexp.MatchString(`^[a-z0-9_]{3,30}$`, username)
+	if !matched {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{
+			"available": false,
+			"message":   "Только латинские буквы a-z, цифры 0-9 и _ (от 3 до 30 знаков)",
+		}})
+		return
+	}
+
+	// Проверка в PostgreSQL
+	if db != nil {
+		var count int
+		err := db.QueryRow("SELECT COUNT(*) FROM users WHERE LOWER(username) = $1", username).Scan(&count)
+		if err == nil && count > 0 {
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{
+				"available": false,
+				"message":   fmt.Sprintf("ID @%s уже занят", username),
+			}})
+			return
+		}
+	}
+
+	// Проверка в памяти
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+	for _, entry := range store.accounts {
+		if strings.ToLower(entry.User.Username) == username {
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{
+				"available": false,
+				"message":   fmt.Sprintf("ID @%s уже занят", username),
+			}})
+			return
+		}
+	}
+
+	for _, u := range mockUsers {
+		if strings.ToLower(u.Username) == username {
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{
+				"available": false,
+				"message":   fmt.Sprintf("ID @%s уже занят", username),
+			}})
+			return
+		}
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{
+		"available": true,
+		"message":   fmt.Sprintf("ID @%s свободен", username),
+	}})
+}
+
 // POST /api/auth/register — Реальная регистрация с хешированием пароля и выдачей JWT
 func handleRegister(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -622,18 +686,44 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Валидация формата уникального ID (@username)
+	matched, _ := regexp.MatchString(`^[a-z0-9_]{3,30}$`, cleanUsername)
+	if !matched {
+		writeJSON(w, http.StatusBadRequest, Response{
+			Status:  "error",
+			Message: "ID пользователя может содержать только латинские буквы, цифры и символ подчеркивания (от 3 до 30 символов)",
+		})
+		return
+	}
+
 	if len(req.Password) < 6 {
 		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Пароль должен содержать не менее 6 символов"})
 		return
 	}
 
+	// Проверка уникальности в PostgreSQL
+	if db != nil {
+		var count int
+		err := db.QueryRow("SELECT COUNT(*) FROM users WHERE LOWER(username) = $1", cleanUsername).Scan(&count)
+		if err == nil && count > 0 {
+			writeJSON(w, http.StatusConflict, Response{Status: "error", Message: fmt.Sprintf("ID @%s уже занят. Выберите другой уникальный ID", cleanUsername)})
+			return
+		}
+		var emailCount int
+		err = db.QueryRow("SELECT COUNT(*) FROM users WHERE LOWER(email_or_phone) = $1", cleanEmailOrPhone).Scan(&emailCount)
+		if err == nil && emailCount > 0 {
+			writeJSON(w, http.StatusConflict, Response{Status: "error", Message: "Аккаунт с таким email или телефоном уже существует в базе"})
+			return
+		}
+	}
+
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	// Проверка на существующего пользователя
+	// Проверка на существующего пользователя в памяти
 	for _, entry := range store.accounts {
 		if strings.ToLower(entry.User.Username) == cleanUsername {
-			writeJSON(w, http.StatusConflict, Response{Status: "error", Message: "Пользователь с таким никнеймом уже зарегистрирован"})
+			writeJSON(w, http.StatusConflict, Response{Status: "error", Message: fmt.Sprintf("ID @%s уже занят другим пользователем", cleanUsername)})
 			return
 		}
 		if strings.ToLower(entry.EmailOrPhone) == cleanEmailOrPhone {
@@ -673,19 +763,11 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	// Сохранение в PostgreSQL, если БД подключена
 	if db != nil {
-		// Проверка дубликатов в БД
-		var existingCount int
-		err := db.QueryRow("SELECT COUNT(*) FROM users WHERE LOWER(username) = $1 OR LOWER(email_or_phone) = $2", cleanUsername, cleanEmailOrPhone).Scan(&existingCount)
-		if err == nil && existingCount > 0 {
-			writeJSON(w, http.StatusConflict, Response{Status: "error", Message: "Пользователь с таким никнеймом или email/телефоном уже существует в базе"})
-			return
-		}
-
 		insertQuery := `
 		INSERT INTO users (id, name, username, email_or_phone, password_hash, salt, avatar, role, belief_type, belief_privacy, followers_count, following_count, critics_count, posts_count, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		`
-		_, err = db.Exec(insertQuery, newID, newUser.Name, cleanUsername, cleanEmailOrPhone, hash, salt, avatar, role, req.BeliefType, req.BeliefPrivacy, 1, 0, 0, 0, time.Now())
+		_, err := db.Exec(insertQuery, newID, newUser.Name, cleanUsername, cleanEmailOrPhone, hash, salt, avatar, role, req.BeliefType, req.BeliefPrivacy, 1, 0, 0, 0, time.Now())
 		if err != nil {
 			log.Printf("⚠️ Ошибка сохранения пользователя в Postgres: %v", err)
 		} else {
