@@ -1,5 +1,5 @@
 .sidebar {
-  width: var(--sidebar-width);
+  width: var(--sidebar-collapsed-width);
   height: 100vh;
   background: var(--color-bg-card);
   border-right: 1px solid var(--color-border);
@@ -8,19 +8,28 @@
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 50;
-  box-shadow: var(--shadow-sm);
+  z-index: 100;
+  box-shadow: 2px 0 12px rgba(15, 23, 42, 0.04);
+  transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s ease;
+  overflow-x: hidden;
+}
+
+.sidebar:hover {
+  width: var(--sidebar-width);
+  box-shadow: 8px 0 28px rgba(15, 23, 42, 0.12);
 }
 
 .sidebar-header {
   height: 76px;
-  padding: 0 1.15rem;
+  padding: 0 0.85rem;
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--color-border-light);
   cursor: pointer;
   background: var(--color-bg-card);
   transition: background 0.2s ease;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .sidebar-header:hover {
@@ -40,11 +49,13 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  width: 44px;
+  height: 44px;
 }
 
 .brand-logo-img {
-  width: 54px;
-  height: 54px;
+  width: 44px;
+  height: 44px;
   border-radius: 12px;
   object-fit: cover;
   background: transparent;
@@ -63,6 +74,17 @@
 .brand-text-block {
   display: flex;
   flex-direction: column;
+  opacity: 0;
+  transform: translateX(-10px);
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  white-space: nowrap;
+}
+
+.sidebar:hover .brand-text-block {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .demo-badge {
@@ -87,11 +109,12 @@
 
 .sidebar-nav {
   flex: 1;
-  padding: 0.85rem 0.75rem;
+  padding: 0.85rem 0.55rem;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
   overflow-y: auto;
+  overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: var(--color-border) transparent;
 }
@@ -112,6 +135,17 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--color-text-tertiary);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+.sidebar:hover .nav-section-title {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .nav-section-divider {
@@ -126,6 +160,15 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.4rem 0.5rem 0.2rem 0.85rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar:hover .services-section-header {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .services-accordion-toggle {
@@ -185,7 +228,7 @@
 
 /* Services Subnav */
 .services-subnav {
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 0.15rem;
   padding-left: 0.4rem;
@@ -193,6 +236,10 @@
   margin-left: 1.25rem;
   margin-top: 0.25rem;
   margin-bottom: 0.35rem;
+}
+
+.sidebar:hover .services-subnav {
+  display: flex;
 }
 
 .sub-nav-item {
@@ -212,6 +259,8 @@
   text-decoration: none;
   transition: all var(--transition-fast);
   position: relative;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .nav-item:hover {
@@ -248,6 +297,16 @@
 
 .nav-label {
   flex: 1;
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar:hover .nav-label {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .nav-badge {
@@ -258,6 +317,25 @@
   padding: 0.12rem 0.48rem;
   border-radius: 999px;
   line-height: 1;
+  transition: all 0.2s ease;
+}
+
+/* On collapsed sidebar, position the badge compactly next to icon */
+.sidebar:not(:hover) .nav-badge {
+  position: absolute;
+  top: 6px;
+  left: 28px;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.65rem;
+}
+
+.nav-lock-badge {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.sidebar:hover .nav-lock-badge {
+  opacity: 1;
 }
 
 .live-dot {
@@ -267,6 +345,13 @@
   background: #10B981;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
   animation: pulse-live 2s infinite;
+  transition: all 0.2s ease;
+}
+
+.sidebar:not(:hover) .live-dot {
+  position: absolute;
+  top: 8px;
+  left: 32px;
 }
 
 @keyframes pulse-live {
@@ -276,19 +361,22 @@
 }
 
 .sidebar-footer {
-  padding: 0.85rem;
+  padding: 0.85rem 0.55rem;
   border-top: 1px solid var(--color-border);
   background: var(--color-bg-card);
+  overflow: hidden;
 }
 
 .user-profile-card {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.5rem 0.65rem;
+  padding: 0.45rem 0.5rem;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .user-profile-card:hover {
@@ -325,6 +413,16 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar:hover .footer-user-info {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .footer-user-name {
@@ -349,12 +447,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.6rem 0.75rem;
+  padding: 0.5rem 0.55rem;
   border-radius: 12px;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .sidebar-guest-card:hover {
@@ -368,6 +468,7 @@
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  flex-shrink: 0;
 }
 
 .guest-avatar-ring {
@@ -380,6 +481,7 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
 }
 
 .guest-icon {
@@ -389,6 +491,16 @@
 .guest-text-block {
   display: flex;
   flex-direction: column;
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar:hover .guest-text-block {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
 }
 
 .guest-title {
@@ -413,7 +525,14 @@
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
-  transition: all 0.15s ease;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar:hover .guest-login-arrow-btn {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .guest-login-arrow-btn:hover {
@@ -481,6 +600,33 @@
 .spiritual-sub-badge.promo-badge {
   background: linear-gradient(135deg, #EC4899, #8B5CF6);
   color: #FFFFFF;
+}
+
+/* Collapsed Mini Section Icons */
+.sidebar-section-collapsed-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sidebar-section-collapsed-icon:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-accent);
+  transform: scale(1.1);
+}
+
+.sidebar:hover .sidebar-section-collapsed-icon {
+  display: none;
+}
+
+.sidebar:not(:hover) .services-section-header,
+.sidebar:not(:hover) .services-subnav {
+  display: none !important;
 }
 
 @media (max-width: 768px) {

@@ -58,6 +58,7 @@
 
   /* Размеры */
   --sidebar-width: 260px;
+  --sidebar-collapsed-width: 72px;
   --header-height: 68px;
   --radius-xs: 6px;
   --radius-sm: 10px;

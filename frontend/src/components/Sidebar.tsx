@@ -113,6 +113,15 @@ export function Sidebar() {
         {/* SECTION: САМОПОЗНАНИЕ & ДУХОВНЫЕ ПРАКТИКИ */}
         <div className="nav-section-divider" />
         
+        {/* Collapsed Shortcut Icon */}
+        <NavLink 
+          to="/spiritual" 
+          className={({ isActive }) => `sidebar-section-collapsed-icon ${isActive ? 'active' : ''}`}
+          title="Самопознание и практики"
+        >
+          <Sparkles className="nav-icon spiritual-star-icon" size={19} />
+        </NavLink>
+
         <div className="services-section-header spiritual-section-header">
           <button 
             type="button" 
@@ -285,6 +294,15 @@ export function Sidebar() {
         {/* SECTION 2: SERVICES ACCORDION & HUB */}
         <div className="nav-section-divider" />
         
+        {/* Collapsed Shortcut Icon */}
+        <NavLink 
+          to="/services" 
+          className={({ isActive }) => `sidebar-section-collapsed-icon ${isActive ? 'active' : ''}`}
+          title="Сервисы и инструменты"
+        >
+          <Layers className="nav-icon" size={19} />
+        </NavLink>
+
         <div className="services-section-header">
           <button 
             type="button" 
