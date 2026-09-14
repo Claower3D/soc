@@ -3,21 +3,109 @@
 export type UserRole = 'user' | 'creator' | 'business' | 'admin';
 export type BeliefPrivacy = 'public' | 'followers' | 'private';
 
-export const BELIEF_OPTIONS = [
-  'Не указано',
-  'Христианство (Православие)',
-  'Христианство (Католицизм)',
-  'Христианство (Протестантизм)',
-  'Ислам (Суннизм)',
-  'Ислам (Шиизм)',
-  'Буддизм',
-  'Иудаизм',
-  'Индуизм',
-  'Агностицизм',
-  'Атеизм / Светский гуманизм',
-  'Тенгрианство',
-  'Другое'
-] as const;
+export interface ReligionItem {
+  id: string;
+  name: string;
+  symbolTitle: string;
+  iconImg: string;
+  description: string;
+}
+
+export const RELIGIONS_CATALOG: ReligionItem[] = [
+  {
+    id: 'christianity',
+    name: 'Христианство',
+    symbolTitle: 'Крест',
+    iconImg: '/symbols/christianity.jpg',
+    description: 'Вера в Иисуса Христа, любовь к ближнему и спасение'
+  },
+  {
+    id: 'islam',
+    name: 'Ислам',
+    symbolTitle: 'Полумесяц и Звезда',
+    iconImg: '/symbols/islam.jpg',
+    description: 'Единобожие (Таухид), следование Корану и Сунне'
+  },
+  {
+    id: 'judaism',
+    name: 'Иудаизм',
+    symbolTitle: 'Звезда Давида (Маген Давид)',
+    iconImg: '/symbols/judaism.jpg',
+    description: 'Завет с Всевышним, Тора, этический монотеизм'
+  },
+  {
+    id: 'hinduism',
+    name: 'Индуизм',
+    symbolTitle: 'Ом (Аум)',
+    iconImg: '/symbols/hinduism.jpg',
+    description: 'Дхарма, карма, сансара, мокша и сакральный звук Ом'
+  },
+  {
+    id: 'buddhism',
+    name: 'Буддизм',
+    symbolTitle: 'Колесо Дхармы (Дхармачакра)',
+    iconImg: '/symbols/buddhism.jpg',
+    description: 'Благородный восьмеричный путь, осознанность и просветление'
+  },
+  {
+    id: 'taoism',
+    name: 'Даосизм',
+    symbolTitle: 'Инь-Ян',
+    iconImg: '/symbols/taoism.jpg',
+    description: 'Путь Дао, гармония противоположностей и естественность'
+  },
+  {
+    id: 'shinto',
+    name: 'Синтоизм',
+    symbolTitle: 'Тории',
+    iconImg: '/symbols/shinto.jpg',
+    description: 'Почитание духов природы (Ками), чистота и гармония'
+  },
+  {
+    id: 'jainism',
+    name: 'Джайнизм',
+    symbolTitle: 'Ахимса (Рука)',
+    iconImg: '/symbols/jainism.jpg',
+    description: 'Ненасилие (Ахимса), самодисциплина и уважение к жизни'
+  },
+  {
+    id: 'sikhism',
+    name: 'Сикхизм',
+    symbolTitle: 'Кханда',
+    iconImg: '/symbols/sikhism.jpg',
+    description: 'Служение людям, равенство, честность и медитация на Имя Бога'
+  },
+  {
+    id: 'zoroastrianism',
+    name: 'Зороастризм',
+    symbolTitle: 'Фаравахар',
+    iconImg: '/symbols/zoroastrianism.jpg',
+    description: 'Благие мысли, благие слова, благие деяния'
+  },
+  {
+    id: 'ayyavazhi',
+    name: 'Айяважи',
+    symbolTitle: 'Ловец Зла (Нама)',
+    iconImg: '/symbols/ayyavazhi.jpg',
+    description: 'Победа света над тьмой и духовное единство'
+  },
+  {
+    id: 'humanism',
+    name: 'Гуманизм / Светский человек',
+    symbolTitle: 'Счастливый Человек',
+    iconImg: '/symbols/humanism.jpg',
+    description: 'Человек, наука, разум, созидание и свобода совести'
+  },
+  {
+    id: 'none',
+    name: 'Не указывать / Личное',
+    symbolTitle: 'Скрыто',
+    iconImg: '',
+    description: 'Предпочитаю не указывать мировоззрение'
+  }
+];
+
+export const BELIEF_OPTIONS = RELIGIONS_CATALOG.map(r => r.name);
 
 export interface User {
   id: string;

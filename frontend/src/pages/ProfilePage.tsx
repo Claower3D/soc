@@ -6,7 +6,7 @@ import {
   UserCheck, UserPlus, Share2, Edit3, Heart, MessageSquare,
   CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield
 } from 'lucide-react';
-import { currentUser, initialUsers, posts, videos, podcasts, initialProducts, type User, type Post } from '../data/mock';
+import { currentUser, initialUsers, posts, videos, podcasts, initialProducts, RELIGIONS_CATALOG, type User, type Post } from '../data/mock';
 import { FollowersModal } from '../components/FollowersModal';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { EditProfileModal } from '../components/EditProfileModal';
@@ -180,19 +180,33 @@ export function ProfilePage() {
                 </a>
               )}
               {/* Чувствительные данные (мировоззрение/вероисповедание с защитой приватности) */}
-              {activeUser.beliefType && activeUser.beliefType !== 'Не указано' && (
-                (isMe || activeUser.beliefPrivacy === 'public' || (activeUser.beliefPrivacy === 'followers' && isFollowing)) && (
-                  <div 
-                    className="meta-item meta-belief" 
-                    title={isMe ? `Видимость: ${activeUser.beliefPrivacy === 'private' ? 'Только мне (Скрыто)' : activeUser.beliefPrivacy === 'followers' ? 'Только подписчикам' : 'Публично'}` : 'Мировоззрение'}
-                  >
-                    <Compass size={15} />
-                    <span>{activeUser.beliefType}</span>
-                    {isMe && activeUser.beliefPrivacy === 'private' && (
-                      <span className="belief-privacy-badge" title="Скрыто от других"><Shield size={11} /></span>
-                    )}
-                  </div>
-                )
+              {activeUser.beliefType && activeUser.beliefType !== 'Не указано' && activeUser.beliefType !== 'Не указывать / Личное' && (
+                (isMe || activeUser.beliefPrivacy === 'public' || (activeUser.beliefPrivacy === 'followers' && isFollowing)) && (() => {
+                  const religion = RELIGIONS_CATALOG.find(r => r.name === activeUser.beliefType);
+                  return (
+                    <div 
+                      className="meta-item meta-belief" 
+                      title={isMe ? `Видимость: ${activeUser.beliefPrivacy === 'private' ? 'Только мне (Скрыто)' : activeUser.beliefPrivacy === 'followers' ? 'Только подписчикам' : 'Публично'}` : 'Мировоззрение'}
+                    >
+                      {religion?.iconImg ? (
+                        <img 
+                          src={religion.iconImg} 
+                          alt={religion.name} 
+                          className="meta-belief-symbol"
+                        />
+                      ) : (
+                        <Compass size={15} />
+                      )}
+                      <span>{activeUser.beliefType}</span>
+                      {religion?.symbolTitle && (
+                        <span className="meta-belief-symbol-name">({religion.symbolTitle})</span>
+                      )}
+                      {isMe && activeUser.beliefPrivacy === 'private' && (
+                        <span className="belief-privacy-badge" title="Скрыто от других"><Shield size={11} /></span>
+                      )}
+                    </div>
+                  );
+                })()
               )}
             </div>
           </div>

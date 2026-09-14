@@ -1,7 +1,7 @@
-.auth-modal-backdrop {
+﻿.auth-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(8px);
   z-index: 1000;
   display: flex;
@@ -17,12 +17,13 @@
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-xl);
   width: 100%;
-  max-width: 480px;
-  max-height: 90vh;
+  max-width: 540px;
+  max-height: 92vh;
   overflow-y: auto;
   position: relative;
   padding: 2rem 2.25rem;
   animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  scrollbar-width: thin;
 }
 
 .auth-modal-close {
@@ -77,6 +78,33 @@
   line-height: 1.4;
 }
 
+/* Success Screen */
+.auth-success-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.auth-success-icon {
+  margin-bottom: 1rem;
+  animation: pulse-live 1.5s infinite;
+}
+
+.auth-success-screen h3 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--color-text);
+  margin-bottom: 0.5rem;
+}
+
+.auth-success-screen p {
+  font-size: 0.92rem;
+  color: var(--color-text-secondary);
+}
+
 /* OAuth */
 .oauth-row {
   display: grid;
@@ -103,7 +131,7 @@
 
 .oauth-btn:hover {
   background: var(--color-bg-secondary);
-  border-color: var(--color-text-tertiary);
+  border-color: #CBD5E1;
 }
 
 .auth-divider {
@@ -111,22 +139,23 @@
   align-items: center;
   text-align: center;
   margin: 1.25rem 0;
-  color: var(--color-text-tertiary);
-  font-size: 0.75rem;
 }
 
 .auth-divider::before,
 .auth-divider::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .auth-divider span {
   padding: 0 0.75rem;
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-/* Form Fields */
 .auth-form {
   display: flex;
   flex-direction: column;
@@ -160,14 +189,15 @@
 
 .auth-at {
   position: absolute;
-  left: 0.95rem;
-  color: var(--color-text-tertiary);
+  left: 0.85rem;
   font-weight: 700;
+  color: var(--color-accent);
+  font-size: 0.95rem;
 }
 
 .auth-input-wrapper input {
   width: 100%;
-  padding: 0.65rem 0.85rem 0.65rem 2.5rem;
+  padding: 0.65rem 1rem 0.65rem 2.4rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: 0.88rem;
@@ -178,33 +208,58 @@
 }
 
 .auth-input-wrapper input:focus {
-  border-color: var(--color-accent);
   background: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.auth-extras {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.forgot-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
 }
 
 .auth-submit-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  width: 100%;
-  padding: 0.75rem;
+  padding: 0.8rem 1.5rem;
   background: var(--color-accent);
   color: #FFFFFF;
   border: none;
   border-radius: var(--radius-md);
   font-size: 0.92rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
   transition: all var(--transition-fast);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
   margin-top: 0.5rem;
 }
 
 .auth-submit-btn:hover:not(:disabled) {
   background: var(--color-accent-hover);
   transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
 }
 
 .auth-submit-btn:disabled {
@@ -212,11 +267,12 @@
   cursor: not-allowed;
 }
 
-/* Role Cards Grid */
+/* Section Step 2 */
 .auth-section {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
 }
 
 .auth-section-title {
@@ -225,76 +281,20 @@
   color: var(--color-text);
 }
 
-.role-cards-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.role-card {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 0.75rem 1rem;
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.role-card:hover {
-  background: #FFFFFF;
-  border-color: var(--color-accent-subtle);
-}
-
-.role-card.active {
-  background: rgba(99, 102, 241, 0.05);
-  border-color: var(--color-accent);
-}
-
-.role-icon-box {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-accent);
-  flex-shrink: 0;
-}
-
-.role-icon-box.creator {
-  color: #8B5CF6;
-}
-
-.role-icon-box.business {
-  color: #10B981;
-}
-
-.role-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.role-info strong {
-  font-size: 0.88rem;
-  color: var(--color-text);
-}
-
-.role-info span {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  line-height: 1.3;
-}
-
-/* Belief & Privacy */
 .belief-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.belief-title-flex {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.belief-compass-icon {
+  color: var(--color-accent);
 }
 
 .belief-tag-badge {
@@ -314,17 +314,198 @@
   line-height: 1.35;
 }
 
-.auth-select {
-  width: 100%;
-  padding: 0.65rem 0.85rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 0.86rem;
-  background: var(--color-bg-secondary);
-  color: var(--color-text);
-  outline: none;
+/* RELIGIONS GRID WITH SACRED GOLD ICONS */
+.religion-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 0.65rem;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 0.35rem 0.2rem;
+  scrollbar-width: thin;
 }
 
+.religion-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.65rem 0.4rem;
+  border-radius: 12px;
+  border: 1.5px solid var(--color-border);
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.religion-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+}
+
+.religion-card.selected {
+  border-color: #F59E0B;
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, rgba(99, 102, 241, 0.05) 100%);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35);
+}
+
+.religion-symbol-frame {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #080C1C;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.45rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 1.5px solid #F59E0B;
+  overflow: hidden;
+}
+
+.religion-symbol-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: -webkit-optimize-contrast;
+  transition: transform 0.2s ease;
+}
+
+.religion-card:hover .religion-symbol-img {
+  transform: scale(1.08);
+}
+
+.religion-check-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #10B981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.religion-text-block {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.religion-card-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.religion-card-symbol {
+  font-size: 0.68rem;
+  color: var(--color-text-tertiary);
+  margin-top: 1px;
+}
+
+.religion-none-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: 10px;
+  border: 1px dashed var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.religion-none-option:hover {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text);
+}
+
+.religion-none-option.selected {
+  border-color: var(--color-accent);
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* Role Cards Grid */
+.role-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+}
+
+.role-card {
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: #FFFFFF;
+}
+
+.role-card:hover {
+  border-color: #CBD5E1;
+  transform: translateY(-2px);
+}
+
+.role-card.active {
+  border-color: var(--color-accent);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.02) 100%);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.role-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.4rem;
+}
+
+.role-icon-box.creator {
+  background: rgba(236, 72, 153, 0.1);
+  color: #EC4899;
+}
+
+.role-icon-box.business {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10B981;
+}
+
+.role-info strong {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  margin-bottom: 0.15rem;
+}
+
+.role-info span {
+  font-size: 0.68rem;
+  color: var(--color-text-tertiary);
+  line-height: 1.25;
+  display: block;
+}
+
+/* Privacy toggle */
 .privacy-toggle-box {
   display: flex;
   align-items: center;
@@ -371,7 +552,7 @@
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
 }
 
 .terms-checkbox input {
@@ -449,5 +630,17 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 600px) {
+  .auth-modal-card {
+    padding: 1.5rem 1.2rem;
+  }
+  .role-cards-grid {
+    grid-template-columns: 1fr;
+  }
+  .religion-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
