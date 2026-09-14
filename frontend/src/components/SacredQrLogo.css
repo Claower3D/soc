@@ -1,0 +1,100 @@
+﻿/* ==========================================================================
+   SACRED QR LOGO COMPONENT STYLES
+   ========================================================================== */
+
+.sacred-qr-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+/* Rotating Sacred Halo Overlay */
+.sacred-qr-halo-svg {
+  position: absolute;
+  top: -12%;
+  left: -12%;
+  width: 124%;
+  height: 124%;
+  pointer-events: none;
+  z-index: 1;
+  filter: drop-shadow(0 0 12px var(--sacred-glow-color, rgba(168, 85, 247, 0.4)));
+}
+
+.halo-spin-slow {
+  transform-origin: 150px 150px;
+  animation: sacredSpin 30s linear infinite;
+}
+
+@keyframes sacredSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Inner Matrix Card with Smooth Corner & Shadow */
+.sacred-qr-matrix-card {
+  position: relative;
+  width: 82%;
+  height: 82%;
+  border-radius: 20px;
+  background: #FFFFFF;
+  border: 2px solid rgba(245, 158, 11, 0.4);
+  box-shadow: 
+    0 12px 36px rgba(0, 0, 0, 0.12),
+    0 0 20px rgba(99, 102, 241, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.sacred-qr-container:hover .sacred-qr-matrix-card {
+  transform: scale(1.02);
+  border-color: #F59E0B;
+  box-shadow: 
+    0 16px 48px rgba(0, 0, 0, 0.18),
+    0 0 30px rgba(245, 158, 11, 0.35);
+}
+
+.sacred-qr-matrix-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Center Emblem containing the Official Religions/Metatron Logo */
+.sacred-qr-center-emblem {
+  position: absolute;
+  width: 38%;
+  height: 38%;
+  border-radius: 50%;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    0 4px 14px rgba(0, 0, 0, 0.15),
+    0 0 12px rgba(245, 158, 11, 0.3);
+  padding: 4px;
+  z-index: 3;
+}
+
+.sacred-qr-center-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+  transition: transform 0.3s ease;
+}
+
+.sacred-qr-container:hover .sacred-qr-center-img {
+  transform: rotate(6deg) scale(1.05);
+}

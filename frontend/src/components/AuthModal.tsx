@@ -7,6 +7,7 @@ import { RELIGIONS_CATALOG, type UserRole, type BeliefPrivacy } from '../data/mo
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { LegalModal } from './LegalModal';
+import { SacredQrLogo } from './SacredQrLogo';
 import logoImg from '../assets/logo.png';
 import './AuthModal.css';
 
@@ -235,56 +236,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               )}
 
-              {/* QR-КОД ВХОД */}
+              {/* QR-КОД ВХОД С САХРАЛЬНЫМ ЛОГОТИПОМ ЭКОСИСТЕМЫ */}
               {mode === 'login' && loginMethod === 'qr' && (
                 <div className="qr-login-container">
-                  <div className="qr-box-wrapper">
-                    {/* Стильный SVG QR-код с брендовым центровым лого */}
-                    <div className="qr-code-frame">
-                      <svg viewBox="0 0 200 200" className="qr-svg-graphic">
-                        {/* QR Matrix Elements */}
-                        <rect width="200" height="200" fill="#FFFFFF" rx="12" />
-                        {/* Top-Left Corner Box */}
-                        <rect x="20" y="20" width="45" height="45" rx="6" fill="#1E293B" />
-                        <rect x="27" y="27" width="31" height="31" rx="4" fill="#FFFFFF" />
-                        <rect x="34" y="34" width="17" height="17" rx="3" fill="#6366F1" />
-
-                        {/* Top-Right Corner Box */}
-                        <rect x="135" y="20" width="45" height="45" rx="6" fill="#1E293B" />
-                        <rect x="142" y="27" width="31" height="31" rx="4" fill="#FFFFFF" />
-                        <rect x="149" y="34" width="17" height="17" rx="3" fill="#6366F1" />
-
-                        {/* Bottom-Left Corner Box */}
-                        <rect x="20" y="135" width="45" height="45" rx="6" fill="#1E293B" />
-                        <rect x="27" y="142" width="31" height="31" rx="4" fill="#FFFFFF" />
-                        <rect x="34" y="149" width="17" height="17" rx="3" fill="#6366F1" />
-
-                        {/* Data Pattern Mock */}
-                        <rect x="75" y="25" width="12" height="12" rx="2" fill="#1E293B" />
-                        <rect x="95" y="25" width="12" height="25" rx="2" fill="#6366F1" />
-                        <rect x="115" y="35" width="12" height="12" rx="2" fill="#1E293B" />
-                        <rect x="75" y="45" width="12" height="12" rx="2" fill="#8B5CF6" />
-                        <rect x="75" y="70" width="22" height="12" rx="2" fill="#1E293B" />
-                        <rect x="105" y="70" width="25" height="12" rx="2" fill="#1E293B" />
-                        <rect x="140" y="75" width="12" height="22" rx="2" fill="#6366F1" />
-                        <rect x="160" y="80" width="15" height="12" rx="2" fill="#1E293B" />
-                        <rect x="25" y="80" width="15" height="12" rx="2" fill="#1E293B" />
-                        <rect x="48" y="75" width="12" height="25" rx="2" fill="#6366F1" />
-
-                        <rect x="75" y="115" width="20" height="12" rx="2" fill="#1E293B" />
-                        <rect x="105" y="115" width="12" height="25" rx="2" fill="#6366F1" />
-                        <rect x="125" y="125" width="20" height="12" rx="2" fill="#1E293B" />
-                        <rect x="155" y="115" width="20" height="20" rx="2" fill="#8B5CF6" />
-                        <rect x="75" y="145" width="12" height="25" rx="2" fill="#6366F1" />
-                        <rect x="95" y="155" width="25" height="12" rx="2" fill="#1E293B" />
-                        <rect x="130" y="150" width="12" height="20" rx="2" fill="#1E293B" />
-                        <rect x="150" y="145" width="25" height="12" rx="2" fill="#6366F1" />
-
-                        {/* Center Emblem */}
-                        <circle cx="100" cy="100" r="20" fill="#FFFFFF" stroke="#E2E8F0" strokeWidth="2" />
-                        <circle cx="100" cy="100" r="14" fill="#6366F1" />
-                      </svg>
-                    </div>
+                  <div className="qr-sacred-stage">
+                    <SacredQrLogo size={220} />
                   </div>
 
                   <div className="qr-instructions">

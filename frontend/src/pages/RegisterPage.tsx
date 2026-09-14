@@ -9,6 +9,7 @@ import { RELIGIONS_CATALOG, type UserRole, type BeliefPrivacy } from '../data/mo
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { LegalModal } from '../components/LegalModal';
+import { SacredQrLogo } from '../components/SacredQrLogo';
 import logoImg from '../assets/logo.png';
 import './RegisterPage.css';
 
@@ -179,6 +180,12 @@ export function RegisterPage() {
                     <span>Полный суверенитет и приватность ваших данных</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Sacred QR Code Widget */}
+              <div className="side-banner-qr-block">
+                <SacredQrLogo size={150} />
+                <span className="side-qr-caption">Сканируйте сакральный QR для входа с телефона</span>
               </div>
 
               <div className="side-banner-footer">
