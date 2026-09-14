@@ -163,6 +163,11 @@
 [data-theme="dark"] .publish-modal-card,
 [data-theme="dark"] .purchase-modal-card,
 [data-theme="dark"] .service-card-item,
+[data-theme="dark"] .editor-top-nav,
+[data-theme="dark"] .preview-canvas-column,
+[data-theme="dark"] .editor-side-tools-column,
+[data-theme="dark"] .editor-timeline-section,
+[data-theme="dark"] .export-modal-box,
 [data-theme="dark"] .auth-modal-box {
   background: var(--color-bg-card) !important;
   border-color: var(--color-border) !important;
@@ -175,6 +180,10 @@
 [data-theme="dark"] .user-profile-card,
 [data-theme="dark"] .cat-pill-btn,
 [data-theme="dark"] .market-sort-box,
+[data-theme="dark"] .timeline-tracks-container,
+[data-theme="dark"] .aspect-ratio-selector,
+[data-theme="dark"] .speed-pills,
+[data-theme="dark"] .export-action-card,
 [data-theme="dark"] .timer-reset-btn {
   background: var(--color-bg-secondary) !important;
   border-color: var(--color-border) !important;
