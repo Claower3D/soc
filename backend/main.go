@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -14,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 // Response — стандартная обёртка для JSON-ответов API.
@@ -116,7 +119,69 @@ var jwtSecretKey = func() []byte {
 	return []byte(k)
 }()
 
-// Хранилище аккаунтов
+// Глобальное подключение к PostgreSQL (если задана DATABASE_URL)
+var db *sql.DB
+
+func initDB() {
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Println("ℹ️ Переменная DATABASE_URL не задана. Работа в in-memory режиме.")
+		return
+	}
+
+	var err error
+	db, err = sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Printf("⚠️ Ошибка открытия соединения с PostgreSQL: %v", err)
+		return
+	}
+
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	if err := db.Ping(); err != nil {
+		log.Printf("⚠️ Не удалось связаться с PostgreSQL (%v). Используется in-memory хранилище.", err)
+		return
+	}
+
+	log.Println("✅ Успешное подключение к PostgreSQL на Railway!")
+
+	// Создание таблицы пользователей при первом запуске
+	createTableQuery := `
+	CREATE TABLE IF NOT EXISTS users (
+		id VARCHAR(64) PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		username VARCHAR(100) UNIQUE NOT NULL,
+		email_or_phone VARCHAR(255) UNIQUE NOT NULL,
+		password_hash VARCHAR(255) NOT NULL,
+		salt VARCHAR(64) NOT NULL,
+		avatar TEXT,
+		cover_image TEXT,
+		bio TEXT,
+		website TEXT,
+		location TEXT,
+		role VARCHAR(50) DEFAULT 'user',
+		belief_type VARCHAR(100) DEFAULT '',
+		belief_privacy VARCHAR(50) DEFAULT 'public',
+		verified BOOLEAN DEFAULT FALSE,
+		followers_count INT DEFAULT 0,
+		following_count INT DEFAULT 0,
+		critics_count INT DEFAULT 0,
+		posts_count INT DEFAULT 0,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+	CREATE INDEX IF NOT EXISTS idx_users_email_or_phone ON users(email_or_phone);
+	`
+	if _, err := db.Exec(createTableQuery); err != nil {
+		log.Printf("⚠️ Ошибка создания таблицы users: %v", err)
+	} else {
+		log.Println("✅ Схема базы данных users проверена и готова к работе.")
+	}
+}
+
+// Хранилище аккаунтов (In-memory + fallback)
 type UserStore struct {
 	mu       sync.RWMutex
 	accounts map[string]AccountStoreEntry // key: userID
@@ -127,39 +192,25 @@ var store = &UserStore{
 }
 
 var currentUser = User{
-	ID:             "me",
-	Name:           "Алексей Миронов",
-	Username:       "alex_mironov",
-	Avatar:         "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
-	Bio:            "Fullstack разработчик на React + Go. Создатель светлой соцсети «Демо».",
-	Online:         true,
-	Role:           "creator",
-	BeliefType:     "Агностицизм",
-	BeliefPrivacy:  "public",
-	FollowersCount: 1420,
-	FollowingCount: 382,
-	PostsCount:     24,
+	ID:             "guest",
+	Name:           "Гость",
+	Username:       "guest",
+	Avatar:         "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80",
+	Bio:            "Гостевой доступ New Age",
+	Online:         false,
+	Role:           "user",
+	BeliefType:     "Не указано",
+	BeliefPrivacy:  "private",
+	FollowersCount: 0,
+	FollowingCount: 0,
+	PostsCount:     0,
 }
 
 var mockUsers = []User{
-	currentUser,
 	{ID: "1", Name: "Алиса Иванова", Username: "alice_iv", Avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80", Bio: "Product Designer & Фотограф", Online: true, FollowersCount: 8420, FollowingCount: 430, PostsCount: 156},
 	{ID: "2", Name: "Максим Петров", Username: "max_p", Avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80", Bio: "Frontend Architect & Автор подкастов", Online: true, FollowersCount: 15300, FollowingCount: 290, PostsCount: 84},
 	{ID: "3", Name: "Екатерина Смирнова", Username: "kate_s", Avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80", Bio: "UX Исследования & Дизайн мышление", Online: false, FollowersCount: 6890, FollowingCount: 512, PostsCount: 62},
 	{ID: "4", Name: "Дмитрий Козлов", Username: "dima_k", Avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80", Bio: "Tech Entrepreneur & Инновации", Online: true, FollowersCount: 22400, FollowingCount: 190, PostsCount: 110},
-}
-
-// Инициализация сидовых пользователей
-func init() {
-	salt := generateSalt(16)
-	hash := hashPassword("password123", salt)
-	store.accounts["me"] = AccountStoreEntry{
-		User:         currentUser,
-		EmailOrPhone: "alex@newage.com",
-		PasswordHash: hash,
-		Salt:         salt,
-		CreatedAt:    time.Now(),
-	}
 }
 
 // =========================================================================
@@ -290,6 +341,9 @@ func extractBearerToken(r *http.Request) string {
 // =========================================================================
 
 func main() {
+	// Инициализация подключения к PostgreSQL (если предоставлена DATABASE_URL на Railway)
+	initDB()
+
 	mux := http.NewServeMux()
 
 	// API-маршруты
@@ -382,11 +436,52 @@ func handleProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleUsers(w http.ResponseWriter, r *http.Request) {
+	if db != nil {
+		rows, err := db.Query("SELECT id, name, username, avatar, COALESCE(bio, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false), followers_count, following_count, critics_count, posts_count FROM users ORDER BY created_at DESC LIMIT 50")
+		if err == nil {
+			defer rows.Close()
+			var dbUsers []User
+			for rows.Next() {
+				var u User
+				if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Avatar, &u.Bio, &u.Role, &u.BeliefType, &u.BeliefPrivacy, &u.Verified, &u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount); err == nil {
+					u.Online = true
+					dbUsers = append(dbUsers, u)
+				}
+			}
+			if len(dbUsers) > 0 {
+				writeJSON(w, http.StatusOK, Response{Status: "ok", Data: append(dbUsers, mockUsers...)})
+				return
+			}
+		}
+	}
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: mockUsers})
 }
 
 func handleSearch(w http.ResponseWriter, r *http.Request) {
 	q := strings.ToLower(r.URL.Query().Get("q"))
+	if q == "" {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []User{}})
+		return
+	}
+
+	if db != nil {
+		rows, err := db.Query("SELECT id, name, username, avatar, COALESCE(bio, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false), followers_count, following_count, critics_count, posts_count FROM users WHERE LOWER(name) LIKE $1 OR LOWER(username) LIKE $1 LIMIT 20", "%"+q+"%")
+		if err == nil {
+			defer rows.Close()
+			var results []User
+			for rows.Next() {
+				var u User
+				if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Avatar, &u.Bio, &u.Role, &u.BeliefType, &u.BeliefPrivacy, &u.Verified, &u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount); err == nil {
+					results = append(results, u)
+				}
+			}
+			if len(results) > 0 {
+				writeJSON(w, http.StatusOK, Response{Status: "ok", Data: results})
+				return
+			}
+		}
+	}
+
 	var results []User
 	for _, u := range mockUsers {
 		if strings.Contains(strings.ToLower(u.Name), q) || strings.Contains(strings.ToLower(u.Username), q) {
@@ -576,6 +671,28 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		PostsCount:     0,
 	}
 
+	// Сохранение в PostgreSQL, если БД подключена
+	if db != nil {
+		// Проверка дубликатов в БД
+		var existingCount int
+		err := db.QueryRow("SELECT COUNT(*) FROM users WHERE LOWER(username) = $1 OR LOWER(email_or_phone) = $2", cleanUsername, cleanEmailOrPhone).Scan(&existingCount)
+		if err == nil && existingCount > 0 {
+			writeJSON(w, http.StatusConflict, Response{Status: "error", Message: "Пользователь с таким никнеймом или email/телефоном уже существует в базе"})
+			return
+		}
+
+		insertQuery := `
+		INSERT INTO users (id, name, username, email_or_phone, password_hash, salt, avatar, role, belief_type, belief_privacy, followers_count, following_count, critics_count, posts_count, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		`
+		_, err = db.Exec(insertQuery, newID, newUser.Name, cleanUsername, cleanEmailOrPhone, hash, salt, avatar, role, req.BeliefType, req.BeliefPrivacy, 1, 0, 0, 0, time.Now())
+		if err != nil {
+			log.Printf("⚠️ Ошибка сохранения пользователя в Postgres: %v", err)
+		} else {
+			log.Printf("💾 Пользователь %s (@%s) успешно сохранён в PostgreSQL!", newUser.Name, cleanUsername)
+		}
+	}
+
 	store.accounts[newID] = AccountStoreEntry{
 		User:         newUser,
 		EmailOrPhone: cleanEmailOrPhone,
@@ -604,7 +721,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /api/auth/login — Проверка логина/пароля и выдача JWT
+// POST /api/auth/login — Проверка логина/пароля и выдача JWT (PostgreSQL + in-memory fallback)
 func handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Login    string `json:"login"`
@@ -621,16 +738,47 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store.mu.RLock()
-	defer store.mu.RUnlock()
-
 	var foundAccount *AccountStoreEntry
-	for _, entry := range store.accounts {
-		if strings.ToLower(entry.User.Username) == target || strings.ToLower(entry.EmailOrPhone) == target {
-			acc := entry
-			foundAccount = &acc
-			break
+
+	// Сначала проверяем в PostgreSQL, если подключена
+	if db != nil {
+		var u User
+		var emailOrPhone, pwdHash, salt string
+		var createdAt time.Time
+		query := `
+		SELECT id, name, username, email_or_phone, password_hash, salt, avatar, COALESCE(bio, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false), followers_count, following_count, critics_count, posts_count, created_at
+		FROM users
+		WHERE LOWER(username) = $1 OR LOWER(email_or_phone) = $1
+		LIMIT 1
+		`
+		err := db.QueryRow(query, target).Scan(
+			&u.ID, &u.Name, &u.Username, &emailOrPhone, &pwdHash, &salt, &u.Avatar, &u.Bio, &u.Role, &u.BeliefType, &u.BeliefPrivacy, &u.Verified, &u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount, &createdAt,
+		)
+		if err == nil {
+			u.Online = true
+			foundAccount = &AccountStoreEntry{
+				User:         u,
+				EmailOrPhone: emailOrPhone,
+				PasswordHash: pwdHash,
+				Salt:         salt,
+				CreatedAt:    createdAt,
+			}
+		} else if err != sql.ErrNoRows {
+			log.Printf("⚠️ Ошибка запроса к БД при логине: %v", err)
 		}
+	}
+
+	// Если не найден в БД или БД недоступна — проверяем in-memory store
+	if foundAccount == nil {
+		store.mu.RLock()
+		for _, entry := range store.accounts {
+			if strings.ToLower(entry.User.Username) == target || strings.ToLower(entry.EmailOrPhone) == target {
+				acc := entry
+				foundAccount = &acc
+				break
+			}
+		}
+		store.mu.RUnlock()
 	}
 
 	if foundAccount == nil {
@@ -677,11 +825,35 @@ func handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store.mu.RLock()
-	account, exists := store.accounts[claims.UserID]
-	store.mu.RUnlock()
+	var user *User
 
-	if !exists {
+	// Ищем в PostgreSQL
+	if db != nil {
+		var u User
+		query := `
+		SELECT id, name, username, avatar, COALESCE(bio, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false), followers_count, following_count, critics_count, posts_count
+		FROM users WHERE id = $1 LIMIT 1
+		`
+		err := db.QueryRow(query, claims.UserID).Scan(
+			&u.ID, &u.Name, &u.Username, &u.Avatar, &u.Bio, &u.Role, &u.BeliefType, &u.BeliefPrivacy, &u.Verified, &u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount,
+		)
+		if err == nil {
+			u.Online = true
+			user = &u
+		}
+	}
+
+	// Fallback в in-memory store
+	if user == nil {
+		store.mu.RLock()
+		account, exists := store.accounts[claims.UserID]
+		store.mu.RUnlock()
+		if exists {
+			user = &account.User
+		}
+	}
+
+	if user == nil {
 		writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден в базе"})
 		return
 	}
@@ -689,7 +861,7 @@ func handleAuthMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, Response{
 		Status: "ok",
 		Data: map[string]interface{}{
-			"user":   account.User,
+			"user":   *user,
 			"claims": claims,
 		},
 	})
