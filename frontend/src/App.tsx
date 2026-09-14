@@ -18,6 +18,7 @@ import { WalletPage } from './pages/WalletPage';
 import { AdminPage } from './pages/AdminPage';
 import { SpiritualPage } from './pages/SpiritualPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { SearchPage } from './pages/SearchPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -49,6 +50,8 @@ function AppContent() {
         <main className="app-main-content">
           <Routes>
             <Route path="/" element={<FeedPage />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/explore" element={<Navigate to="/search" replace />} />
             <Route path="/video" element={<VideoPage />} />
             <Route path="/channel/:channelId" element={<ChannelPage />} />
             <Route path="/channel/me" element={<ChannelPage />} />

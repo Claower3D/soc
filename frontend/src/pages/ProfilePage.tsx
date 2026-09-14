@@ -15,6 +15,13 @@ import { CreatePostModal } from '../components/CreatePostModal';
 import { CreateStoryModal } from '../components/CreateStoryModal';
 import { AuthModal } from '../components/AuthModal';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
+import { 
+  getStoredFollowingIds, 
+  isUserFollowed, 
+  toggleUserFollow, 
+  getFollowersForUser, 
+  getAllUsersPool 
+} from '../utils/followStorage';
 import './ProfilePage.css';
 
 export function ProfilePage() {
@@ -58,8 +65,23 @@ export function ProfilePage() {
     return initialUsers[1];
   }, [isMe, cleanParam, currentUser, allAccounts]);
 
-  const [isFollowing, setIsFollowing] = useState(user.isFollowed ?? false);
-  const [followersCount, setFollowersCount] = useState(user.followersCount);
+  const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds());
+  const isFollowing = useMemo(() => isUserFollowed(user.id), [user.id, followingIds]);
+
+  // Dynamic real counts
+  const realFollowersCount = useMemo(() => {
+    const pool = getAllUsersPool(currentUser, allAccounts);
+    const followers = getFollowersForUser(user.id, pool, currentUser?.id);
+    return Math.max(followers.length, user.followersCount || 1);
+  }, [user.id, user.followersCount, currentUser, allAccounts]);
+
+  const realFollowingCount = useMemo(() => {
+    if (isMe) {
+      return followingIds.length;
+    }
+    return user.followingCount || 0;
+  }, [isMe, followingIds.length, user.followingCount]);
+
   const [isCritic, setIsCritic] = useState(user.isCritic ?? false);
   const [criticsCount, setCriticsCount] = useState(user.criticsCount ?? 148);
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'podcasts' | 'saved' | 'shop'>('posts');
@@ -67,6 +89,15 @@ export function ProfilePage() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+
+  // Live sync with external follow changes
+  useEffect(() => {
+    const handleSync = () => {
+      setFollowingIds(getStoredFollowingIds());
+    };
+    window.addEventListener('follow_change', handleSync);
+    return () => window.removeEventListener('follow_change', handleSync);
+  }, []);
 
   const activeUser = isMe ? currentUser : user;
 
@@ -95,13 +126,8 @@ export function ProfilePage() {
   }, [user.id, isMe]);
 
   const handleToggleFollow = () => {
-    if (isFollowing) {
-      setIsFollowing(false);
-      setFollowersCount(c => c - 1);
-    } else {
-      setIsFollowing(true);
-      setFollowersCount(c => c + 1);
-    }
+    toggleUserFollow(user.id);
+    setFollowingIds(getStoredFollowingIds());
   };
 
   const handleSendMessage = () => {
@@ -353,12 +379,12 @@ export function ProfilePage() {
               <span className="stat-label">публикаций</span>
             </div>
             <div className="stat-card clickable" onClick={() => setModalType('Подписчики')}>
-              <span className="stat-number">{followersCount.toLocaleString('ru-RU')}</span>
+              <span className="stat-number">{realFollowersCount.toLocaleString('ru-RU')}</span>
               <span className="stat-label">подписчиков</span>
               <ChevronRight size={14} className="stat-arrow" />
             </div>
             <div className="stat-card clickable" onClick={() => setModalType('Подписки')}>
-              <span className="stat-number">{user.followingCount.toLocaleString('ru-RU')}</span>
+              <span className="stat-number">{realFollowingCount.toLocaleString('ru-RU')}</span>
               <span className="stat-label">подписок</span>
               <ChevronRight size={14} className="stat-arrow" />
             </div>
@@ -618,6 +644,7 @@ export function ProfilePage() {
           onClose={() => setModalType(null)}
           title={modalType}
           currentUserId={user.id}
+          isMe={Boolean(isMe)}
         />
       )}
 

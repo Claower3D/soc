@@ -1,7 +1,16 @@
 import { X, Check, UserPlus } from 'lucide-react';
-import { initialUsers, type User } from '../data/mock';
+import { type User } from '../data/mock';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { 
+  getAllUsersPool, 
+  getFollowersForUser, 
+  getFollowingForUser, 
+  getCriticsForUser, 
+  toggleUserFollow,
+  getStoredFollowingIds 
+} from '../utils/followStorage';
+import { useAuth } from '../context/AuthContext';
 import './FollowersModal.css';
 
 interface FollowersModalProps {
@@ -9,31 +18,42 @@ interface FollowersModalProps {
   onClose: () => void;
   title: 'Подписчики' | 'Подписки' | 'Критики';
   currentUserId: string;
+  isMe?: boolean;
 }
 
-export function FollowersModal({ isOpen, onClose, title, currentUserId }: FollowersModalProps) {
+export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: FollowersModalProps) {
   const navigate = useNavigate();
-  // Generate mock followers/following list from initialUsers excluding current user
-  const otherUsers = initialUsers.filter(u => u.id !== currentUserId);
-  const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({
-    '1': true,
-    '2': false,
-    '3': true,
-    '4': true,
-    '5': false,
-    '6': true,
-    '7': false,
-    '8': true,
-  });
+  const { currentUser, allAccounts } = useAuth();
+  const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds());
+
+  useEffect(() => {
+    const handleSync = () => {
+      setFollowingIds(getStoredFollowingIds());
+    };
+    window.addEventListener('follow_change', handleSync);
+    return () => window.removeEventListener('follow_change', handleSync);
+  }, []);
+
+  const allUsers = useMemo(() => {
+    return getAllUsersPool(currentUser, allAccounts);
+  }, [currentUser, allAccounts]);
+
+  const listUsers: User[] = useMemo(() => {
+    if (title === 'Подписчики') {
+      return getFollowersForUser(currentUserId, allUsers, currentUser?.id);
+    }
+    if (title === 'Подписки') {
+      return getFollowingForUser(currentUserId, allUsers, !!isMe);
+    }
+    return getCriticsForUser(currentUserId, allUsers);
+  }, [title, currentUserId, allUsers, isMe, currentUser?.id]);
 
   if (!isOpen) return null;
 
-  const toggleFollow = (userId: string, e: React.MouseEvent) => {
+  const handleToggle = (userId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setFollowingMap(prev => ({
-      ...prev,
-      [userId]: !prev[userId],
-    }));
+    toggleUserFollow(userId);
+    setFollowingIds(getStoredFollowingIds());
   };
 
   const handleUserClick = (user: User) => {
@@ -54,40 +74,47 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId }: Follow
         </div>
 
         <div className="modal-body">
-          <div className="followers-list">
-            {otherUsers.map(user => {
-              const isFollowing = followingMap[user.id] ?? false;
-              return (
-                <div
-                  key={user.id}
-                  className="follower-row"
-                  onClick={() => handleUserClick(user)}
-                >
-                  <img src={user.avatar} alt={user.name} className="follower-avatar" />
-                  <div className="follower-info">
-                    <span className="follower-name">{user.name}</span>
-                    <span className="follower-username">@{user.username}</span>
+          {listUsers.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--color-text-tertiary)' }}>
+              <span>Список пуст</span>
+            </div>
+          ) : (
+            <div className="followers-list">
+              {listUsers.map(user => {
+                const isSubscribed = followingIds.includes(user.id);
+                const isMeUser = currentUser?.id === user.id;
+                return (
+                  <div
+                    key={user.id}
+                    className="follower-row"
+                    onClick={() => handleUserClick(user)}
+                  >
+                    <img src={user.avatar} alt={user.name} className="follower-avatar" />
+                    <div className="follower-info">
+                      <span className="follower-name">{user.name}</span>
+                      <span className="follower-username">@{user.username}</span>
+                    </div>
+                    {!isMeUser && (
+                      <button
+                        className={`follower-btn ${isSubscribed ? 'following' : 'not-following'}`}
+                        onClick={e => handleToggle(user.id, e)}
+                      >
+                        {isSubscribed ? (
+                          <>
+                            <Check size={14} /> Подписки
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus size={14} /> Подписаться
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
-                  {user.id !== 'me' && (
-                    <button
-                      className={`follower-btn ${isFollowing ? 'following' : 'not-following'}`}
-                      onClick={e => toggleFollow(user.id, e)}
-                    >
-                      {isFollowing ? (
-                        <>
-                          <Check size={14} /> Подписки
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus size={14} /> Подписаться
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

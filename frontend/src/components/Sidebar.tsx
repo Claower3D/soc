@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { 
-  Home, Video, MessageCircle, PhoneCall, Headphones, 
+  Home, Search, Video, MessageCircle, PhoneCall, Headphones, 
   User as UserIcon, Tv, ShoppingBag, Users, Film, Wallet, ShieldAlert,
   ChevronDown, ChevronRight, Layers, ExternalLink,
   Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles, GraduationCap, Lock,
@@ -50,6 +50,11 @@ export function Sidebar() {
         <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} end>
           <Home className="nav-icon" size={19} />
           <span className="nav-label">{t('nav.feed')}</span>
+        </NavLink>
+
+        <NavLink to="/search" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Search className="nav-icon" size={19} />
+          <span className="nav-label">Поиск</span>
         </NavLink>
 
         <NavLink to="/video" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>

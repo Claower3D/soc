@@ -106,6 +106,16 @@ export function Header() {
               setIsOpen(true);
             }}
             onFocus={() => setIsOpen(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setIsOpen(false);
+                if (query.trim()) {
+                  navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+                } else {
+                  navigate('/search');
+                }
+              }
+            }}
             className="global-search-input"
           />
           {query && (
@@ -264,6 +274,26 @@ export function Header() {
                       ))}
                     </div>
                   )}
+                </div>
+
+                <div 
+                  className="search-footer-action" 
+                  onClick={() => {
+                    setIsOpen(false);
+                    navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+                  }}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    borderTop: '1px solid var(--color-border)',
+                    background: 'var(--color-bg-secondary)',
+                    color: 'var(--color-primary)',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    textAlign: 'center',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Посмотреть все результаты по «{query}» →
                 </div>
               </>
             )}

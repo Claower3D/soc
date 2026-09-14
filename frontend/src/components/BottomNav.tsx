@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Video, MessageCircle, Layers, User } from 'lucide-react';
+import { Home, Search, Video, MessageCircle, Layers, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './BottomNav.css';
 
@@ -11,6 +11,11 @@ export function BottomNav() {
       <NavLink to="/" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`} end>
         <Home className="bottom-nav-icon" size={20} />
         <span className="bottom-nav-label">Лента</span>
+      </NavLink>
+
+      <NavLink to="/search" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+        <Search className="bottom-nav-icon" size={20} />
+        <span className="bottom-nav-label">Поиск</span>
       </NavLink>
 
       <NavLink to="/video" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
