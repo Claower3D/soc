@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
 import { Header } from './components/Header';
@@ -16,13 +16,15 @@ import { CommunityDetailPage } from './pages/CommunityDetailPage';
 import { VideoEditorPage } from './pages/VideoEditorPage';
 import { WalletPage } from './pages/WalletPage';
 import { AdminPage } from './pages/AdminPage';
+import { AuthProvider } from './context/AuthContext';
 import './styles/theme.css';
 import './App.css';
 
 function App() {
   return (
     <BrowserRouter>
-      <div className="app-layout">
+      <AuthProvider>
+        <div className="app-layout">
         <Sidebar />
         <div className="app-main-area">
           <Header />
@@ -51,7 +53,8 @@ function App() {
         </div>
         <BottomNav />
       </div>
-    </BrowserRouter>
+    </AuthProvider>
+  </BrowserRouter>
   );
 }
 

@@ -1,9 +1,10 @@
 ﻿import { useState } from 'react';
 import { 
   X, Mail, Lock, Phone, User as UserIcon, Shield, CheckCircle2, 
-  ShoppingBag, Video, ArrowRight, Check, Compass, Info
+  ShoppingBag, Video, ArrowRight, Check, Compass, Info, AlertCircle
 } from 'lucide-react';
-import { RELIGIONS_CATALOG, currentUser, type UserRole, type BeliefPrivacy } from '../data/mock';
+import { RELIGIONS_CATALOG, type UserRole, type BeliefPrivacy } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import './AuthModal.css';
 
 interface AuthModalProps {
@@ -19,8 +20,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialMode = 'login',
   onSuccess 
 }) => {
+  const { login, register, currentUser } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
-  const [step, setStep] = useState<1 | 2>(1); // In register mode: 1 = credentials, 2 = profile & belief/role
+  const [step, setStep] = useState<1 | 2>(1);
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -29,6 +31,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [selectedBeliefId, setSelectedBeliefId] = useState<string>('christianity');
   const [beliefPrivacy, setBeliefPrivacy] = useState<BeliefPrivacy>('public');
   const [agreedToTerms, setAgreedToTerms] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loginSuccessMessage, setLoginSuccessMessage] = useState(false);
 
   if (!isOpen) return null;
@@ -37,18 +40,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleNextOrSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === 'register' && step === 1) {
+    setErrorMessage(null);
+
+    if (mode === 'login') {
+      const res = login(emailOrPhone, password);
+      if (!res.success) {
+        setErrorMessage(res.message || 'Ошибка входа');
+        return;
+      }
+      setLoginSuccessMessage(true);
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+        onClose();
+        setLoginSuccessMessage(false);
+      }, 700);
+      return;
+    }
+
+    // Mode: register
+    if (step === 1) {
+      if (!name.trim() || !username.trim() || !emailOrPhone.trim() || !password) {
+        setErrorMessage('Пожалуйста, заполните все обязательные поля');
+        return;
+      }
+      if (password.length < 6) {
+        setErrorMessage('Пароль должен содержать минимум 6 символов');
+        return;
+      }
       setStep(2);
       return;
     }
 
-    // Apply updates to currentUser (simulating real persistent profile)
-    if (name) currentUser.name = name;
-    if (username) currentUser.username = username.replace(/^@/, '');
-    if (mode === 'register') {
-      currentUser.role = selectedRole;
-      currentUser.beliefType = selectedReligion.name;
-      currentUser.beliefPrivacy = beliefPrivacy;
+    // Step 2 submit
+    const res = register({
+      name,
+      username,
+      emailOrPhone,
+      password,
+      role: selectedRole,
+      beliefType: selectedBeliefId === 'none' ? 'Не указывать / Личное' : selectedReligion.name,
+      beliefPrivacy,
+    });
+
+    if (!res.success) {
+      setErrorMessage(res.message || 'Ошибка при регистрации');
+      return;
     }
 
     setLoginSuccessMessage(true);
@@ -84,24 +120,39 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </p>
         </div>
 
+        {errorMessage && (
+          <div className="auth-error-banner">
+            <AlertCircle size={16} />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
         {loginSuccessMessage ? (
           <div className="auth-success-screen">
             <div className="auth-success-icon">
               <CheckCircle2 size={48} color="#10B981" />
             </div>
             <h3>{mode === 'login' ? 'Успешный вход!' : 'Аккаунт успешно создан!'}</h3>
-            <p>Добро пожаловать в экосистему New Age, {currentUser.name}</p>
+            <p>Добро пожаловать в экосистему New Age, <b>{currentUser.name}</b></p>
           </div>
         ) : (
           <>
             {/* OAuth Buttons */}
             {step === 1 && (
               <div className="oauth-row">
-                <button type="button" className="oauth-btn" onClick={() => { onSuccess?.(); onClose(); }}>
+                <button type="button" className="oauth-btn" onClick={() => { 
+                  login('alex_mironov');
+                  onSuccess?.(); 
+                  onClose(); 
+                }}>
                   <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" width="18" />
                   Google
                 </button>
-                <button type="button" className="oauth-btn" onClick={() => { onSuccess?.(); onClose(); }}>
+                <button type="button" className="oauth-btn" onClick={() => { 
+                  login('alex_mironov');
+                  onSuccess?.(); 
+                  onClose(); 
+                }}>
                   <img src="https://www.svgrepo.com/show/349527/telegram.svg" alt="Telegram" width="18" />
                   Telegram
                 </button>
@@ -114,12 +165,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {mode === 'login' && (
                 <>
                   <div className="auth-field">
-                    <label>Email или Телефон</label>
+                    <label>Email или Телефон или Никнейм</label>
                     <div className="auth-input-wrapper">
                       <Mail size={18} className="auth-input-icon" />
                       <input 
                         type="text" 
-                        placeholder="example@newage.com или +7 999 000-00-00" 
+                        placeholder="alex_mironov или example@newage.com" 
                         value={emailOrPhone}
                         onChange={e => setEmailOrPhone(e.target.value)}
                         required 
@@ -136,7 +187,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         placeholder="••••••••" 
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        required 
                       />
                     </div>
                   </div>
@@ -146,7 +196,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <input type="checkbox" defaultChecked />
                       <span>Запомнить меня</span>
                     </label>
-                    <a href="#forgot" className="forgot-link" onClick={e => { e.preventDefault(); alert('Ссылка для сброса отправлена на почту'); }}>
+                    <a href="#forgot" className="forgot-link" onClick={e => { e.preventDefault(); alert('Для демо используйте любой логин или существующего пользователя'); }}>
                       Забыли пароль?
                     </a>
                   </div>
@@ -179,7 +229,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <span className="auth-at">@</span>
                       <input 
                         type="text" 
-                        placeholder="alex_mironov" 
+                        placeholder="ivan_petrov" 
                         value={username}
                         onChange={e => setUsername(e.target.value)}
                         required 
@@ -193,7 +243,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <Phone size={18} className="auth-input-icon" />
                       <input 
                         type="text" 
-                        placeholder="Email или номер телефона" 
+                        placeholder="ivan@mail.com или +7 999 123-45-67" 
                         value={emailOrPhone}
                         onChange={e => setEmailOrPhone(e.target.value)}
                         required 
@@ -207,7 +257,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <Lock size={18} className="auth-input-icon" />
                       <input 
                         type="password" 
-                        placeholder="Минимум 8 символов" 
+                        placeholder="Минимум 6 символов" 
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         required 
@@ -234,7 +284,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     </div>
 
                     <p className="auth-field-hint">
-                      Выберите ваше духовное или философское направление. Платформа будет подбирать близкие сообщества, праздники и мероприятия.
+                      Выберите ваше духовное или философское направление. Платформа подберёт близкие сообщества, праздники и единомышленников.
                     </p>
 
                     {/* Галерея карточек с золотыми символами */}
@@ -373,7 +423,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button 
                     type="button" 
                     className="auth-toggle-btn"
-                    onClick={() => { setMode('register'); setStep(1); }}
+                    onClick={() => { setMode('register'); setStep(1); setErrorMessage(null); }}
                   >
                     Создать аккаунт
                   </button>
@@ -384,7 +434,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button 
                     type="button" 
                     className="auth-toggle-btn"
-                    onClick={() => { setMode('login'); setStep(1); }}
+                    onClick={() => { setMode('login'); setStep(1); setErrorMessage(null); }}
                   >
                     Войти
                   </button>

@@ -22,7 +22,7 @@ type HealthCheck struct {
 	Timestamp string `json:"timestamp"`
 }
 
-// User — пользователь.
+// User — пользователь платформы New Age.
 type User struct {
 	ID             string `json:"id"`
 	Name           string `json:"name"`
@@ -30,8 +30,13 @@ type User struct {
 	Avatar         string `json:"avatar"`
 	Bio            string `json:"bio,omitempty"`
 	Online         bool   `json:"online"`
+	Role           string `json:"role,omitempty"`
+	BeliefType     string `json:"beliefType,omitempty"`
+	BeliefPrivacy  string `json:"beliefPrivacy,omitempty"`
+	Verified       bool   `json:"verified,omitempty"`
 	FollowersCount int    `json:"followersCount"`
 	FollowingCount int    `json:"followingCount"`
+	CriticsCount   int    `json:"criticsCount,omitempty"`
 	PostsCount     int    `json:"postsCount"`
 }
 
@@ -122,6 +127,8 @@ func main() {
 	mux.HandleFunc("GET /api/communities", handleCommunities)
 	mux.HandleFunc("GET /api/wallet", handleWallet)
 	mux.HandleFunc("GET /api/admin/stats", handleAdminStats)
+	mux.HandleFunc("POST /api/auth/register", handleRegister)
+	mux.HandleFunc("POST /api/auth/login", handleLogin)
 
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
@@ -314,6 +321,64 @@ func handleAdminStats(w http.ResponseWriter, r *http.Request) {
 		"pendingReports":  3,
 	}
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: stats})
+}
+
+func handleRegister(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name          string `json:"name"`
+		Username      string `json:"username"`
+		EmailOrPhone  string `json:"emailOrPhone"`
+		Password      string `json:"password"`
+		Role          string `json:"role"`
+		BeliefType    string `json:"beliefType"`
+		BeliefPrivacy string `json:"beliefPrivacy"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Некорректные данные"})
+		return
+	}
+
+	newUser := User{
+		ID:             "u_" + time.Now().Format("20060102150405"),
+		Name:           req.Name,
+		Username:       strings.TrimPrefix(req.Username, "@"),
+		Avatar:         "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
+		Online:         true,
+		Role:           req.Role,
+		BeliefType:     req.BeliefType,
+		BeliefPrivacy:  req.BeliefPrivacy,
+		FollowersCount: 1,
+		FollowingCount: 0,
+		CriticsCount:   0,
+		PostsCount:     0,
+	}
+
+	mockUsers = append([]User{newUser}, mockUsers...)
+	currentUser = newUser
+
+	writeJSON(w, http.StatusCreated, Response{Status: "ok", Message: "Аккаунт успешно создан", Data: newUser})
+}
+
+func handleLogin(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Login    string `json:"login"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Некорректные данные"})
+		return
+	}
+
+	target := strings.ToLower(strings.TrimPrefix(req.Login, "@"))
+	for _, u := range mockUsers {
+		if strings.ToLower(u.Username) == target || strings.ToLower(u.Name) == target {
+			currentUser = u
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Успешный вход", Data: u})
+			return
+		}
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Вход выполнен (демо)", Data: currentUser})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {

@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, Video, Headphones, MessageCircle, User as UserIcon, Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, Users, Film, LogIn } from 'lucide-react';
-import { initialUsers, posts, videos, podcasts, currentUser, type User } from '../data/mock';
+import { initialUsers, posts, videos, podcasts, type User } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import { AuthModal } from './AuthModal';
 import './Header.css';
 
 export function Header() {
+  const { currentUser, isAuthenticated } = useAuth();
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'users' | 'videos' | 'podcasts' | 'posts'>('all');
@@ -360,7 +362,7 @@ export function Header() {
         <button
           className="header-icon-btn"
           onClick={() => setAuthModalOpen(true)}
-          title="Вход / Регистрация в New Age"
+          title={isAuthenticated ? `Сменить аккаунт / Вход (Вы вошли как @${currentUser.username})` : "Вход / Регистрация в New Age"}
         >
           <LogIn size={18} />
         </button>

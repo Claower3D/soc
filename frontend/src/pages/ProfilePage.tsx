@@ -6,7 +6,8 @@ import {
   UserCheck, UserPlus, Share2, Edit3, Heart, MessageSquare,
   CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame
 } from 'lucide-react';
-import { currentUser, initialUsers, posts, videos, podcasts, initialProducts, RELIGIONS_CATALOG, type User, type Post } from '../data/mock';
+import { initialUsers, posts, videos, podcasts, initialProducts, RELIGIONS_CATALOG, type User, type Post } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import { FollowersModal } from '../components/FollowersModal';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { EditProfileModal } from '../components/EditProfileModal';
@@ -15,6 +16,7 @@ import './ProfilePage.css';
 export function ProfilePage() {
   const { userId } = useParams();
   const navigate = useNavigate();
+  const { currentUser, updateProfile } = useAuth();
 
   // Find user by id or 'me'
   const isMe = !userId || userId === 'me' || userId === currentUser.id;
@@ -23,7 +25,7 @@ export function ProfilePage() {
     if (isMe) return currentUser;
     const found = initialUsers.find(u => u.id === userId || u.username === userId);
     return found || initialUsers[1];
-  }, [isMe, userId]);
+  }, [isMe, userId, currentUser]);
 
   const [isFollowing, setIsFollowing] = useState(user.isFollowed ?? false);
   const [followersCount, setFollowersCount] = useState(user.followersCount);
@@ -34,9 +36,8 @@ export function ProfilePage() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-  const [localUser, setLocalUser] = useState<User>(currentUser);
 
-  const activeUser = isMe ? localUser : user;
+  const activeUser = isMe ? currentUser : user;
 
   // Filter user's posts, videos, and podcasts
   const userPosts = useMemo(() => {
@@ -528,7 +529,7 @@ export function ProfilePage() {
         isOpen={isEditProfileOpen}
         onClose={() => setIsEditProfileOpen(false)}
         onSave={(updated) => {
-          setLocalUser({ ...updated });
+          updateProfile(updated);
         }}
       />
     </div>

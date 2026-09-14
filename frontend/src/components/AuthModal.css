@@ -1,4 +1,4 @@
-﻿.auth-modal-backdrop {
+.auth-modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 42, 0.55);
@@ -78,8 +78,22 @@
   line-height: 1.4;
 }
 
-/* Success Screen */
-.auth-success-screen {
+/* Error banner */
+.auth-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #FEE2E2;
+  border: 1px solid #FCA5A5;
+  color: #DC2626;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-size: 0.84rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.auth-success-icon {
   display: flex;
   flex-direction: column;
   align-items: center;

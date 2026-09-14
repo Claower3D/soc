@@ -5,12 +5,13 @@ import {
   User as UserIcon, Tv, ShoppingBag, Users, Film, Wallet, ShieldAlert,
   ChevronDown, ChevronRight, Layers, ExternalLink
 } from 'lucide-react';
-import { currentUser } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import logoImg from '../assets/logo.png';
 import './Sidebar.css';
 
 export function Sidebar() {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [servicesExpanded, setServicesExpanded] = useState(true);
 
   return (
