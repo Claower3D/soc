@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   Home, Video, MessageCircle, PhoneCall, Headphones, 
@@ -18,14 +18,16 @@ export function Sidebar() {
       {/* Brand Header with Uploaded Official Logo */}
       <div className="sidebar-header" onClick={() => navigate('/')}>
         <div className="brand-logo-container">
-          <img 
-            src={logoImg} 
-            alt="New Age Logo" 
-            className="brand-logo-img" 
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = 'none';
-            }}
-          />
+          <div className="brand-logo-glow-wrapper">
+            <img 
+              src={logoImg} 
+              alt="New Age Logo" 
+              className="brand-logo-img" 
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = 'none';
+              }}
+            />
+          </div>
           <div className="brand-text-block">
             <span className="demo-badge new-age-badge">NEW AGE</span>
             <span className="demo-subtext">социальная экосистема</span>
