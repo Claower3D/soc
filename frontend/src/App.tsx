@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
 import { Header } from './components/Header';
@@ -17,6 +17,7 @@ import { VideoEditorPage } from './pages/VideoEditorPage';
 import { WalletPage } from './pages/WalletPage';
 import { AdminPage } from './pages/AdminPage';
 import { SpiritualPage } from './pages/SpiritualPage';
+import { RegisterPage } from './pages/RegisterPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -27,6 +28,17 @@ import './App.css';
 
 function AppContent() {
   const { isAuthModalOpen, closeAuthModal, authModalMode } = useAuth();
+  const location = useLocation();
+  const isAuthPage = location.pathname === '/register' || location.pathname === '/signup';
+
+  if (isAuthPage) {
+    return (
+      <Routes>
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/signup" element={<RegisterPage />} />
+      </Routes>
+    );
+  }
 
   return (
     <div className="app-layout">

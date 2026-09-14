@@ -663,7 +663,7 @@ export function Header() {
 
             <button
               className="header-register-btn"
-              onClick={() => setAuthModalOpen(true)}
+              onClick={() => navigate('/register')}
             >
               <Plus size={16} />
               <span>{t('header.register')}</span>
