@@ -1,4 +1,4 @@
-﻿.services-page {
+.services-page {
   padding: 1.5rem 2rem 3rem 2rem;
   max-width: 1200px;
   margin: 0 auto;
@@ -64,7 +64,7 @@
   align-items: center;
   gap: 2rem;
   padding: 0.85rem 1.25rem;
-  background: #FFFFFF;
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: 12px;
   margin-bottom: 2rem;
@@ -90,7 +90,7 @@
 }
 
 .service-card {
-  background: #FFFFFF;
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: 16px;
   padding: 1.5rem;
