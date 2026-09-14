@@ -255,6 +255,10 @@
   border-top: 1px solid var(--color-border);
 }
 
+.profile-stats-row.four-stats {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .stat-card {
   display: flex;
   align-items: center;
@@ -274,6 +278,52 @@
 .stat-card.clickable:hover {
   background: var(--color-accent-light);
   border-color: var(--color-accent-subtle);
+}
+
+.critic-stat-card {
+  background: #FFFBEB;
+  border-color: #FDE68A;
+}
+
+.critic-stat-card:hover {
+  background: #FEF3C7 !important;
+  border-color: #F59E0B !important;
+}
+
+.critic-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #D97706;
+}
+
+.critic-flame-icon {
+  color: #F59E0B;
+}
+
+.btn-critic-toggle {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-critic-toggle:hover {
+  background: #FEF3C7;
+  border-color: #F59E0B;
+}
+
+.btn-critic-toggle.active {
+  background: #F59E0B;
+  color: #FFFFFF;
+  border-color: #D97706;
 }
 
 .stat-number {

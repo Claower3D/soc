@@ -4,7 +4,7 @@ import {
   Grid, Video as VideoIcon, Headphones, Bookmark, 
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Share2, Edit3, Heart, MessageSquare,
-  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield
+  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame
 } from 'lucide-react';
 import { currentUser, initialUsers, posts, videos, podcasts, initialProducts, RELIGIONS_CATALOG, type User, type Post } from '../data/mock';
 import { FollowersModal } from '../components/FollowersModal';
@@ -27,8 +27,10 @@ export function ProfilePage() {
 
   const [isFollowing, setIsFollowing] = useState(user.isFollowed ?? false);
   const [followersCount, setFollowersCount] = useState(user.followersCount);
+  const [isCritic, setIsCritic] = useState(user.isCritic ?? false);
+  const [criticsCount, setCriticsCount] = useState(user.criticsCount ?? 148);
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'podcasts' | 'saved' | 'shop'>('posts');
-  const [modalType, setModalType] = useState<'Подписчики' | 'Подписки' | null>(null);
+  const [modalType, setModalType] = useState<'Подписчики' | 'Подписки' | 'Критики' | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -132,6 +134,23 @@ export function ProfilePage() {
                       </>
                     )}
                   </button>
+
+                  <button
+                    className={`btn btn-critic-toggle ${isCritic ? 'active' : ''}`}
+                    onClick={() => {
+                      if (isCritic) {
+                        setIsCritic(false);
+                        setCriticsCount(c => c - 1);
+                      } else {
+                        setIsCritic(true);
+                        setCriticsCount(c => c + 1);
+                      }
+                    }}
+                    title="Стать критиком (следить с акцентом на разбор и рецензии)"
+                  >
+                    <Flame size={15} /> {isCritic ? 'В критиках' : 'Стать критиком'}
+                  </button>
+
                   <button className="btn btn-secondary" onClick={handleSendMessage}>
                     <MessageCircle size={16} /> Сообщение
                   </button>
@@ -211,8 +230,8 @@ export function ProfilePage() {
             </div>
           </div>
 
-          {/* Statistics Counters */}
-          <div className="profile-stats-row">
+          {/* Statistics Counters: Публикации, Подписчики, Подписки, Критики */}
+          <div className="profile-stats-row four-stats">
             <div className="stat-card">
               <span className="stat-number">{userPosts.length || user.postsCount}</span>
               <span className="stat-label">публикаций</span>
@@ -225,6 +244,14 @@ export function ProfilePage() {
             <div className="stat-card clickable" onClick={() => setModalType('Подписки')}>
               <span className="stat-number">{user.followingCount.toLocaleString('ru-RU')}</span>
               <span className="stat-label">подписок</span>
+              <ChevronRight size={14} className="stat-arrow" />
+            </div>
+            <div className="stat-card clickable critic-stat-card" onClick={() => setModalType('Критики')} title="Пользователи, следящие за профилем в режиме конструктивной критики">
+              <span className="stat-number critic-number">
+                <Flame size={14} className="critic-flame-icon" />
+                {criticsCount.toLocaleString('ru-RU')}
+              </span>
+              <span className="stat-label">критиков</span>
               <ChevronRight size={14} className="stat-arrow" />
             </div>
           </div>

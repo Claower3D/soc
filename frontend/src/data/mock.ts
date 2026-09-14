@@ -120,6 +120,8 @@ export interface User {
   isFollowed?: boolean;
   followersCount: number;
   followingCount: number;
+  criticsCount?: number;
+  isCritic?: boolean;
   postsCount: number;
   highlights?: Highlight[];
   role?: UserRole;
@@ -355,6 +357,7 @@ export const currentUser: User = {
   online: true,
   followersCount: 1420,
   followingCount: 382,
+  criticsCount: 148,
   postsCount: 24,
   role: 'creator',
   beliefType: 'Агностицизм',

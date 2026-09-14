@@ -7,7 +7,7 @@ import './FollowersModal.css';
 interface FollowersModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: 'Подписчики' | 'Подписки';
+  title: 'Подписчики' | 'Подписки' | 'Критики';
   currentUserId: string;
 }
 
@@ -45,7 +45,9 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId }: Follow
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-container" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>{title}</h3>
+          <h3>
+            {title === 'Критики' ? '🔥 Критики профиля' : title}
+          </h3>
           <button className="modal-close-btn" onClick={onClose}>
             <X size={20} />
           </button>
