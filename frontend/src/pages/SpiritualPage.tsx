@@ -5,7 +5,7 @@ import {
   Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, 
   CheckCircle2, Plus, Trash2, Heart, ChevronLeft, ChevronRight,
   GraduationCap, Megaphone, Star, Check, X,
-  Compass, Calendar as CalendarIcon, Bot, Users
+  Compass, Calendar as CalendarIcon, Bot, Users, LayoutGrid, ArrowRight
 } from 'lucide-react';
 import { 
   MEDITATION_TRACKS, YOGA_ROUTINES, INITIAL_AFFIRMATIONS, 
@@ -25,21 +25,161 @@ import { KarmaTreeWidget } from '../components/KarmaTreeWidget';
 import { MasterBookingModal } from '../components/MasterBookingModal';
 import './SpiritualPage.css';
 
-type TabType = 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom' | 'courses' | 'tarot' | 'astrology' | 'calendar' | 'livezen';
+type TabType = 'all' | 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom' | 'courses' | 'tarot' | 'astrology' | 'calendar' | 'livezen';
+
+interface SpiritualPracticeCard {
+  id: TabType;
+  title: string;
+  category: string;
+  description: string;
+  icon: typeof Flower2;
+  badge?: string;
+  badgeClass?: string;
+  gradient: string;
+  stats: string;
+}
+
+const SPIRITUAL_PRACTICES_CARDS: SpiritualPracticeCard[] = [
+  {
+    id: 'meditation',
+    title: 'Медитация',
+    category: 'Тишина и Осознанность',
+    description: 'Интерактивный дзен-таймер, бинауральные ритмы, природные звуки и целебные частоты 432 Гц и 528 Гц.',
+    icon: Flower2,
+    badge: '432 Гц',
+    badgeClass: 'badge-emerald',
+    gradient: 'linear-gradient(135deg, #10B981, #059669)',
+    stats: '6 режимов звучания'
+  },
+  {
+    id: 'yoga',
+    title: 'Йога и Прана',
+    category: 'Тело и Энергия',
+    description: 'Комплексы асан для утра и вечера, сурья намаскар, таймер удержания поз и визуальные инструкции.',
+    icon: Activity,
+    badge: 'Практика',
+    badgeClass: 'badge-purple',
+    gradient: 'linear-gradient(135deg, #8B5CF6, #6366F1)',
+    stats: '4 авторских комплекса'
+  },
+  {
+    id: 'affirmations',
+    title: 'Аффирмации',
+    category: 'Разум и Мышление',
+    description: 'Трансформирующие позитивные установки, карточки принятия дня, звук кристального гонга и личные списки.',
+    icon: Sunrise,
+    badge: 'Каждый день',
+    badgeClass: 'badge-amber',
+    gradient: 'linear-gradient(135deg, #F59E0B, #D97706)',
+    stats: '100+ позитивных установок'
+  },
+  {
+    id: 'breathing',
+    title: 'Дыхание (Пранаяма)',
+    category: 'Антистресс и Баланс',
+    description: 'Анимированный круг пранаямы: квадратное дыхание 4-4-4-4, расслабляющее 4-7-8 и дыхание огня Капалабхати.',
+    icon: Wind,
+    badge: 'Антистресс',
+    badgeClass: 'badge-cyan',
+    gradient: 'linear-gradient(135deg, #06B6D4, #0284C7)',
+    stats: '3 техники пранаямы'
+  },
+  {
+    id: 'sounds',
+    title: 'Звуки & Мантры',
+    category: 'Саундхилинг',
+    description: 'Генератор амбиентного фона: тибетские чаши, горный ручей, шум костра, ночной лес и бинауральный резонанс.',
+    icon: Waves,
+    badge: 'HD Audio',
+    badgeClass: 'badge-blue',
+    gradient: 'linear-gradient(135deg, #3B82F6, #4F46E5)',
+    stats: 'Многоканальный микшер'
+  },
+  {
+    id: 'wisdom',
+    title: 'Мудрость Веков',
+    category: 'Философия и Дао',
+    description: 'Притчи, дзен-коаны, цитаты мудрецов Дао дэ цзин, стоицизма и восточных учителей для глубоких размышлений.',
+    icon: BookOpen,
+    badge: 'Притчи',
+    badgeClass: 'badge-rose',
+    gradient: 'linear-gradient(135deg, #F43F5E, #BE123C)',
+    stats: 'Ежедневные озарения'
+  },
+  {
+    id: 'tarot',
+    title: 'Таро & МАК',
+    category: 'Символы и Архетипы',
+    description: 'Интерактивная 3D колода карт с физикой переворота, авторские расклады на день, выбор пути и поиск ресурсов.',
+    icon: Sparkles,
+    badge: '3D Deck',
+    badgeClass: 'badge-pink',
+    gradient: 'linear-gradient(135deg, #EC4899, #A855F7)',
+    stats: 'Интерактивное 3D'
+  },
+  {
+    id: 'astrology',
+    title: 'Натальная карта',
+    category: 'Астрология и Космос',
+    description: 'Интерактивный расчет планетных позиций, асцендента, домов гороскопа и ключевых аспектов личности.',
+    icon: Compass,
+    badge: 'Астро-расчет',
+    badgeClass: 'badge-teal',
+    gradient: 'linear-gradient(135deg, #14B8A6, #0D9488)',
+    stats: 'Точный математический расчет'
+  },
+  {
+    id: 'calendar',
+    title: 'Духовный календарь',
+    category: 'Ритмы и Луна',
+    description: 'Лунный календарь, фазы луны, дни Экадаши, солнечные затмения, точки равноденствия и практики по суткам.',
+    icon: CalendarIcon,
+    badge: 'Лунный цикл',
+    badgeClass: 'badge-indigo',
+    gradient: 'linear-gradient(135deg, #6366F1, #4338CA)',
+    stats: 'Синхронизация с космосом'
+  },
+  {
+    id: 'livezen',
+    title: 'Live Zen & ИИ-Гуру',
+    category: 'Реальное время',
+    description: 'Совместные онлайн-медитации в реальном времени, круг живого присутствия и диалог с ИИ духовным наставником.',
+    icon: Users,
+    badge: '● LIVE',
+    badgeClass: 'badge-live',
+    gradient: 'linear-gradient(135deg, #10B981, #06B6D4)',
+    stats: 'Живой круг присутствия'
+  },
+  {
+    id: 'courses',
+    title: 'Курсы & Академия',
+    category: 'Мастера и Обучение',
+    description: 'Авторские образовательные программы, видеокурсы наставников, ретриты и мультивалютная оплата (9 валют).',
+    icon: GraduationCap,
+    badge: 'PRO Studio',
+    badgeClass: 'badge-gold',
+    gradient: 'linear-gradient(135deg, #D97706, #B45309)',
+    stats: 'Мультивалютная оплата'
+  }
+];
 
 export function SpiritualPage() {
   const { isAuthenticated } = useAuth();
   const { tab } = useParams<{ tab?: string }>();
   const navigate = useNavigate();
 
-  // Active Tab
-  const validTabs = ['meditation', 'yoga', 'affirmations', 'breathing', 'sounds', 'wisdom', 'courses', 'tarot', 'astrology', 'calendar', 'livezen'];
-  const activeTab: TabType = (tab && validTabs.includes(tab)) 
+  // Active Tab: if no tab or tab is 'all' / 'overview', show card catalog
+  const validTabs: TabType[] = ['all', 'meditation', 'yoga', 'affirmations', 'breathing', 'sounds', 'wisdom', 'courses', 'tarot', 'astrology', 'calendar', 'livezen'];
+  const activeTab: TabType = (tab && validTabs.includes(tab as TabType)) 
     ? (tab as TabType) 
-    : 'meditation';
+    : 'all';
 
   const handleTabChange = (newTab: TabType) => {
-    navigate(`/spiritual/${newTab}`);
+    if (newTab === 'all') {
+      navigate('/spiritual');
+    } else {
+      navigate(`/spiritual/${newTab}`);
+    }
   };
 
   // --- MULTI-CURRENCY STATE ---
@@ -638,6 +778,14 @@ export function SpiritualPage() {
       {/* Main Navigation Tabs */}
       <div className="spiritual-tabs-bar">
         <button 
+          className={`spiritual-tab-btn tab-btn-all ${activeTab === 'all' ? 'active' : ''}`}
+          onClick={() => handleTabChange('all')}
+        >
+          <LayoutGrid size={18} />
+          <span>Все практики</span>
+        </button>
+
+        <button 
           className={`spiritual-tab-btn ${activeTab === 'meditation' ? 'active' : ''}`}
           onClick={() => handleTabChange('meditation')}
         >
@@ -737,6 +885,66 @@ export function SpiritualPage() {
           streakDays={streakDays}
         />
       </div>
+
+      {/* ========================================================================= */}
+      {/* TAB 0: ВСЕ ПРАКТИКИ (КАТАЛОГ КАРТОЧЕК В СТИЛЕ СЕРВИСОВ) */}
+      {/* ========================================================================= */}
+      {activeTab === 'all' && (
+        <div className="spiritual-tab-content">
+          <div className="spiritual-catalog-header">
+            <div className="spiritual-catalog-title-group">
+              <h2 className="spiritual-catalog-title">Каталог Духовных Практик</h2>
+              <p className="spiritual-catalog-desc">
+                Выберите направление для персональной медитации, гармонизации сознания, работы с телом или расширения знаний.
+              </p>
+            </div>
+            <div className="spiritual-catalog-count-badge">
+              <span>{SPIRITUAL_PRACTICES_CARDS.length} направлений</span>
+            </div>
+          </div>
+
+          <div className="spiritual-practices-grid">
+            {SPIRITUAL_PRACTICES_CARDS.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div 
+                  key={card.id}
+                  className="spiritual-practice-card"
+                  onClick={() => handleTabChange(card.id)}
+                >
+                  <div className="spiritual-practice-card-top">
+                    <div 
+                      className="spiritual-practice-icon-box"
+                      style={{ background: card.gradient }}
+                    >
+                      <Icon size={26} color="#FFFFFF" />
+                    </div>
+                    {card.badge && (
+                      <span className={`spiritual-practice-badge ${card.badgeClass || ''}`}>
+                        {card.badge}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="spiritual-practice-card-body">
+                    <span className="spiritual-practice-category">{card.category}</span>
+                    <h3 className="spiritual-practice-name">{card.title}</h3>
+                    <p className="spiritual-practice-desc">{card.description}</p>
+                  </div>
+
+                  <div className="spiritual-practice-card-footer">
+                    <span className="spiritual-practice-stats">{card.stats}</span>
+                    <div className="spiritual-practice-action-btn">
+                      <span>Начать</span>
+                      <ArrowRight size={16} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* TAB 1: МЕДИТАЦИЯ */}
