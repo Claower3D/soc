@@ -114,19 +114,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleQuickDemoLogin = async () => {
-    setIsSubmitting(true);
-    try {
-      await login('alex_mironov');
-      setLoginSuccessMessage(true);
-      setTimeout(() => {
-        onSuccess?.();
-        onClose();
-        setLoginSuccessMessage(false);
-      }, 600);
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleOAuthClick = (provider: string) => {
+    setErrorMessage(`Авторизация через ${provider} будет доступна в мобильном приложении`);
   };
 
   return (
@@ -253,40 +242,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <span>Перейдите в <b>Профиль → QR-сканер</b> и наведите камеру</span>
                     </div>
                   </div>
-
-                  <button 
-                    type="button" 
-                    className="qr-demo-instant-btn"
-                    onClick={handleQuickDemoLogin}
-                  >
-                    Имитировать сканирование QR и войти <ArrowRight size={15} />
-                  </button>
                 </div>
               )}
 
               {/* ОБЫЧНЫЙ ВХОД ИЛИ РЕГИСТРАЦИЯ */}
               {(mode === 'register' || (mode === 'login' && loginMethod === 'form')) && (
                 <>
-                  {/* Quick Demo Login Option */}
-                  {mode === 'login' && (
-                    <div className="demo-quick-login-banner" onClick={handleQuickDemoLogin}>
-                      <div className="demo-login-badge">Тестовый вход</div>
-                      <div className="demo-login-text">
-                        <strong>Войти как Алексей Миронов</strong>
-                        <span>Демо-аккаунт с заполненным профилем и публикациями</span>
-                      </div>
-                      <ArrowRight size={16} className="demo-arrow" />
-                    </div>
-                  )}
-
                   {/* OAuth Buttons */}
                   {step === 1 && (
                     <div className="oauth-row">
-                      <button type="button" className="oauth-btn" onClick={handleQuickDemoLogin}>
+                      <button type="button" className="oauth-btn" onClick={() => handleOAuthClick('Google')}>
                         <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" width="18" />
                         Google
                       </button>
-                      <button type="button" className="oauth-btn" onClick={handleQuickDemoLogin}>
+                      <button type="button" className="oauth-btn" onClick={() => handleOAuthClick('Telegram')}>
                         <img src="https://www.svgrepo.com/show/349527/telegram.svg" alt="Telegram" width="18" />
                         Telegram
                       </button>
@@ -304,7 +273,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             <Mail size={17} className="auth-input-icon" />
                             <input 
                               type="text" 
-                              placeholder="alex_mironov или alex@newage.com" 
+                              placeholder="+7 (___) ___-__-__ или email" 
                               value={emailOrPhone}
                               onChange={e => setEmailOrPhone(e.target.value)}
                               required 
@@ -330,7 +299,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             <input type="checkbox" defaultChecked />
                             <span>Запомнить меня</span>
                           </label>
-                          <a href="#forgot" className="forgot-link" onClick={e => { e.preventDefault(); alert('Для демо используйте любой логин или существующего пользователя'); }}>
+                          <a href="#forgot" className="forgot-link" onClick={e => { e.preventDefault(); setErrorMessage('Для восстановления доступа обратитесь в службу поддержки: support@newage.network'); }}>
                             Забыли пароль?
                           </a>
                         </div>

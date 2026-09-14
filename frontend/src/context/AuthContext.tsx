@@ -71,28 +71,6 @@ export const GUEST_USER: User = {
   verified: false,
 };
 
-const defaultDemoAccount: RegisteredAccount = {
-  id: 'me',
-  name: defaultCurrentUser.name,
-  username: defaultCurrentUser.username,
-  emailOrPhone: 'alex@newage.com',
-  password: 'password123',
-  avatar: defaultCurrentUser.avatar,
-  coverImage: defaultCurrentUser.coverImage,
-  bio: defaultCurrentUser.bio,
-  website: defaultCurrentUser.website,
-  location: defaultCurrentUser.location,
-  role: defaultCurrentUser.role || 'creator',
-  beliefType: defaultCurrentUser.beliefType || 'Агностицизм',
-  beliefPrivacy: defaultCurrentUser.beliefPrivacy || 'public',
-  verified: defaultCurrentUser.verified,
-  followersCount: defaultCurrentUser.followersCount,
-  followingCount: defaultCurrentUser.followingCount,
-  criticsCount: defaultCurrentUser.criticsCount || 148,
-  postsCount: defaultCurrentUser.postsCount,
-  createdAt: new Date().toISOString(),
-};
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -112,12 +90,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const saved = localStorage.getItem(STORAGE_KEY_ACCOUNTS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          // Sanitize accounts, exclude legacy me demo account
+          return parsed.filter((a) => a && a.id && a.id !== 'me' && (a.username || a.emailOrPhone));
+        }
       }
     } catch {
       // ignore
     }
-    return [defaultDemoAccount];
+    return [];
   });
 
   const [activeUser, setActiveUser] = useState<User>(() => {
@@ -129,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const saved = localStorage.getItem(STORAGE_KEY_USER);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.id !== 'guest') {
+        if (parsed && parsed.id && parsed.id !== 'guest' && parsed.id !== 'me') {
           Object.assign(defaultCurrentUser, parsed);
           return parsed;
         }
@@ -137,7 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // ignore
     }
-    return defaultDemoAccount;
+    return GUEST_USER;
   });
 
   // Verify JWT session with Go backend on mount
@@ -231,74 +212,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const resData = await response.json();
 
       if (!response.ok) {
-        return { success: false, message: resData.error || 'Ошибка при регистрации' };
+        return { success: false, message: resData.message || resData.error || 'Ошибка при регистрации' };
       }
 
-      const user: User = resData.user;
-      const token: string = resData.token;
+      const user: User = resData.data?.user || resData.user;
+      const token: string = resData.data?.token || resData.token;
 
-      setJwtToken(token);
-      setActiveUser(user);
-      setIsAuthenticated(true);
-      setAllAccounts((prev) => [
-        {
-          ...user,
-          emailOrPhone: data.emailOrPhone.trim(),
-          password: data.password,
-          createdAt: new Date().toISOString(),
-        } as RegisteredAccount,
-        ...prev,
-      ]);
-
-      return { success: true };
+      if (token && user) {
+        setJwtToken(token);
+        setActiveUser(user);
+        setIsAuthenticated(true);
+        setAllAccounts((prev) => [
+          {
+            ...user,
+            emailOrPhone: data.emailOrPhone.trim(),
+            password: data.password,
+            createdAt: new Date().toISOString(),
+          } as RegisteredAccount,
+          ...prev.filter((a) => a && a.id !== user.id),
+        ]);
+        return { success: true };
+      }
     } catch (err) {
       console.warn('Backend offline, proceeding with secure local registration fallback', err);
-
-      // Local Fallback
-      const exists = allAccounts.some(
-        (a) =>
-          a.username.toLowerCase() === cleanUsername ||
-          a.emailOrPhone.toLowerCase() === data.emailOrPhone.trim().toLowerCase()
-      );
-
-      if (exists) {
-        return { success: false, message: 'Пользователь с таким никнеймом или email/телефоном уже существует' };
-      }
-
-      const newId = 'user_' + Date.now();
-      const defaultAvatars = [
-        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-        'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80',
-        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-      ];
-      const avatar = data.avatar || defaultAvatars[Math.floor(Math.random() * defaultAvatars.length)];
-
-      const newAccount: RegisteredAccount = {
-        id: newId,
-        name: data.name.trim(),
-        username: cleanUsername,
-        emailOrPhone: data.emailOrPhone.trim(),
-        password: data.password,
-        avatar,
-        coverImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-        bio: 'Новый участник экосистемы New Age ✨',
-        role: data.role,
-        beliefType: data.beliefType,
-        beliefPrivacy: data.beliefPrivacy,
-        verified: false,
-        followersCount: 1,
-        followingCount: 0,
-        criticsCount: 0,
-        postsCount: 0,
-        createdAt: new Date().toISOString(),
-      };
-
-      setAllAccounts((prev) => [newAccount, ...prev]);
-      setActiveUser(newAccount);
-      setIsAuthenticated(true);
-      return { success: true };
     }
+
+    // Local Fallback
+    const exists = allAccounts.some((a) => {
+      if (!a) return false;
+      const u = a.username ? String(a.username).toLowerCase() : '';
+      const e = a.emailOrPhone ? String(a.emailOrPhone).toLowerCase() : '';
+      return (u && u === cleanUsername) || (e && e === data.emailOrPhone.trim().toLowerCase());
+    });
+
+    if (exists) {
+      return { success: false, message: 'Пользователь с таким никнеймом или email/телефоном уже существует' };
+    }
+
+    const newId = 'user_' + Date.now();
+    const defaultAvatars = [
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
+      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80',
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+    ];
+    const avatar = data.avatar || defaultAvatars[Math.floor(Math.random() * defaultAvatars.length)];
+
+    const newAccount: RegisteredAccount = {
+      id: newId,
+      name: data.name.trim(),
+      username: cleanUsername,
+      emailOrPhone: data.emailOrPhone.trim(),
+      password: data.password,
+      avatar,
+      coverImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+      bio: 'Новый участник экосистемы New Age ✨',
+      role: data.role,
+      beliefType: data.beliefType,
+      beliefPrivacy: data.beliefPrivacy,
+      verified: false,
+      followersCount: 1,
+      followingCount: 0,
+      criticsCount: 0,
+      postsCount: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    setAllAccounts((prev) => [newAccount, ...prev.filter((a) => a && a.id !== newId)]);
+    setActiveUser(newAccount);
+    setIsAuthenticated(true);
+    return { success: true };
   };
 
   // Real Login with Go JWT backend & local fallback
@@ -306,7 +289,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     emailOrUsername: string,
     password?: string
   ): Promise<{ success: boolean; message?: string }> => {
-    const query = emailOrUsername.trim().toLowerCase().replace(/^@/, '');
+    if (!emailOrUsername) {
+      return { success: false, message: 'Введите логин, email или номер телефона' };
+    }
+
+    const query = String(emailOrUsername).trim().toLowerCase().replace(/^@/, '');
 
     // Try Go Backend login
     try {
@@ -321,24 +308,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const resData = await response.json();
 
-      if (response.ok && resData.token) {
-        setJwtToken(resData.token);
-        setActiveUser(resData.user);
+      const token = resData.data?.token || resData.token;
+      const user = resData.data?.user || resData.user;
+
+      if (response.ok && token && user) {
+        setJwtToken(token);
+        setActiveUser(user);
         setIsAuthenticated(true);
         return { success: true };
       }
 
-      if (!response.ok && resData.error && !resData.error.includes('Failed to fetch')) {
-        return { success: false, message: resData.error };
+      if (!response.ok && (resData.message || resData.error)) {
+        const msg = resData.message || resData.error;
+        if (!msg.includes('Failed to fetch')) {
+          return { success: false, message: msg };
+        }
       }
     } catch (err) {
       console.warn('Backend login fallback to local credentials', err);
     }
 
     // Local Fallback
-    const account = allAccounts.find(
-      (a) => a.username.toLowerCase() === query || a.emailOrPhone.toLowerCase() === query
-    );
+    const account = allAccounts.find((a) => {
+      if (!a) return false;
+      const u = a.username ? String(a.username).toLowerCase() : '';
+      const e = a.emailOrPhone ? String(a.emailOrPhone).toLowerCase() : '';
+      return (u && u === query) || (e && e === query);
+    });
 
     if (!account) {
       return { success: false, message: 'Пользователь не найден. Проверьте логин или зарегистрируйтесь.' };
