@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { X, Image as ImageIcon, MapPin, Sparkles } from 'lucide-react';
-import { currentUser, type Post } from '../data/mock';
+import { type Post } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import './CreatePostModal.css';
 
 interface CreatePostModalProps {
@@ -17,6 +18,7 @@ const sampleImages = [
 ];
 
 export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostModalProps) {
+  const { currentUser } = useAuth();
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(sampleImages[0]);

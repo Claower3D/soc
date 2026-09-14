@@ -14,6 +14,7 @@ export function FeedPage() {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
   const [posts, setPosts] = useState<Post[]>(mockPosts);
+  const [feedStories, setFeedStories] = useState(stories);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -22,6 +23,11 @@ export function FeedPage() {
     '5': false,
     '7': false,
   });
+
+  const handleAddStory = (newStory: typeof stories[0]) => {
+    setFeedStories(prev => [newStory, ...prev]);
+    stories.unshift(newStory);
+  };
 
   const handleCreatePost = (newPost: Post) => {
     setPosts(prev => [newPost, ...prev]);
@@ -74,7 +80,7 @@ export function FeedPage() {
     <div className="feed-page-layout">
       {/* Main Feed Column */}
       <div className="feed-main-col">
-        <StoriesBar stories={stories} />
+        <StoriesBar stories={feedStories} onAddStory={handleAddStory} />
 
         {/* Create Post Input Bar or Guest Welcome Banner */}
         {isAuthenticated ? (

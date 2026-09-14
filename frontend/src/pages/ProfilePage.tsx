@@ -4,13 +4,15 @@ import {
   Grid, Video as VideoIcon, Headphones, Bookmark, 
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Share2, Edit3, Heart, MessageSquare,
-  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn
+  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn, Plus
 } from 'lucide-react';
-import { initialUsers, posts, videos, podcasts, initialProducts, RELIGIONS_CATALOG, type User, type Post } from '../data/mock';
+import { initialUsers, posts, stories, videos, podcasts, initialProducts, RELIGIONS_CATALOG, type User, type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { FollowersModal } from '../components/FollowersModal';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { EditProfileModal } from '../components/EditProfileModal';
+import { CreatePostModal } from '../components/CreatePostModal';
+import { CreateStoryModal } from '../components/CreateStoryModal';
 import { AuthModal } from '../components/AuthModal';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './ProfilePage.css';
@@ -20,6 +22,9 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated, logout, updateProfile, allAccounts } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
+  const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
+  const [profilePosts, setProfilePosts] = useState<Post[]>(posts);
 
   // Normalize route param (e.g. '@claower' -> 'claower', 'me', or custom ID)
   const cleanParam = userId ? userId.replace(/^@/, '').toLowerCase() : '';
@@ -67,12 +72,15 @@ export function ProfilePage() {
 
   // Filter user's posts, videos, and podcasts
   const userPosts = useMemo(() => {
-    return posts.filter(p => p.user.id === user.id || (isMe && p.user.id === 'me'));
-  }, [user.id, isMe]);
+    return profilePosts.filter(
+      p => p.user.id === user.id || 
+           (isMe && (p.user.id === 'me' || p.user.id === currentUser.id || p.user.username === currentUser.username))
+    );
+  }, [profilePosts, user.id, isMe, currentUser]);
 
   const savedPosts = useMemo(() => {
-    return posts.filter(p => p.saved);
-  }, []);
+    return profilePosts.filter(p => p.saved);
+  }, [profilePosts]);
 
   const userVideos = useMemo(() => {
     return videos.filter(v => v.channel.id === user.id || (isMe && v.channel.id === 'me'));
@@ -161,6 +169,12 @@ export function ProfilePage() {
               {isMe ? (
                 isAuthenticated ? (
                   <>
+                    <button className="btn btn-primary" onClick={() => setIsCreatePostOpen(true)}>
+                      <Plus size={16} /> Опубликовать
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => setIsCreateStoryOpen(true)}>
+                      <Plus size={16} /> Добавить историю
+                    </button>
                     <button className="btn btn-secondary" onClick={() => setIsEditProfileOpen(true)}>
                       <Edit3 size={16} /> Редактировать
                     </button>
@@ -639,6 +653,28 @@ export function ProfilePage() {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onSuccess={() => {}}
+      />
+
+      {/* Create Post Modal */}
+      <CreatePostModal
+        isOpen={isCreatePostOpen}
+        onClose={() => setIsCreatePostOpen(false)}
+        onCreatePost={(newPost) => {
+          setProfilePosts(prev => [newPost, ...prev]);
+          posts.unshift(newPost);
+          setIsCreatePostOpen(false);
+        }}
+      />
+
+      {/* Create Story Modal */}
+      <CreateStoryModal
+        isOpen={isCreateStoryOpen}
+        onClose={() => setIsCreateStoryOpen(false)}
+        onCreateStory={(newStory) => {
+          stories.unshift(newStory);
+          setIsCreateStoryOpen(false);
+          alert('История успешно опубликована!');
+        }}
       />
     </div>
   );

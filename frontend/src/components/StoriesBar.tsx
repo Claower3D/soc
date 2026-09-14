@@ -1,20 +1,23 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, X, Heart, Send, ChevronLeft, ChevronRight } from 'lucide-react';
-import { currentUser, type Story } from '../data/mock';
+import { type Story } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { CreateStoryModal } from './CreateStoryModal';
 import './StoriesBar.css';
 
 interface StoriesBarProps {
   stories: Story[];
+  onAddStory?: (newStory: Story) => void;
 }
 
-export function StoriesBar({ stories }: StoriesBarProps) {
+export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
   const navigate = useNavigate();
-  const { isAuthenticated, openAuthModal } = useAuth();
+  const { currentUser, isAuthenticated, openAuthModal } = useAuth();
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
   const [likedStory, setLikedStory] = useState(false);
+  const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
 
   const activeStory = activeStoryIndex !== null ? stories[activeStoryIndex] : null;
 
@@ -67,7 +70,7 @@ export function StoriesBar({ stories }: StoriesBarProps) {
               if (!isAuthenticated) {
                 openAuthModal('register');
               } else {
-                navigate(currentUser.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser.id}`);
+                setIsCreateStoryOpen(true);
               }
             }}
           >
@@ -114,19 +117,7 @@ export function StoriesBar({ stories }: StoriesBarProps) {
             <X size={26} />
           </button>
 
-          {activeStoryIndex! > 0 && (
-            <button className="story-nav-btn prev" onClick={handlePrev}>
-              <ChevronLeft size={28} />
-            </button>
-          )}
-
-          {activeStoryIndex! < stories.length - 1 && (
-            <button className="story-nav-btn next" onClick={handleNext}>
-              <ChevronRight size={28} />
-            </button>
-          )}
-
-          <div className="story-viewer-card" onClick={e => e.stopPropagation()}>
+          <div className="story-viewer-container" onClick={e => e.stopPropagation()}>
             {/* Top progress bar */}
             <div className="story-progress-bar">
               <div className="story-progress-fill" />
@@ -134,35 +125,48 @@ export function StoriesBar({ stories }: StoriesBarProps) {
 
             {/* Author info */}
             <div 
-              className="story-author-header"
+              className="story-header"
               onClick={(e) => handleAuthorClick(activeStory.user.id, e)}
             >
               <img src={activeStory.user.avatar} alt={activeStory.user.name} className="story-author-avatar" />
-              <div className="story-author-text">
+              <div className="story-author-info">
                 <span className="story-author-name">{activeStory.user.name}</span>
-                <span className="story-timestamp">{activeStory.timestamp || '3 ч назад'}</span>
+                <span className="story-time">{activeStory.timestamp || '2 ч назад'}</span>
               </div>
             </div>
 
-            {/* Story Image */}
-            <div className="story-media-box">
+            {/* Story Content */}
+            <div className="story-content">
               <img 
-                src={activeStory.image || activeStory.user.coverImage || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80'} 
+                src={activeStory.image || activeStory.user.avatar} 
                 alt="Story" 
-                className="story-full-img"
+                className="story-image"
               />
+              <div className="story-tap-areas">
+                <div className="story-tap-left" onClick={handlePrev}>
+                  <ChevronLeft size={24} className="tap-arrow" />
+                </div>
+                <div className="story-tap-right" onClick={handleNext}>
+                  <ChevronRight size={24} className="tap-arrow" />
+                </div>
+              </div>
             </div>
 
             {/* Bottom reply bar */}
-            <div className="story-reply-bar">
+            <div className="story-footer">
               <input
                 type="text"
-                placeholder={isAuthenticated ? `Ответить ${activeStory.user.name.split(' ')[0]}...` : "Войдите, чтобы ответить..."}
+                placeholder="Ответить на историю..."
                 value={replyText}
                 onChange={e => setReplyText(e.target.value)}
-                onFocus={() => {
-                  if (!isAuthenticated) {
-                    openAuthModal('register');
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && replyText.trim()) {
+                    if (!isAuthenticated) {
+                      openAuthModal('register');
+                      return;
+                    }
+                    alert(`Сообщение отправлено для ${activeStory.user.name}`);
+                    setReplyText('');
                   }
                 }}
                 className="story-reply-input"
@@ -198,6 +202,18 @@ export function StoriesBar({ stories }: StoriesBarProps) {
           </div>
         </div>
       )}
+
+      {/* Create Story Modal */}
+      <CreateStoryModal
+        isOpen={isCreateStoryOpen}
+        onClose={() => setIsCreateStoryOpen(false)}
+        onCreateStory={(newStory) => {
+          if (onAddStory) {
+            onAddStory(newStory);
+          }
+          setIsCreateStoryOpen(false);
+        }}
+      />
     </>
   );
 }

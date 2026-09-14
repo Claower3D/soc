@@ -86,6 +86,35 @@
   box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
+.market-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.market-add-product-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--color-bg-card);
+  color: var(--color-text);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition-fast);
+}
+
+.market-add-product-btn:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+  transform: translateY(-1px);
+}
+
 .market-cart-trigger {
   display: inline-flex;
   align-items: center;

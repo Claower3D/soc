@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { 
-  Search, ShoppingBag, Star, ArrowUpDown, Sparkles 
+  Search, ShoppingBag, Star, ArrowUpDown, Sparkles, Plus 
 } from 'lucide-react';
 import { initialProducts, type Product, type CartItem } from '../data/mock';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { CartDrawer } from '../components/CartDrawer';
+import { CreateProductModal } from '../components/CreateProductModal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
@@ -23,12 +24,19 @@ const CATEGORIES = [
 export function MarketplacePage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const [productsList, setProductsList] = useState<Product[]>(initialProducts);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Все товары');
   const [sortBy, setSortBy] = useState<'popular' | 'price_asc' | 'price_desc' | 'rating'>('popular');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
+
+  const handleAddProduct = (newProd: Product) => {
+    setProductsList(prev => [newProd, ...prev]);
+    initialProducts.unshift(newProd);
+  };
 
   // Cart operations
   const handleAddToCart = (product: Product, quantity = 1) => {
@@ -67,7 +75,7 @@ export function MarketplacePage() {
 
   // Filtered and sorted products
   const filteredProducts = useMemo(() => {
-    return initialProducts.filter(p => {
+    return productsList.filter(p => {
       const matchesQuery = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -79,7 +87,7 @@ export function MarketplacePage() {
       if (sortBy === 'rating') return b.rating - a.rating;
       return b.reviewsCount - a.reviewsCount; // popular
     });
-  }, [searchQuery, selectedCategory, sortBy]);
+  }, [productsList, searchQuery, selectedCategory, sortBy]);
 
   const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
@@ -123,18 +131,30 @@ export function MarketplacePage() {
             />
           </div>
 
-          <button 
-            type="button" 
-            className="market-cart-trigger"
-            onClick={() => setIsCartOpen(true)}
-            title="Открыть корзину"
-          >
-            <ShoppingBag size={20} />
-            <span className="cart-trigger-label">Корзина</span>
-            {totalCartCount > 0 && (
-              <span className="cart-badge-count">{totalCartCount}</span>
-            )}
-          </button>
+          <div className="market-actions-group">
+            <button 
+              type="button" 
+              className="market-add-product-btn"
+              onClick={() => setIsCreateProductOpen(true)}
+              title="Разместить свой товар"
+            >
+              <Plus size={18} />
+              <span>Добавить товар</span>
+            </button>
+
+            <button 
+              type="button" 
+              className="market-cart-trigger"
+              onClick={() => setIsCartOpen(true)}
+              title="Открыть корзину"
+            >
+              <ShoppingBag size={20} />
+              <span className="cart-trigger-label">Корзина</span>
+              {totalCartCount > 0 && (
+                <span className="cart-badge-count">{totalCartCount}</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -258,6 +278,13 @@ export function MarketplacePage() {
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveFromCart}
         onClearCart={handleClearCart}
+      />
+
+      {/* Create Product Modal */}
+      <CreateProductModal
+        isOpen={isCreateProductOpen}
+        onClose={() => setIsCreateProductOpen(false)}
+        onCreateProduct={handleAddProduct}
       />
     </div>
   );
