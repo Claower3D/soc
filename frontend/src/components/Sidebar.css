@@ -45,17 +45,19 @@
 .brand-logo-img {
   width: 54px;
   height: 54px;
-  border-radius: 14px;
+  border-radius: 12px;
   object-fit: cover;
-  background: #FFFFFF;
+  background: transparent;
   display: block;
-  box-shadow: 0 3px 12px rgba(99, 102, 241, 0.18), 0 0 0 1px rgba(99, 102, 241, 0.2);
+  border: 0;
+  outline: none;
+  box-shadow: none;
   transition: all 0.25s ease;
 }
 
 .brand-logo-container:hover .brand-logo-img {
   transform: scale(1.05);
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3), 0 0 0 1.5px var(--color-accent);
+  box-shadow: none;
 }
 
 .brand-text-block {
