@@ -4,7 +4,8 @@ import {
   Flower2, Activity, Sunrise, Wind, Waves, BookOpen, 
   Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, 
   CheckCircle2, Plus, Trash2, Heart, ChevronLeft, ChevronRight,
-  GraduationCap, Megaphone, Star, Check, X
+  GraduationCap, Megaphone, Star, Check, X,
+  Compass, Calendar as CalendarIcon, Bot, Users
 } from 'lucide-react';
 import { 
   MEDITATION_TRACKS, YOGA_ROUTINES, INITIAL_AFFIRMATIONS, 
@@ -15,9 +16,16 @@ import {
 import { spiritualAudio } from '../utils/spiritualAudio';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
+import { TarotDeckModal } from '../components/TarotDeckModal';
+import { NatalChartCalculator } from '../components/NatalChartCalculator';
+import { SpiritualCalendar } from '../components/SpiritualCalendar';
+import { AiGuruModal } from '../components/AiGuruModal';
+import { LiveZenRoom } from '../components/LiveZenRoom';
+import { KarmaTreeWidget } from '../components/KarmaTreeWidget';
+import { MasterBookingModal } from '../components/MasterBookingModal';
 import './SpiritualPage.css';
 
-type TabType = 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom' | 'courses';
+type TabType = 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom' | 'courses' | 'tarot' | 'astrology' | 'calendar' | 'livezen';
 
 export function SpiritualPage() {
   const { isAuthenticated } = useAuth();
@@ -25,7 +33,8 @@ export function SpiritualPage() {
   const navigate = useNavigate();
 
   // Active Tab
-  const activeTab: TabType = (tab && ['meditation', 'yoga', 'affirmations', 'breathing', 'sounds', 'wisdom', 'courses'].includes(tab)) 
+  const validTabs = ['meditation', 'yoga', 'affirmations', 'breathing', 'sounds', 'wisdom', 'courses', 'tarot', 'astrology', 'calendar', 'livezen'];
+  const activeTab: TabType = (tab && validTabs.includes(tab)) 
     ? (tab as TabType) 
     : 'meditation';
 
@@ -150,6 +159,36 @@ export function SpiritualPage() {
       setPurchaseSuccess(false);
       setSelectedCourseForPurchase(null);
     }, 2500);
+  };
+
+  // --- ESOTERIC & MASTERS MODAL STATES ---
+  const [isTarotOpen, setIsTarotOpen] = useState(false);
+  const [isAiGuruOpen, setIsAiGuruOpen] = useState(false);
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [preselectedExpert, setPreselectedExpert] = useState('tarot');
+
+  // --- KARMA TREE STATE ---
+  const [karmaXp, setKarmaXp] = useState(() => {
+    return parseInt(localStorage.getItem('newage_karma_xp') || '65', 10);
+  });
+  const [karmaLevel, setKarmaLevel] = useState(() => {
+    return parseInt(localStorage.getItem('newage_karma_level') || '1', 10);
+  });
+  const [streakDays] = useState(7);
+
+  const handleEarnKarmaXp = (amount: number, _reason?: string) => {
+    const nextXp = karmaXp + amount;
+    const nextLevel = Math.floor(nextXp / 100) + 1;
+    setKarmaXp(nextXp);
+    setKarmaLevel(nextLevel);
+    localStorage.setItem('newage_karma_xp', String(nextXp));
+    localStorage.setItem('newage_karma_level', String(nextLevel));
+    spiritualAudio.playCrystalChime();
+  };
+
+  const handleOpenBooking = (expertType: string = 'tarot') => {
+    setPreselectedExpert(expertType);
+    setIsBookingOpen(true);
   };
 
   // --- MEDITATION TIMER STATE ---
@@ -573,15 +612,26 @@ export function SpiritualPage() {
           <div className="quote-tradition-tag">Мудрость Дня</div>
           <p className="quote-text">«Тот, кто побеждает других — силен. Тот, кто постигает себя — истинно могущественен.»</p>
           <span className="quote-author">— Лао-цзы, Дао Дэ Цзин</span>
-          <button 
-            type="button" 
-            className="chime-test-btn" 
-            onClick={() => spiritualAudio.playZenBowl(432, 4)}
-            title="Очищающий звон поющей чаши"
-          >
-            <Sparkles size={14} />
-            <span>Звон тибетской чаши</span>
-          </button>
+          <div className="quote-buttons-row">
+            <button 
+              type="button" 
+              className="chime-test-btn" 
+              onClick={() => spiritualAudio.playZenBowl(432, 4)}
+              title="Очищающий звон поющей чаши"
+            >
+              <Sparkles size={14} />
+              <span>Звон чаши 432 Гц</span>
+            </button>
+            <button
+              type="button"
+              className="ai-guru-trigger-btn"
+              onClick={() => setIsAiGuruOpen(true)}
+              title="ИИ-Духовный Наставник"
+            >
+              <Bot size={14} />
+              <span>Спросить ИИ-Гуру</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -636,6 +686,40 @@ export function SpiritualPage() {
         </button>
 
         <button 
+          className={`spiritual-tab-btn ${activeTab === 'tarot' ? 'active' : ''}`}
+          onClick={() => handleTabChange('tarot')}
+        >
+          <Sparkles size={18} />
+          <span>Таро & МАК</span>
+          <span className="tab-hot-badge">3D</span>
+        </button>
+
+        <button 
+          className={`spiritual-tab-btn ${activeTab === 'astrology' ? 'active' : ''}`}
+          onClick={() => handleTabChange('astrology')}
+        >
+          <Compass size={18} />
+          <span>Натальная карта</span>
+        </button>
+
+        <button 
+          className={`spiritual-tab-btn ${activeTab === 'calendar' ? 'active' : ''}`}
+          onClick={() => handleTabChange('calendar')}
+        >
+          <CalendarIcon size={18} />
+          <span>Календарь</span>
+        </button>
+
+        <button 
+          className={`spiritual-tab-btn ${activeTab === 'livezen' ? 'active' : ''}`}
+          onClick={() => handleTabChange('livezen')}
+        >
+          <Users size={18} />
+          <span>Live Zen</span>
+          <span className="tab-hot-badge live">● LIVE</span>
+        </button>
+
+        <button 
           className={`spiritual-tab-btn tab-btn-courses ${activeTab === 'courses' ? 'active' : ''}`}
           onClick={() => handleTabChange('courses')}
         >
@@ -643,6 +727,15 @@ export function SpiritualPage() {
           <span>Курсы & Маркет</span>
           <span className="tab-hot-badge">PRO</span>
         </button>
+      </div>
+
+      {/* Karma Tree Progress Bar */}
+      <div className="spiritual-karma-strip">
+        <KarmaTreeWidget 
+          xp={karmaXp}
+          level={karmaLevel}
+          streakDays={streakDays}
+        />
       </div>
 
       {/* ========================================================================= */}
@@ -1385,6 +1478,72 @@ export function SpiritualPage() {
       )}
 
       {/* ========================================================================= */}
+      {/* TAB 8: ТАРО & МАК (3D КАРТЫ) */}
+      {/* ========================================================================= */}
+      {activeTab === 'tarot' && (
+        <div className="spiritual-tab-content">
+          <div className="tarot-hub-banner">
+            <div className="tarot-hub-info">
+              <div className="hub-badge">
+                <Sparkles size={14} />
+                <span>3D Оракул • Символическое Поле</span>
+              </div>
+              <h2 className="hub-title">Карты Таро и Метафорические Карты (МАК)</h2>
+              <p className="hub-desc">
+                Интерактивное вытягивание карт с реалистичным 3D-переворотом, аудио-резонансом 528 Гц и глубокими толкованиями Старших Арканов. Выберите «Совет дня», расклад на 3 карты «Триединство» или расклад «Путь души».
+              </p>
+              <div className="hub-actions-row">
+                <button 
+                  className="btn-launch-tarot"
+                  onClick={() => setIsTarotOpen(true)}
+                >
+                  <Sparkles size={18} />
+                  <span>Открыть 3D-колоду Таро</span>
+                </button>
+                <button 
+                  className="btn-expert-tarot"
+                  onClick={() => handleOpenBooking('tarot')}
+                >
+                  Запись к живому тарологу
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 9: НАТАЛЬНАЯ КАРТА & HUMAN DESIGN */}
+      {/* ========================================================================= */}
+      {activeTab === 'astrology' && (
+        <div className="spiritual-tab-content">
+          <NatalChartCalculator 
+            onOpenBooking={handleOpenBooking}
+          />
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 10: ЕДИНЫЙ ДУХОВНЫЙ КАЛЕНДАРЬ */}
+      {/* ========================================================================= */}
+      {activeTab === 'calendar' && (
+        <div className="spiritual-tab-content">
+          <SpiritualCalendar />
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 11: LIVE ZEN (СИНХРОННАЯ МЕДИТАЦИЯ) */}
+      {/* ========================================================================= */}
+      {activeTab === 'livezen' && (
+        <div className="spiritual-tab-content">
+          <LiveZenRoom 
+            onEarnXp={handleEarnKarmaXp}
+          />
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* MODAL: CREATE / PUBLISH COURSE OR AD */}
       {/* ========================================================================= */}
       {isCreateCourseModalOpen && (
@@ -1655,6 +1814,37 @@ export function SpiritualPage() {
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* 3D TAROT & MAC MODAL */}
+      {/* ========================================================================= */}
+      <TarotDeckModal
+        isOpen={isTarotOpen}
+        onClose={() => setIsTarotOpen(false)}
+        onBookExpert={() => handleOpenBooking('tarot')}
+      />
+
+      {/* ========================================================================= */}
+      {/* AI GURU MODAL */}
+      {/* ========================================================================= */}
+      <AiGuruModal
+        isOpen={isAiGuruOpen}
+        onClose={() => setIsAiGuruOpen(false)}
+        onStartBreathing={() => handleTabChange('breathing')}
+        onPlaySound={() => handleTabChange('sounds')}
+      />
+
+      {/* ========================================================================= */}
+      {/* MASTER 1-ON-1 BOOKING MODAL */}
+      {/* ========================================================================= */}
+      <MasterBookingModal
+        isOpen={isBookingOpen}
+        onClose={() => setIsBookingOpen(false)}
+        preselectedMasterType={preselectedExpert}
+        onConferenceCreated={(_roomName, _inviteLink) => {
+          handleEarnKarmaXp(100, 'Запись на консультацию к наставнику');
+        }}
+      />
     </div>
   );
 }

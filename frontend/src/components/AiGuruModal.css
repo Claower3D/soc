@@ -1,0 +1,286 @@
+.guru-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.guru-modal {
+  background: var(--surface, #18181b);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 580px;
+  height: 640px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.guru-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color, #27272a);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(24, 24, 27, 0.8);
+}
+
+.guru-header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.guru-avatar-circle {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.4);
+}
+
+.guru-header-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary, #ffffff);
+}
+
+.guru-header-sub {
+  font-size: 0.8rem;
+  color: #c084fc;
+  font-weight: 500;
+}
+
+.guru-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #a1a1aa);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  transition: all 0.15s;
+}
+
+.guru-close-btn:hover {
+  color: var(--text-primary, #ffffff);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Traditions Selector */
+.guru-traditions-bar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color, #27272a);
+  overflow-x: auto;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.guru-persona-btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: var(--surface, #18181b);
+  border: 1px solid var(--border-color, #27272a);
+  color: var(--text-secondary, #a1a1aa);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+.guru-persona-btn:hover {
+  color: var(--text-primary, #ffffff);
+}
+
+.guru-persona-btn.active {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.5);
+  color: #c084fc;
+}
+
+/* Messages Area */
+.guru-messages-area {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.guru-message-wrap {
+  display: flex;
+  width: 100%;
+}
+
+.guru-message-wrap.user {
+  justify-content: flex-end;
+}
+
+.guru-message-wrap.guru {
+  justify-content: flex-start;
+}
+
+.guru-bubble {
+  max-width: 82%;
+  border-radius: 16px;
+  padding: 12px 16px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.guru-message-wrap.user .guru-bubble {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
+}
+
+.guru-message-wrap.guru .guru-bubble {
+  background: var(--bg-primary, #09090b);
+  color: var(--text-primary, #ffffff);
+  border: 1px solid var(--border-color, #27272a);
+  border-bottom-left-radius: 4px;
+}
+
+/* Recommendation Box */
+.guru-rec-box {
+  margin-top: 10px;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.guru-rec-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #c084fc;
+  margin-bottom: 8px;
+}
+
+.guru-rec-action-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #a855f7, #7c3aed);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.guru-rec-action-btn:hover {
+  opacity: 0.9;
+}
+
+/* Typing indicator */
+.typing-bubble {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  background: #a855f7;
+  border-radius: 50%;
+  animation: pulse-dot 1.2s infinite;
+}
+
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes pulse-dot {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1.1); opacity: 1; }
+}
+
+/* Mood chips */
+.guru-mood-chips {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  overflow-x: auto;
+  border-top: 1px solid var(--border-color, #27272a);
+}
+
+.guru-mood-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color, #27272a);
+  color: var(--text-primary, #ffffff);
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.guru-mood-chip:hover {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.4);
+}
+
+/* Input Bar */
+.guru-input-bar {
+  display: flex;
+  padding: 14px 16px;
+  gap: 10px;
+  border-top: 1px solid var(--border-color, #27272a);
+  background: var(--surface, #18181b);
+}
+
+.guru-input {
+  flex: 1;
+  background: var(--bg-primary, #09090b);
+  border: 1px solid var(--border-color, #27272a);
+  color: var(--text-primary, #ffffff);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.guru-input:focus {
+  border-color: #a855f7;
+}
+
+.guru-send-btn {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.guru-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

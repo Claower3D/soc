@@ -11,7 +11,9 @@ import {
   Sparkles,
   Check,
   Plus,
-  Send
+  Send,
+  Share2,
+  Copy
 } from 'lucide-react';
 import {
   initialTransactions,
@@ -254,6 +256,86 @@ export const WalletPage: React.FC = () => {
               </button>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Referral Program Section */}
+      <div className="referral-program-section" style={{
+        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%)',
+        border: '1px solid rgba(168, 85, 247, 0.3)',
+        borderRadius: '16px',
+        padding: '24px',
+        marginBottom: '24px'
+      }}>
+        <div className="section-title-row">
+          <div className="section-title-wrap">
+            <Share2 size={20} color="#a855f7" />
+            <div>
+              <h3 style={{ color: 'var(--text-primary, #ffffff)', fontSize: '1.2rem', fontWeight: 700 }}>
+                Реферальная программа 2.0 (New Age Partners)
+              </h3>
+              <p style={{ color: 'var(--text-secondary, #a1a1aa)', fontSize: '0.88rem' }}>
+                Приглашайте друзей и авторов. Получайте 10% от их оплат курсов и премиум-подписок пожизненно прямо на баланс кошелька.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '14px',
+          marginTop: '16px',
+          marginBottom: '18px'
+        }}>
+          <div style={{ background: 'var(--surface, #18181b)', border: '1px solid var(--border-color, #27272a)', borderRadius: '12px', padding: '14px' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary, #a1a1aa)' }}>Приглашено участников:</span>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary, #ffffff)' }}>14 человек</div>
+          </div>
+          <div style={{ background: 'var(--surface, #18181b)', border: '1px solid var(--border-color, #27272a)', borderRadius: '12px', padding: '14px' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary, #a1a1aa)' }}>Заработано на рефералах:</span>
+            <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#34d399' }}>+4 250 ₽</div>
+          </div>
+          <div style={{ background: 'var(--surface, #18181b)', border: '1px solid var(--border-color, #27272a)', borderRadius: '12px', padding: '14px' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary, #a1a1aa)' }}>Ваш партнерский уровень:</span>
+            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#c084fc' }}>Серебряный Партнёр (10%)</div>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          alignItems: 'center',
+          background: 'var(--bg-primary, #09090b)',
+          border: '1px solid var(--border-color, #27272a)',
+          borderRadius: '10px',
+          padding: '8px 12px'
+        }}>
+          <code style={{ flex: 1, fontSize: '0.88rem', color: '#38bdf8' }}>
+            https://newage.network/join?ref=alex_guru
+          </code>
+          <button 
+            type="button" 
+            onClick={() => {
+              navigator.clipboard?.writeText('https://newage.network/join?ref=alex_guru');
+              alert('Партнёрская ссылка скопирована в буфер обмена!');
+            }}
+            style={{
+              background: 'linear-gradient(135deg, #a855f7, #6366f1)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '8px 14px',
+              fontSize: '0.84rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <Copy size={14} /> Скопировать ссылку
+          </button>
         </div>
       </div>
 
