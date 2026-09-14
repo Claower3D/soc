@@ -11,10 +11,12 @@ import {
   initialConferences, initialRecordings, initialChats, 
   currentUser, type Conference, type Chat 
 } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import './CallsPage.css';
 
 export function ConferencesPage() {
   const navigate = useNavigate();
+  const { isAuthenticated, openAuthModal } = useAuth();
   const [conferences, setConferences] = useState<Conference[]>(initialConferences);
   const [recordings, setRecordings] = useState(initialRecordings);
   const [activeTab, setActiveTab] = useState<'all' | 'open' | 'private' | 'recordings'>('all');
@@ -165,13 +167,24 @@ export function ConferencesPage() {
             </p>
           </div>
 
-          <button 
-            className="btn-create-conf-main"
-            onClick={() => setIsCreateModalOpen(true)}
-          >
-            <Plus size={20} />
-            <span>Создать свою конференцию</span>
-          </button>
+          {isAuthenticated ? (
+            <button 
+              className="btn-create-conf-main"
+              onClick={() => setIsCreateModalOpen(true)}
+            >
+              <Plus size={20} />
+              <span>Создать свою конференцию</span>
+            </button>
+          ) : (
+            <button 
+              className="btn-create-conf-main guest-restricted-btn"
+              onClick={() => openAuthModal('register')}
+              title="Для создания видеоконференции войдите в аккаунт"
+            >
+              <Lock size={18} />
+              <span>Создать свою конференцию</span>
+            </button>
+          )}
         </div>
 
         {/* Quick Join Bar */}

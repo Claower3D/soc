@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Search, Radio, Headphones, Plus } from 'lucide-react';
+import { Search, Radio, Headphones, Plus, Lock } from 'lucide-react';
 import { PodcastCard } from '../components/PodcastCard';
 import { PodcastPlayer } from '../components/PodcastPlayer';
 import { UploadPodcastModal } from '../components/UploadPodcastModal';
 import { podcasts, type Podcast, type Episode } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import './PodcastsPage.css';
 
 const categories = ['Все', 'Технологии & IT', 'Дизайн & Продукт', 'Бизнес & Стартапы', 'Искусственный интеллект'];
 
 export function PodcastsPage() {
+  const { isAuthenticated, openAuthModal } = useAuth();
   const [podcastList, setPodcastList] = useState<Podcast[]>(podcasts);
   const [activePodcast, setActivePodcast] = useState<Podcast | null>(podcasts[0]);
   const [activeEpisode, setActiveEpisode] = useState<Episode | null>(podcasts[0].episodes[0]);
@@ -55,13 +57,24 @@ export function PodcastsPage() {
         </div>
 
         <div className="podcasts-header-actions">
-          <button 
-            className="btn-create-podcast-trigger"
-            onClick={() => setIsUploadModalOpen(true)}
-          >
-            <Plus size={18} />
-            <span>Опубликовать подкаст</span>
-          </button>
+          {isAuthenticated ? (
+            <button 
+              className="btn-create-podcast-trigger"
+              onClick={() => setIsUploadModalOpen(true)}
+            >
+              <Plus size={18} />
+              <span>Опубликовать подкаст</span>
+            </button>
+          ) : (
+            <button 
+              className="btn-create-podcast-trigger guest-restricted-btn"
+              onClick={() => openAuthModal('register')}
+              title="Для публикации подкаста войдите в аккаунт"
+            >
+              <Lock size={16} />
+              <span>Опубликовать подкаст</span>
+            </button>
+          )}
 
           <div className="podcasts-search-bar">
             <Search size={18} className="pod-search-icon" />

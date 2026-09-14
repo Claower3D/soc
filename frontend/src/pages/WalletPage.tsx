@@ -19,11 +19,27 @@ import {
   currentUser,
   type WalletTransaction
 } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './WalletPage.css';
 
 export const WalletPage: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const [balance, setBalance] = useState(14850);
   const [transactions, setTransactions] = useState<WalletTransaction[]>(initialTransactions);
+
+  if (!isAuthenticated) {
+    return (
+      <div style={{ maxWidth: 760, margin: '2rem auto', padding: '1rem' }}>
+        <GuestLockPrompt
+          featureName="Кошелёк и New Age Pay"
+          title="Финансовый кошелёк привязан к личному профилю"
+          description="Пополнение баланса, донаты авторам контента, покупка премиум-подписок и вывод средств доступны только зарегистрированным пользователям."
+          actionText="Создать аккаунт для доступа к кошельку"
+        />
+      </div>
+    );
+  }
 
   // Modal states
   const [isDepositOpen, setIsDepositOpen] = useState(false);

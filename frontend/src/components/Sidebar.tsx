@@ -4,7 +4,7 @@ import {
   Home, Video, MessageCircle, PhoneCall, Headphones, 
   User as UserIcon, Tv, ShoppingBag, Users, Film, Wallet, ShieldAlert,
   ChevronDown, ChevronRight, Layers, ExternalLink,
-  Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles, GraduationCap
+  Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles, GraduationCap, Lock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AuthModal } from './AuthModal';
@@ -165,7 +165,7 @@ export function Sidebar() {
           </NavLink>
         </div>
 
-        {servicesExpanded && (
+          {servicesExpanded && (
           <div className="services-subnav">
             <NavLink to="/marketplace" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
               <ShoppingBag className="nav-icon service-icon-market" size={18} />
@@ -182,15 +182,39 @@ export function Sidebar() {
               <span className="nav-label">Видеостудия</span>
             </NavLink>
 
-            <NavLink to="/wallet" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
-              <Wallet className="nav-icon service-icon-wallet" size={18} />
-              <span className="nav-label">Кошелёк</span>
-            </NavLink>
+            {isAuthenticated ? (
+              <NavLink to="/wallet" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
+                <Wallet className="nav-icon service-icon-wallet" size={18} />
+                <span className="nav-label">Кошелёк</span>
+              </NavLink>
+            ) : (
+              <div 
+                className="nav-item sub-nav-item guest-locked-nav" 
+                onClick={() => setAuthModalOpen(true)}
+                title="Кошелёк доступен после регистрации"
+              >
+                <Wallet className="nav-icon service-icon-wallet" size={18} />
+                <span className="nav-label">Кошелёк</span>
+                <span className="nav-lock-badge"><Lock size={12} /></span>
+              </div>
+            )}
 
-            <NavLink to="/admin" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
-              <ShieldAlert className="nav-icon service-icon-admin" size={18} />
-              <span className="nav-label">Админ-панель</span>
-            </NavLink>
+            {isAuthenticated ? (
+              <NavLink to="/admin" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
+                <ShieldAlert className="nav-icon service-icon-admin" size={18} />
+                <span className="nav-label">Админ-панель</span>
+              </NavLink>
+            ) : (
+              <div 
+                className="nav-item sub-nav-item guest-locked-nav" 
+                onClick={() => setAuthModalOpen(true)}
+                title="Админ-панель доступна только авторизованным модераторам"
+              >
+                <ShieldAlert className="nav-icon service-icon-admin" size={18} />
+                <span className="nav-label">Админ-панель</span>
+                <span className="nav-lock-badge"><Lock size={12} /></span>
+              </div>
+            )}
           </div>
         )}
 

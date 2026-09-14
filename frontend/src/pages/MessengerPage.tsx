@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { ChatList } from '../components/ChatList';
 import { ChatWindow } from '../components/ChatWindow';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import { chats, type Chat } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import './MessengerPage.css';
 
 export function MessengerPage() {
+  const { isAuthenticated } = useAuth();
   const [chatList, setChatList] = useState<Chat[]>(chats);
   const [activeChatId, setActiveChatId] = useState<string | null>(chats[0]?.id ?? null);
 
@@ -16,6 +19,19 @@ export function MessengerPage() {
       setActiveChatId(null);
     }
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="messenger-guest-lock-container">
+        <GuestLockPrompt
+          featureName="Личные сообщения и чаты"
+          title="Мессенджер защищён сквозным шифрованием"
+          description="Чтобы начать общение с другими участниками, совершать звонки, создавать групповые чаты и делиться файлами, войдите в свой аккаунт или зарегистрируйтесь."
+          actionText="Создать аккаунт для переписки"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="messenger-page">

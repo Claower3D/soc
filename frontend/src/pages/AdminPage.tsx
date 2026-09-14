@@ -13,6 +13,8 @@ import {
   Ban
 } from 'lucide-react';
 import { initialUsers, initialProducts, type User } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './AdminPage.css';
 
 interface ModerationReport {
@@ -27,7 +29,21 @@ interface ModerationReport {
 }
 
 export const AdminPage: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<'kpi' | 'moderation' | 'users'>('kpi');
+
+  if (!isAuthenticated) {
+    return (
+      <div style={{ maxWidth: 760, margin: '2rem auto', padding: '1rem' }}>
+        <GuestLockPrompt
+          featureName="Административная панель"
+          title="Раздел предназначен для модераторов и администраторов"
+          description="Доступ к метрикам KPI, очереди жалоб модерации и управлению пользователями ограничен правами безопасности экосистемы New Age."
+          actionText="Авторизоваться администратором"
+        />
+      </div>
+    );
+  }
   
   // User Management
   const [usersList, setUsersList] = useState<User[]>(initialUsers);

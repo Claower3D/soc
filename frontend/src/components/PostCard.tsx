@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Check, MapPin, Trash2 } from 'lucide-react';
 import { currentUser, type Post } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import './PostCard.css';
 
 interface PostCardProps {
@@ -12,6 +13,7 @@ interface PostCardProps {
 
 export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
   const navigate = useNavigate();
+  const { isAuthenticated, openAuthModal } = useAuth();
   const [bookmarked, setBookmarked] = useState(post.saved ?? false);
   const [copied, setCopied] = useState(false);
   const [commentInput, setCommentInput] = useState('');
@@ -19,8 +21,18 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
   const [showAllComments, setShowAllComments] = useState(false);
   const [showHeartBurst, setShowHeartBurst] = useState(false);
 
+  const handleShare = () => {
+    navigator.clipboard?.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isAuthenticated) {
+      openAuthModal('register');
+      return;
+    }
     if (!post.liked) {
       onLike(post.id);
     }
@@ -51,15 +63,30 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
     navigate(`/profile/${userId === 'me' ? 'me' : userId}`);
   };
 
-  const handleShare = (e: React.MouseEvent) => {
+  const handleLikeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigator.clipboard?.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (!isAuthenticated) {
+      openAuthModal('register');
+      return;
+    }
+    onLike(post.id);
+  };
+
+  const handleBookmarkClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      openAuthModal('register');
+      return;
+    }
+    setBookmarked(!bookmarked);
   };
 
   const handleAddComment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAuthenticated) {
+      openAuthModal('register');
+      return;
+    }
     if (!commentInput.trim()) return;
     const newC = {
       id: `c_${Date.now()}`,
@@ -131,7 +158,7 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
           <div className="post-actions-left">
             <button 
               className={`action-btn ${post.liked ? 'liked' : ''}`} 
-              onClick={() => onLike(post.id)}
+              onClick={handleLikeClick}
               title={post.liked ? 'Не нравится' : 'Нравится'}
             >
               <Heart fill={post.liked ? '#EF4444' : 'none'} color={post.liked ? '#EF4444' : 'currentColor'} size={22} />
@@ -152,7 +179,7 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
 
           <button 
             className={`action-btn bookmark-btn ${bookmarked ? 'bookmarked' : ''}`} 
-            onClick={() => setBookmarked(!bookmarked)}
+            onClick={handleBookmarkClick}
             title={bookmarked ? 'В закладках' : 'Сохранить'}
           >
             <Bookmark fill={bookmarked ? '#6366F1' : 'none'} color={bookmarked ? '#6366F1' : 'currentColor'} size={22} />

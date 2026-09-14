@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { Search, Upload, Video as VideoIcon } from 'lucide-react';
+import { Search, Upload, Video as VideoIcon, Lock } from 'lucide-react';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { UploadVideoModal } from '../components/UploadVideoModal';
 import { videos, type Video } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import './VideoPage.css';
 
 const categories = ['Все', 'Разработка', 'Дизайн', 'Go & Docker', 'React', 'Карьера'];
 
 export function VideoPage() {
+  const { isAuthenticated, openAuthModal } = useAuth();
   const [videoList, setVideoList] = useState<Video[]>(videos);
   const [selectedVideo, setSelectedVideo] = useState<Video>(videos[0]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,13 +37,24 @@ export function VideoPage() {
       <aside className="video-sidebar">
         {/* Upload Button */}
         <div className="video-upload-top-action">
-          <button 
-            className="btn-upload-video-trigger"
-            onClick={() => setIsUploadModalOpen(true)}
-          >
-            <Upload size={16} />
-            <span>Загрузить своё видео</span>
-          </button>
+          {isAuthenticated ? (
+            <button 
+              className="btn-upload-video-trigger"
+              onClick={() => setIsUploadModalOpen(true)}
+            >
+              <Upload size={16} />
+              <span>Загрузить своё видео</span>
+            </button>
+          ) : (
+            <button 
+              className="btn-upload-video-trigger guest-restricted-btn"
+              onClick={() => openAuthModal('register')}
+              title="Для загрузки видео требуется зарегистрироваться"
+            >
+              <Lock size={15} />
+              <span>Загрузить своё видео</span>
+            </button>
+          )}
         </div>
 
         {/* Search Bar in Video Section */}

@@ -4,7 +4,8 @@ import {
   X, Heart, MessageCircle, Send, Bookmark, 
   Trash2, Reply, Smile, Check, MapPin 
 } from 'lucide-react';
-import { currentUser, type Post, type Comment } from '../data/mock';
+import { type Post, type Comment } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import './PostDetailModal.css';
 
 interface PostDetailModalProps {
@@ -18,6 +19,7 @@ const quickEmojis = ['❤️', '🔥', '👏', '😍', '☕', '✨', '🚀', '�
 
 export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: PostDetailModalProps) {
   const navigate = useNavigate();
+  const { currentUser, isAuthenticated, openAuthModal } = useAuth();
   const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState<Comment[]>(post?.comments || []);
   const [likedComments, setLikedComments] = useState<Record<string, { liked: boolean; count: number }>>({});
@@ -47,6 +49,10 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
   };
 
   const handleToggleLikeComment = (commentId: string) => {
+    if (!isAuthenticated) {
+      openAuthModal('register');
+      return;
+    }
     setLikedComments(prev => {
       const cur = prev[commentId] || { liked: false, count: 0 };
       return {
@@ -61,6 +67,10 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
 
   const handleAddComment = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!isAuthenticated) {
+      openAuthModal('register');
+      return;
+    }
     if (!commentText.trim()) return;
 
     const newCommentObj: Comment = {
@@ -265,7 +275,13 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
             <div className="actions-left">
               <button 
                 className={`modal-tool-btn ${post.liked ? 'liked' : ''}`}
-                onClick={() => onLikePost(post.id)}
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    openAuthModal('register');
+                  } else {
+                    onLikePost(post.id);
+                  }
+                }}
                 title={post.liked ? 'Не нравится' : 'Нравится'}
               >
                 <Heart 
@@ -277,7 +293,13 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
 
               <button 
                 className="modal-tool-btn" 
-                onClick={() => inputRef.current?.focus()}
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    openAuthModal('register');
+                  } else {
+                    inputRef.current?.focus();
+                  }
+                }}
                 title="Оставить комментарий"
               >
                 <MessageCircle size={24} />
@@ -294,7 +316,13 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
 
             <button 
               className={`modal-tool-btn bookmark ${saved ? 'saved' : ''}`}
-              onClick={() => setSaved(!saved)}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  openAuthModal('register');
+                } else {
+                  setSaved(!saved);
+                }
+              }}
               title={saved ? 'В закладках' : 'Сохранить'}
             >
               <Bookmark 

@@ -27,6 +27,10 @@ interface AuthContextType {
   currentUser: User;
   isAuthenticated: boolean;
   allAccounts: RegisteredAccount[];
+  isAuthModalOpen: boolean;
+  authModalMode: 'login' | 'register';
+  openAuthModal: (mode?: 'login' | 'register') => void;
+  closeAuthModal: () => void;
   login: (emailOrUsername: string, password?: string) => { success: boolean; message?: string };
   register: (data: {
     name: string;
@@ -90,6 +94,19 @@ const defaultDemoAccount: RegisteredAccount = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Modal global state for guest locks
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+
+  const openAuthModal = (mode: 'login' | 'register' = 'login') => {
+    setAuthModalMode(mode);
+    setIsAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setIsAuthModalOpen(false);
+  };
+
   // 1. Is Authenticated: defaults to false if not explicitly set to 'true'
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('new_age_is_auth') === 'true';
@@ -244,6 +261,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       currentUser: activeUser,
       isAuthenticated,
       allAccounts,
+      isAuthModalOpen,
+      authModalMode,
+      openAuthModal,
+      closeAuthModal,
       login,
       register,
       logout,

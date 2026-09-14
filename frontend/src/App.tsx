@@ -17,11 +17,57 @@ import { VideoEditorPage } from './pages/VideoEditorPage';
 import { WalletPage } from './pages/WalletPage';
 import { AdminPage } from './pages/AdminPage';
 import { SpiritualPage } from './pages/SpiritualPage';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { AuthModal } from './components/AuthModal';
 import './styles/theme.css';
 import './App.css';
+
+function AppContent() {
+  const { isAuthModalOpen, closeAuthModal, authModalMode } = useAuth();
+
+  return (
+    <div className="app-layout">
+      <Sidebar />
+      <div className="app-main-area">
+        <Header />
+        <main className="app-main-content">
+          <Routes>
+            <Route path="/" element={<FeedPage />} />
+            <Route path="/video" element={<VideoPage />} />
+            <Route path="/channel/:channelId" element={<ChannelPage />} />
+            <Route path="/channel/me" element={<ChannelPage />} />
+            <Route path="/messenger" element={<MessengerPage />} />
+            <Route path="/conferences" element={<ConferencesPage />} />
+            <Route path="/calls" element={<Navigate to="/conferences" replace />} />
+            <Route path="/podcasts" element={<PodcastsPage />} />
+            <Route path="/services" element={<ServicesPage />} />
+            <Route path="/marketplace" element={<MarketplacePage />} />
+            <Route path="/communities" element={<CommunitiesPage />} />
+            <Route path="/community/:id" element={<CommunityDetailPage />} />
+            <Route path="/editor" element={<VideoEditorPage />} />
+            <Route path="/wallet" element={<WalletPage />} />
+            <Route path="/admin" element={<AdminPage />} />
+            <Route path="/spiritual" element={<SpiritualPage />} />
+            <Route path="/spiritual/:tab" element={<SpiritualPage />} />
+            <Route path="/profile/:userId" element={<ProfilePage />} />
+            <Route path="/profile/me" element={<ProfilePage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </main>
+      </div>
+      <BottomNav />
+
+      {/* Global Auth Modal for all guest locks */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        initialMode={authModalMode}
+      />
+    </div>
+  );
+}
 
 function App() {
   return (
@@ -29,42 +75,12 @@ function App() {
       <ThemeProvider>
         <NotificationProvider>
           <AuthProvider>
-            <div className="app-layout">
-        <Sidebar />
-        <div className="app-main-area">
-          <Header />
-          <main className="app-main-content">
-            <Routes>
-              <Route path="/" element={<FeedPage />} />
-              <Route path="/video" element={<VideoPage />} />
-              <Route path="/channel/:channelId" element={<ChannelPage />} />
-              <Route path="/channel/me" element={<ChannelPage />} />
-              <Route path="/messenger" element={<MessengerPage />} />
-              <Route path="/conferences" element={<ConferencesPage />} />
-              <Route path="/calls" element={<Navigate to="/conferences" replace />} />
-              <Route path="/podcasts" element={<PodcastsPage />} />
-              <Route path="/services" element={<ServicesPage />} />
-              <Route path="/marketplace" element={<MarketplacePage />} />
-              <Route path="/communities" element={<CommunitiesPage />} />
-              <Route path="/community/:id" element={<CommunityDetailPage />} />
-              <Route path="/editor" element={<VideoEditorPage />} />
-              <Route path="/wallet" element={<WalletPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-              <Route path="/spiritual" element={<SpiritualPage />} />
-              <Route path="/spiritual/:tab" element={<SpiritualPage />} />
-              <Route path="/profile/:userId" element={<ProfilePage />} />
-              <Route path="/profile/me" element={<ProfilePage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </main>
-        </div>
-          <BottomNav />
-        </div>
-            </AuthProvider>
-          </NotificationProvider>
-        </ThemeProvider>
-      </BrowserRouter>
-    );
-  }
+            <AppContent />
+          </AuthProvider>
+        </NotificationProvider>
+      </ThemeProvider>
+    </BrowserRouter>
+  );
+}
 
 export default App;

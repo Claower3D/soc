@@ -13,7 +13,7 @@ import { AuthModal } from './AuthModal';
 import './Header.css';
 
 export function Header() {
-  const { currentUser, isAuthenticated } = useAuth();
+  const { currentUser, isAuthenticated, openAuthModal } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { preferences, updatePreferences, triggerTestPush, requestDesktopPermission, browserPermission } = useNotifications();
   const [query, setQuery] = useState('');
@@ -280,7 +280,14 @@ export function Header() {
             <div className="header-create-dropdown">
               <button 
                 className="create-menu-item" 
-                onClick={() => { setCreateMenuOpen(false); navigate('/'); }}
+                onClick={() => { 
+                  setCreateMenuOpen(false); 
+                  if (!isAuthenticated) {
+                    openAuthModal('register');
+                  } else {
+                    navigate('/'); 
+                  }
+                }}
               >
                 <ImageIcon size={18} color="#10B981" />
                 <div className="create-item-text">
@@ -291,7 +298,14 @@ export function Header() {
 
               <button 
                 className="create-menu-item" 
-                onClick={() => { setCreateMenuOpen(false); navigate('/video'); }}
+                onClick={() => { 
+                  setCreateMenuOpen(false); 
+                  if (!isAuthenticated) {
+                    openAuthModal('register');
+                  } else {
+                    navigate('/video'); 
+                  }
+                }}
               >
                 <Video size={18} color="#EF4444" />
                 <div className="create-item-text">
@@ -302,7 +316,14 @@ export function Header() {
 
               <button 
                 className="create-menu-item" 
-                onClick={() => { setCreateMenuOpen(false); navigate('/podcasts'); }}
+                onClick={() => { 
+                  setCreateMenuOpen(false); 
+                  if (!isAuthenticated) {
+                    openAuthModal('register');
+                  } else {
+                    navigate('/podcasts'); 
+                  }
+                }}
               >
                 <Headphones size={18} color="var(--color-accent)" />
                 <div className="create-item-text">
@@ -313,7 +334,14 @@ export function Header() {
 
               <button 
                 className="create-menu-item" 
-                onClick={() => { setCreateMenuOpen(false); navigate('/conferences'); }}
+                onClick={() => { 
+                  setCreateMenuOpen(false); 
+                  if (!isAuthenticated) {
+                    openAuthModal('register');
+                  } else {
+                    navigate('/conferences'); 
+                  }
+                }}
               >
                 <PhoneCall size={18} color="#3B82F6" />
                 <div className="create-item-text">
@@ -324,7 +352,14 @@ export function Header() {
 
               <button 
                 className="create-menu-item" 
-                onClick={() => { setCreateMenuOpen(false); navigate('/marketplace'); }}
+                onClick={() => { 
+                  setCreateMenuOpen(false); 
+                  if (!isAuthenticated) {
+                    openAuthModal('register');
+                  } else {
+                    navigate('/marketplace'); 
+                  }
+                }}
               >
                 <ShoppingBag size={18} color="#10B981" />
                 <div className="create-item-text">
@@ -335,7 +370,14 @@ export function Header() {
 
               <button 
                 className="create-menu-item" 
-                onClick={() => { setCreateMenuOpen(false); navigate('/communities'); }}
+                onClick={() => { 
+                  setCreateMenuOpen(false); 
+                  if (!isAuthenticated) {
+                    openAuthModal('register');
+                  } else {
+                    navigate('/communities'); 
+                  }
+                }}
               >
                 <Users size={18} color="#8B5CF6" />
                 <div className="create-item-text">
@@ -346,7 +388,14 @@ export function Header() {
 
               <button 
                 className="create-menu-item" 
-                onClick={() => { setCreateMenuOpen(false); navigate('/editor'); }}
+                onClick={() => { 
+                  setCreateMenuOpen(false); 
+                  if (!isAuthenticated) {
+                    openAuthModal('register');
+                  } else {
+                    navigate('/editor'); 
+                  }
+                }}
               >
                 <Film size={18} color="#F59E0B" />
                 <div className="create-item-text">
@@ -360,7 +409,13 @@ export function Header() {
 
         <button
           className="header-action-btn conference-quick-btn"
-          onClick={() => navigate('/conferences')}
+          onClick={() => {
+            if (!isAuthenticated) {
+              openAuthModal('register');
+            } else {
+              navigate('/conferences');
+            }
+          }}
           title="Быстрый старт конференции"
         >
           <Video size={17} />
