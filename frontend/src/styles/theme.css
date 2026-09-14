@@ -155,6 +155,13 @@
 [data-theme="dark"] .channel-card,
 [data-theme="dark"] .video-card-item,
 [data-theme="dark"] .podcast-channel-card,
+[data-theme="dark"] .podcast-card,
+[data-theme="dark"] .podcast-player-container,
+[data-theme="dark"] .section-ad-banner,
+[data-theme="dark"] .courses-hub-top-bar,
+[data-theme="dark"] .course-market-card,
+[data-theme="dark"] .publish-modal-card,
+[data-theme="dark"] .purchase-modal-card,
 [data-theme="dark"] .service-card-item,
 [data-theme="dark"] .auth-modal-box {
   background: var(--color-bg-card) !important;

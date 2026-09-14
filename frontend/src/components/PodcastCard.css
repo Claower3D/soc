@@ -1,8 +1,10 @@
 .podcast-card {
-  background-color: var(--bg-color, #FFFFFF);
-  border-radius: var(--border-radius-lg, 12px);
+  background-color: var(--color-bg-card);
+  border-radius: var(--radius-lg, 16px);
   padding: 20px;
-  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.1));
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
 }
 
 .podcast-header {
@@ -14,9 +16,10 @@
 .podcast-cover {
   width: 150px;
   height: 150px;
-  border-radius: var(--border-radius-md, 8px);
+  border-radius: var(--radius-md, 12px);
   object-fit: cover;
-  box-shadow: var(--shadow-md, 0 4px 6px rgba(0,0,0,0.1));
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border-light);
 }
 
 .podcast-info {
@@ -27,19 +30,19 @@
   font-size: 1.5rem;
   font-weight: 700;
   margin: 0 0 4px 0;
-  color: var(--text-primary, #333);
+  color: var(--color-text);
 }
 
 .podcast-author {
   font-size: 1rem;
-  color: var(--primary-color, #6C5CE7);
+  color: var(--color-accent);
   margin-bottom: 12px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .podcast-description {
   font-size: 0.9375rem;
-  color: var(--text-secondary, #666);
+  color: var(--color-text-secondary);
   line-height: 1.5;
   margin: 0;
 }
@@ -48,7 +51,7 @@
   font-size: 1.125rem;
   font-weight: 600;
   margin: 0 0 12px 0;
-  color: var(--text-primary, #333);
+  color: var(--color-text);
 }
 
 .episodes-list {
@@ -61,35 +64,38 @@
   display: flex;
   align-items: center;
   padding: 12px;
-  background-color: var(--surface-color, #F8F9FA);
-  border-radius: var(--border-radius-md, 8px);
-  transition: background-color 0.2s;
+  background-color: var(--color-bg-secondary);
+  border-radius: var(--radius-md, 12px);
+  border: 1px solid var(--color-border-light);
+  transition: all 0.2s;
 }
 
 .episode-item:hover {
-  background-color: #F0EDFF;
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-accent);
 }
 
 .episode-play-btn {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: var(--bg-color, #FFFFFF);
-  border: 1px solid var(--border-color, #E2E8F0);
-  color: var(--primary-color, #6C5CE7);
+  background-color: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-accent);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-right: 16px;
   cursor: pointer;
   flex-shrink: 0;
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition-fast);
 }
 
 .episode-play-btn:hover {
-  background-color: var(--primary-color, #6C5CE7);
-  color: white;
-  border-color: var(--primary-color, #6C5CE7);
+  background-color: var(--color-accent);
+  color: #FFFFFF;
+  border-color: var(--color-accent);
 }
 
 .episode-details {
@@ -99,7 +105,7 @@
 
 .episode-name {
   font-weight: 600;
-  color: var(--text-primary, #333);
+  color: var(--color-text);
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
@@ -108,7 +114,7 @@
 
 .episode-meta {
   font-size: 0.8125rem;
-  color: var(--text-secondary, #666);
+  color: var(--color-text-tertiary);
 }
 
 .meta-dot {

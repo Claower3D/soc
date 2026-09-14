@@ -6,7 +6,7 @@
 
 /* Hero Card */
 .market-hero-card {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(236, 72, 153, 0.05) 100%), #FFFFFF;
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 2.25rem 2.5rem;
@@ -71,18 +71,19 @@
   width: 100%;
   padding: 0.75rem 1rem 0.75rem 2.75rem;
   border: 1px solid var(--color-border);
-  background: #FFFFFF;
+  background: var(--color-bg-secondary);
   border-radius: var(--radius-full);
   font-size: 0.9rem;
   color: var(--color-text);
   outline: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-xs);
   transition: all var(--transition-fast);
 }
 
 .market-search-input-box input:focus {
+  background: var(--color-bg-card);
   border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
 }
 
 .market-cart-trigger {
@@ -139,7 +140,7 @@
 .cat-pill-btn {
   padding: 0.5rem 1rem;
   border: 1px solid var(--color-border);
-  background: #FFFFFF;
+  background: var(--color-bg-card);
   border-radius: var(--radius-full);
   font-size: 0.84rem;
   font-weight: 600;
@@ -152,7 +153,7 @@
 .cat-pill-btn:hover {
   background: var(--color-bg-secondary);
   color: var(--color-text);
-  border-color: var(--color-text-tertiary);
+  border-color: var(--color-accent);
 }
 
 .cat-pill-btn.active {
@@ -166,7 +167,7 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  background: #FFFFFF;
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 0.35rem 0.65rem;
@@ -194,7 +195,7 @@
 }
 
 .market-card {
-  background: #FFFFFF;
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -208,7 +209,7 @@
 .market-card:hover {
   transform: translateY(-3px);
   box-shadow: var(--shadow-md);
-  border-color: var(--color-accent-subtle);
+  border-color: var(--color-accent);
 }
 
 .market-card-img-box {
@@ -233,8 +234,8 @@
   position: absolute;
   top: 10px;
   left: 10px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(4px);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   padding: 0.25rem 0.6rem;
   border-radius: var(--radius-full);
   font-size: 0.72rem;
