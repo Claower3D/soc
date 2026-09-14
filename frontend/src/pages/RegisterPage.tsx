@@ -13,12 +13,25 @@ import { SacredQrLogo } from '../components/SacredQrLogo';
 import logoImg from '../assets/logo.png';
 import './RegisterPage.css';
 
-export function RegisterPage() {
+interface RegisterPageProps {
+  initialMode?: 'register' | 'login';
+}
+
+export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
   const navigate = useNavigate();
-  const { register } = useAuth();
+  const { register, login } = useAuth();
   const { t, currentLang, setLanguage, languages } = useTranslation();
 
+  const [authMode, setAuthMode] = useState<'register' | 'login'>(initialMode);
   const [step, setStep] = useState<1 | 2>(1);
+
+  // Login form state
+  const [loginQuery, setLoginQuery] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [isLoginSubmitting, setIsLoginSubmitting] = useState(false);
+
+  // Registration form state
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [emailOrPhone, setEmailOrPhone] = useState('');
@@ -34,6 +47,7 @@ export function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [successText, setSuccessText] = useState('');
   const [legalModalOpen, setLegalModalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'privacy' | 'terms'>('privacy');
 
@@ -58,6 +72,35 @@ export function RegisterPage() {
 
     setStep(2);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    if (!loginQuery.trim() || !loginPassword) {
+      setErrorMessage(t('auth.modal.err_fill_all') || 'Заполните все поля');
+      return;
+    }
+
+    setIsLoginSubmitting(true);
+    try {
+      const res = await login(loginQuery.trim(), loginPassword);
+      if (!res.success) {
+        setErrorMessage(res.message || 'Неверный логин или пароль');
+        return;
+      }
+
+      setSuccessText('Авторизация успешна! Входим в профиль...');
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/profile/me');
+      }, 1000);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Ошибка сервера при входе');
+    } finally {
+      setIsLoginSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -86,6 +129,7 @@ export function RegisterPage() {
         return;
       }
 
+      setSuccessText('Ваш криптографический JWT-токен успешно сгенерирован сервером. Перенаправляем на платформу...');
       setSuccess(true);
       setTimeout(() => {
         navigate('/');
@@ -189,32 +233,79 @@ export function RegisterPage() {
               </div>
 
               <div className="side-banner-footer">
-                <span>Уже есть аккаунт?</span>
-                <button 
-                  type="button" 
-                  className="side-login-link-btn"
-                  onClick={() => navigate('/')}
-                >
-                  Войти в профиль
-                </button>
+                {authMode === 'register' ? (
+                  <>
+                    <span>Уже есть аккаунт?</span>
+                    <button 
+                      type="button" 
+                      className="side-login-link-btn"
+                      onClick={() => {
+                        setAuthMode('login');
+                        setErrorMessage(null);
+                      }}
+                    >
+                      Войти в профиль
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span>Впервые у нас?</span>
+                    <button 
+                      type="button" 
+                      className="side-login-link-btn"
+                      onClick={() => {
+                        setAuthMode('register');
+                        setErrorMessage(null);
+                      }}
+                    >
+                      Создать аккаунт
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
           {/* Right Interactive Form */}
           <div className="register-form-container">
-            {/* Step Progress Tracker */}
-            <div className="step-progress-tracker">
-              <div className={`progress-step-node ${step >= 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`}>
-                <div className="node-number">{step > 1 ? <Check size={14} /> : '1'}</div>
-                <span className="node-title">Аккаунт</span>
-              </div>
-              <div className={`progress-track-line ${step >= 2 ? 'active' : ''}`} />
-              <div className={`progress-step-node ${step >= 2 ? 'active' : ''}`}>
-                <div className="node-number">2</div>
-                <span className="node-title">Мировоззрение & Роль</span>
-              </div>
+            {/* Mode Switcher Tabs on top of the form */}
+            <div className="auth-mode-switch-tabs">
+              <button
+                type="button"
+                className={`auth-mode-tab ${authMode === 'login' ? 'active' : ''}`}
+                onClick={() => {
+                  setAuthMode('login');
+                  setErrorMessage(null);
+                }}
+              >
+                Вход в аккаунт
+              </button>
+              <button
+                type="button"
+                className={`auth-mode-tab ${authMode === 'register' ? 'active' : ''}`}
+                onClick={() => {
+                  setAuthMode('register');
+                  setErrorMessage(null);
+                }}
+              >
+                Регистрация
+              </button>
             </div>
+
+            {/* Step Progress Tracker (only when registering) */}
+            {authMode === 'register' && (
+              <div className="step-progress-tracker">
+                <div className={`progress-step-node ${step >= 1 ? 'active' : ''} ${step > 1 ? 'completed' : ''}`}>
+                  <div className="node-number">{step > 1 ? <Check size={14} /> : '1'}</div>
+                  <span className="node-title">Аккаунт</span>
+                </div>
+                <div className={`progress-track-line ${step >= 2 ? 'active' : ''}`} />
+                <div className={`progress-step-node ${step >= 2 ? 'active' : ''}`}>
+                  <div className="node-number">2</div>
+                  <span className="node-title">Мировоззрение & Роль</span>
+                </div>
+              </div>
+            )}
 
             {errorMessage && (
               <div className="register-alert-box error">
@@ -228,10 +319,82 @@ export function RegisterPage() {
                 <div className="success-icon-animation">
                   <CheckCircle2 size={64} color="#10B981" />
                 </div>
-                <h2>{t('auth.modal.success_reg')}</h2>
-                <p>Ваш криптографический JWT-токен успешно сгенерирован сервером. Перенаправляем на платформу...</p>
+                <h2>{authMode === 'login' ? 'Вход выполнен' : t('auth.modal.success_reg')}</h2>
+                <p>{successText || 'Перенаправляем в систему...'}</p>
                 <div className="success-loader-bar" />
               </div>
+            ) : authMode === 'login' ? (
+              <form onSubmit={handleLoginSubmit} className="register-step-form">
+                <div className="step-header-text">
+                  <h2>Авторизация в профиль</h2>
+                  <p>Введите ваш Email, телефон или @username для входа</p>
+                </div>
+
+                <div className="form-fields-grid single-col">
+                  <div className="form-group-field">
+                    <label>{t('auth.modal.email_or_phone')} *</label>
+                    <div className="form-input-box">
+                      <Mail size={18} className="field-icon" />
+                      <input 
+                        type="text" 
+                        placeholder="example@newage.ru или @username" 
+                        value={loginQuery}
+                        onChange={(e) => setLoginQuery(e.target.value)}
+                        autoFocus
+                        required 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group-field">
+                    <div className="field-label-row">
+                      <label>{t('auth.modal.password')} *</label>
+                    </div>
+                    <div className="form-input-box">
+                      <Lock size={18} className="field-icon" />
+                      <input 
+                        type={showLoginPassword ? 'text' : 'password'} 
+                        placeholder="Введите ваш пароль"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        required 
+                      />
+                      <button 
+                        type="button" 
+                        className="password-toggle-btn"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      >
+                        {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-bottom-actions">
+                  <button 
+                    type="submit" 
+                    className="primary-register-btn full-width"
+                    disabled={isLoginSubmitting}
+                  >
+                    <span>{isLoginSubmitting ? 'Проверка JWT токена...' : 'Войти в профиль'}</span>
+                    <ArrowRight size={18} />
+                  </button>
+                </div>
+
+                <div className="login-quick-switch-footer">
+                  <span>Нет профиля в New Age? </span>
+                  <button
+                    type="button"
+                    className="inline-toggle-link"
+                    onClick={() => {
+                      setAuthMode('register');
+                      setErrorMessage(null);
+                    }}
+                  >
+                    Пройти быструю регистрацию
+                  </button>
+                </div>
+              </form>
             ) : (
               <>
                 {step === 1 ? (

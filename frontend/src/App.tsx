@@ -29,13 +29,14 @@ import './App.css';
 function AppContent() {
   const { isAuthModalOpen, closeAuthModal, authModalMode } = useAuth();
   const location = useLocation();
-  const isAuthPage = location.pathname === '/register' || location.pathname === '/signup';
+  const isAuthPage = location.pathname === '/register' || location.pathname === '/signup' || location.pathname === '/login';
 
   if (isAuthPage) {
     return (
       <Routes>
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/signup" element={<RegisterPage />} />
+        <Route path="/register" element={<RegisterPage initialMode="register" />} />
+        <Route path="/signup" element={<RegisterPage initialMode="register" />} />
+        <Route path="/login" element={<RegisterPage initialMode="login" />} />
       </Routes>
     );
   }
