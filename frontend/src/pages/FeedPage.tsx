@@ -160,7 +160,7 @@ export function FeedPage() {
         {isAuthenticated ? (
           <div 
             className="feed-current-user-card"
-            onClick={() => navigate('/profile/me')}
+            onClick={() => navigate(currentUser.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser.id}`)}
           >
             <div 
               className="feed-user-hero-cover" 

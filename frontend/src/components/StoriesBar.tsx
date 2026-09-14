@@ -49,7 +49,11 @@ export function StoriesBar({ stories }: StoriesBarProps) {
   const handleAuthorClick = (userId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     handleClose();
-    navigate(`/profile/${userId === 'me' ? 'me' : userId}`);
+    if (userId === 'me' || userId === currentUser.id) {
+      navigate(currentUser.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser.id}`);
+    } else {
+      navigate(`/profile/${userId}`);
+    }
   };
 
   return (
@@ -63,7 +67,7 @@ export function StoriesBar({ stories }: StoriesBarProps) {
               if (!isAuthenticated) {
                 openAuthModal('register');
               } else {
-                navigate('/profile/me');
+                navigate(currentUser.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser.id}`);
               }
             }}
           >

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Grid, Video as VideoIcon, Headphones, Bookmark, 
@@ -18,17 +18,40 @@ import './ProfilePage.css';
 export function ProfilePage() {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const { currentUser, isAuthenticated, logout, updateProfile } = useAuth();
+  const { currentUser, isAuthenticated, logout, updateProfile, allAccounts } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
-  // Find user by id or 'me'
-  const isMe = !userId || userId === 'me' || userId === currentUser.id;
-  
+  // Normalize route param (e.g. '@claower' -> 'claower', 'me', or custom ID)
+  const cleanParam = userId ? userId.replace(/^@/, '').toLowerCase() : '';
+
+  // Determine if viewing own profile
+  const isMe = !userId || 
+    userId === 'me' || 
+    cleanParam === currentUser.id?.toLowerCase() || 
+    (currentUser.username && cleanParam === currentUser.username.toLowerCase());
+
+  // Automatically rewrite /profile/me or legacy /profile to /profile/@username when logged in
+  useEffect(() => {
+    if ((!userId || userId === 'me') && isAuthenticated && currentUser?.username && currentUser.username !== 'guest') {
+      navigate(`/profile/@${currentUser.username}`, { replace: true });
+    }
+  }, [userId, isAuthenticated, currentUser?.username, navigate]);
+
   const user: User = useMemo(() => {
     if (isMe) return currentUser;
-    const found = initialUsers.find(u => u.id === userId || u.username === userId);
-    return found || initialUsers[1];
-  }, [isMe, userId, currentUser]);
+    if (cleanParam) {
+      const fromRegistered = allAccounts.find(
+        a => a.id.toLowerCase() === cleanParam || a.username.toLowerCase() === cleanParam
+      );
+      if (fromRegistered) return fromRegistered as unknown as User;
+
+      const found = initialUsers.find(
+        u => u.id.toLowerCase() === cleanParam || u.username.toLowerCase() === cleanParam
+      );
+      if (found) return found;
+    }
+    return initialUsers[1];
+  }, [isMe, cleanParam, currentUser, allAccounts]);
 
   const [isFollowing, setIsFollowing] = useState(user.isFollowed ?? false);
   const [followersCount, setFollowersCount] = useState(user.followersCount);
@@ -90,7 +113,8 @@ export function ProfilePage() {
   };
 
   const handleShareProfile = () => {
-    navigator.clipboard?.writeText(window.location.href);
+    const shareUrl = `${window.location.origin}/profile/@${activeUser.username}`;
+    navigator.clipboard?.writeText(shareUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2000);
   };

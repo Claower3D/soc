@@ -19,7 +19,7 @@ interface RegisterPageProps {
 
 export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
   const navigate = useNavigate();
-  const { register, login } = useAuth();
+  const { register, login, currentUser } = useAuth();
   const { t, currentLang, setLanguage, languages } = useTranslation();
 
   const [authMode, setAuthMode] = useState<'register' | 'login'>(initialMode);
@@ -157,8 +157,13 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
 
       setSuccessText('Авторизация успешна! Входим в профиль...');
       setSuccess(true);
+      const cleanUser = loginQuery.trim().replace(/^@/, '');
       setTimeout(() => {
-        navigate('/profile/me');
+        if (cleanUser && !cleanUser.includes('@') && !cleanUser.includes('.')) {
+          navigate(`/profile/@${cleanUser}`);
+        } else {
+          navigate(`/profile/@${currentUser?.username || cleanUser}`);
+        }
       }, 1000);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Ошибка сервера при входе');
@@ -178,9 +183,10 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
 
     setIsSubmitting(true);
     try {
+      const cleanUser = username.trim().replace(/^@/, '');
       const res = await register({
         name: name.trim(),
-        username: username.trim(),
+        username: cleanUser,
         emailOrPhone: emailOrPhone.trim(),
         password,
         role: selectedRole,
@@ -193,10 +199,10 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
         return;
       }
 
-      setSuccessText('Ваш криптографический JWT-токен успешно сгенерирован сервером. Перенаправляем на платформу...');
+      setSuccessText('Ваш криптографический JWT-токен успешно сгенерирован сервером. Перенаправляем в профиль...');
       setSuccess(true);
       setTimeout(() => {
-        navigate('/');
+        navigate(`/profile/@${cleanUser}`);
       }, 1500);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Серверная ошибка');

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import './BottomNav.css';
 
 export function BottomNav() {
-  const { isAuthenticated, openAuthModal } = useAuth();
+  const { isAuthenticated, openAuthModal, currentUser } = useAuth();
 
   return (
     <nav className="bottom-nav">
@@ -53,7 +53,10 @@ export function BottomNav() {
       )}
 
       {isAuthenticated ? (
-        <NavLink to="/profile/me" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+        <NavLink 
+          to={currentUser?.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser?.id || 'me'}`} 
+          className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
+        >
           <User className="bottom-nav-icon" size={20} />
           <span className="bottom-nav-label">Профиль</span>
         </NavLink>

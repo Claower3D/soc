@@ -396,7 +396,10 @@ export function Sidebar() {
               <span className="nav-label">Мой канал</span>
             </NavLink>
 
-            <NavLink to="/profile/me" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <NavLink 
+              to={currentUser.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser.id}`} 
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
               <UserIcon className="nav-icon" size={19} />
               <span className="nav-label">Мой профиль</span>
             </NavLink>
@@ -414,7 +417,7 @@ export function Sidebar() {
         {isAuthenticated ? (
           <div 
             className="user-profile-card"
-            onClick={() => navigate('/profile/me')}
+            onClick={() => navigate(currentUser.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser.id}`)}
             title="Перейти в Мой профиль"
           >
             <div className="footer-avatar-wrapper">
