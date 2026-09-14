@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Video, Headphones, MessageCircle, User as UserIcon, Bell, Check, Plus, Image as ImageIcon, PhoneCall } from 'lucide-react';
+import { Search, X, Video, Headphones, MessageCircle, User as UserIcon, Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, Users, Film, LogIn } from 'lucide-react';
 import { initialUsers, posts, videos, podcasts, currentUser, type User } from '../data/mock';
+import { AuthModal } from './AuthModal';
 import './Header.css';
 
 export function Header() {
@@ -10,6 +11,7 @@ export function Header() {
   const [activeTab, setActiveTab] = useState<'all' | 'users' | 'videos' | 'podcasts' | 'posts'>('all');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -308,6 +310,39 @@ export function Header() {
                   <span>Создать открытую или закрытую встречу</span>
                 </div>
               </button>
+
+              <button 
+                className="create-menu-item" 
+                onClick={() => { setCreateMenuOpen(false); navigate('/marketplace'); }}
+              >
+                <ShoppingBag size={18} color="#10B981" />
+                <div className="create-item-text">
+                  <strong>Товар на Маркетплейс</strong>
+                  <span>Разместить товар в каталоге и витрине</span>
+                </div>
+              </button>
+
+              <button 
+                className="create-menu-item" 
+                onClick={() => { setCreateMenuOpen(false); navigate('/communities'); }}
+              >
+                <Users size={18} color="#8B5CF6" />
+                <div className="create-item-text">
+                  <strong>Создать Сообщество</strong>
+                  <span>Клуб по интересам, профессии или мировоззрению</span>
+                </div>
+              </button>
+
+              <button 
+                className="create-menu-item" 
+                onClick={() => { setCreateMenuOpen(false); navigate('/editor'); }}
+              >
+                <Film size={18} color="#F59E0B" />
+                <div className="create-item-text">
+                  <strong>Видеостудия</strong>
+                  <span>Смонтировать ролик, сторис или shorts</span>
+                </div>
+              </button>
             </div>
           )}
         </div>
@@ -319,6 +354,15 @@ export function Header() {
         >
           <Video size={17} />
           <span className="btn-text">Конференция</span>
+        </button>
+
+        {/* Auth Modal Trigger Button */}
+        <button
+          className="header-icon-btn"
+          onClick={() => setAuthModalOpen(true)}
+          title="Вход / Регистрация в New Age"
+        >
+          <LogIn size={18} />
         </button>
 
         <div className="notification-wrapper">
@@ -376,6 +420,12 @@ export function Header() {
           </div>
         </button>
       </div>
+
+      <AuthModal 
+        isOpen={authModalOpen} 
+        onClose={() => setAuthModalOpen(false)} 
+        onSuccess={() => window.location.reload()}
+      />
     </header>
   );
 }

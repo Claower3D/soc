@@ -118,6 +118,10 @@ func main() {
 	mux.HandleFunc("GET /api/profile", handleProfile)
 	mux.HandleFunc("GET /api/users", handleUsers)
 	mux.HandleFunc("GET /api/search", handleSearch)
+	mux.HandleFunc("GET /api/marketplace", handleMarketplace)
+	mux.HandleFunc("GET /api/communities", handleCommunities)
+	mux.HandleFunc("GET /api/wallet", handleWallet)
+	mux.HandleFunc("GET /api/admin/stats", handleAdminStats)
 
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
@@ -243,6 +247,73 @@ func handlePodcasts(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: podcasts})
+}
+
+func handleMarketplace(w http.ResponseWriter, r *http.Request) {
+	products := []map[string]interface{}{
+		{
+			"id":          "prod-1",
+			"title":       "Худи оверсайз New Age (Светлая коллекция)",
+			"price":       4990,
+			"oldPrice":    6490,
+			"category":    "Одежда & Мерч",
+			"rating":      4.9,
+			"inStock":     true,
+			"stockCount":  14,
+		},
+		{
+			"id":          "prod-2",
+			"title":       "Конденсаторный USB-микрофон New Age Pro Podcast",
+			"price":       7890,
+			"oldPrice":    9990,
+			"category":    "Электроника",
+			"rating":      4.95,
+			"inStock":     true,
+			"stockCount":  8,
+		},
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: products})
+}
+
+func handleCommunities(w http.ResponseWriter, r *http.Request) {
+	communities := []map[string]interface{}{
+		{
+			"id":           "comm-1",
+			"name":         "Go & Cloud Architecture",
+			"handle":       "golang_ru",
+			"category":     "IT & Технологии",
+			"membersCount": 14200,
+			"isPrivate":    false,
+		},
+		{
+			"id":           "comm-2",
+			"name":         "Философия & Мировоззрения XXI Века",
+			"handle":       "philosophy_open",
+			"category":     "Мировоззрение & Философия",
+			"membersCount": 8400,
+			"isPrivate":    false,
+		},
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: communities})
+}
+
+func handleWallet(w http.ResponseWriter, r *http.Request) {
+	walletData := map[string]interface{}{
+		"balance":  14850,
+		"currency": "RUB",
+		"status":   "active",
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: walletData})
+}
+
+func handleAdminStats(w http.ResponseWriter, r *http.Request) {
+	stats := map[string]interface{}{
+		"dau":             142580,
+		"marketplaceGMV": 4820000,
+		"revenue":         724500,
+		"pendingReports":  3,
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: stats})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {

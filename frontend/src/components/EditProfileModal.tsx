@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
-import { X, Camera, MapPin, Globe, Sparkles } from 'lucide-react';
-import { currentUser, type User } from '../data/mock';
+import { X, Camera, MapPin, Globe, Sparkles, Shield, ShoppingBag, Video, User as UserIcon } from 'lucide-react';
+import { currentUser, type User, BELIEF_OPTIONS, type UserRole, type BeliefPrivacy } from '../data/mock';
 import './EditProfileModal.css';
 
 interface EditProfileModalProps {
@@ -32,6 +32,9 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
   const [avatar, setAvatar] = useState(currentUser.avatar);
   const [coverImage, setCoverImage] = useState(currentUser.coverImage || sampleCovers[0]);
   const [online, setOnline] = useState(currentUser.online ?? true);
+  const [role, setRole] = useState<UserRole>(currentUser.role || 'creator');
+  const [beliefType, setBeliefType] = useState<string>(currentUser.beliefType || 'Не указано');
+  const [beliefPrivacy, setBeliefPrivacy] = useState<BeliefPrivacy>(currentUser.beliefPrivacy || 'public');
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +71,9 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
       avatar,
       coverImage,
       online,
+      role,
+      beliefType,
+      beliefPrivacy,
     };
 
     // Update global object
@@ -202,6 +208,65 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
                   className="edit-input-with-icon"
                   placeholder="https://github.com/..."
                 />
+              </div>
+            </div>
+
+            {/* Role selection */}
+            <div className="edit-form-group">
+              <label className="edit-label">Тип аккаунта (Роль в New Age)</label>
+              <div className="role-selector-row">
+                <button 
+                  type="button" 
+                  className={`role-select-btn ${role === 'user' ? 'active' : ''}`}
+                  onClick={() => setRole('user')}
+                >
+                  <UserIcon size={16} /> Личный
+                </button>
+                <button 
+                  type="button" 
+                  className={`role-select-btn ${role === 'creator' ? 'active' : ''}`}
+                  onClick={() => setRole('creator')}
+                >
+                  <Video size={16} /> Автор
+                </button>
+                <button 
+                  type="button" 
+                  className={`role-select-btn ${role === 'business' ? 'active' : ''}`}
+                  onClick={() => setRole('business')}
+                >
+                  <ShoppingBag size={16} /> Бизнес / Магазин
+                </button>
+              </div>
+            </div>
+
+            {/* Belief selection & privacy */}
+            <div className="edit-form-group">
+              <div className="belief-header-flex">
+                <label className="edit-label">Мировоззрение / Конфессия</label>
+                <span className="gdpr-pill">GDPR</span>
+              </div>
+              <select 
+                value={beliefType} 
+                onChange={e => setBeliefType(e.target.value)}
+                className="edit-select-input"
+              >
+                {BELIEF_OPTIONS.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+
+              <div className="privacy-row-inline">
+                <Shield size={14} className="privacy-inline-icon" />
+                <span className="privacy-inline-text">Кто видит в профиле:</span>
+                <select 
+                  value={beliefPrivacy}
+                  onChange={e => setBeliefPrivacy(e.target.value as BeliefPrivacy)}
+                  className="privacy-select-small"
+                >
+                  <option value="public">🌐 Всем</option>
+                  <option value="followers">👥 Только подписчикам</option>
+                  <option value="private">🔒 Скрыто (Только мне)</option>
+                </select>
               </div>
             </div>
           </div>

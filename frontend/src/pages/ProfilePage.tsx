@@ -4,9 +4,9 @@ import {
   Grid, Video as VideoIcon, Headphones, Bookmark, 
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Share2, Edit3, Heart, MessageSquare,
-  CheckCircle2, ChevronRight, Tv
+  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield
 } from 'lucide-react';
-import { currentUser, initialUsers, posts, videos, podcasts, type User, type Post } from '../data/mock';
+import { currentUser, initialUsers, posts, videos, podcasts, initialProducts, type User, type Post } from '../data/mock';
 import { FollowersModal } from '../components/FollowersModal';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { EditProfileModal } from '../components/EditProfileModal';
@@ -27,7 +27,7 @@ export function ProfilePage() {
 
   const [isFollowing, setIsFollowing] = useState(user.isFollowed ?? false);
   const [followersCount, setFollowersCount] = useState(user.followersCount);
-  const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'podcasts' | 'saved'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'podcasts' | 'saved' | 'shop'>('posts');
   const [modalType, setModalType] = useState<'Подписчики' | 'Подписки' | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -52,6 +52,10 @@ export function ProfilePage() {
   const userPodcasts = useMemo(() => {
     return podcasts.filter(p => p.author.toLowerCase().includes(user.name.split(' ')[0].toLowerCase()));
   }, [user.name]);
+
+  const userProducts = useMemo(() => {
+    return initialProducts.filter(p => p.seller.id === user.id || (isMe && p.seller.id === 'me'));
+  }, [user.id, isMe]);
 
   const handleToggleFollow = () => {
     if (isFollowing) {
@@ -144,6 +148,19 @@ export function ProfilePage() {
             <div className="name-row">
               <h1 className="profile-fullname">{activeUser.name}</h1>
               <span title="Подтвержденный профиль"><CheckCircle2 size={18} className="verified-badge" /></span>
+              
+              {/* Роли пользователя */}
+              {activeUser.role === 'creator' && (
+                <span className="profile-role-badge creator" title="Автор контента">
+                  <VideoIcon size={12} /> Автор
+                </span>
+              )}
+              {activeUser.role === 'business' && (
+                <span className="profile-role-badge business" title="Проверенный продавец">
+                  <ShoppingBag size={12} /> Магазин {activeUser.businessCategory ? `• ${activeUser.businessCategory}` : ''}
+                </span>
+              )}
+
               <span className="profile-username">@{activeUser.username}</span>
             </div>
 
@@ -161,6 +178,21 @@ export function ProfilePage() {
                   <LinkIcon size={15} />
                   <span>{activeUser.website.replace('https://', '')}</span>
                 </a>
+              )}
+              {/* Чувствительные данные (мировоззрение/вероисповедание с защитой приватности) */}
+              {activeUser.beliefType && activeUser.beliefType !== 'Не указано' && (
+                (isMe || activeUser.beliefPrivacy === 'public' || (activeUser.beliefPrivacy === 'followers' && isFollowing)) && (
+                  <div 
+                    className="meta-item meta-belief" 
+                    title={isMe ? `Видимость: ${activeUser.beliefPrivacy === 'private' ? 'Только мне (Скрыто)' : activeUser.beliefPrivacy === 'followers' ? 'Только подписчикам' : 'Публично'}` : 'Мировоззрение'}
+                  >
+                    <Compass size={15} />
+                    <span>{activeUser.beliefType}</span>
+                    {isMe && activeUser.beliefPrivacy === 'private' && (
+                      <span className="belief-privacy-badge" title="Скрыто от других"><Shield size={11} /></span>
+                    )}
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -229,6 +261,16 @@ export function ProfilePage() {
             <span>Подкасты</span>
             <span className="tab-count">{userPodcasts.length}</span>
           </button>
+          {(activeUser.role === 'business' || userProducts.length > 0 || isMe) && (
+            <button
+              className={`tab-btn ${activeTab === 'shop' ? 'active' : ''}`}
+              onClick={() => setActiveTab('shop')}
+            >
+              <ShoppingBag size={17} />
+              <span>Товары & Магазин</span>
+              <span className="tab-count">{userProducts.length}</span>
+            </button>
+          )}
           {isMe && (
             <button
               className={`tab-btn ${activeTab === 'saved' ? 'active' : ''}`}
@@ -374,6 +416,41 @@ export function ProfilePage() {
               </div>
             ))}
           </div>
+        )}
+
+        {/* SHOP / MARKETPLACE TAB */}
+        {activeTab === 'shop' && (
+          userProducts.length > 0 ? (
+            <div className="profile-products-grid">
+              {userProducts.map(product => (
+                <div key={product.id} className="profile-product-card" onClick={() => navigate('/marketplace')}>
+                  <div className="profile-product-img-box">
+                    <img src={product.images[0]} alt={product.title} />
+                    <span className="product-category-tag">{product.category}</span>
+                  </div>
+                  <div className="profile-product-details">
+                    <h4>{product.title}</h4>
+                    <div className="product-price-row">
+                      <span className="current-price">{product.price.toLocaleString('ru-RU')} ₽</span>
+                      {product.oldPrice && <span className="old-price">{product.oldPrice.toLocaleString('ru-RU')} ₽</span>}
+                    </div>
+                    <button className="btn-product-buy" onClick={(e) => { e.stopPropagation(); navigate('/marketplace'); }}>
+                      Купить на маркетплейсе
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-tab-state">
+              <ShoppingBag size={40} className="empty-icon" />
+              <h3>Витрина пуста</h3>
+              <p>В магазине автора пока нет опубликованных товаров.</p>
+              <button className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => navigate('/marketplace')}>
+                Перейти в общий маркетплейс
+              </button>
+            </div>
+          )
         )}
       </div>
 

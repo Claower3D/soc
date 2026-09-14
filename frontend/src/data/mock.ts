@@ -1,5 +1,24 @@
 // ==================== ТИПЫ ====================
 
+export type UserRole = 'user' | 'creator' | 'business' | 'admin';
+export type BeliefPrivacy = 'public' | 'followers' | 'private';
+
+export const BELIEF_OPTIONS = [
+  'Не указано',
+  'Христианство (Православие)',
+  'Христианство (Католицизм)',
+  'Христианство (Протестантизм)',
+  'Ислам (Суннизм)',
+  'Ислам (Шиизм)',
+  'Буддизм',
+  'Иудаизм',
+  'Индуизм',
+  'Агностицизм',
+  'Атеизм / Светский гуманизм',
+  'Тенгрианство',
+  'Другое'
+] as const;
+
 export interface User {
   id: string;
   name: string;
@@ -15,6 +34,13 @@ export interface User {
   followingCount: number;
   postsCount: number;
   highlights?: Highlight[];
+  role?: UserRole;
+  beliefType?: string;
+  beliefPrivacy?: BeliefPrivacy;
+  verified?: boolean;
+  businessCategory?: string;
+  rating?: number;
+  salesCount?: number;
 }
 
 export interface Highlight {
@@ -137,6 +163,96 @@ export interface ConferenceMessage {
   time: string;
 }
 
+// ==================== МАРКЕТПЛЕЙС ====================
+
+export interface Product {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  oldPrice?: number;
+  images: string[];
+  seller: User;
+  category: string;
+  rating: number;
+  reviewsCount: number;
+  inStock: boolean;
+  stockCount: number;
+  tags: string[];
+  specs?: Record<string, string>;
+  createdAt: string;
+}
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+  selectedColor?: string;
+  selectedSize?: string;
+}
+
+export interface Order {
+  id: string;
+  items: CartItem[];
+  totalAmount: number;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  deliveryAddress: string;
+  createdAt: string;
+  paymentMethod: 'wallet' | 'card';
+}
+
+// ==================== СООБЩЕСТВА ====================
+
+export interface Community {
+  id: string;
+  name: string;
+  handle: string;
+  avatar: string;
+  cover: string;
+  description: string;
+  category: string;
+  beliefCategory?: string;
+  membersCount: number;
+  isPrivate: boolean;
+  isJoined?: boolean;
+  verified?: boolean;
+  creator: User;
+  rules: string[];
+  events: CommunityEvent[];
+  chatGroupId?: string;
+}
+
+export interface CommunityEvent {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  isOnline: boolean;
+  attendeesCount: number;
+  isAttending?: boolean;
+}
+
+// ==================== КОШЕЛЕК И ПОДПИСКИ ====================
+
+export interface WalletTransaction {
+  id: string;
+  type: 'deposit' | 'withdrawal' | 'purchase' | 'sale' | 'donation_sent' | 'donation_received' | 'subscription';
+  amount: number;
+  description: string;
+  date: string;
+  status: 'completed' | 'pending' | 'failed';
+  recipientOrSender?: string;
+}
+
+export interface SubscriptionTier {
+  id: string;
+  title: string;
+  price: number;
+  authorId: string;
+  perks: string[];
+  isSubscribed?: boolean;
+}
+
 // ==================== ТЕКУЩИЙ ПОЛЬЗОВАТЕЛЬ ("МОЙ ПРОФИЛЬ") ====================
 
 export const currentUser: User = {
@@ -152,6 +268,12 @@ export const currentUser: User = {
   followersCount: 1420,
   followingCount: 382,
   postsCount: 24,
+  role: 'creator',
+  beliefType: 'Агностицизм',
+  beliefPrivacy: 'public',
+  verified: true,
+  rating: 4.95,
+  salesCount: 25,
   highlights: [
     { id: 'h1', title: 'Проекты', cover: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=150&q=80' },
     { id: 'h2', title: 'Путешествия', cover: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=150&q=80' },
@@ -178,6 +300,13 @@ export const initialUsers: User[] = [
     followersCount: 8420,
     followingCount: 430,
     postsCount: 156,
+    role: 'business',
+    businessCategory: 'Дизайн & Гаджеты',
+    rating: 4.9,
+    salesCount: 142,
+    beliefType: 'Христианство (Православие)',
+    beliefPrivacy: 'public',
+    verified: true,
   },
   {
     id: '2',
@@ -193,6 +322,10 @@ export const initialUsers: User[] = [
     followersCount: 15300,
     followingCount: 290,
     postsCount: 84,
+    role: 'creator',
+    beliefType: 'Атеизм / Светский гуманизм',
+    beliefPrivacy: 'public',
+    verified: true,
   },
   {
     id: '3',
@@ -208,6 +341,10 @@ export const initialUsers: User[] = [
     followersCount: 6890,
     followingCount: 512,
     postsCount: 62,
+    role: 'user',
+    beliefType: 'Буддизм',
+    beliefPrivacy: 'followers',
+    verified: false,
   },
   {
     id: '4',
@@ -222,6 +359,13 @@ export const initialUsers: User[] = [
     followersCount: 22400,
     followingCount: 190,
     postsCount: 110,
+    role: 'business',
+    businessCategory: 'Аксессуары & Звук',
+    rating: 4.85,
+    salesCount: 89,
+    beliefType: 'Иудаизм',
+    beliefPrivacy: 'public',
+    verified: true,
   },
   {
     id: '5',
@@ -582,3 +726,319 @@ export const initialConferenceMessages: ConferenceMessage[] = [
   { id: 'cm3', user: currentUser, text: 'Да, всё прекрасно видно! Давайте начинать синк.', time: '16:04' },
   { id: 'cm4', user: initialUsers[2], text: 'Я включил запись конференции, после завершения видео появится в чат-группе.', time: '16:05' },
 ];
+
+// ==================== МАРКЕТПЛЕЙС ТОВАРЫ ====================
+
+export const initialProducts: Product[] = [
+  {
+    id: 'prod-1',
+    title: 'Кастомная механическая клавиатура New Age 75% Wireless',
+    description: 'Алюминиевый корпус, смазанные линейные свитчи Gateron Oil King, RGB-подсветка и беспроводное подключение 2.4G/Bluetooth.',
+    price: 12990,
+    oldPrice: 15490,
+    images: [
+      'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1618384887929-16ec33fab9ef?auto=format&fit=crop&w=800&q=80'
+    ],
+    seller: initialUsers[1],
+    category: 'Электроника',
+    rating: 4.9,
+    reviewsCount: 38,
+    inStock: true,
+    stockCount: 14,
+    tags: ['Клавиатура', 'Гаджеты', 'Рабочее место'],
+    specs: {
+      'Тип переключателей': 'Gateron Oil King (Linear)',
+      'Подключение': 'USB Type-C, Bluetooth 5.2, 2.4GHz',
+      'Емкость аккумулятора': '4000 мАч',
+      'Материал': 'CNC Алюминий'
+    },
+    createdAt: '2026-09-01'
+  },
+  {
+    id: 'prod-2',
+    title: 'Книга «Паттерны архитектуры высоконагруженных систем 2026»',
+    description: 'Практическое руководство по построению распределенных систем на Go, микросервисов, очередей сообщений и масштабированию баз данных.',
+    price: 2490,
+    oldPrice: 2990,
+    images: [
+      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=800&q=80'
+    ],
+    seller: initialUsers[2],
+    category: 'Книги',
+    rating: 5.0,
+    reviewsCount: 64,
+    inStock: true,
+    stockCount: 85,
+    tags: ['IT', 'Архитектура', 'Go', 'Книги'],
+    specs: {
+      'Количество страниц': '540 стр.',
+      'Переплет': 'Твердый',
+      'Язык': 'Русский',
+      'Год издания': '2026'
+    },
+    createdAt: '2026-08-28'
+  },
+  {
+    id: 'prod-3',
+    title: 'Чехол-папка из натуральной кожи для MacBook 14" / 16"',
+    description: 'Ручная работа мастеров из Санкт-Петербурга. Премиальная итальянская кожа растительного дубления, мягкая подкладка из микрофибры.',
+    price: 4800,
+    oldPrice: 5500,
+    images: [
+      'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=800&q=80'
+    ],
+    seller: initialUsers[4],
+    category: 'Аксессуары',
+    rating: 4.8,
+    reviewsCount: 22,
+    inStock: true,
+    stockCount: 7,
+    tags: ['Кожа', 'MacBook', 'Ручная работа'],
+    specs: {
+      'Совместимость': 'MacBook Pro 14", MacBook Air 13.6"',
+      'Материал': 'Натуральная кожа Crazy Horse',
+      'Цвет': 'Глубокий шоколад'
+    },
+    createdAt: '2026-08-30'
+  },
+  {
+    id: 'prod-4',
+    title: 'Студийный конденсаторный USB-микрофон New Age Pro Podcast',
+    description: 'Идеальное решение для записи подкастов, стримов и видеоконференций с кардиоидной диаграммой и встроенным поп-фильтром.',
+    price: 9900,
+    oldPrice: 11900,
+    images: [
+      'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80'
+    ],
+    seller: initialUsers[4],
+    category: 'Электроника',
+    rating: 4.9,
+    reviewsCount: 45,
+    inStock: true,
+    stockCount: 19,
+    tags: ['Подкасты', 'Звук', 'Микрофон'],
+    specs: {
+      'Частотный диапазон': '20 Гц – 20 кГц',
+      'Частота дискретизации': '24 бит / 96 кГц',
+      'Подключение': 'USB-C (Plug & Play)'
+    },
+    createdAt: '2026-09-02'
+  },
+  {
+    id: 'prod-5',
+    title: 'Худи оверсайз из плотного органического хлопка «New Age Minimalist»',
+    description: 'Премиальный плотный трикотаж 460 г/м², свободный оверсайз крой, мягкий начес, минималистичный вышитый логотип New Age на груди.',
+    price: 5200,
+    oldPrice: 6200,
+    images: [
+      'https://images.unsplash.com/photo-1556905055-8f358a7a47b2?auto=format&fit=crop&w=800&q=80'
+    ],
+    seller: currentUser,
+    category: 'Одежда и стиль',
+    rating: 4.9,
+    reviewsCount: 19,
+    inStock: true,
+    stockCount: 25,
+    tags: ['Мерч', 'Худи', 'Одежда', 'New Age'],
+    specs: {
+      'Состав': '100% органический хлопок',
+      'Плотность': '460 г/м²',
+      'Уход': 'Деликатная стирка при 30°C'
+    },
+    createdAt: '2026-09-03'
+  }
+];
+
+// ==================== СООБЩЕСТВА ====================
+
+export const initialCommunities: Community[] = [
+  {
+    id: 'comm-1',
+    name: 'Go & Cloud Architecture',
+    handle: 'golang_ru',
+    avatar: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=300&q=80',
+    cover: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80',
+    description: 'Сообщество инженеров, бэкенд-разработчиков и архитекторов облачных решений на Go, Kubernetes и gRPC.',
+    category: 'IT & Технологии',
+    membersCount: 14200,
+    isPrivate: false,
+    isJoined: true,
+    verified: true,
+    creator: currentUser,
+    rules: [
+      'Уважительное профессиональное общение',
+      'Только конструктивный код-ревью без токсичности',
+      'Запрещен прямой спам и нецелевая реклама'
+    ],
+    events: [
+      {
+        id: 'ev-1',
+        title: 'Онлайн-митап: Архитектура мессенджера на Go и WebSockets',
+        date: '20 сентября 2026',
+        time: '19:00 МСК',
+        location: 'Комната New Age Conferences',
+        isOnline: true,
+        attendeesCount: 342,
+        isAttending: true
+      }
+    ],
+    chatGroupId: 'group_comm_go'
+  },
+  {
+    id: 'comm-2',
+    name: 'Философия & Мировоззрения XXI Века',
+    handle: 'philosophy_open',
+    avatar: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=300&q=80',
+    cover: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
+    description: 'Открытая площадка для уважительного диалога между представителями различных конфессий, традиций и светского гуманизма.',
+    category: 'Мировоззрение & Философия',
+    beliefCategory: 'Межконфессиональный диалог',
+    membersCount: 8400,
+    isPrivate: false,
+    isJoined: false,
+    verified: true,
+    creator: initialUsers[3],
+    rules: [
+      'Строгий запрет на оскорбление чувств верующих и дискриминацию',
+      'Конструктивный философский обмен мнениями',
+      'Модерация по принципам взаимного уважения'
+    ],
+    events: [
+      {
+        id: 'ev-2',
+        title: 'Круглый стол: Этика искусственного интеллекта и сознание',
+        date: '25 сентября 2026',
+        time: '18:30 МСК',
+        location: 'Санкт-Петербург + Онлайн трансляция',
+        isOnline: true,
+        attendeesCount: 180,
+        isAttending: false
+      }
+    ],
+    chatGroupId: 'group_comm_philo'
+  },
+  {
+    id: 'comm-3',
+    name: 'Product Design & Светлые Интерфейсы',
+    handle: 'light_ui_design',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=300&q=80',
+    cover: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+    description: 'Всё о проектировании чистых, эстетичных светлых интерфейсов, микроанимациях, дизайн-системах и типографике.',
+    category: 'Дизайн & Арт',
+    membersCount: 19800,
+    isPrivate: false,
+    isJoined: true,
+    verified: true,
+    creator: initialUsers[1],
+    rules: [
+      'Делитесь реальными кейсами и макетами в Figma',
+      'Конструктивная критика с аргументами'
+    ],
+    events: [],
+    chatGroupId: 'group_comm_design'
+  },
+  {
+    id: 'comm-4',
+    name: 'Инди-Хакеры и Микробизнес',
+    handle: 'indie_hackers_hub',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
+    cover: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=80',
+    description: 'Клуб создателей собственных цифровых продуктов, инди-разработчиков и продавцов на маркетплейсах.',
+    category: 'Бизнес & Стартапы',
+    membersCount: 11300,
+    isPrivate: false,
+    isJoined: false,
+    verified: false,
+    creator: initialUsers[4],
+    rules: [
+      'Прозрачность: делимся выручкой, метриками и фейлами',
+      'Взаимная поддержка на старте'
+    ],
+    events: [],
+    chatGroupId: 'group_comm_indie'
+  }
+];
+
+// ==================== ТРАНЗАКЦИИ КОШЕЛЬКА ====================
+
+export const initialTransactions: WalletTransaction[] = [
+  {
+    id: 'tx-1',
+    type: 'sale',
+    amount: 5200,
+    description: 'Продажа: Худи оверсайз New Age',
+    date: '14 сен 2026, 10:15',
+    status: 'completed',
+    recipientOrSender: 'Покупатель @kate_s'
+  },
+  {
+    id: 'tx-2',
+    type: 'donation_received',
+    amount: 1000,
+    description: 'Донат за выпуск подкаста «Код и Кофе»',
+    date: '12 сен 2026, 17:40',
+    status: 'completed',
+    recipientOrSender: 'От @dima_k'
+  },
+  {
+    id: 'tx-3',
+    type: 'purchase',
+    amount: -2490,
+    description: 'Покупка книги «Паттерны архитектуры»',
+    date: '08 сен 2026, 14:20',
+    status: 'completed',
+    recipientOrSender: 'Продавец @max_p'
+  },
+  {
+    id: 'tx-4',
+    type: 'deposit',
+    amount: 15000,
+    description: 'Пополнение кошелька через СБП',
+    date: '01 сен 2026, 09:00',
+    status: 'completed'
+  }
+];
+
+// ==================== АВТОРСКИЕ ПОДПИСКИ ====================
+
+export const initialSubscriptionTiers: SubscriptionTier[] = [
+  {
+    id: 'tier-1',
+    title: 'Поддержка автора ☕',
+    price: 199,
+    authorId: 'me',
+    perks: [
+      'Особый бейдж спонсора в комментариях и чате',
+      'Доступ к закрытому Telegram-чату для спонсоров',
+      'Ранний доступ к новым видео и статьям'
+    ],
+    isSubscribed: false
+  },
+  {
+    id: 'tier-2',
+    title: 'Продвинутый разработчик 🚀',
+    price: 499,
+    authorId: 'me',
+    perks: [
+      'Все привилегии базового уровня',
+      'Эксклюзивные исходные коды и шаблоны проектов',
+      'Участие в закрытых ежемесячных Q&A видеоконференциях'
+    ],
+    isSubscribed: true
+  },
+  {
+    id: 'tier-3',
+    title: 'Персональный менторинг 💼',
+    price: 2490,
+    authorId: 'me',
+    perks: [
+      'Все предыдущие привилегии',
+      'Личный разбор вашего проекта и резюме (1 раз в месяц)',
+      'Прямой контакт в личном мессенджере с приоритетом'
+    ],
+    isSubscribed: false
+  }
+];
+

@@ -350,3 +350,97 @@
   background: var(--color-accent-hover);
   transform: translateY(-1px);
 }
+
+/* Role Selector */
+.role-selector-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.role-select-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.5rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.role-select-btn:hover {
+  background: #FFFFFF;
+  border-color: var(--color-accent-subtle);
+  color: var(--color-text);
+}
+
+.role-select-btn.active {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* Belief & Privacy */
+.belief-header-flex {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gdpr-pill {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #059669;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-full);
+}
+
+.edit-select-input {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  color: var(--color-text);
+  outline: none;
+}
+
+.privacy-row-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  padding: 0.4rem 0.65rem;
+  background: #F8FAFC;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+}
+
+.privacy-inline-icon {
+  color: var(--color-accent);
+}
+
+.privacy-inline-text {
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+  flex: 1;
+}
+
+.privacy-select-small {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  background: #FFFFFF;
+  color: var(--color-text);
+  outline: none;
+}
