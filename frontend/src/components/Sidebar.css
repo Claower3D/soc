@@ -455,6 +455,10 @@
   color: #D97706;
 }
 
+.spiritual-icon-courses {
+  color: #8B5CF6;
+}
+
 .spiritual-sub-badge {
   font-size: 0.62rem;
   font-weight: 800;
@@ -463,6 +467,11 @@
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
   margin-left: auto;
+}
+
+.spiritual-sub-badge.promo-badge {
+  background: linear-gradient(135deg, #EC4899, #8B5CF6);
+  color: #FFFFFF;
 }
 
 @media (max-width: 768px) {

@@ -3,29 +3,150 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Flower2, Activity, Sunrise, Wind, Waves, BookOpen, 
   Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, 
-  CheckCircle2, Plus, Trash2, Heart, ChevronLeft, ChevronRight
+  CheckCircle2, Plus, Trash2, Heart, ChevronLeft, ChevronRight,
+  GraduationCap, Megaphone, Star, Check, X
 } from 'lucide-react';
 import { 
   MEDITATION_TRACKS, YOGA_ROUTINES, INITIAL_AFFIRMATIONS, 
   BREATHING_TECHNIQUES, AMBIENT_SOUNDS, WISDOM_QUOTES,
-  type YogaRoutine, type Affirmation
+  INITIAL_COURSES, CURRENCIES, convertPrice, formatPrice,
+  type YogaRoutine, type Affirmation, type SpiritualCourse, type CurrencyCode
 } from '../data/spiritualData';
 import { spiritualAudio } from '../utils/spiritualAudio';
 import './SpiritualPage.css';
 
-type TabType = 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom';
+type TabType = 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom' | 'courses';
 
 export function SpiritualPage() {
   const { tab } = useParams<{ tab?: string }>();
   const navigate = useNavigate();
 
   // Active Tab
-  const activeTab: TabType = (tab && ['meditation', 'yoga', 'affirmations', 'breathing', 'sounds', 'wisdom'].includes(tab)) 
+  const activeTab: TabType = (tab && ['meditation', 'yoga', 'affirmations', 'breathing', 'sounds', 'wisdom', 'courses'].includes(tab)) 
     ? (tab as TabType) 
     : 'meditation';
 
   const handleTabChange = (newTab: TabType) => {
     navigate(`/spiritual/${newTab}`);
+  };
+
+  // --- MULTI-CURRENCY STATE ---
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(() => {
+    return (localStorage.getItem('newage_spiritual_currency') as CurrencyCode) || 'RUB';
+  });
+
+  const handleCurrencyChange = (curr: CurrencyCode) => {
+    setSelectedCurrency(curr);
+    localStorage.setItem('newage_spiritual_currency', curr);
+  };
+
+  // Calculate formatted price for any course
+  const getCoursePrice = (course: SpiritualCourse) => {
+    const rawPrice = convertPrice(course.basePrice, course.baseCurrency, selectedCurrency);
+    if (course.discountPercent) {
+      const discountedRaw = Math.round(rawPrice * (1 - course.discountPercent / 100));
+      return {
+        original: formatPrice(rawPrice, selectedCurrency),
+        discounted: formatPrice(discountedRaw, selectedCurrency),
+        hasDiscount: true,
+        percent: course.discountPercent
+      };
+    }
+    return {
+      original: formatPrice(rawPrice, selectedCurrency),
+      discounted: formatPrice(rawPrice, selectedCurrency),
+      hasDiscount: false,
+      percent: 0
+    };
+  };
+
+  // --- COMMERCIAL COURSES & PROMO STATE ---
+  const [coursesList, setCoursesList] = useState<SpiritualCourse[]>(() => {
+    const saved = localStorage.getItem('newage_spiritual_courses');
+    if (saved) {
+      try { return JSON.parse(saved); } catch { /* ignore */ }
+    }
+    return INITIAL_COURSES;
+  });
+
+  const [courseCategoryFilter, setCourseCategoryFilter] = useState<string>('all');
+  const [selectedCourseForPurchase, setSelectedCourseForPurchase] = useState<SpiritualCourse | null>(null);
+  const [purchaseSuccess, setPurchaseSuccess] = useState(false);
+  const [isCreateCourseModalOpen, setIsCreateCourseModalOpen] = useState(false);
+
+  // New Course Form State
+  const [newCourseTitle, setNewCourseTitle] = useState('');
+  const [newCourseSubtitle, setNewCourseSubtitle] = useState('');
+  const [newCourseCategory, setNewCourseCategory] = useState<SpiritualCourse['category']>('yoga');
+  const [newCourseFormat, setNewCourseFormat] = useState<SpiritualCourse['format']>('Видеокурс');
+  const [newCourseAuthorName, setNewCourseAuthorName] = useState('');
+  const [newCourseAuthorRole, setNewCourseAuthorRole] = useState('');
+  const [newCourseDuration, setNewCourseDuration] = useState('4 недели • 12 уроков');
+  const [newCoursePrice, setNewCoursePrice] = useState('5000');
+  const [newCourseCurrency, setNewCourseCurrency] = useState<CurrencyCode>('RUB');
+  const [newCourseDiscount, setNewCourseDiscount] = useState('20');
+  const [newCourseIsSponsored, setNewCourseIsSponsored] = useState(true);
+  const [newCourseDescription, setNewCourseDescription] = useState('');
+
+  const handleCreateCourseSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCourseTitle.trim() || !newCoursePrice) return;
+
+    const newCourse: SpiritualCourse = {
+      id: `course-${Date.now()}`,
+      title: newCourseTitle.trim(),
+      subtitle: newCourseSubtitle.trim() || 'Авторская практическая программа обучения',
+      category: newCourseCategory,
+      categoryLabel: 
+        newCourseCategory === 'yoga' ? 'Йога и Прана' :
+        newCourseCategory === 'meditation' ? 'Медитация' :
+        newCourseCategory === 'affirmations' ? 'Аффирмации и Разум' :
+        newCourseCategory === 'breathing' ? 'Дыхание' :
+        newCourseCategory === 'soundhealing' ? 'Саундхилинг' : 'Живые Ретриты',
+      authorName: newCourseAuthorName.trim() || 'Сертифицированный Мастер',
+      authorRole: newCourseAuthorRole.trim() || 'Инструктор New Age Academy',
+      authorAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      authorVerified: true,
+      rating: 5.0,
+      studentsCount: 1,
+      lessonsCount: 12,
+      durationLabel: newCourseDuration,
+      format: newCourseFormat,
+      description: newCourseDescription.trim() || 'Комплексная программа самопознания и практик для трансформации тела и сознания.',
+      highlights: [
+        'Пошаговые видеоматериалы и подробные инструкции',
+        'Персональная поддержка и закрытый чат участников',
+        'Бессрочный доступ ко всем обновлениям программы'
+      ],
+      basePrice: Number(newCoursePrice) || 3000,
+      baseCurrency: newCourseCurrency,
+      discountPercent: Number(newCourseDiscount) || undefined,
+      isSponsored: newCourseIsSponsored,
+      sponsoredPlacement: newCourseIsSponsored ? [newCourseCategory, 'all'] : ['all'],
+      badgeLabel: newCourseIsSponsored ? '🔥 СПОНСИРОВАНО • НОВИНКА' : '✨ НОВЫЙ КУРС',
+      bgGradient: 'linear-gradient(135deg, #6366F1, #8B5CF6)'
+    };
+
+    const updated = [newCourse, ...coursesList];
+    setCoursesList(updated);
+    localStorage.setItem('newage_spiritual_courses', JSON.stringify(updated));
+    setIsCreateCourseModalOpen(false);
+    spiritualAudio.playCrystalChime();
+
+    // Reset form
+    setNewCourseTitle('');
+    setNewCourseSubtitle('');
+    setNewCourseDescription('');
+    setNewCoursePrice('5000');
+  };
+
+  const handleSimulatePurchase = () => {
+    spiritualAudio.playCrystalChime();
+    setPurchaseSuccess(true);
+    setTimeout(() => {
+      setPurchaseSuccess(false);
+      setSelectedCourseForPurchase(null);
+    }, 2500);
   };
 
   // --- MEDITATION TIMER STATE ---
@@ -67,7 +188,6 @@ export function SpiritualPage() {
   const handleToggleTimer = () => {
     if (!isTimerRunning) {
       spiritualAudio.playZenBowl(432, 4);
-      // Start bg sound if selected
       if (selectedBgSound === '432') {
         spiritualAudio.toggleContinuousTone('timer-bg-432', 432, 0.15);
       } else if (selectedBgSound === '528') {
@@ -219,7 +339,6 @@ export function SpiritualPage() {
         setBreathCountdown(prev => {
           if (prev > 1) return prev - 1;
 
-          // Transition to next phase
           if (breathPhase === 'inhale') {
             if (selectedBreathTech.holdSec > 0) {
               setBreathPhase('hold');
@@ -241,7 +360,6 @@ export function SpiritualPage() {
               return selectedBreathTech.inhaleSec;
             }
           } else {
-            // holdAfter -> inhale
             setCompletedBreathCycles(c => c + 1);
             setBreathPhase('inhale');
             return selectedBreathTech.inhaleSec;
@@ -339,11 +457,62 @@ export function SpiritualPage() {
     spiritualAudio.playCrystalChime();
   };
 
-  // Format time MM:SS
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Render sponsored in-section ad banner
+  const renderSectionAdBanner = (category: 'yoga' | 'meditation' | 'affirmations' | 'breathing') => {
+    const sponsoredCourse = coursesList.find(c => 
+      c.isSponsored && (c.sponsoredPlacement?.includes(category) || c.sponsoredPlacement?.includes('all'))
+    );
+    if (!sponsoredCourse) return null;
+
+    const priceInfo = getCoursePrice(sponsoredCourse);
+
+    return (
+      <div className="section-ad-banner">
+        <div className="ad-banner-glow" style={{ background: sponsoredCourse.bgGradient }} />
+        <div className="ad-banner-badge">
+          <Megaphone size={13} />
+          <span>РЕКЛАМА • ПАРТНЁРСКИЙ КУРС</span>
+        </div>
+        <div className="ad-banner-main">
+          <div className="ad-author-pill">
+            <img src={sponsoredCourse.authorAvatar} alt={sponsoredCourse.authorName} className="ad-author-avatar" />
+            <span>{sponsoredCourse.authorName}</span>
+            {sponsoredCourse.authorVerified && <Check size={12} className="ad-verified-icon" />}
+          </div>
+          <h4 className="ad-course-title">{sponsoredCourse.title}</h4>
+          <p className="ad-course-desc">{sponsoredCourse.subtitle}</p>
+          <div className="ad-course-meta-row">
+            <span className="ad-meta-item"><Star size={13} className="star-filled" /> {sponsoredCourse.rating} ({sponsoredCourse.studentsCount} учеников)</span>
+            <span className="ad-meta-item">⏱ {sponsoredCourse.durationLabel}</span>
+          </div>
+        </div>
+
+        <div className="ad-banner-action">
+          <div className="ad-price-block">
+            {priceInfo.hasDiscount && (
+              <span className="ad-old-price">{priceInfo.original}</span>
+            )}
+            <span className="ad-current-price">{priceInfo.discounted}</span>
+            {priceInfo.hasDiscount && (
+              <span className="ad-discount-tag">-{priceInfo.percent}%</span>
+            )}
+          </div>
+          <button 
+            className="ad-enroll-btn"
+            onClick={() => setSelectedCourseForPurchase(sponsoredCourse)}
+          >
+            <span>Записаться на курс</span>
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -358,7 +527,7 @@ export function SpiritualPage() {
           </div>
           <h1 className="spiritual-main-title">Самопознание и Практики</h1>
           <p className="spiritual-subtitle">
-            Пространство тишины, осознанности и восстановления. Медитации с частотами 432 Гц, древние комплексы йоги, трансформирующие аффирмации и дыхательные техники.
+            Пространство тишины, осознанности и коммерческая академия мастеров. Медитации 432 Гц, древняя йога, аффирмации, пранаяма и авторские курсы с оплатой в любой мировой валюте.
           </p>
 
           {/* Quick Metrics */}
@@ -372,8 +541,12 @@ export function SpiritualPage() {
               <span className="metric-lbl">Установок принято</span>
             </div>
             <div className="metric-pill">
-              <span className="metric-num">432 Гц</span>
-              <span className="metric-lbl">Базовый тон гармонии</span>
+              <span className="metric-num">{coursesList.length}</span>
+              <span className="metric-lbl">Курсов в Академии</span>
+            </div>
+            <div className="metric-pill">
+              <span className="metric-num">9 валют</span>
+              <span className="metric-lbl">Мультивалютная оплата</span>
             </div>
           </div>
         </div>
@@ -441,7 +614,16 @@ export function SpiritualPage() {
           onClick={() => handleTabChange('wisdom')}
         >
           <BookOpen size={18} />
-          <span>Мудрость & Дневник</span>
+          <span>Мудрость</span>
+        </button>
+
+        <button 
+          className={`spiritual-tab-btn tab-btn-courses ${activeTab === 'courses' ? 'active' : ''}`}
+          onClick={() => handleTabChange('courses')}
+        >
+          <GraduationCap size={18} />
+          <span>Курсы & Маркет</span>
+          <span className="tab-hot-badge">PRO</span>
         </button>
       </div>
 
@@ -450,6 +632,9 @@ export function SpiritualPage() {
       {/* ========================================================================= */}
       {activeTab === 'meditation' && (
         <div className="spiritual-tab-content">
+          {/* In-section Sponsored Course Ad Banner */}
+          {renderSectionAdBanner('meditation')}
+
           <div className="meditation-grid-layout">
             {/* Left: Interactive Zen Timer */}
             <div className="meditation-timer-card">
@@ -579,7 +764,9 @@ export function SpiritualPage() {
       {/* ========================================================================= */}
       {activeTab === 'yoga' && (
         <div className="spiritual-tab-content">
-          {/* If interactive routine is running */}
+          {/* In-section Sponsored Course Ad Banner for Yoga */}
+          {renderSectionAdBanner('yoga')}
+
           {activeRoutine ? (
             <div className="yoga-practice-session-card">
               <div className="practice-header">
@@ -690,7 +877,6 @@ export function SpiritualPage() {
                         <div className="routine-meta-pill">🧘 {routine.poses.length} асан</div>
                       </div>
 
-                      {/* Pose preview list */}
                       <div className="routine-poses-preview">
                         <span className="poses-preview-title">Ключевые асаны:</span>
                         <ul className="poses-bullet-list">
@@ -717,12 +903,14 @@ export function SpiritualPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: АФФИРМАЦИИ (АФЕРМИТИЗАЦИЯ) */}
+      {/* TAB 3: АФФИРМАЦИИ */}
       {/* ========================================================================= */}
       {activeTab === 'affirmations' && (
         <div className="spiritual-tab-content">
+          {/* In-section Sponsored Course Ad Banner for Affirmations */}
+          {renderSectionAdBanner('affirmations')}
+
           <div className="affirmations-layout">
-            {/* Big Interactive Affirmation Card of the Day */}
             <div className="affirmation-spotlight-card">
               <div className="spotlight-tag">
                 <Sunrise size={16} />
@@ -756,7 +944,6 @@ export function SpiritualPage() {
               </div>
             </div>
 
-            {/* Custom Affirmation Input */}
             <div className="create-affirmation-card">
               <h3 className="section-card-title">Создать Свою Установку</h3>
               <p className="section-desc">Сформулируйте намерение в настоящем времени от первого лица.</p>
@@ -778,7 +965,6 @@ export function SpiritualPage() {
               </form>
             </div>
 
-            {/* Category Filter and List */}
             <div className="affirmations-list-section">
               <div className="category-filter-row">
                 {[
@@ -835,12 +1021,14 @@ export function SpiritualPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 4: ДЫХАТЕЛЬНЫЕ ПРАКТИКИ (ПРАНАЯМА) */}
+      {/* TAB 4: ДЫХАТЕЛЬНЫЕ ПРАКТИКИ */}
       {/* ========================================================================= */}
       {activeTab === 'breathing' && (
         <div className="spiritual-tab-content">
+          {/* In-section Sponsored Course Ad Banner for Breathing */}
+          {renderSectionAdBanner('breathing')}
+
           <div className="breathing-page-layout">
-            {/* Tech selector */}
             <div className="breathing-tech-selector">
               {BREATHING_TECHNIQUES.map(tech => (
                 <div 
@@ -859,7 +1047,6 @@ export function SpiritualPage() {
               ))}
             </div>
 
-            {/* Central Animated Breathing Stage */}
             <div className="breathing-stage-card">
               <div className="breathing-counter-badge">
                 Завершено циклов: <strong>{completedBreathCycles}</strong>
@@ -904,7 +1091,7 @@ export function SpiritualPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 5: ЗВУКИ И МАНТРЫ (САУНДХИЛИНГ) */}
+      {/* TAB 5: ЗВУКИ И МАНТРЫ */}
       {/* ========================================================================= */}
       {activeTab === 'sounds' && (
         <div className="spiritual-tab-content">
@@ -939,7 +1126,6 @@ export function SpiritualPage() {
                     </button>
                   </div>
 
-                  {/* Volume Slider */}
                   <div className="channel-slider-row">
                     <span className="vol-icon"><Volume2 size={14} /></span>
                     <input 
@@ -965,7 +1151,6 @@ export function SpiritualPage() {
       {activeTab === 'wisdom' && (
         <div className="spiritual-tab-content">
           <div className="wisdom-layout-grid">
-            {/* Left: Gratitude Journal */}
             <div className="gratitude-journal-card">
               <h3 className="section-card-title">Дневник Осознанности и Благодарности</h3>
               <p className="section-desc">
@@ -1009,7 +1194,6 @@ export function SpiritualPage() {
                 </button>
               </form>
 
-              {/* Journal History */}
               <div className="journal-history-list">
                 <h4 className="history-title">Мои записи благодарности</h4>
                 {gratitudeEntries.map(entry => (
@@ -1025,7 +1209,6 @@ export function SpiritualPage() {
               </div>
             </div>
 
-            {/* Right: Wisdom Quotes & Ancient Parables */}
             <div className="wisdom-quotes-column">
               <h3 className="section-card-title">Жемчужины Древней Мудрости</h3>
               <p className="section-desc">Вечные наставления учителей Востока и Запада.</p>
@@ -1040,6 +1223,417 @@ export function SpiritualPage() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 7: КУРСЫ & МАРКЕТ ПРАКТИК (COMMERCE & ADS) */}
+      {/* ========================================================================= */}
+      {activeTab === 'courses' && (
+        <div className="spiritual-tab-content">
+          {/* Top Control Bar: Currency Selector & Publish Button */}
+          <div className="courses-hub-top-bar">
+            <div className="currency-selector-box">
+              <span className="currency-selector-label">Отображать цены в валюте:</span>
+              <div className="currency-pills-list">
+                {(Object.keys(CURRENCIES) as CurrencyCode[]).map(cCode => (
+                  <button 
+                    key={cCode}
+                    className={`curr-pill-btn ${selectedCurrency === cCode ? 'active' : ''}`}
+                    onClick={() => handleCurrencyChange(cCode)}
+                    title={CURRENCIES[cCode].name}
+                  >
+                    <span>{CURRENCIES[cCode].symbol}</span>
+                    <span className="curr-code-name">{cCode}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button 
+              className="publish-course-cta-btn"
+              onClick={() => setIsCreateCourseModalOpen(true)}
+            >
+              <Plus size={18} />
+              <span>Опубликовать курс / Рекламу</span>
+            </button>
+          </div>
+
+          {/* Courses Category Filter */}
+          <div className="courses-category-filter-row">
+            {[
+              { id: 'all', label: 'Все направления' },
+              { id: 'yoga', label: 'Йога' },
+              { id: 'meditation', label: 'Медитация' },
+              { id: 'affirmations', label: 'Аффирмации и Мышление' },
+              { id: 'breathing', label: 'Дыхание' },
+              { id: 'soundhealing', label: 'Саундхилинг' },
+              { id: 'retreats', label: 'Живые Ретриты' }
+            ].map(cat => (
+              <button
+                key={cat.id}
+                className={`course-cat-pill ${courseCategoryFilter === cat.id ? 'active' : ''}`}
+                onClick={() => setCourseCategoryFilter(cat.id)}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Course Cards Grid */}
+          <div className="courses-marketplace-grid">
+            {coursesList
+              .filter(course => courseCategoryFilter === 'all' || course.category === courseCategoryFilter)
+              .map(course => {
+                const price = getCoursePrice(course);
+
+                return (
+                  <div key={course.id} className={`course-market-card ${course.isSponsored ? 'is-sponsored-card' : ''}`}>
+                    {/* Top Banner with Author and Badge */}
+                    <div className="course-card-hero" style={{ background: course.bgGradient }}>
+                      <div className="course-badge-line">
+                        <span className="course-main-badge">{course.badgeLabel || course.categoryLabel}</span>
+                        <span className="course-format-badge">{course.format}</span>
+                      </div>
+                      <h3 className="course-title-text">{course.title}</h3>
+                      <p className="course-subtitle-text">{course.subtitle}</p>
+                    </div>
+
+                    <div className="course-card-body">
+                      {/* Author Info Row */}
+                      <div className="course-author-row">
+                        <img src={course.authorAvatar} alt={course.authorName} className="course-author-img" />
+                        <div className="course-author-meta">
+                          <div className="course-author-name-line">
+                            <span className="author-bold-name">{course.authorName}</span>
+                            {course.authorVerified && <Check size={14} className="verified-check" />}
+                          </div>
+                          <span className="author-role-sub">{course.authorRole}</span>
+                        </div>
+                      </div>
+
+                      <div className="course-stats-strip">
+                        <div className="stat-bubble">
+                          <Star size={14} className="star-filled" />
+                          <span>{course.rating}</span>
+                        </div>
+                        <div className="stat-bubble">
+                          <span>{course.studentsCount} учеников</span>
+                        </div>
+                        <div className="stat-bubble">
+                          <span>⏱ {course.durationLabel}</span>
+                        </div>
+                      </div>
+
+                      {/* Course Key Highlights */}
+                      <ul className="course-highlights-list">
+                        {course.highlights.slice(0, 3).map((item, idx) => (
+                          <li key={idx}>
+                            <Check size={13} className="bullet-check" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      {/* Price & Buy Action */}
+                      <div className="course-pricing-action-box">
+                        <div className="pricing-left">
+                          {price.hasDiscount && (
+                            <span className="pricing-old">{price.original}</span>
+                          )}
+                          <div className="pricing-active-row">
+                            <span className="pricing-final">{price.discounted}</span>
+                            {price.hasDiscount && (
+                              <span className="pricing-percent-tag">-{price.percent}%</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <button 
+                          className="enroll-course-btn"
+                          onClick={() => setSelectedCourseForPurchase(course)}
+                        >
+                          <span>Записаться</span>
+                          <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: CREATE / PUBLISH COURSE OR AD */}
+      {/* ========================================================================= */}
+      {isCreateCourseModalOpen && (
+        <div className="modal-backdrop" onClick={() => setIsCreateCourseModalOpen(false)}>
+          <div className="publish-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h3 className="modal-title">Разместить курс или рекламу</h3>
+                <p className="modal-desc">Опубликуйте свою авторскую программу и начните принимать оплаты от аудитории.</p>
+              </div>
+              <button className="modal-close-btn" onClick={() => setIsCreateCourseModalOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCourseSubmit} className="publish-form">
+              <div className="form-group">
+                <label className="form-label">Название курса / программы *</label>
+                <input 
+                  type="text" 
+                  required
+                  value={newCourseTitle}
+                  onChange={e => setNewCourseTitle(e.target.value)}
+                  placeholder="Например: Интенсив по Хатха-Йоге и Чакровому Дыханию"
+                  className="form-control"
+                />
+              </div>
+
+              <div className="form-row-2">
+                <div className="form-group">
+                  <label className="form-label">Направление / Категория</label>
+                  <select 
+                    value={newCourseCategory}
+                    onChange={e => setNewCourseCategory(e.target.value as SpiritualCourse['category'])}
+                    className="form-control"
+                  >
+                    <option value="yoga">Йога</option>
+                    <option value="meditation">Медитация</option>
+                    <option value="affirmations">Аффирмации и Мышление</option>
+                    <option value="breathing">Дыхание и Пранаяма</option>
+                    <option value="soundhealing">Саундхилинг</option>
+                    <option value="retreats">Ретриты</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Формат обучения</label>
+                  <select 
+                    value={newCourseFormat}
+                    onChange={e => setNewCourseFormat(e.target.value as SpiritualCourse['format'])}
+                    className="form-control"
+                  >
+                    <option value="Видеокурс">Видеокурс</option>
+                    <option value="Интенсив">Онлайн-интенсив</option>
+                    <option value="Наставничество">Личное наставничество</option>
+                    <option value="Ретрит">Выездной ретрит</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Длительность / Программа</label>
+                  <input 
+                    type="text"
+                    value={newCourseDuration}
+                    onChange={e => setNewCourseDuration(e.target.value)}
+                    placeholder="Например: 4 недели • 12 уроков"
+                    className="form-control"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row-2">
+                <div className="form-group">
+                  <label className="form-label">Имя мастера / Школы *</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={newCourseAuthorName}
+                    onChange={e => setNewCourseAuthorName(e.target.value)}
+                    placeholder="Например: Мастер Ананта"
+                    className="form-control"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Статус / Регалии автора</label>
+                  <input 
+                    type="text" 
+                    value={newCourseAuthorRole}
+                    onChange={e => setNewCourseAuthorRole(e.target.value)}
+                    placeholder="Например: Инструктор международного альянса йоги"
+                    className="form-control"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row-3">
+                <div className="form-group">
+                  <label className="form-label">Базовая стоимость *</label>
+                  <input 
+                    type="number" 
+                    required
+                    min="0"
+                    value={newCoursePrice}
+                    onChange={e => setNewCoursePrice(e.target.value)}
+                    className="form-control"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Валюта курса</label>
+                  <select 
+                    value={newCourseCurrency}
+                    onChange={e => setNewCourseCurrency(e.target.value as CurrencyCode)}
+                    className="form-control"
+                  >
+                    {(Object.keys(CURRENCIES) as CurrencyCode[]).map(code => (
+                      <option key={code} value={code}>{code} ({CURRENCIES[code].symbol}) - {CURRENCIES[code].name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Скидка (%)</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    max="90"
+                    value={newCourseDiscount}
+                    onChange={e => setNewCourseDiscount(e.target.value)}
+                    className="form-control"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Краткое описание и программа</label>
+                <textarea 
+                  rows={3}
+                  value={newCourseDescription}
+                  onChange={e => setNewCourseDescription(e.target.value)}
+                  placeholder="Опишите, чему научатся участники и какие результаты получат..."
+                  className="form-control"
+                />
+              </div>
+
+              {/* Promo Ads Option */}
+              <div className="form-checkbox-card">
+                <label className="checkbox-label-container">
+                  <input 
+                    type="checkbox" 
+                    checked={newCourseIsSponsored}
+                    onChange={e => setNewCourseIsSponsored(e.target.checked)}
+                    className="custom-checkbox"
+                  />
+                  <div>
+                    <span className="checkbox-title">🔥 Запустить внутреннюю рекламу и продвижение</span>
+                    <span className="checkbox-sub">
+                      Курс будет отображаться в рекламных баннерах внутри разделов Йоги, Медитации и Аффирмаций с пометкой «Спонсировано».
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="modal-action-row">
+                <button type="button" className="btn-cancel" onClick={() => setIsCreateCourseModalOpen(false)}>
+                  Отмена
+                </button>
+                <button type="submit" className="btn-submit-publish">
+                  <Plus size={18} />
+                  <span>Опубликовать курс в Маркете</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: PURCHASE / ENROLL COURSE */}
+      {/* ========================================================================= */}
+      {selectedCourseForPurchase && (
+        <div className="modal-backdrop" onClick={() => setSelectedCourseForPurchase(null)}>
+          <div className="purchase-modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <span className="purchase-modal-tag">{selectedCourseForPurchase.categoryLabel}</span>
+                <h3 className="modal-title">{selectedCourseForPurchase.title}</h3>
+                <span className="purchase-author-sub">Автор: {selectedCourseForPurchase.authorName}</span>
+              </div>
+              <button className="modal-close-btn" onClick={() => setSelectedCourseForPurchase(null)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {purchaseSuccess ? (
+              <div className="purchase-success-view">
+                <div className="success-icon-circle">
+                  <CheckCircle2 size={48} className="check-emerald" />
+                </div>
+                <h3>Оплата успешно завершена!</h3>
+                <p>Доступ к курсу активирован. Все уроки и закрытый чат добавлены в ваш личный профиль.</p>
+              </div>
+            ) : (
+              <div className="purchase-modal-content">
+                <div className="purchase-overview-box">
+                  <p className="purchase-desc">{selectedCourseForPurchase.description}</p>
+                  
+                  <div className="purchase-highlights-box">
+                    <span className="highlights-title">Что входит в курс:</span>
+                    <ul>
+                      {selectedCourseForPurchase.highlights.map((h, i) => (
+                        <li key={i}>{h}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Price summary */}
+                <div className="purchase-total-row">
+                  <span className="total-label">Итого к оплате:</span>
+                  <div className="total-price-box">
+                    {getCoursePrice(selectedCourseForPurchase).hasDiscount && (
+                      <span className="total-old-price">{getCoursePrice(selectedCourseForPurchase).original}</span>
+                    )}
+                    <span className="total-final-price">{getCoursePrice(selectedCourseForPurchase).discounted}</span>
+                  </div>
+                </div>
+
+                {/* Payment method selection */}
+                <div className="payment-methods-block">
+                  <span className="pay-methods-title">Способ оплаты:</span>
+                  <div className="pay-options-list">
+                    <label className="pay-option-item active">
+                      <input type="radio" name="pay_opt" defaultChecked />
+                      <div>
+                        <strong>Кошелёк New Age Pay (Баланс 14 850 ₽)</strong>
+                        <span className="sub-opt-hint">Мгновенное списание без комиссии</span>
+                      </div>
+                    </label>
+                    <label className="pay-option-item">
+                      <input type="radio" name="pay_opt" />
+                      <div>
+                        <strong>Банковская карта (Мир, Visa, Mastercard)</strong>
+                        <span className="sub-opt-hint">Любые российские и зарубежные карты</span>
+                      </div>
+                    </label>
+                    <label className="pay-option-item">
+                      <input type="radio" name="pay_opt" />
+                      <div>
+                        <strong>Криптовалюта (USDT / TON / New Age Token)</strong>
+                        <span className="sub-opt-hint">Автоматическое зачисление после 1 подтверждения сети</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="modal-action-row">
+                  <button className="btn-cancel" onClick={() => setSelectedCourseForPurchase(null)}>
+                    Отмена
+                  </button>
+                  <button className="btn-confirm-pay" onClick={handleSimulatePurchase}>
+                    <span>Оплатить {getCoursePrice(selectedCourseForPurchase).discounted}</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

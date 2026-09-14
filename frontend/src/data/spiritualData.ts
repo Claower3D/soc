@@ -408,3 +408,257 @@ export const WISDOM_QUOTES: WisdomQuote[] = [
     tradition: 'Дзен'
   }
 ];
+
+export type CurrencyCode = 'RUB' | 'USD' | 'EUR' | 'KZT' | 'UAH' | 'AED' | 'CNY' | 'USDT' | 'AGE';
+
+export interface CurrencyConfig {
+  code: CurrencyCode;
+  symbol: string;
+  name: string;
+  rateToRub: number; // 1 unit of currency = X RUB
+}
+
+export const CURRENCIES: Record<CurrencyCode, CurrencyConfig> = {
+  RUB: { code: 'RUB', symbol: '₽', name: 'Рубль (RUB)', rateToRub: 1 },
+  USD: { code: 'USD', symbol: '$', name: 'Доллар (USD)', rateToRub: 92 },
+  EUR: { code: 'EUR', symbol: '€', name: 'Евро (EUR)', rateToRub: 100 },
+  KZT: { code: 'KZT', symbol: '₸', name: 'Тенге (KZT)', rateToRub: 0.20 },
+  UAH: { code: 'UAH', symbol: '₴', name: 'Гривна (UAH)', rateToRub: 2.25 },
+  AED: { code: 'AED', symbol: 'AED', name: 'Дирхам (AED)', rateToRub: 25 },
+  CNY: { code: 'CNY', symbol: '¥', name: 'Юань (CNY)', rateToRub: 12.8 },
+  USDT: { code: 'USDT', symbol: '₮', name: 'Tether (USDT)', rateToRub: 92 },
+  AGE: { code: 'AGE', symbol: '🪙 AGE', name: 'New Age Token', rateToRub: 10 }
+};
+
+export function convertPrice(amount: number, from: CurrencyCode, to: CurrencyCode): number {
+  if (from === to) return amount;
+  const rubVal = amount * CURRENCIES[from].rateToRub;
+  const targetVal = rubVal / CURRENCIES[to].rateToRub;
+  
+  if (to === 'USD' || to === 'EUR' || to === 'USDT') {
+    return Math.round(targetVal);
+  }
+  if (to === 'KZT' || to === 'RUB' || to === 'UAH' || to === 'AED' || to === 'CNY' || to === 'AGE') {
+    return Math.round(targetVal / 10) * 10;
+  }
+  return Math.round(targetVal);
+}
+
+export function formatPrice(amount: number, currency: CurrencyCode): string {
+  const formatted = Math.round(amount).toLocaleString('ru-RU');
+  const conf = CURRENCIES[currency];
+  if (currency === 'USD') return `$${formatted}`;
+  if (currency === 'EUR') return `€${formatted}`;
+  if (currency === 'USDT') return `${formatted} ₮`;
+  if (currency === 'AGE') return `${formatted} 🪙 AGE`;
+  return `${formatted} ${conf.symbol}`;
+}
+
+export interface SpiritualCourse {
+  id: string;
+  title: string;
+  subtitle: string;
+  category: 'yoga' | 'meditation' | 'affirmations' | 'breathing' | 'soundhealing' | 'retreats';
+  categoryLabel: string;
+  authorName: string;
+  authorRole: string;
+  authorAvatar: string;
+  authorVerified: boolean;
+  rating: number;
+  studentsCount: number;
+  lessonsCount: number;
+  durationLabel: string;
+  format: 'Видеокурс' | 'Интенсив' | 'Наставничество' | 'Ретрит';
+  description: string;
+  highlights: string[];
+  basePrice: number;
+  baseCurrency: CurrencyCode;
+  discountPercent?: number;
+  isSponsored?: boolean;
+  sponsoredPlacement?: ('yoga' | 'meditation' | 'affirmations' | 'breathing' | 'soundhealing' | 'retreats' | 'all')[];
+  badgeLabel?: string;
+  bgGradient: string;
+}
+
+export const INITIAL_COURSES: SpiritualCourse[] = [
+  {
+    id: 'course-yoga-ashtanga',
+    title: 'Аштанга-Виньяса и Энергетические Замки (Бандхи)',
+    subtitle: 'Полный фундаментальный курс раскрытия силы, гибкости и пранических каналов',
+    category: 'yoga',
+    categoryLabel: 'Йога и Прана',
+    authorName: 'Сурьянанда Дев',
+    authorRole: 'Гранд-мастер йоги, 18 лет практики в Ришикеше',
+    authorAvatar: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=150&auto=format&fit=crop&q=80',
+    authorVerified: true,
+    rating: 4.98,
+    studentsCount: 1420,
+    lessonsCount: 24,
+    durationLabel: '6 недель • 24 урока',
+    format: 'Видеокурс',
+    description: 'Глубокое погружение в первую серию Аштанга-йоги. Освоение дыхания Удджайи, мышечных замков Мула и Уддияна Бандха, травмобезопасные отстройки и медитативный поток.',
+    highlights: [
+      '24 видеоурока в 4K с детальным разбором геометрии асан',
+      'Методичка по дыханию Удджайи и точкам концентрации Дришти',
+      'Закрытый чат обратной связи и проверка вашей техники мастером',
+      'Сертификат о прохождении курса в профиле New Age'
+    ],
+    basePrice: 6900,
+    baseCurrency: 'RUB',
+    discountPercent: 25,
+    isSponsored: true,
+    sponsoredPlacement: ['yoga', 'all'],
+    badgeLabel: '🔥 ХИТ • СПОНСИРОВАНО',
+    bgGradient: 'linear-gradient(135deg, #F59E0B, #EA580C)'
+  },
+  {
+    id: 'course-meditation-vipassana',
+    title: '30 Дней Випассаны: Остановка Внутреннего Диалога',
+    subtitle: 'Практическое руководство по выходу из тревожности в чистое присутствие наблюдателя',
+    category: 'meditation',
+    categoryLabel: 'Медитация',
+    authorName: 'Анна Сатори',
+    authorRole: 'Трансперсональный психолог, мастер майндфулнесс',
+    authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    authorVerified: true,
+    rating: 4.95,
+    studentsCount: 980,
+    lessonsCount: 30,
+    durationLabel: '30 дней • Ежедневные сессии',
+    format: 'Интенсив',
+    description: 'Системный протокол постепенного успокоения ума. Вы научитесь растождествляться со стрессовыми мыслями, управлять вниманием и восстанавливать внутренний ресурс в любых условиях.',
+    highlights: [
+      '30 управляемых аудио-медитаций с бинауральными частотами 432 Гц',
+      'Ежедневный трекер осознанности и дневник наблюдений',
+      'Прямые эфиры вопросов и ответов каждую субботу',
+      'Доступ к библиотеке дыхательных практик навсегда'
+    ],
+    basePrice: 4900,
+    baseCurrency: 'RUB',
+    discountPercent: 20,
+    isSponsored: true,
+    sponsoredPlacement: ['meditation', 'all'],
+    badgeLabel: '✨ РЕКОМЕНДУЕМ',
+    bgGradient: 'linear-gradient(135deg, #6366F1, #8B5CF6)'
+  },
+  {
+    id: 'course-affirm-neuro',
+    title: 'Нейро-Аффирмации и Код Изобилия',
+    subtitle: 'Научная перепрошивка ограничивающих убеждений и денежного мышления',
+    category: 'affirmations',
+    categoryLabel: 'Аффирмации и Мышление',
+    authorName: 'Михаил Рассветов',
+    authorRole: 'Нейрокоуч, исследователь квантовой психологии',
+    authorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    authorVerified: true,
+    rating: 4.92,
+    studentsCount: 2310,
+    lessonsCount: 21,
+    durationLabel: '21 день • Трансформация подсознания',
+    format: 'Интенсив',
+    description: 'Как перестать саботировать свой успех и создать стабильный поток благополучия. Работа с тета-состоянием, формулирование эффективных вербальных кодов и удаление родовых установок дефицита.',
+    highlights: [
+      '21 аудио-настройка для прослушивания перед сном и утром',
+      'Рабочая тетрадь по нейтрализации страха больших денег',
+      'Алгоритм формулирования индивидуальных аффирмаций под вашу цель',
+      'Чат единомышленников и поддерживающее поле группы'
+    ],
+    basePrice: 5500,
+    baseCurrency: 'RUB',
+    discountPercent: 15,
+    isSponsored: true,
+    sponsoredPlacement: ['affirmations', 'all'],
+    badgeLabel: '💎 ТОП КУРС',
+    bgGradient: 'linear-gradient(135deg, #EC4899, #F43F5E)'
+  },
+  {
+    id: 'course-breath-wimhof',
+    title: 'Искусство Дыхания: Метод Пранаямы и Сверх-Иммунитета',
+    subtitle: 'Управление уровнем энергии, стрессом и биохимией крови через дыхание',
+    category: 'breathing',
+    categoryLabel: 'Дыхание',
+    authorName: 'Артур Прана',
+    authorRole: 'Сертифицированный инструктор по экстремальному дыханию',
+    authorAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    authorVerified: true,
+    rating: 4.91,
+    studentsCount: 760,
+    lessonsCount: 16,
+    durationLabel: '4 недели • 16 видеопрактик',
+    format: 'Видеокурс',
+    description: 'Освойте древнейшие техники Пранаямы (Капалабхати, Бхастрика, Нади Шодхана) в синтезе с современным физиологическим методом гипервентиляции и холодового закаливания.',
+    highlights: [
+      '16 пошаговых тренировок с метрономом и аудио-ведением',
+      'Гайд по измерению пульсовой волны и кислородного насыщения',
+      'Техники моментального выхода из панических атак за 3 минуты',
+      'Протоколы дыхания для спортсменов и руководителей'
+    ],
+    basePrice: 3900,
+    baseCurrency: 'RUB',
+    discountPercent: 20,
+    isSponsored: true,
+    sponsoredPlacement: ['breathing', 'all'],
+    badgeLabel: '🌬️ АНТИСТРЕСС',
+    bgGradient: 'linear-gradient(135deg, #0284C7, #06B6D4)'
+  },
+  {
+    id: 'course-sound-bowls',
+    title: 'Звукотерапия: Исцеление Тибетскими Чашами и Гонгом',
+    subtitle: 'Практический курс саунд-хилера для дома и профессиональной помощи близким',
+    category: 'soundhealing',
+    categoryLabel: 'Саундхилинг',
+    authorName: 'Елена Голден',
+    authorRole: 'Звукотерапевт, музыкант, ведущая soundbath-сессий',
+    authorAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    authorVerified: true,
+    rating: 4.97,
+    studentsCount: 520,
+    lessonsCount: 18,
+    durationLabel: '3 недели • Видео + Аудиобиблиотека',
+    format: 'Видеокурс',
+    description: 'Как правильно выбирать кованые чаши, извлекать чистые обертоны, структурировать воду и гармонизировать энергетическое поле человека через звуковой резонанс.',
+    highlights: [
+      '18 видеоуроков по технике звукоизвлечения стиком и колотушкой',
+      'Коллекция несжатых звуковых файлов (WAV 96kHz/24bit) для медитаций',
+      'Схемы расстановки чаш вокруг тела человека',
+      'Методичка по соответствию нот и энергетических центров (чакр)'
+    ],
+    basePrice: 4200,
+    baseCurrency: 'RUB',
+    isSponsored: false,
+    sponsoredPlacement: ['all'],
+    badgeLabel: '🎶 АУДИОКУРС',
+    bgGradient: 'linear-gradient(135deg, #8B5CF6, #6366F1)'
+  },
+  {
+    id: 'course-retreat-altai',
+    title: 'Ретрит Молчания «Сердце Алтая» (7 дней)',
+    subtitle: 'Полная перезагрузка в местах силы: медитации, баня на травах, йога на рассвете',
+    category: 'retreats',
+    categoryLabel: 'Живые Ретриты',
+    authorName: 'Центр Осознанности «Беловодье»',
+    authorRole: 'Эко-ретритный центр в долине реки Катунь',
+    authorAvatar: 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=150&auto=format&fit=crop&q=80',
+    authorVerified: true,
+    rating: 5.0,
+    studentsCount: 22,
+    lessonsCount: 7,
+    durationLabel: '7 дней оффлайн • Алтай',
+    format: 'Ретрит',
+    description: 'Неделя без гаджетов и городского шума. Проживание в кедровых домиках, вегетарианское питание от шеф-повара, радиальные выходы в горы, молчаливая випассана и ночные посиделки у костра.',
+    highlights: [
+      'Включено: трансфер из Горно-Алтайска, эко-питание, проживание',
+      'Ежедневная утренняя йога и вечерние чайные церемонии',
+      'Банные ритуалы с горными травами и купелью с родниковой водой',
+      'Ограниченная группа: всего 12 участников'
+    ],
+    basePrice: 48000,
+    baseCurrency: 'RUB',
+    discountPercent: 10,
+    isSponsored: true,
+    sponsoredPlacement: ['all'],
+    badgeLabel: '⛰️ МЕСТА СИЛЫ',
+    bgGradient: 'linear-gradient(135deg, #10B981, #059669)'
+  }
+];
+

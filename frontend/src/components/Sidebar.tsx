@@ -4,7 +4,7 @@ import {
   Home, Video, MessageCircle, PhoneCall, Headphones, 
   User as UserIcon, Tv, ShoppingBag, Users, Film, Wallet, ShieldAlert,
   ChevronDown, ChevronRight, Layers, ExternalLink,
-  Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles
+  Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles, GraduationCap
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AuthModal } from './AuthModal';
@@ -128,6 +128,12 @@ export function Sidebar() {
             <NavLink to="/spiritual/wisdom" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
               <BookOpen className="nav-icon spiritual-icon-wisdom" size={18} />
               <span className="nav-label">Мудрость</span>
+            </NavLink>
+
+            <NavLink to="/spiritual/courses" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+              <GraduationCap className="nav-icon spiritual-icon-courses" size={18} />
+              <span className="nav-label">Курсы & Маркет</span>
+              <span className="spiritual-sub-badge promo-badge">PRO</span>
             </NavLink>
           </div>
         )}
