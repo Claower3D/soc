@@ -1,6 +1,6 @@
 .karma-tree-card {
-  background: var(--surface, #18181b);
-  border: 1px solid var(--border-color, #27272a);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: 16px;
   padding: 18px 20px;
   display: flex;
@@ -8,7 +8,7 @@
   gap: 14px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-sm);
 }
 
 .karma-tree-card::after {
@@ -60,7 +60,7 @@
 .karma-lvl-pill {
   background: rgba(168, 85, 247, 0.15);
   border: 1px solid rgba(168, 85, 247, 0.3);
-  color: #c084fc;
+  color: #8b5cf6;
   font-size: 0.72rem;
   font-weight: 700;
   padding: 2px 8px;
@@ -73,7 +73,7 @@
   gap: 4px;
   background: rgba(249, 115, 22, 0.12);
   border: 1px solid rgba(249, 115, 22, 0.25);
-  color: #fb923c;
+  color: #ea580c;
   font-size: 0.72rem;
   font-weight: 600;
   padding: 2px 8px;
@@ -87,12 +87,12 @@
 .karma-stage-name {
   font-size: 1.05rem;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  color: var(--color-text);
 }
 
 .karma-stage-desc {
   font-size: 0.8rem;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
 }
 
 /* Progress bar */
@@ -111,16 +111,18 @@
 }
 
 .xp-label {
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
 }
 
 .xp-val {
-  color: #34d399;
+  color: #059669;
+  font-weight: 700;
 }
 
 .karma-progress-bg {
   height: 6px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -152,12 +154,12 @@
 .micro-badge.earned {
   background: rgba(16, 185, 129, 0.12);
   border: 1px solid rgba(16, 185, 129, 0.25);
-  color: #34d399;
+  color: #059669;
 }
 
 .micro-badge.locked {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--text-secondary, #71717a);
-  opacity: 0.7;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-tertiary);
+  opacity: 0.85;
 }

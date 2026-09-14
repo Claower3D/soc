@@ -242,12 +242,13 @@
 }
 
 .zen-intentions-card, .zen-chat-card {
-  background: var(--surface, #18181b);
-  border: 1px solid var(--border-color, #27272a);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 20px;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--shadow-sm);
 }
 
 .card-header-line {
@@ -256,7 +257,7 @@
   gap: 8px;
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  color: var(--color-text);
   margin-bottom: 14px;
 }
 
@@ -265,7 +266,7 @@
 .intention-quote {
   font-size: 0.9rem;
   line-height: 1.55;
-  color: #e2e8f0;
+  color: var(--color-text);
   font-style: italic;
   margin-bottom: 16px;
 }
@@ -274,11 +275,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--color-bg-secondary);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 0.78rem;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--color-text-secondary);
   margin-top: auto;
 }
 
@@ -293,8 +294,8 @@
 }
 
 .zen-chat-item {
-  background: var(--bg-primary, #09090b);
-  border: 1px solid var(--border-color, #27272a);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 0.84rem;
@@ -309,16 +310,16 @@
 
 .zen-chat-name {
   font-weight: 700;
-  color: #c084fc;
+  color: #8b5cf6;
 }
 
 .zen-chat-city {
   font-size: 0.74rem;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--color-text-tertiary);
 }
 
 .zen-chat-text {
-  color: var(--text-primary, #f1f5f9);
+  color: var(--color-text);
 }
 
 .zen-chat-form {
@@ -329,11 +330,11 @@
 
 .zen-chat-input {
   flex: 1;
-  background: var(--bg-primary, #09090b);
-  border: 1px solid var(--border-color, #27272a);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 8px 12px;
-  color: var(--text-primary, #ffffff);
+  color: var(--color-text);
   font-size: 0.85rem;
   outline: none;
 }

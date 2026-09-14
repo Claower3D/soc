@@ -1482,33 +1482,10 @@ export function SpiritualPage() {
       {/* ========================================================================= */}
       {activeTab === 'tarot' && (
         <div className="spiritual-tab-content">
-          <div className="tarot-hub-banner">
-            <div className="tarot-hub-info">
-              <div className="hub-badge">
-                <Sparkles size={14} />
-                <span>3D Оракул • Символическое Поле</span>
-              </div>
-              <h2 className="hub-title">Карты Таро и Метафорические Карты (МАК)</h2>
-              <p className="hub-desc">
-                Интерактивное вытягивание карт с реалистичным 3D-переворотом, аудио-резонансом 528 Гц и глубокими толкованиями Старших Арканов. Выберите «Совет дня», расклад на 3 карты «Триединство» или расклад «Путь души».
-              </p>
-              <div className="hub-actions-row">
-                <button 
-                  className="btn-launch-tarot"
-                  onClick={() => setIsTarotOpen(true)}
-                >
-                  <Sparkles size={18} />
-                  <span>Открыть 3D-колоду Таро</span>
-                </button>
-                <button 
-                  className="btn-expert-tarot"
-                  onClick={() => handleOpenBooking('tarot')}
-                >
-                  Запись к живому тарологу
-                </button>
-              </div>
-            </div>
-          </div>
+          <TarotDeckModal
+            isOpen={true}
+            onBookExpert={() => handleOpenBooking('tarot')}
+          />
         </div>
       )}
 
@@ -1816,13 +1793,15 @@ export function SpiritualPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* 3D TAROT & MAC MODAL */}
+      {/* 3D TAROT & MAC MODAL (IF TRIGGERED AS OVERLAY OUTSIDE TAROT TAB) */}
       {/* ========================================================================= */}
-      <TarotDeckModal
-        isOpen={isTarotOpen}
-        onClose={() => setIsTarotOpen(false)}
-        onBookExpert={() => handleOpenBooking('tarot')}
-      />
+      {activeTab !== 'tarot' && (
+        <TarotDeckModal
+          isOpen={isTarotOpen}
+          onClose={() => setIsTarotOpen(false)}
+          onBookExpert={() => handleOpenBooking('tarot')}
+        />
+      )}
 
       {/* ========================================================================= */}
       {/* AI GURU MODAL */}

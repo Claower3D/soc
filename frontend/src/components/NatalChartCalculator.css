@@ -10,7 +10,7 @@
 .natal-header {
   position: relative;
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(74, 14, 122, 0.6) 0%, rgba(20, 10, 45, 0.9) 100%);
+  background: linear-gradient(135deg, rgba(74, 14, 122, 0.7) 0%, rgba(20, 10, 45, 0.95) 100%);
   border: 1px solid rgba(168, 85, 247, 0.25);
   overflow: hidden;
   padding: 24px;
@@ -43,23 +43,24 @@
 .natal-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  color: #ffffff;
   margin-bottom: 8px;
 }
 
 .natal-subtitle {
   font-size: 0.9rem;
-  color: var(--text-secondary, #a1a1aa);
+  color: #cbd5e1;
   line-height: 1.5;
   max-width: 680px;
 }
 
 /* Form */
 .natal-form-card {
-  background: var(--surface, #18181b);
-  border: 1px solid var(--border-color, #27272a);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 20px;
+  box-shadow: var(--shadow-sm);
 }
 
 .natal-form-grid {
@@ -78,16 +79,16 @@
 .natal-input-group label {
   font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
 .natal-input {
-  background: var(--bg-primary, #09090b);
-  border: 1px solid var(--border-color, #27272a);
-  color: var(--text-primary, #ffffff);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
   padding: 10px 12px;
   border-radius: 10px;
   font-size: 0.9rem;
@@ -129,7 +130,7 @@
 .natal-nav-tabs {
   display: flex;
   gap: 8px;
-  border-bottom: 1px solid var(--border-color, #27272a);
+  border-bottom: 1px solid var(--color-border);
   padding-bottom: 12px;
   margin-top: 10px;
   overflow-x: auto;
@@ -143,7 +144,7 @@
   border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
   font-size: 0.88rem;
   font-weight: 600;
   cursor: pointer;
@@ -152,14 +153,14 @@
 }
 
 .natal-nav-tab:hover {
-  color: var(--text-primary, #ffffff);
-  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text);
+  background: var(--color-bg-secondary);
 }
 
 .natal-nav-tab.active {
-  background: rgba(168, 85, 247, 0.15);
+  background: rgba(168, 85, 247, 0.12);
   border-color: rgba(168, 85, 247, 0.3);
-  color: #c084fc;
+  color: #8b5cf6;
 }
 
 /* Trio Grid */
@@ -171,14 +172,15 @@
 }
 
 .natal-trio-card {
-  background: var(--surface, #18181b);
-  border: 1px solid var(--border-color, #27272a);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 20px;
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .sun-card { border-top: 3px solid #f59e0b; }
@@ -198,36 +200,37 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
   margin-bottom: 4px;
 }
 
 .trio-title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  color: var(--color-text);
   margin-bottom: 6px;
 }
 
 .trio-meta {
   font-size: 0.8rem;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
   margin-bottom: 12px;
 }
 
 .trio-desc {
   font-size: 0.86rem;
   line-height: 1.5;
-  color: var(--text-primary, #d4d4d8);
+  color: var(--color-text);
 }
 
 /* Section Card */
 .natal-section-card {
-  background: var(--surface, #18181b);
-  border: 1px solid var(--border-color, #27272a);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 20px;
   margin-top: 16px;
+  box-shadow: var(--shadow-sm);
 }
 
 .section-title {
@@ -236,14 +239,14 @@
   gap: 4px;
   font-size: 1.05rem;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  color: var(--color-text);
   margin-bottom: 16px;
 }
 
 .section-sub {
   font-size: 0.8rem;
   font-weight: 400;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
 }
 
 /* Elements Balance */
@@ -274,7 +277,8 @@
 
 .element-bar-bg {
   height: 8px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -292,11 +296,12 @@
 
 /* Human Design UI */
 .hd-overview-card {
-  background: var(--surface, #18181b);
-  border: 1px solid var(--border-color, #27272a);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 20px;
   margin-top: 16px;
+  box-shadow: var(--shadow-sm);
 }
 
 .hd-main-pill {
@@ -331,10 +336,10 @@
 }
 
 .hd-detail-box {
-  background: var(--bg-primary, #09090b);
+  background: var(--color-bg-secondary);
   padding: 12px;
   border-radius: 10px;
-  border: 1px solid var(--border-color, #27272a);
+  border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -342,17 +347,18 @@
 
 .hd-box-lbl {
   font-size: 0.74rem;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
   text-transform: uppercase;
 }
 
 .hd-box-val {
   font-size: 0.92rem;
-  color: var(--text-primary, #ffffff);
+  color: var(--color-text);
+  font-weight: 600;
 }
 
-.success-text { color: #34d399; }
-.alert-text { color: #f87171; }
+.success-text { color: #059669; }
+.alert-text { color: #ef4444; }
 
 .hd-centers-grid {
   display: grid;
@@ -361,8 +367,8 @@
 }
 
 .hd-center-item {
-  background: var(--bg-primary, #09090b);
-  border: 1px solid var(--border-color, #27272a);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   padding: 14px;
   display: flex;
@@ -372,7 +378,7 @@
 
 .hd-center-item.defined {
   border-color: rgba(168, 85, 247, 0.4);
-  background: rgba(168, 85, 247, 0.04);
+  background: rgba(168, 85, 247, 0.08);
 }
 
 .status-badge {
@@ -385,23 +391,23 @@
 
 .status-badge.defined {
   background: rgba(168, 85, 247, 0.2);
-  color: #c084fc;
+  color: #8b5cf6;
 }
 
 .status-badge.open {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-secondary, #a1a1aa);
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--color-text-tertiary);
 }
 
 .center-item-name {
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  color: var(--color-text);
 }
 
 .center-item-theme {
   font-size: 0.82rem;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
   line-height: 1.4;
 }
 
@@ -410,11 +416,12 @@
   display: flex;
   gap: 24px;
   align-items: center;
-  background: var(--surface, #18181b);
-  border: 1px solid var(--border-color, #27272a);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 24px;
   margin-top: 16px;
+  box-shadow: var(--shadow-sm);
 }
 
 .lunar-visual {
@@ -427,19 +434,19 @@
 }
 
 .lunar-big-icon {
-  color: #38bdf8;
-  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.4));
+  color: #0284c7;
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.3));
 }
 
 .lunar-phase-badge {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #38bdf8;
+  color: #0284c7;
 }
 
 .lunar-day-num {
   font-size: 0.8rem;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
 }
 
 .lunar-info {
@@ -451,12 +458,12 @@
 .lunar-energy-title {
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  color: var(--color-text);
 }
 
 .lunar-energy-desc {
   font-size: 0.9rem;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
   line-height: 1.5;
 }
 
@@ -466,20 +473,20 @@
   border-radius: 8px;
   padding: 12px 14px;
   font-size: 0.88rem;
-  color: var(--text-primary, #d4d4d8);
+  color: var(--color-text);
   line-height: 1.4;
 }
 
 .lunar-advice-box strong {
   display: block;
-  color: #38bdf8;
+  color: #0284c7;
   margin-bottom: 4px;
 }
 
 /* Expert Banner */
 .natal-expert-banner {
   margin-top: 20px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.12));
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1));
   border: 1px solid rgba(168, 85, 247, 0.3);
   border-radius: 12px;
   padding: 18px 20px;
@@ -493,13 +500,13 @@
 .expert-banner-info h4 {
   font-size: 1rem;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  color: var(--color-text);
   margin-bottom: 4px;
 }
 
 .expert-banner-info p {
   font-size: 0.85rem;
-  color: var(--text-secondary, #a1a1aa);
+  color: var(--color-text-secondary);
 }
 
 .expert-cta-btn {

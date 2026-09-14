@@ -62,7 +62,7 @@ export const TarotDeckModal: React.FC<TarotDeckModalProps> = ({ isOpen = true, o
 
   const allRevealed = drawnCards.length > 0 && drawnCards.every(c => c.revealed);
 
-  return (
+  const content = (
     <div className="tarot-section-container">
       {/* Header with Mode Selectors */}
       <div className="tarot-header-card">
@@ -304,4 +304,16 @@ export const TarotDeckModal: React.FC<TarotDeckModalProps> = ({ isOpen = true, o
       )}
     </div>
   );
+
+  if (onClose) {
+    return (
+      <div className="tarot-overlay-backdrop" onClick={onClose}>
+        <div className="tarot-overlay-window" onClick={e => e.stopPropagation()}>
+          {content}
+        </div>
+      </div>
+    );
+  }
+
+  return content;
 };
