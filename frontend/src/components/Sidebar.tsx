@@ -54,22 +54,58 @@ export function Sidebar() {
           <span className="nav-label">Видео</span>
         </NavLink>
 
-        <NavLink to="/messenger" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <MessageCircle className="nav-icon" size={19} />
-          <span className="nav-label">Мессенджер</span>
-          <span className="nav-badge">3</span>
-        </NavLink>
+        {isAuthenticated ? (
+          <NavLink to="/messenger" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <MessageCircle className="nav-icon" size={19} />
+            <span className="nav-label">Мессенджер</span>
+            <span className="nav-badge">3</span>
+          </NavLink>
+        ) : (
+          <div 
+            className="nav-item guest-locked-nav" 
+            onClick={() => setAuthModalOpen(true)}
+            title="Мессенджер доступен после регистрации"
+          >
+            <MessageCircle className="nav-icon" size={19} />
+            <span className="nav-label">Мессенджер</span>
+            <span className="nav-lock-badge"><Lock size={12} /></span>
+          </div>
+        )}
 
-        <NavLink to="/conferences" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <PhoneCall className="nav-icon" size={19} />
-          <span className="nav-label">Конференции</span>
-          <span className="live-dot" title="В эфире" />
-        </NavLink>
+        {isAuthenticated ? (
+          <NavLink to="/conferences" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <PhoneCall className="nav-icon" size={19} />
+            <span className="nav-label">Конференции</span>
+            <span className="live-dot" title="В эфире" />
+          </NavLink>
+        ) : (
+          <div 
+            className="nav-item guest-locked-nav" 
+            onClick={() => setAuthModalOpen(true)}
+            title="Конференции доступны после регистрации"
+          >
+            <PhoneCall className="nav-icon" size={19} />
+            <span className="nav-label">Конференции</span>
+            <span className="nav-lock-badge"><Lock size={12} /></span>
+          </div>
+        )}
 
-        <NavLink to="/podcasts" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Headphones className="nav-icon" size={19} />
-          <span className="nav-label">Подкасты</span>
-        </NavLink>
+        {isAuthenticated ? (
+          <NavLink to="/podcasts" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+            <Headphones className="nav-icon" size={19} />
+            <span className="nav-label">Подкасты</span>
+          </NavLink>
+        ) : (
+          <div 
+            className="nav-item guest-locked-nav" 
+            onClick={() => setAuthModalOpen(true)}
+            title="Подкасты доступны после регистрации"
+          >
+            <Headphones className="nav-icon" size={19} />
+            <span className="nav-label">Подкасты</span>
+            <span className="nav-lock-badge"><Lock size={12} /></span>
+          </div>
+        )}
 
         {/* SECTION: САМОПОЗНАНИЕ & ДУХОВНЫЕ ПРАКТИКИ */}
         <div className="nav-section-divider" />
@@ -88,53 +124,112 @@ export function Sidebar() {
             {spiritualExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
 
-          <NavLink 
-            to="/spiritual" 
-            className="services-hub-link" 
-            title="Центр самопознания и практик (Все разделы)"
-          >
-            <span>Все</span>
-            <ExternalLink size={11} />
-          </NavLink>
+          {isAuthenticated ? (
+            <NavLink 
+              to="/spiritual" 
+              className="services-hub-link" 
+              title="Центр самопознания и практик (Все разделы)"
+            >
+              <span>Все</span>
+              <ExternalLink size={11} />
+            </NavLink>
+          ) : (
+            <div 
+              className="services-hub-link guest-locked-hub-link"
+              onClick={() => setAuthModalOpen(true)}
+              title="Доступно после регистрации"
+            >
+              <span>Все</span>
+              <Lock size={10} />
+            </div>
+          )}
         </div>
 
         {spiritualExpanded && (
           <div className="services-subnav spiritual-subnav">
-            <NavLink to="/spiritual/meditation" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
-              <Flower2 className="nav-icon spiritual-icon-flower" size={18} />
-              <span className="nav-label">Медитация</span>
-            </NavLink>
+            {isAuthenticated ? (
+              <>
+                <NavLink to="/spiritual/meditation" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <Flower2 className="nav-icon spiritual-icon-flower" size={18} />
+                  <span className="nav-label">Медитация</span>
+                </NavLink>
 
-            <NavLink to="/spiritual/yoga" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
-              <Activity className="nav-icon spiritual-icon-yoga" size={18} />
-              <span className="nav-label">Йога</span>
-            </NavLink>
+                <NavLink to="/spiritual/yoga" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <Activity className="nav-icon spiritual-icon-yoga" size={18} />
+                  <span className="nav-label">Йога</span>
+                </NavLink>
 
-            <NavLink to="/spiritual/affirmations" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
-              <Sunrise className="nav-icon spiritual-icon-affirm" size={18} />
-              <span className="nav-label">Аффирмации</span>
-            </NavLink>
+                <NavLink to="/spiritual/affirmations" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <Sunrise className="nav-icon spiritual-icon-affirm" size={18} />
+                  <span className="nav-label">Аффирмации</span>
+                </NavLink>
 
-            <NavLink to="/spiritual/breathing" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
-              <Wind className="nav-icon spiritual-icon-wind" size={18} />
-              <span className="nav-label">Дыхание</span>
-            </NavLink>
+                <NavLink to="/spiritual/breathing" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <Wind className="nav-icon spiritual-icon-wind" size={18} />
+                  <span className="nav-label">Дыхание</span>
+                </NavLink>
 
-            <NavLink to="/spiritual/sounds" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
-              <Waves className="nav-icon spiritual-icon-waves" size={18} />
-              <span className="nav-label">Звуки & Мантры</span>
-            </NavLink>
+                <NavLink to="/spiritual/sounds" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <Waves className="nav-icon spiritual-icon-waves" size={18} />
+                  <span className="nav-label">Звуки & Мантры</span>
+                </NavLink>
 
-            <NavLink to="/spiritual/wisdom" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
-              <BookOpen className="nav-icon spiritual-icon-wisdom" size={18} />
-              <span className="nav-label">Мудрость</span>
-            </NavLink>
+                <NavLink to="/spiritual/wisdom" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <BookOpen className="nav-icon spiritual-icon-wisdom" size={18} />
+                  <span className="nav-label">Мудрость</span>
+                </NavLink>
 
-            <NavLink to="/spiritual/courses" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
-              <GraduationCap className="nav-icon spiritual-icon-courses" size={18} />
-              <span className="nav-label">Курсы & Маркет</span>
-              <span className="spiritual-sub-badge promo-badge">PRO</span>
-            </NavLink>
+                <NavLink to="/spiritual/courses" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <GraduationCap className="nav-icon spiritual-icon-courses" size={18} />
+                  <span className="nav-label">Курсы & Маркет</span>
+                  <span className="spiritual-sub-badge promo-badge">PRO</span>
+                </NavLink>
+              </>
+            ) : (
+              <>
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Flower2 className="nav-icon spiritual-icon-flower" size={18} />
+                  <span className="nav-label">Медитация</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Activity className="nav-icon spiritual-icon-yoga" size={18} />
+                  <span className="nav-label">Йога</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Sunrise className="nav-icon spiritual-icon-affirm" size={18} />
+                  <span className="nav-label">Аффирмации</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Wind className="nav-icon spiritual-icon-wind" size={18} />
+                  <span className="nav-label">Дыхание</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Waves className="nav-icon spiritual-icon-waves" size={18} />
+                  <span className="nav-label">Звуки & Мантры</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <BookOpen className="nav-icon spiritual-icon-wisdom" size={18} />
+                  <span className="nav-label">Мудрость</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <GraduationCap className="nav-icon spiritual-icon-courses" size={18} />
+                  <span className="nav-label">Курсы & Маркет</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -155,65 +250,88 @@ export function Sidebar() {
             {servicesExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
 
-          <NavLink 
-            to="/services" 
-            className="services-hub-link" 
-            title="Все сервисы экосистемы (витрина)"
-          >
-            <span>Все</span>
-            <ExternalLink size={11} />
-          </NavLink>
+          {isAuthenticated ? (
+            <NavLink 
+              to="/services" 
+              className="services-hub-link" 
+              title="Все сервисы экосистемы (витрина)"
+            >
+              <span>Все</span>
+              <ExternalLink size={11} />
+            </NavLink>
+          ) : (
+            <div 
+              className="services-hub-link guest-locked-hub-link"
+              onClick={() => setAuthModalOpen(true)}
+              title="Доступно после регистрации"
+            >
+              <span>Все</span>
+              <Lock size={10} />
+            </div>
+          )}
         </div>
 
-          {servicesExpanded && (
+        {servicesExpanded && (
           <div className="services-subnav">
-            <NavLink to="/marketplace" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
-              <ShoppingBag className="nav-icon service-icon-market" size={18} />
-              <span className="nav-label">Маркетплейс</span>
-            </NavLink>
-
-            <NavLink to="/communities" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
-              <Users className="nav-icon service-icon-comm" size={18} />
-              <span className="nav-label">Сообщества</span>
-            </NavLink>
-
-            <NavLink to="/editor" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
-              <Film className="nav-icon service-icon-editor" size={18} />
-              <span className="nav-label">Видеостудия</span>
-            </NavLink>
-
             {isAuthenticated ? (
-              <NavLink to="/wallet" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
-                <Wallet className="nav-icon service-icon-wallet" size={18} />
-                <span className="nav-label">Кошелёк</span>
-              </NavLink>
-            ) : (
-              <div 
-                className="nav-item sub-nav-item guest-locked-nav" 
-                onClick={() => setAuthModalOpen(true)}
-                title="Кошелёк доступен после регистрации"
-              >
-                <Wallet className="nav-icon service-icon-wallet" size={18} />
-                <span className="nav-label">Кошелёк</span>
-                <span className="nav-lock-badge"><Lock size={12} /></span>
-              </div>
-            )}
+              <>
+                <NavLink to="/marketplace" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
+                  <ShoppingBag className="nav-icon service-icon-market" size={18} />
+                  <span className="nav-label">Маркетплейс</span>
+                </NavLink>
 
-            {isAuthenticated ? (
-              <NavLink to="/admin" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
-                <ShieldAlert className="nav-icon service-icon-admin" size={18} />
-                <span className="nav-label">Админ-панель</span>
-              </NavLink>
+                <NavLink to="/communities" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
+                  <Users className="nav-icon service-icon-comm" size={18} />
+                  <span className="nav-label">Сообщества</span>
+                </NavLink>
+
+                <NavLink to="/editor" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
+                  <Film className="nav-icon service-icon-editor" size={18} />
+                  <span className="nav-label">Видеостудия</span>
+                </NavLink>
+
+                <NavLink to="/wallet" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
+                  <Wallet className="nav-icon service-icon-wallet" size={18} />
+                  <span className="nav-label">Кошелёк</span>
+                </NavLink>
+
+                <NavLink to="/admin" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
+                  <ShieldAlert className="nav-icon service-icon-admin" size={18} />
+                  <span className="nav-label">Админ-панель</span>
+                </NavLink>
+              </>
             ) : (
-              <div 
-                className="nav-item sub-nav-item guest-locked-nav" 
-                onClick={() => setAuthModalOpen(true)}
-                title="Админ-панель доступна только авторизованным модераторам"
-              >
-                <ShieldAlert className="nav-icon service-icon-admin" size={18} />
-                <span className="nav-label">Админ-панель</span>
-                <span className="nav-lock-badge"><Lock size={12} /></span>
-              </div>
+              <>
+                <div className="nav-item sub-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <ShoppingBag className="nav-icon service-icon-market" size={18} />
+                  <span className="nav-label">Маркетплейс</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Users className="nav-icon service-icon-comm" size={18} />
+                  <span className="nav-label">Сообщества</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Film className="nav-icon service-icon-editor" size={18} />
+                  <span className="nav-label">Видеостудия</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Wallet className="nav-icon service-icon-wallet" size={18} />
+                  <span className="nav-label">Кошелёк</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <ShieldAlert className="nav-icon service-icon-admin" size={18} />
+                  <span className="nav-label">Админ-панель</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+              </>
             )}
           </div>
         )}

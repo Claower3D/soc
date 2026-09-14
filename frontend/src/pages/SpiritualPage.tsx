@@ -13,11 +13,14 @@ import {
   type YogaRoutine, type Affirmation, type SpiritualCourse, type CurrencyCode
 } from '../data/spiritualData';
 import { spiritualAudio } from '../utils/spiritualAudio';
+import { useAuth } from '../context/AuthContext';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './SpiritualPage.css';
 
 type TabType = 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom' | 'courses';
 
 export function SpiritualPage() {
+  const { isAuthenticated } = useAuth();
   const { tab } = useParams<{ tab?: string }>();
   const navigate = useNavigate();
 
@@ -514,6 +517,21 @@ export function SpiritualPage() {
       </div>
     );
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="spiritual-page-container">
+        <div className="messenger-guest-lock-container">
+          <GuestLockPrompt
+            featureName="Самопознание и духовные практики"
+            title="Раздел практик доступен после регистрации"
+            description="Погрузитесь в медитации с частотой 432 Гц, авторские уроки йоги, трансформационные аффирмации и Академию курсов мастеров после создания аккаунта."
+            actionText="Войти или зарегистрироваться"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="spiritual-page-container">

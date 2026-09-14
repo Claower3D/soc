@@ -1,8 +1,11 @@
-﻿import { NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { Home, Video, MessageCircle, Layers, User } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import './BottomNav.css';
 
 export function BottomNav() {
+  const { isAuthenticated, openAuthModal } = useAuth();
+
   return (
     <nav className="bottom-nav">
       <NavLink to="/" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`} end>
@@ -15,20 +18,56 @@ export function BottomNav() {
         <span className="bottom-nav-label">Видео</span>
       </NavLink>
 
-      <NavLink to="/messenger" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-        <MessageCircle className="bottom-nav-icon" size={20} />
-        <span className="bottom-nav-label">Чат</span>
-      </NavLink>
+      {isAuthenticated ? (
+        <NavLink to="/messenger" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <MessageCircle className="bottom-nav-icon" size={20} />
+          <span className="bottom-nav-label">Чат</span>
+        </NavLink>
+      ) : (
+        <button 
+          type="button" 
+          className="bottom-nav-item bottom-nav-btn-guest" 
+          onClick={() => openAuthModal('register')}
+          title="Вход в аккаунт"
+        >
+          <MessageCircle className="bottom-nav-icon" size={20} />
+          <span className="bottom-nav-label">Чат</span>
+        </button>
+      )}
 
-      <NavLink to="/services" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-        <Layers className="bottom-nav-icon" size={20} />
-        <span className="bottom-nav-label">Сервисы</span>
-      </NavLink>
+      {isAuthenticated ? (
+        <NavLink to="/services" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <Layers className="bottom-nav-icon" size={20} />
+          <span className="bottom-nav-label">Сервисы</span>
+        </NavLink>
+      ) : (
+        <button 
+          type="button" 
+          className="bottom-nav-item bottom-nav-btn-guest" 
+          onClick={() => openAuthModal('register')}
+          title="Вход в аккаунт"
+        >
+          <Layers className="bottom-nav-icon" size={20} />
+          <span className="bottom-nav-label">Сервисы</span>
+        </button>
+      )}
 
-      <NavLink to="/profile/me" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-        <User className="bottom-nav-icon" size={20} />
-        <span className="bottom-nav-label">Профиль</span>
-      </NavLink>
+      {isAuthenticated ? (
+        <NavLink to="/profile/me" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+          <User className="bottom-nav-icon" size={20} />
+          <span className="bottom-nav-label">Профиль</span>
+        </NavLink>
+      ) : (
+        <button 
+          type="button" 
+          className="bottom-nav-item bottom-nav-btn-guest" 
+          onClick={() => openAuthModal('register')}
+          title="Вход в аккаунт"
+        >
+          <User className="bottom-nav-icon" size={20} />
+          <span className="bottom-nav-label">Войти</span>
+        </button>
+      )}
     </nav>
   );
 }

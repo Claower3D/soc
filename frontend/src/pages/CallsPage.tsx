@@ -12,6 +12,7 @@ import {
   currentUser, type Conference, type Chat 
 } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './CallsPage.css';
 
 export function ConferencesPage() {
@@ -151,6 +152,21 @@ export function ConferencesPage() {
     if (activeTab === 'private') return matchesSearch && c.isPrivate;
     return matchesSearch;
   });
+
+  if (!isAuthenticated) {
+    return (
+      <div className="conferences-page">
+        <div className="messenger-guest-lock-container">
+          <GuestLockPrompt
+            featureName="Конференции и видеовстречи"
+            title="Конференции доступны после регистрации"
+            description="Создавайте защищенные видеовстречи, подключайтесь по коду приглашения, транслируйте экран и сохраняйте записи звонков в экосистеме New Age."
+            actionText="Войти или зарегистрироваться"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="conferences-page">

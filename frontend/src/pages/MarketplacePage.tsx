@@ -6,6 +6,8 @@ import { initialProducts, type Product, type CartItem } from '../data/mock';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { CartDrawer } from '../components/CartDrawer';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './MarketplacePage.css';
 
 const CATEGORIES = [
@@ -20,6 +22,7 @@ const CATEGORIES = [
 
 export function MarketplacePage() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Все товары');
   const [sortBy, setSortBy] = useState<'popular' | 'price_asc' | 'price_desc' | 'rating'>('popular');
@@ -79,6 +82,21 @@ export function MarketplacePage() {
   }, [searchQuery, selectedCategory, sortBy]);
 
   const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="marketplace-page">
+        <div className="messenger-guest-lock-container">
+          <GuestLockPrompt
+            featureName="Маркетплейс New Age"
+            title="Маркетплейс доступен после регистрации"
+            description="Покупайте мерч, книги, цифровые товары у любимых авторов с безопасной оплатой через внутренний кошелек New Age Pay."
+            actionText="Войти или зарегистрироваться"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="marketplace-page">

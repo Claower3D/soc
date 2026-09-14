@@ -4,6 +4,8 @@ import {
   ArrowRight, Sparkles, TrendingUp, Compass, Flower2
 } from 'lucide-react';
 import { currentUser } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './ServicesPage.css';
 
 interface ServiceItem {
@@ -88,6 +90,22 @@ const SERVICES: ServiceItem[] = [
 
 export function ServicesPage() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return (
+      <div className="services-page">
+        <div className="messenger-guest-lock-container">
+          <GuestLockPrompt
+            featureName="Сервисы экосистемы"
+            title="Сервисы New Age доступны после регистрации"
+            description="Маркетплейс, тематические сообщества, профессиональная видеостудия и внутренний кошелёк New Age Pay доступны зарегистрированным участникам."
+            actionText="Войти или зарегистрироваться"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="services-page">

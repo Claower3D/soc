@@ -39,6 +39,10 @@ export function FeedPage() {
   };
 
   const toggleFollow = (userId: string) => {
+    if (!isAuthenticated) {
+      setAuthModalOpen(true);
+      return;
+    }
     setFollowedMap(prev => ({
       ...prev,
       [userId]: !prev[userId],
@@ -212,7 +216,18 @@ export function FeedPage() {
         <div className="feed-recommendations-box">
           <div className="box-header">
             <span className="box-title">Рекомендации для вас</span>
-            <span className="box-all-btn" onClick={() => navigate('/conferences')}>Конференция</span>
+            <span 
+              className="box-all-btn" 
+              onClick={() => {
+                if (!isAuthenticated) {
+                  setAuthModalOpen(true);
+                } else {
+                  navigate('/conferences');
+                }
+              }}
+            >
+              Конференция
+            </span>
           </div>
 
           <div className="recommendations-list">

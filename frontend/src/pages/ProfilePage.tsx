@@ -12,6 +12,7 @@ import { FollowersModal } from '../components/FollowersModal';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { EditProfileModal } from '../components/EditProfileModal';
 import { AuthModal } from '../components/AuthModal';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './ProfilePage.css';
 
 export function ProfilePage() {
@@ -73,10 +74,18 @@ export function ProfilePage() {
   };
 
   const handleSendMessage = () => {
+    if (!isAuthenticated) {
+      setAuthModalOpen(true);
+      return;
+    }
     navigate('/messenger');
   };
 
   const handleStartCall = () => {
+    if (!isAuthenticated) {
+      setAuthModalOpen(true);
+      return;
+    }
     navigate('/conferences');
   };
 
@@ -86,7 +95,20 @@ export function ProfilePage() {
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-
+  if (!isAuthenticated && isMe) {
+    return (
+      <div className="profile-page">
+        <div className="messenger-guest-lock-container">
+          <GuestLockPrompt
+            featureName="Личный профиль"
+            title="Личный профиль доступен после регистрации"
+            description="Зарегистрируйтесь в New Age, чтобы создать свой профиль, установить аватар и обложку, публиковать фото, истории, видео и общаться с друзьями."
+            actionText="Войти или зарегистрироваться"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="profile-page">

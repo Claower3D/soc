@@ -20,6 +20,8 @@ import {
   Layers,
   Wand2
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './VideoEditorPage.css';
 
 interface TrackItem {
@@ -48,6 +50,7 @@ const MUSIC_TRACKS = [
 ];
 
 export const VideoEditorPage: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   // Aspect Ratio: 9:16 (Story/Shorts), 1:1 (Square Feed), 16:9 (YouTube)
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '1:1' | '16:9'>('9:16');
   
@@ -143,6 +146,21 @@ export const VideoEditorPage: React.FC = () => {
 
   const currentFilterCss =
     COLOR_PRESETS.find((p) => p.id === selectedFilter)?.filter || 'none';
+
+  if (!isAuthenticated) {
+    return (
+      <div className="video-editor-page">
+        <div className="messenger-guest-lock-container">
+          <GuestLockPrompt
+            featureName="Видеостудия New Age"
+            title="Видеостудия доступна после регистрации"
+            description="Профессиональный монтаж Reels, Shorts, Stories, наложение звуковых дорожек, цветокоррекция и экспорт доступны зарегистрированным авторам."
+            actionText="Войти или зарегистрироваться"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="video-editor-page">

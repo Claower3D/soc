@@ -5,6 +5,7 @@ import { PodcastPlayer } from '../components/PodcastPlayer';
 import { UploadPodcastModal } from '../components/UploadPodcastModal';
 import { podcasts, type Podcast, type Episode } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './PodcastsPage.css';
 
 const categories = ['Все', 'Технологии & IT', 'Дизайн & Продукт', 'Бизнес & Стартапы', 'Искусственный интеллект'];
@@ -41,6 +42,21 @@ export function PodcastsPage() {
     if (selectedCategory === 'Все') return matchesSearch;
     return matchesSearch && pod.category === selectedCategory;
   });
+
+  if (!isAuthenticated) {
+    return (
+      <div className="podcasts-page">
+        <div className="messenger-guest-lock-container">
+          <GuestLockPrompt
+            featureName="Подкасты и аудиошоу"
+            title="Раздел подкастов доступен после регистрации"
+            description="Слушайте выпуски экспертов, подписывайтесь на авторов аудиошоу или публикуйте собственные подкасты в экосистеме New Age."
+            actionText="Войти или зарегистрироваться"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="podcasts-page">

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, X, Heart, Send, ChevronLeft, ChevronRight } from 'lucide-react';
 import { currentUser, type Story } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import './StoriesBar.css';
 
 interface StoriesBarProps {
@@ -10,6 +11,7 @@ interface StoriesBarProps {
 
 export function StoriesBar({ stories }: StoriesBarProps) {
   const navigate = useNavigate();
+  const { isAuthenticated, openAuthModal } = useAuth();
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
   const [likedStory, setLikedStory] = useState(false);
@@ -57,7 +59,13 @@ export function StoriesBar({ stories }: StoriesBarProps) {
           {/* User's own story card */}
           <div 
             className="story-card own-story-card"
-            onClick={() => navigate('/profile/me')}
+            onClick={() => {
+              if (!isAuthenticated) {
+                openAuthModal('register');
+              } else {
+                navigate('/profile/me');
+              }
+            }}
           >
             <div className="story-card-bg-wrap">
               <img src={currentUser.coverImage || currentUser.avatar} alt="Ваша история" className="story-card-bg" />
@@ -145,14 +153,25 @@ export function StoriesBar({ stories }: StoriesBarProps) {
             <div className="story-reply-bar">
               <input
                 type="text"
-                placeholder={`Ответить ${activeStory.user.name.split(' ')[0]}...`}
+                placeholder={isAuthenticated ? `Ответить ${activeStory.user.name.split(' ')[0]}...` : "Войдите, чтобы ответить..."}
                 value={replyText}
                 onChange={e => setReplyText(e.target.value)}
+                onFocus={() => {
+                  if (!isAuthenticated) {
+                    openAuthModal('register');
+                  }
+                }}
                 className="story-reply-input"
               />
               <button 
                 className={`story-action-btn ${likedStory ? 'liked' : ''}`}
-                onClick={() => setLikedStory(!likedStory)}
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    openAuthModal('register');
+                    return;
+                  }
+                  setLikedStory(!likedStory);
+                }}
               >
                 <Heart size={22} fill={likedStory ? '#EF4444' : 'none'} color={likedStory ? '#EF4444' : 'white'} />
               </button>
@@ -160,6 +179,10 @@ export function StoriesBar({ stories }: StoriesBarProps) {
                 <button 
                   className="story-action-btn send"
                   onClick={() => {
+                    if (!isAuthenticated) {
+                      openAuthModal('register');
+                      return;
+                    }
                     alert(`Сообщение отправлено для ${activeStory.user.name}`);
                     setReplyText('');
                   }}

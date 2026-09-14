@@ -11,6 +11,8 @@ import {
   currentUser, initialUsers, videos as initialVideos, 
   type User, type Video as VideoType 
 } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './ChannelPage.css';
 
 interface CommunityPost {
@@ -73,6 +75,7 @@ const playlists = [
 export function ChannelPage() {
   const { channelId } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated, openAuthModal } = useAuth();
 
   const isMe = !channelId || channelId === 'me' || channelId === currentUser.id;
 
@@ -117,6 +120,10 @@ export function ChannelPage() {
   }, [channelVideos, videoSort]);
 
   const handleToggleSubscribe = () => {
+    if (!isAuthenticated) {
+      openAuthModal('register');
+      return;
+    }
     if (isSubscribed) {
       setIsSubscribed(false);
       setSubsCount(s => Math.max(0, s - 1));
@@ -144,6 +151,10 @@ export function ChannelPage() {
 
   const handleAddCommunityPost = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAuthenticated) {
+      openAuthModal('register');
+      return;
+    }
     if (!newCommunityText.trim()) return;
 
     const newPost: CommunityPost = {
@@ -151,8 +162,8 @@ export function ChannelPage() {
       author: currentUser,
       text: newCommunityText.trim(),
       date: 'Только что',
-      likes: 1,
-      liked: true,
+      likes: 0,
+      liked: false,
       commentsCount: 0,
     };
 
@@ -161,6 +172,10 @@ export function ChannelPage() {
   };
 
   const handleToggleLikeCommunity = (postId: string) => {
+    if (!isAuthenticated) {
+      openAuthModal('register');
+      return;
+    }
     setCommunityPosts(prev =>
       prev.map(p => {
         if (p.id === postId) {
@@ -174,6 +189,21 @@ export function ChannelPage() {
       })
     );
   };
+
+  if (!isAuthenticated && isMe) {
+    return (
+      <div className="youtube-channel-page">
+        <div className="messenger-guest-lock-container">
+          <GuestLockPrompt
+            featureName="Мой видеоканал"
+            title="Канал автора доступен после регистрации"
+            description="Создайте свой видеоканал, загружайте ролики, публикуйте новости во вкладке «Сообщество» и набирайте аудиторию подписчиков."
+            actionText="Войти или зарегистрироваться"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="youtube-channel-page">

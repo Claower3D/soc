@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { initialCommunities, type Community } from '../data/mock';
 import { CreateCommunityModal } from '../components/CreateCommunityModal';
+import { useAuth } from '../context/AuthContext';
+import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './CommunitiesPage.css';
 
 const CATEGORIES = [
@@ -28,6 +30,7 @@ const CATEGORIES = [
 
 export const CommunitiesPage: React.FC = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [communities, setCommunities] = useState<Community[]>(initialCommunities);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Все направления');
@@ -65,6 +68,21 @@ export const CommunitiesPage: React.FC = () => {
 
     return matchesSearch && matchesCategory;
   });
+
+  if (!isAuthenticated) {
+    return (
+      <div className="communities-page">
+        <div className="messenger-guest-lock-container">
+          <GuestLockPrompt
+            featureName="Сообщества и клубы"
+            title="Сообщества доступны после регистрации"
+            description="Вступайте в тематические клубы по интересам, участвуйте в обсуждениях и создавайте свои собственные сообщества после регистрации в New Age."
+            actionText="Войти или зарегистрироваться"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="communities-page">
