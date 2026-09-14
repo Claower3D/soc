@@ -7,17 +7,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2rem;
+  padding: 0 1.75rem;
   position: sticky;
   top: 0;
   z-index: 40;
   box-shadow: var(--shadow-sm);
 }
 
-.header-search-container {
-  position: relative;
-  width: 100%;
-  max-width: 480px;
+.header-left-area {
+  flex: 1;
 }
 
 .search-input-wrapper {
