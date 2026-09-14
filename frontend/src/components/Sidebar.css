@@ -420,6 +420,51 @@
   color: #6366F1;
 }
 
+/* Spiritual / Self-discovery Subnav */
+.spiritual-section-header .spiritual-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.spiritual-star-icon {
+  color: #8B5CF6;
+}
+
+.spiritual-icon-flower {
+  color: #EC4899;
+}
+
+.spiritual-icon-yoga {
+  color: #10B981;
+}
+
+.spiritual-icon-affirm {
+  color: #F59E0B;
+}
+
+.spiritual-icon-wind {
+  color: #06B6D4;
+}
+
+.spiritual-icon-waves {
+  color: #6366F1;
+}
+
+.spiritual-icon-wisdom {
+  color: #D97706;
+}
+
+.spiritual-sub-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #10B981;
+  background: #ECFDF5;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
 @media (max-width: 768px) {
   .sidebar {
     display: none;

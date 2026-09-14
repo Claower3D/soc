@@ -16,6 +16,7 @@ import { CommunityDetailPage } from './pages/CommunityDetailPage';
 import { VideoEditorPage } from './pages/VideoEditorPage';
 import { WalletPage } from './pages/WalletPage';
 import { AdminPage } from './pages/AdminPage';
+import { SpiritualPage } from './pages/SpiritualPage';
 import { AuthProvider } from './context/AuthContext';
 import './styles/theme.css';
 import './App.css';
@@ -45,6 +46,8 @@ function App() {
               <Route path="/editor" element={<VideoEditorPage />} />
               <Route path="/wallet" element={<WalletPage />} />
               <Route path="/admin" element={<AdminPage />} />
+              <Route path="/spiritual" element={<SpiritualPage />} />
+              <Route path="/spiritual/:tab" element={<SpiritualPage />} />
               <Route path="/profile/:userId" element={<ProfilePage />} />
               <Route path="/profile/me" element={<ProfilePage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -3,7 +3,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   Home, Video, MessageCircle, PhoneCall, Headphones, 
   User as UserIcon, Tv, ShoppingBag, Users, Film, Wallet, ShieldAlert,
-  ChevronDown, ChevronRight, Layers, ExternalLink
+  ChevronDown, ChevronRight, Layers, ExternalLink,
+  Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AuthModal } from './AuthModal';
@@ -14,6 +15,7 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
   const [servicesExpanded, setServicesExpanded] = useState(true);
+  const [spiritualExpanded, setSpiritualExpanded] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   return (
@@ -68,6 +70,67 @@ export function Sidebar() {
           <Headphones className="nav-icon" size={19} />
           <span className="nav-label">Подкасты</span>
         </NavLink>
+
+        {/* SECTION: САМОПОЗНАНИЕ & ДУХОВНЫЕ ПРАКТИКИ */}
+        <div className="nav-section-divider" />
+        
+        <div className="services-section-header spiritual-section-header">
+          <button 
+            type="button" 
+            className="services-accordion-toggle spiritual-accordion-toggle"
+            onClick={() => setSpiritualExpanded(!spiritualExpanded)}
+            title={spiritualExpanded ? "Свернуть самопознание" : "Развернуть самопознание"}
+          >
+            <div className="services-header-title">
+              <Sparkles size={14} className="services-header-icon spiritual-star-icon" />
+              <span>Самопознание</span>
+            </div>
+            {spiritualExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+
+          <NavLink 
+            to="/spiritual" 
+            className="services-hub-link" 
+            title="Центр самопознания и практик (Все разделы)"
+          >
+            <span>Все</span>
+            <ExternalLink size={11} />
+          </NavLink>
+        </div>
+
+        {spiritualExpanded && (
+          <div className="services-subnav spiritual-subnav">
+            <NavLink to="/spiritual/meditation" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+              <Flower2 className="nav-icon spiritual-icon-flower" size={18} />
+              <span className="nav-label">Медитация</span>
+            </NavLink>
+
+            <NavLink to="/spiritual/yoga" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+              <Activity className="nav-icon spiritual-icon-yoga" size={18} />
+              <span className="nav-label">Йога</span>
+            </NavLink>
+
+            <NavLink to="/spiritual/affirmations" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+              <Sunrise className="nav-icon spiritual-icon-affirm" size={18} />
+              <span className="nav-label">Аффирмации</span>
+            </NavLink>
+
+            <NavLink to="/spiritual/breathing" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+              <Wind className="nav-icon spiritual-icon-wind" size={18} />
+              <span className="nav-label">Дыхание</span>
+            </NavLink>
+
+            <NavLink to="/spiritual/sounds" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+              <Waves className="nav-icon spiritual-icon-waves" size={18} />
+              <span className="nav-label">Звуки & Мантры</span>
+            </NavLink>
+
+            <NavLink to="/spiritual/wisdom" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+              <BookOpen className="nav-icon spiritual-icon-wisdom" size={18} />
+              <span className="nav-label">Мудрость</span>
+            </NavLink>
+          </div>
+        )}
 
         {/* SECTION 2: SERVICES ACCORDION & HUB */}
         <div className="nav-section-divider" />

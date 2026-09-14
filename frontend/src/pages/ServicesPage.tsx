@@ -1,7 +1,7 @@
-﻿import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
   ShoppingBag, Users, Film, Wallet, ShieldAlert, 
-  ArrowRight, Sparkles, TrendingUp, Compass
+  ArrowRight, Sparkles, TrendingUp, Compass, Flower2
 } from 'lucide-react';
 import { currentUser } from '../data/mock';
 import './ServicesPage.css';
@@ -19,6 +19,17 @@ interface ServiceItem {
 }
 
 const SERVICES: ServiceItem[] = [
+  {
+    id: 'spiritual',
+    title: 'Самопознание и Духовные Практики',
+    category: 'Осознанность и Здоровье',
+    description: 'Медитации с частотами 432 Гц, авторские комплексы йоги, трансформирующие аффирмации, пранаяма и саундхилинг.',
+    icon: Flower2,
+    route: '/spiritual',
+    badge: 'Новинка',
+    colorGradient: 'linear-gradient(135deg, #10B981, #6366F1)',
+    stats: '6 направлений практик'
+  },
   {
     id: 'marketplace',
     title: 'Маркетплейс',
