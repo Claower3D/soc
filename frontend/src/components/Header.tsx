@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Search, X, Video, Headphones, MessageCircle, User as UserIcon, 
   Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
-  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing
+  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Bot
 } from 'lucide-react';
 import { initialUsers, posts, videos, podcasts, type User } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -420,6 +420,21 @@ export function Header() {
         >
           <Video size={17} />
           <span className="btn-text">Конференция</span>
+        </button>
+
+        {/* AI Guru Quick Trigger */}
+        <button
+          className="header-action-btn ai-guru-quick-btn"
+          onClick={() => navigate('/spiritual/livezen')}
+          style={{
+            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(99, 102, 241, 0.25))',
+            borderColor: 'rgba(168, 85, 247, 0.4)',
+            color: '#c084fc'
+          }}
+          title="ИИ-Духовный Наставник & Live Zen"
+        >
+          <Bot size={17} />
+          <span className="btn-text">ИИ-Гуру</span>
         </button>
 
         {/* Theme Toggle Button (Day / Night mode) */}

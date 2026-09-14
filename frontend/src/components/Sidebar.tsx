@@ -4,7 +4,8 @@ import {
   Home, Video, MessageCircle, PhoneCall, Headphones, 
   User as UserIcon, Tv, ShoppingBag, Users, Film, Wallet, ShieldAlert,
   ChevronDown, ChevronRight, Layers, ExternalLink,
-  Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles, GraduationCap, Lock
+  Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles, GraduationCap, Lock,
+  Compass, Calendar as CalendarIcon, Bot
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AuthModal } from './AuthModal';
@@ -184,6 +185,28 @@ export function Sidebar() {
                   <span className="nav-label">Курсы & Маркет</span>
                   <span className="spiritual-sub-badge promo-badge">PRO</span>
                 </NavLink>
+
+                <NavLink to="/spiritual/tarot" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <Sparkles className="nav-icon spiritual-icon-flower" size={18} />
+                  <span className="nav-label">Таро & МАК</span>
+                  <span className="spiritual-sub-badge">3D</span>
+                </NavLink>
+
+                <NavLink to="/spiritual/astrology" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <Compass className="nav-icon spiritual-icon-yoga" size={18} />
+                  <span className="nav-label">Натальная карта</span>
+                </NavLink>
+
+                <NavLink to="/spiritual/calendar" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <CalendarIcon className="nav-icon spiritual-icon-affirm" size={18} />
+                  <span className="nav-label">Календарь</span>
+                </NavLink>
+
+                <NavLink to="/spiritual/livezen" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <Bot className="nav-icon spiritual-icon-waves" size={18} />
+                  <span className="nav-label">Live Zen & ИИ</span>
+                  <span className="spiritual-sub-badge" style={{ background: '#22c55e', color: '#fff' }}>LIVE</span>
+                </NavLink>
               </>
             ) : (
               <>
@@ -226,6 +249,30 @@ export function Sidebar() {
                 <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
                   <GraduationCap className="nav-icon spiritual-icon-courses" size={18} />
                   <span className="nav-label">Курсы & Маркет</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Sparkles className="nav-icon spiritual-icon-flower" size={18} />
+                  <span className="nav-label">Таро & МАК</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Compass className="nav-icon spiritual-icon-yoga" size={18} />
+                  <span className="nav-label">Натальная карта</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <CalendarIcon className="nav-icon spiritual-icon-affirm" size={18} />
+                  <span className="nav-label">Календарь</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Bot className="nav-icon spiritual-icon-waves" size={18} />
+                  <span className="nav-label">Live Zen & ИИ</span>
                   <span className="nav-lock-badge"><Lock size={12} /></span>
                 </div>
               </>

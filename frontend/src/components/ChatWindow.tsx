@@ -127,6 +127,33 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
     setReplyingToMessage(null);
     setShowAttachMenu(false);
     setShowEmojiPicker(false);
+
+    // If talking to AI Guru, generate interactive reply
+    if (chat?.id === 'ai_guru_bot') {
+      const userText = (newMsg.text || '').toLowerCase();
+      setTimeout(() => {
+        let guruAnswer = 'То, что ты ищешь снаружи, уже присутствует внутри как свидетель. Успокой мысли и наблюдай за дыханием. ✨';
+        if (userText.includes('таро') || userText.includes('карт')) {
+          guruAnswer = 'Карты Таро — это зеркало твоего подсознания. Перейди во вкладку «Самопознание ➔ Таро & МАК», чтобы вытянуть Карту Дня в 3D! 🔮';
+        } else if (userText.includes('натальн') || userText.includes('гороскоп') || userText.includes('дизайн')) {
+          guruAnswer = 'Твой космический код уникален. Загляни в раздел «Натальная карта», чтобы рассчитать асцендент, стихии и бодиграф Human Design! 🌌';
+        } else if (userText.includes('тревог') || userText.includes('стресс') || userText.includes('страх')) {
+          guruAnswer = 'Сделай глубокий вдох животом на 4 счета и медленный выдох на 8. В этот миг ты в безопасности. Зайди в «Live Zen», чтобы подышать в общем круге практикующих. 🧘';
+        } else if (userText.includes('привет') || userText.includes('здравствуй')) {
+          guruAnswer = 'Мир твоему сердцу, путник! Я всегда рядом, чтобы подсказать практику, совет или толкование символов. О чем думаешь сейчас? 🙏';
+        }
+
+        setMessages(mPrev => [
+          ...mPrev,
+          {
+            id: `guru_reply_${Date.now()}`,
+            text: guruAnswer,
+            fromMe: false,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+      }, 700);
+    }
   };
 
   // Delete message execution

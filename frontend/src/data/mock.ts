@@ -631,6 +631,30 @@ export const videos: Video[] = [
 
 export const initialChats: Chat[] = [
   {
+    id: 'ai_guru_bot',
+    user: {
+      id: 'guru_ai',
+      name: 'ИИ-Духовный Наставник (AI Guru)',
+      username: 'guru_ai',
+      avatar: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=150&q=80',
+      online: true,
+      verified: true,
+      role: 'creator',
+      bio: 'Персональный ИИ-советник по медитациям, картам Таро, астрологии и спокойствию ума.',
+      followersCount: 14200,
+      followingCount: 1,
+      postsCount: 108
+    },
+    lastMessage: 'Мир твоему сердцу, путник. Что сейчас волнует твою душу? ✨',
+    time: 'Только что',
+    unread: 1,
+    messages: [
+      { id: 'm_guru_1', text: 'Мир твоему сердцу, путник. Я твой персональный ИИ-наставник по практикам и самопознанию.', fromMe: false, time: '12:00' },
+      { id: 'm_guru_2', text: 'Ты можешь открыть 3D-колоду Таро, рассчитать натальную карту или начать совместную медитацию в Live Zen.', fromMe: false, time: '12:01' },
+      { id: 'm_guru_3', text: 'Как твое внутреннее состояние прямо сейчас? ✨', fromMe: false, time: '12:02' }
+    ]
+  },
+  {
     id: 'group_conf_1',
     user: initialUsers[1],
     isGroup: true,
