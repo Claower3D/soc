@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { RELIGIONS_CATALOG, type UserRole, type BeliefPrivacy } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../context/LanguageContext';
 import { LegalModal } from './LegalModal';
 import logoImg from '../assets/logo.png';
 import './AuthModal.css';
@@ -23,6 +24,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onSuccess 
 }) => {
   const { login, register, currentUser } = useAuth();
+  const { t } = useTranslation();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [loginMethod, setLoginMethod] = useState<'form' | 'qr'>('form');
   const [step, setStep] = useState<1 | 2>(1);
@@ -36,6 +38,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [agreedToTerms, setAgreedToTerms] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loginSuccessMessage, setLoginSuccessMessage] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [legalModalOpen, setLegalModalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'privacy' | 'terms'>('privacy');
 
@@ -43,33 +46,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const selectedReligion = RELIGIONS_CATALOG.find(r => r.id === selectedBeliefId) || RELIGIONS_CATALOG[0];
 
-  const handleNextOrSubmit = (e: React.FormEvent) => {
+  const handleNextOrSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
     if (mode === 'login') {
-      const res = login(emailOrPhone, password);
-      if (!res.success) {
-        setErrorMessage(res.message || 'Ошибка входа');
-        return;
+      setIsSubmitting(true);
+      try {
+        const res = await login(emailOrPhone, password);
+        if (!res.success) {
+          setErrorMessage(res.message || t('auth.modal.err_fill_all'));
+          return;
+        }
+        setLoginSuccessMessage(true);
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+          setLoginSuccessMessage(false);
+        }, 700);
+      } finally {
+        setIsSubmitting(false);
       }
-      setLoginSuccessMessage(true);
-      setTimeout(() => {
-        if (onSuccess) onSuccess();
-        onClose();
-        setLoginSuccessMessage(false);
-      }, 700);
       return;
     }
 
     // Mode: register
     if (step === 1) {
       if (!name.trim() || !username.trim() || !emailOrPhone.trim() || !password) {
-        setErrorMessage('Пожалуйста, заполните все обязательные поля');
+        setErrorMessage(t('auth.modal.err_fill_all'));
         return;
       }
       if (password.length < 6) {
-        setErrorMessage('Пароль должен содержать минимум 6 символов');
+        setErrorMessage(t('auth.modal.err_password_len'));
         return;
       }
       setStep(2);
@@ -77,37 +85,47 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     // Step 2 submit
-    const res = register({
-      name,
-      username,
-      emailOrPhone,
-      password,
-      role: selectedRole,
-      beliefType: selectedBeliefId === 'none' ? 'Не указывать / Личное' : selectedReligion.name,
-      beliefPrivacy,
-    });
+    setIsSubmitting(true);
+    try {
+      const res = await register({
+        name,
+        username,
+        emailOrPhone,
+        password,
+        role: selectedRole,
+        beliefType: selectedBeliefId === 'none' ? 'Не указывать / Личное' : selectedReligion.name,
+        beliefPrivacy,
+      });
 
-    if (!res.success) {
-      setErrorMessage(res.message || 'Ошибка при регистрации');
-      return;
+      if (!res.success) {
+        setErrorMessage(res.message || 'Ошибка при регистрации');
+        return;
+      }
+
+      setLoginSuccessMessage(true);
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+        onClose();
+        setLoginSuccessMessage(false);
+      }, 800);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setLoginSuccessMessage(true);
-    setTimeout(() => {
-      if (onSuccess) onSuccess();
-      onClose();
-      setLoginSuccessMessage(false);
-    }, 800);
   };
 
-  const handleQuickDemoLogin = () => {
-    login('alex_mironov');
-    setLoginSuccessMessage(true);
-    setTimeout(() => {
-      onSuccess?.();
-      onClose();
-      setLoginSuccessMessage(false);
-    }, 600);
+  const handleQuickDemoLogin = async () => {
+    setIsSubmitting(true);
+    try {
+      await login('alex_mironov');
+      setLoginSuccessMessage(true);
+      setTimeout(() => {
+        onSuccess?.();
+        onClose();
+        setLoginSuccessMessage(false);
+      }, 600);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -325,7 +343,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     {mode === 'login' && (
                       <>
                         <div className="auth-field">
-                          <label>Email или Телефон или Никнейм</label>
+                          <label>{t('auth.modal.contact_label')}</label>
                           <div className="auth-input-wrapper">
                             <Mail size={17} className="auth-input-icon" />
                             <input 
@@ -339,7 +357,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         </div>
 
                         <div className="auth-field">
-                          <label>Пароль</label>
+                          <label>{t('auth.modal.password_label')}</label>
                           <div className="auth-input-wrapper">
                             <Lock size={17} className="auth-input-icon" />
                             <input 
@@ -361,8 +379,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           </a>
                         </div>
 
-                        <button type="submit" className="auth-submit-btn">
-                          Войти в аккаунт
+                        <button type="submit" className="auth-submit-btn" disabled={isSubmitting}>
+                          {isSubmitting ? 'Вход...' : t('auth.modal.btn_submit_login')}
                         </button>
                       </>
                     )}
@@ -371,12 +389,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <>
                         <div className="auth-inputs-grid-2">
                           <div className="auth-field">
-                            <label>Ваше имя и фамилия</label>
+                            <label>{t('auth.modal.name_label')}</label>
                             <div className="auth-input-wrapper">
                               <UserIcon size={17} className="auth-input-icon" />
                               <input 
                                 type="text" 
-                                placeholder="Иван Петров" 
+                                placeholder={t('auth.modal.name_placeholder')}
                                 value={name}
                                 onChange={e => setName(e.target.value)}
                                 required 
@@ -385,12 +403,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           </div>
 
                           <div className="auth-field">
-                            <label>Имя пользователя (@ник)</label>
+                            <label>{t('auth.modal.username_label')}</label>
                             <div className="auth-input-wrapper">
                               <span className="auth-at">@</span>
                               <input 
                                 type="text" 
-                                placeholder="ivan_petrov" 
+                                placeholder="username" 
                                 value={username}
                                 onChange={e => setUsername(e.target.value)}
                                 required 
@@ -400,12 +418,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         </div>
 
                         <div className="auth-field">
-                          <label>Email или телефон</label>
+                          <label>{t('auth.modal.contact_label')}</label>
                           <div className="auth-input-wrapper">
                             <Phone size={17} className="auth-input-icon" />
                             <input 
                               type="text" 
-                              placeholder="ivan@mail.com или +7 999 123-45-67" 
+                              placeholder={t('auth.modal.contact_placeholder')}
                               value={emailOrPhone}
                               onChange={e => setEmailOrPhone(e.target.value)}
                               required 
@@ -414,12 +432,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         </div>
 
                         <div className="auth-field">
-                          <label>Пароль</label>
+                          <label>{t('auth.modal.password_label')}</label>
                           <div className="auth-input-wrapper">
                             <Lock size={17} className="auth-input-icon" />
                             <input 
                               type="password" 
-                              placeholder="Минимум 6 символов" 
+                              placeholder={t('auth.modal.password_placeholder')}
                               value={password}
                               onChange={e => setPassword(e.target.value)}
                               required 
@@ -449,7 +467,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         </div>
 
                         <button type="submit" className="auth-submit-btn">
-                          Продолжить к выбору веры и роли <ArrowRight size={18} />
+                          {t('auth.modal.btn_next')} <ArrowRight size={18} />
                         </button>
                       </>
                     )}
@@ -614,10 +632,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                         <div className="auth-action-buttons">
                           <button type="button" className="auth-back-btn" onClick={() => setStep(1)}>
-                            Назад
+                            {t('auth.modal.btn_back')}
                           </button>
-                          <button type="submit" className="auth-submit-btn" disabled={!agreedToTerms}>
-                            <CheckCircle2 size={17} /> Завершить
+                          <button type="submit" className="auth-submit-btn" disabled={!agreedToTerms || isSubmitting}>
+                            <CheckCircle2 size={17} /> {isSubmitting ? 'Регистрация...' : t('auth.modal.btn_submit_register')}
                           </button>
                         </div>
                       </>

@@ -20,6 +20,7 @@ import { SpiritualPage } from './pages/SpiritualPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { AuthModal } from './components/AuthModal';
 import './styles/theme.css';
 import './App.css';
@@ -72,13 +73,15 @@ function AppContent() {
 function App() {
   return (
     <BrowserRouter>
-      <ThemeProvider>
-        <NotificationProvider>
-          <AuthProvider>
-            <AppContent />
-          </AuthProvider>
-        </NotificationProvider>
-      </ThemeProvider>
+      <LanguageProvider>
+        <ThemeProvider>
+          <NotificationProvider>
+            <AuthProvider>
+              <AppContent />
+            </AuthProvider>
+          </NotificationProvider>
+        </ThemeProvider>
+      </LanguageProvider>
     </BrowserRouter>
   );
 }

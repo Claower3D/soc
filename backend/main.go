@@ -1,11 +1,18 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -38,6 +45,15 @@ type User struct {
 	FollowingCount int    `json:"followingCount"`
 	CriticsCount   int    `json:"criticsCount,omitempty"`
 	PostsCount     int    `json:"postsCount"`
+}
+
+// AccountStoreEntry — внутренняя запись пользователя с хешем пароля.
+type AccountStoreEntry struct {
+	User         User
+	EmailOrPhone string
+	PasswordHash string
+	Salt         string
+	CreatedAt    time.Time
 }
 
 // Post — пост в ленте.
@@ -91,6 +107,25 @@ type Episode struct {
 
 var startTime = time.Now()
 
+// JWT Secret Key (читается из окружения или дефолтный безопасный ключ)
+var jwtSecretKey = func() []byte {
+	k := os.Getenv("JWT_SECRET")
+	if k == "" {
+		k = "new_age_super_secret_jwt_key_2026_zen_platform"
+	}
+	return []byte(k)
+}()
+
+// Хранилище аккаунтов
+type UserStore struct {
+	mu       sync.RWMutex
+	accounts map[string]AccountStoreEntry // key: userID
+}
+
+var store = &UserStore{
+	accounts: make(map[string]AccountStoreEntry),
+}
+
 var currentUser = User{
 	ID:             "me",
 	Name:           "Алексей Миронов",
@@ -98,6 +133,9 @@ var currentUser = User{
 	Avatar:         "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
 	Bio:            "Fullstack разработчик на React + Go. Создатель светлой соцсети «Демо».",
 	Online:         true,
+	Role:           "creator",
+	BeliefType:     "Агностицизм",
+	BeliefPrivacy:  "public",
 	FollowersCount: 1420,
 	FollowingCount: 382,
 	PostsCount:     24,
@@ -110,6 +148,146 @@ var mockUsers = []User{
 	{ID: "3", Name: "Екатерина Смирнова", Username: "kate_s", Avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80", Bio: "UX Исследования & Дизайн мышление", Online: false, FollowersCount: 6890, FollowingCount: 512, PostsCount: 62},
 	{ID: "4", Name: "Дмитрий Козлов", Username: "dima_k", Avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80", Bio: "Tech Entrepreneur & Инновации", Online: true, FollowersCount: 22400, FollowingCount: 190, PostsCount: 110},
 }
+
+// Инициализация сидовых пользователей
+func init() {
+	salt := generateSalt(16)
+	hash := hashPassword("password123", salt)
+	store.accounts["me"] = AccountStoreEntry{
+		User:         currentUser,
+		EmailOrPhone: "alex@newage.com",
+		PasswordHash: hash,
+		Salt:         salt,
+		CreatedAt:    time.Now(),
+	}
+}
+
+// =========================================================================
+// CRYPTO & JWT IMPLEMENTATION (RFC 7519 HMAC-SHA256)
+// =========================================================================
+
+type JWTHeader struct {
+	Alg string `json:"alg"`
+	Typ string `json:"typ"`
+}
+
+type JWTClaims struct {
+	UserID       string `json:"user_id"`
+	Username     string `json:"username"`
+	Role         string `json:"role"`
+	EmailOrPhone string `json:"email_or_phone"`
+	Exp          int64  `json:"exp"`
+	Iat          int64  `json:"iat"`
+}
+
+func base64URLEncode(data []byte) string {
+	return strings.TrimRight(base64.URLEncoding.EncodeToString(data), "=")
+}
+
+func base64URLDecode(s string) ([]byte, error) {
+	if l := len(s) % 4; l > 0 {
+		s += strings.Repeat("=", 4-l)
+	}
+	return base64.URLEncoding.DecodeString(s)
+}
+
+func generateSalt(n int) string {
+	b := make([]byte, n)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func hashPassword(password, salt string) string {
+	h := sha256.New()
+	h.Write([]byte(password + ":" + salt + ":new_age_pepper"))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func checkPassword(password, salt, expectedHash string) bool {
+	return hashPassword(password, salt) == expectedHash
+}
+
+func generateJWT(user User, emailOrPhone string) (string, error) {
+	header := JWTHeader{
+		Alg: "HS256",
+		Typ: "JWT",
+	}
+	headerJSON, err := json.Marshal(header)
+	if err != nil {
+		return "", err
+	}
+	encodedHeader := base64URLEncode(headerJSON)
+
+	now := time.Now()
+	claims := JWTClaims{
+		UserID:       user.ID,
+		Username:     user.Username,
+		Role:         user.Role,
+		EmailOrPhone: emailOrPhone,
+		Iat:          now.Unix(),
+		Exp:          now.Add(30 * 24 * time.Hour).Unix(), // 30 дней сессия
+	}
+	claimsJSON, err := json.Marshal(claims)
+	if err != nil {
+		return "", err
+	}
+	encodedClaims := base64URLEncode(claimsJSON)
+
+	unsignedToken := encodedHeader + "." + encodedClaims
+	mac := hmac.New(sha256.New, jwtSecretKey)
+	mac.Write([]byte(unsignedToken))
+	signature := base64URLEncode(mac.Sum(nil))
+
+	return unsignedToken + "." + signature, nil
+}
+
+func parseAndValidateJWT(tokenStr string) (*JWTClaims, error) {
+	parts := strings.Split(tokenStr, ".")
+	if len(parts) != 3 {
+		return nil, errors.New("неверный формат токена")
+	}
+
+	unsignedToken := parts[0] + "." + parts[1]
+	mac := hmac.New(sha256.New, jwtSecretKey)
+	mac.Write([]byte(unsignedToken))
+	expectedSig := base64URLEncode(mac.Sum(nil))
+
+	if !hmac.Equal([]byte(parts[2]), []byte(expectedSig)) {
+		return nil, errors.New("недействительная подпись токена")
+	}
+
+	claimsBytes, err := base64URLDecode(parts[1])
+	if err != nil {
+		return nil, errors.New("ошибка декодирования payload")
+	}
+
+	var claims JWTClaims
+	if err := json.Unmarshal(claimsBytes, &claims); err != nil {
+		return nil, errors.New("некорректный payload")
+	}
+
+	if claims.Exp < time.Now().Unix() {
+		return nil, errors.New("срок действия токена истек")
+	}
+
+	return &claims, nil
+}
+
+func extractBearerToken(r *http.Request) string {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return ""
+	}
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+		return strings.TrimSpace(parts[1])
+	}
+	return ""
+}
+
+// =========================================================================
+// MAIN & ROUTES
+// =========================================================================
 
 func main() {
 	mux := http.NewServeMux()
@@ -127,8 +305,11 @@ func main() {
 	mux.HandleFunc("GET /api/communities", handleCommunities)
 	mux.HandleFunc("GET /api/wallet", handleWallet)
 	mux.HandleFunc("GET /api/admin/stats", handleAdminStats)
+
+	// Auth эндпоинты (JWT)
 	mux.HandleFunc("POST /api/auth/register", handleRegister)
 	mux.HandleFunc("POST /api/auth/login", handleLogin)
+	mux.HandleFunc("GET /api/auth/me", handleAuthMe)
 
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
@@ -248,8 +429,8 @@ func handlePodcasts(w http.ResponseWriter, r *http.Request) {
 			Cover: "https://images.unsplash.com/photo-1589903308904-1010c2294adc?auto=format&fit=crop&w=400&q=80",
 			Description: "Еженедельный подкаст об архитектуре ПО и Go",
 			Episodes: []Episode{
-				{ID: "e1", Title: "React 19 vs современные фреймворки в 2026", Duration: "48:20", Date: "1 сен 2026"},
-				{ID: "e2", Title: "Путь Senior разработчика", Duration: "39:15", Date: "25 авг 2026"},
+				{ID: "ep1", Title: "Выпуск #1: Архитектура соцсети на Go и React", Duration: "42:15", Date: "12 мая"},
+				{ID: "ep2", Title: "Выпуск #2: Микросервисы или монолит в 2026?", Duration: "38:40", Date: "5 мая"},
 			},
 		},
 	}
@@ -259,24 +440,24 @@ func handlePodcasts(w http.ResponseWriter, r *http.Request) {
 func handleMarketplace(w http.ResponseWriter, r *http.Request) {
 	products := []map[string]interface{}{
 		{
-			"id":          "prod-1",
-			"title":       "Худи оверсайз New Age (Светлая коллекция)",
-			"price":       4990,
-			"oldPrice":    6490,
-			"category":    "Одежда & Мерч",
-			"rating":      4.9,
-			"inStock":     true,
-			"stockCount":  14,
+			"id":       "prod1",
+			"title":    "Мини-курс: Практика Дыхания и Пранаяма",
+			"price":    1990,
+			"currency": "RUB",
+			"rating":   4.9,
+			"author":   "Мастер Самадхи",
+			"image":    "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=600&q=80",
+			"category": "Медитации",
 		},
 		{
-			"id":          "prod-2",
-			"title":       "Конденсаторный USB-микрофон New Age Pro Podcast",
-			"price":       7890,
-			"oldPrice":    9990,
-			"category":    "Электроника",
-			"rating":      4.95,
-			"inStock":     true,
-			"stockCount":  8,
+			"id":       "prod2",
+			"title":    "Индивидуальный разбор Натальной карты",
+			"price":    4500,
+			"currency": "RUB",
+			"rating":   5.0,
+			"author":   "Астролог Аэлита",
+			"image":    "https://images.unsplash.com/photo-1532968961962-8a0cb3a2d4f5?auto=format&fit=crop&w=600&q=80",
+			"category": "Астрология",
 		},
 	}
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: products})
@@ -285,18 +466,16 @@ func handleMarketplace(w http.ResponseWriter, r *http.Request) {
 func handleCommunities(w http.ResponseWriter, r *http.Request) {
 	communities := []map[string]interface{}{
 		{
-			"id":           "comm-1",
-			"name":         "Go & Cloud Architecture",
-			"handle":       "golang_ru",
-			"category":     "IT & Технологии",
-			"membersCount": 14200,
+			"id":           "com1",
+			"name":         "Осознанность и Дзен",
+			"avatar":       "https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=300&q=80",
+			"membersCount": 12450,
 			"isPrivate":    false,
 		},
 		{
-			"id":           "comm-2",
-			"name":         "Философия & Мировоззрения XXI Века",
-			"handle":       "philosophy_open",
-			"category":     "Мировоззрение & Философия",
+			"id":           "com2",
+			"name":         "Клуб Астрологии и Human Design",
+			"avatar":       "https://images.unsplash.com/photo-1532968961962-8a0cb3a2d4f5?auto=format&fit=crop&w=300&q=80",
 			"membersCount": 8400,
 			"isPrivate":    false,
 		},
@@ -315,14 +494,15 @@ func handleWallet(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminStats(w http.ResponseWriter, r *http.Request) {
 	stats := map[string]interface{}{
-		"dau":             142580,
+		"dau":            142580,
 		"marketplaceGMV": 4820000,
-		"revenue":         724500,
-		"pendingReports":  3,
+		"revenue":        724500,
+		"pendingReports": 3,
 	}
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: stats})
 }
 
+// POST /api/auth/register — Реальная регистрация с хешированием пароля и выдачей JWT
 func handleRegister(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name          string `json:"name"`
@@ -332,19 +512,62 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		Role          string `json:"role"`
 		BeliefType    string `json:"beliefType"`
 		BeliefPrivacy string `json:"beliefPrivacy"`
+		Avatar        string `json:"avatar"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Некорректные данные"})
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Некорректные данные запроса"})
 		return
 	}
 
+	cleanUsername := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(req.Username), "@"))
+	cleanEmailOrPhone := strings.ToLower(strings.TrimSpace(req.EmailOrPhone))
+
+	if cleanUsername == "" || cleanEmailOrPhone == "" || req.Password == "" || strings.TrimSpace(req.Name) == "" {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Все обязательные поля должны быть заполнены"})
+		return
+	}
+
+	if len(req.Password) < 6 {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Пароль должен содержать не менее 6 символов"})
+		return
+	}
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	// Проверка на существующего пользователя
+	for _, entry := range store.accounts {
+		if strings.ToLower(entry.User.Username) == cleanUsername {
+			writeJSON(w, http.StatusConflict, Response{Status: "error", Message: "Пользователь с таким никнеймом уже зарегистрирован"})
+			return
+		}
+		if strings.ToLower(entry.EmailOrPhone) == cleanEmailOrPhone {
+			writeJSON(w, http.StatusConflict, Response{Status: "error", Message: "Аккаунт с таким email или телефоном уже существует"})
+			return
+		}
+	}
+
+	newID := "u_" + time.Now().Format("20060102150405")
+	avatar := req.Avatar
+	if avatar == "" {
+		avatar = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80"
+	}
+
+	role := req.Role
+	if role == "" {
+		role = "user"
+	}
+
+	salt := generateSalt(16)
+	hash := hashPassword(req.Password, salt)
+
 	newUser := User{
-		ID:             "u_" + time.Now().Format("20060102150405"),
-		Name:           req.Name,
-		Username:       strings.TrimPrefix(req.Username, "@"),
-		Avatar:         "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
+		ID:             newID,
+		Name:           strings.TrimSpace(req.Name),
+		Username:       cleanUsername,
+		Avatar:         avatar,
 		Online:         true,
-		Role:           req.Role,
+		Role:           role,
 		BeliefType:     req.BeliefType,
 		BeliefPrivacy:  req.BeliefPrivacy,
 		FollowersCount: 1,
@@ -353,32 +576,123 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		PostsCount:     0,
 	}
 
+	store.accounts[newID] = AccountStoreEntry{
+		User:         newUser,
+		EmailOrPhone: cleanEmailOrPhone,
+		PasswordHash: hash,
+		Salt:         salt,
+		CreatedAt:    time.Now(),
+	}
+
 	mockUsers = append([]User{newUser}, mockUsers...)
 	currentUser = newUser
 
-	writeJSON(w, http.StatusCreated, Response{Status: "ok", Message: "Аккаунт успешно создан", Data: newUser})
+	token, err := generateJWT(newUser, cleanEmailOrPhone)
+	if err != nil {
+		log.Printf("Ошибка генерации JWT: %v", err)
+		writeJSON(w, http.StatusInternalServerError, Response{Status: "error", Message: "Ошибка создания сессии"})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, Response{
+		Status:  "ok",
+		Message: "Аккаунт успешно создан",
+		Data: map[string]interface{}{
+			"token": token,
+			"user":  newUser,
+		},
+	})
 }
 
+// POST /api/auth/login — Проверка логина/пароля и выдача JWT
 func handleLogin(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Login    string `json:"login"`
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Некорректные данные"})
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Некорректные данные запроса"})
 		return
 	}
 
-	target := strings.ToLower(strings.TrimPrefix(req.Login, "@"))
-	for _, u := range mockUsers {
-		if strings.ToLower(u.Username) == target || strings.ToLower(u.Name) == target {
-			currentUser = u
-			writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Успешный вход", Data: u})
-			return
+	target := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(req.Login), "@"))
+	if target == "" || req.Password == "" {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Введите логин и пароль"})
+		return
+	}
+
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	var foundAccount *AccountStoreEntry
+	for _, entry := range store.accounts {
+		if strings.ToLower(entry.User.Username) == target || strings.ToLower(entry.EmailOrPhone) == target {
+			acc := entry
+			foundAccount = &acc
+			break
 		}
 	}
 
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Вход выполнен (демо)", Data: currentUser})
+	if foundAccount == nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Пользователь не найден. Проверьте логин или зарегистрируйтесь."})
+		return
+	}
+
+	// Проверка хеша пароля
+	if !checkPassword(req.Password, foundAccount.Salt, foundAccount.PasswordHash) {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Неверный пароль"})
+		return
+	}
+
+	currentUser = foundAccount.User
+
+	token, err := generateJWT(foundAccount.User, foundAccount.EmailOrPhone)
+	if err != nil {
+		log.Printf("Ошибка генерации JWT: %v", err)
+		writeJSON(w, http.StatusInternalServerError, Response{Status: "error", Message: "Ошибка создания сессии"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: "Успешный вход",
+		Data: map[string]interface{}{
+			"token": token,
+			"user":  foundAccount.User,
+		},
+	})
+}
+
+// GET /api/auth/me — Валидация сессии по JWT Bearer токену
+func handleAuthMe(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	if token == "" {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Токен авторизации отсутствует"})
+		return
+	}
+
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Недействительный или просроченный токен: " + err.Error()})
+		return
+	}
+
+	store.mu.RLock()
+	account, exists := store.accounts[claims.UserID]
+	store.mu.RUnlock()
+
+	if !exists {
+		writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден в базе"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, Response{
+		Status: "ok",
+		Data: map[string]interface{}{
+			"user":   account.User,
+			"claims": claims,
+		},
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {

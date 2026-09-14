@@ -8,6 +8,7 @@ import {
   Compass, Calendar as CalendarIcon, Bot
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../context/LanguageContext';
 import { AuthModal } from './AuthModal';
 import logoImg from '../assets/logo.png';
 import './Sidebar.css';
@@ -15,6 +16,7 @@ import './Sidebar.css';
 export function Sidebar() {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
+  const { t } = useTranslation();
   const [servicesExpanded, setServicesExpanded] = useState(true);
   const [spiritualExpanded, setSpiritualExpanded] = useState(true);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -47,18 +49,18 @@ export function Sidebar() {
 
         <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} end>
           <Home className="nav-icon" size={19} />
-          <span className="nav-label">Лента</span>
+          <span className="nav-label">{t('nav.feed')}</span>
         </NavLink>
 
         <NavLink to="/video" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Video className="nav-icon" size={19} />
-          <span className="nav-label">Видео</span>
+          <span className="nav-label">{t('nav.video')}</span>
         </NavLink>
 
         {isAuthenticated ? (
           <NavLink to="/messenger" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <MessageCircle className="nav-icon" size={19} />
-            <span className="nav-label">Мессенджер</span>
+            <span className="nav-label">{t('nav.messenger')}</span>
             <span className="nav-badge">3</span>
           </NavLink>
         ) : (
@@ -68,7 +70,7 @@ export function Sidebar() {
             title="Мессенджер доступен после регистрации"
           >
             <MessageCircle className="nav-icon" size={19} />
-            <span className="nav-label">Мессенджер</span>
+            <span className="nav-label">{t('nav.messenger')}</span>
             <span className="nav-lock-badge"><Lock size={12} /></span>
           </div>
         )}
@@ -76,7 +78,7 @@ export function Sidebar() {
         {isAuthenticated ? (
           <NavLink to="/conferences" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <PhoneCall className="nav-icon" size={19} />
-            <span className="nav-label">Конференции</span>
+            <span className="nav-label">{t('nav.calls')}</span>
             <span className="live-dot" title="В эфире" />
           </NavLink>
         ) : (
@@ -86,7 +88,7 @@ export function Sidebar() {
             title="Конференции доступны после регистрации"
           >
             <PhoneCall className="nav-icon" size={19} />
-            <span className="nav-label">Конференции</span>
+            <span className="nav-label">{t('nav.calls')}</span>
             <span className="nav-lock-badge"><Lock size={12} /></span>
           </div>
         )}
@@ -94,7 +96,7 @@ export function Sidebar() {
         {isAuthenticated ? (
           <NavLink to="/podcasts" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Headphones className="nav-icon" size={19} />
-            <span className="nav-label">Подкасты</span>
+            <span className="nav-label">{t('nav.podcasts')}</span>
           </NavLink>
         ) : (
           <div 
@@ -103,7 +105,7 @@ export function Sidebar() {
             title="Подкасты доступны после регистрации"
           >
             <Headphones className="nav-icon" size={19} />
-            <span className="nav-label">Подкасты</span>
+            <span className="nav-label">{t('nav.podcasts')}</span>
             <span className="nav-lock-badge"><Lock size={12} /></span>
           </div>
         )}

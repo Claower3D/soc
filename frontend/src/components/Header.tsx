@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Search, X, Video, Headphones, MessageCircle, User as UserIcon, 
   Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
-  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Bot
+  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Bot, Globe
 } from 'lucide-react';
 import { initialUsers, posts, videos, podcasts, type User } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useTranslation } from '../context/LanguageContext';
 import { AuthModal } from './AuthModal';
 import './Header.css';
 
@@ -16,15 +17,18 @@ export function Header() {
   const { currentUser, isAuthenticated, openAuthModal } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { preferences, updatePreferences, triggerTestPush, requestDesktopPermission, browserPermission } = useNotifications();
+  const { currentLang, setLanguage, languages, t } = useTranslation();
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'users' | 'videos' | 'podcasts' | 'posts'>('all');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [notifTab, setNotifTab] = useState<'alerts' | 'push_settings'>('alerts');
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   // Filter items based on query
@@ -55,6 +59,9 @@ export function Header() {
       }
       if (createRef.current && !createRef.current.contains(event.target as Node)) {
         setCreateMenuOpen(false);
+      }
+      if (langRef.current && !langRef.current.contains(event.target as Node)) {
+        setLangDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -437,6 +444,46 @@ export function Header() {
           <span className="btn-text">ИИ-Гуру</span>
         </button>
 
+        {/* Language Switcher Dropdown */}
+        <div className="header-lang-wrapper" ref={langRef}>
+          <button
+            className={`header-icon-btn header-lang-btn ${langDropdownOpen ? 'active' : ''}`}
+            onClick={() => setLangDropdownOpen(!langDropdownOpen)}
+            title="Выбор языка платформы / Select Language"
+          >
+            <span className="lang-active-flag">
+              {languages.find((l) => l.code === currentLang)?.flag || '🌐'}
+            </span>
+            <span className="lang-active-code">{currentLang.toUpperCase()}</span>
+          </button>
+
+          {langDropdownOpen && (
+            <div className="header-lang-dropdown">
+              <div className="lang-dropdown-header">
+                <Globe size={14} />
+                <span>Язык / Language</span>
+              </div>
+              <div className="lang-options-list">
+                {languages.map((lang) => (
+                  <button
+                    key={lang.code}
+                    className={`lang-option-item ${currentLang === lang.code ? 'selected' : ''}`}
+                    onClick={() => {
+                      setLanguage(lang.code);
+                      setLangDropdownOpen(false);
+                    }}
+                  >
+                    <span className="lang-item-flag">{lang.flag}</span>
+                    <span className="lang-item-name">{lang.nativeName}</span>
+                    <span className="lang-item-code">{lang.code.toUpperCase()}</span>
+                    {currentLang === lang.code && <Check size={14} className="lang-check-icon" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Theme Toggle Button (Day / Night mode) */}
         <button
           className="header-icon-btn theme-toggle-btn"
@@ -611,7 +658,7 @@ export function Header() {
               onClick={() => setAuthModalOpen(true)}
             >
               <LogIn size={16} />
-              <span>Войти</span>
+              <span>{t('header.login')}</span>
             </button>
 
             <button
@@ -619,7 +666,7 @@ export function Header() {
               onClick={() => setAuthModalOpen(true)}
             >
               <Plus size={16} />
-              <span>Регистрация</span>
+              <span>{t('header.register')}</span>
             </button>
           </div>
         )}
