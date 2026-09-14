@@ -1,211 +1,360 @@
+/* ==================== MODAL BACKDROP ==================== */
 .auth-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(10, 15, 30, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.25rem 1rem;
-  animation: fadeIn 0.25s ease-out;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease-out;
 }
 
-.auth-modal-card.luxury-auth-card {
+/* ==================== HORIZONTAL MODAL CARD ==================== */
+.auth-modal-horizontal-card {
   background: #FFFFFF;
-  border-radius: 24px;
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(99, 102, 241, 0.08);
+  border-radius: 20px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04);
   width: 100%;
-  max-width: 530px;
-  max-height: 94vh;
-  overflow-y: auto;
+  max-width: 860px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden; /* Скроллбар внутри панели, ничего не выпирает */
   position: relative;
-  padding: 2.25rem 2.25rem;
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  scrollbar-width: thin;
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.auth-modal-close {
+.auth-modal-close-btn {
   position: absolute;
-  top: 1.25rem;
-  right: 1.25rem;
+  top: 1rem;
+  right: 1rem;
   background: #F1F5F9;
   border: none;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #64748B;
   cursor: pointer;
-  transition: all var(--transition-fast);
-  z-index: 10;
+  transition: all 0.2s ease;
+  z-index: 20;
 }
 
-.auth-modal-close:hover {
+.auth-modal-close-btn:hover {
   background: #E2E8F0;
   color: #0F172A;
   transform: rotate(90deg);
 }
 
-/* LUXURY LOGO AND BRANDING */
-.luxury-header {
+/* ==================== LEFT BRAND PANEL ==================== */
+.auth-modal-left-panel {
+  width: 320px;
+  background: linear-gradient(165deg, #FAF5FF 0%, #EEF2FF 50%, #F0FDF4 100%);
+  border-right: 1px solid #E2E8F0;
+  padding: 2rem 1.75rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  margin-bottom: 1.5rem;
+  justify-content: space-between;
+  flex-shrink: 0;
 }
 
-.luxury-logo-aura-wrapper {
-  position: relative;
-  width: 80px;
-  height: 80px;
+.auth-brand-top {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 0.85rem;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
-.luxury-logo-ring-pulse {
-  position: absolute;
-  inset: -6px;
-  border-radius: 22px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.45) 0%, rgba(139, 92, 246, 0.45) 50%, rgba(236, 72, 153, 0.45) 100%);
-  filter: blur(10px);
-  opacity: 0.75;
-  animation: pulse-glow 3s infinite alternate;
-}
-
-@keyframes pulse-glow {
-  0% { transform: scale(0.95); opacity: 0.55; }
-  100% { transform: scale(1.08); opacity: 0.85; }
-}
-
-.luxury-auth-logo-img {
-  position: relative;
-  width: 68px;
-  height: 68px;
-  border-radius: 16px;
+/* ЧИСТЫЙ ЛОГОТИП БЕЗ РАМОК И БЕЗ ПОДСВЕТКИ */
+.auth-brand-clean-logo {
+  width: 58px;
+  height: 58px;
+  border-radius: 12px;
   object-fit: cover;
   background: transparent;
   border: 0;
   outline: none;
   box-shadow: none;
-  z-index: 2;
-  transition: transform 0.25s ease;
-}
-
-.luxury-header:hover .luxury-auth-logo-img {
-  transform: scale(1.04);
+  display: block;
+  margin-bottom: 1.15rem;
 }
 
 .auth-brand-badge-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   color: #6366F1;
-  background: rgba(99, 102, 241, 0.08);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  padding: 0.25rem 0.75rem;
+  background: rgba(99, 102, 241, 0.1);
+  padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.75rem;
 }
 
-.sparkle-icon {
+.sparkle-gold {
   color: #F59E0B;
 }
 
-.luxury-modal-title {
-  font-size: 1.45rem;
+.auth-brand-title {
+  font-size: 1.25rem;
   font-weight: 800;
   color: #0F172A;
-  margin: 0 0 0.4rem 0;
-  letter-spacing: -0.02em;
+  margin: 0 0 0.65rem 0;
+  line-height: 1.3;
 }
 
-.auth-subtitle {
-  font-size: 0.88rem;
+.auth-brand-desc {
+  font-size: 0.82rem;
   color: #64748B;
-  margin: 0 0 1.25rem 0;
   line-height: 1.45;
-  max-width: 440px;
+  margin: 0;
 }
 
-/* SLEEK MODE TABS CONTAINER */
-.auth-mode-tabs-container {
+.auth-left-features {
   display: flex;
-  background: #F1F5F9;
-  padding: 0.28rem;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 360px;
-  margin-top: 0.25rem;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin: 1.5rem 0;
 }
 
-.auth-mode-tab-btn {
+.auth-feature-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: #334155;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+}
+
+.feature-check {
+  color: #10B981;
+  flex-shrink: 0;
+}
+
+.auth-left-footer {
+  font-size: 0.72rem;
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+/* ==================== RIGHT PANEL ==================== */
+.auth-modal-right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #FFFFFF;
+  height: 100%;
+}
+
+/* TABS: Вход / Регистрация */
+.auth-tabs-row {
+  display: flex;
+  border-bottom: 1px solid #F1F5F9;
+  padding: 1rem 1.75rem 0 1.75rem;
+  gap: 1.5rem;
+}
+
+.auth-top-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.65rem 0.2rem;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s ease;
+}
+
+.auth-top-tab:hover {
+  color: #0F172A;
+}
+
+.auth-top-tab.active {
+  color: #4F46E5;
+  font-weight: 700;
+}
+
+.auth-top-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  background: #4F46E5;
+  border-radius: 4px 4px 0 0;
+}
+
+/* Скроллируемая область формы - СКРОЛЛБАР АККУРАТНЫЙ И НЕ ВЫПИРАЕТ */
+.auth-form-scroll-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem 1.75rem 1.75rem 1.75rem;
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 transparent;
+}
+
+.auth-form-scroll-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.auth-form-scroll-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.auth-form-scroll-body::-webkit-scrollbar-thumb {
+  background: #E2E8F0;
+  border-radius: 4px;
+}
+
+.auth-form-scroll-body::-webkit-scrollbar-thumb:hover {
+  background: #CBD5E1;
+}
+
+/* Переключатель способа входа (Логин / QR) */
+.login-method-toggle {
+  display: flex;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 0.25rem;
+  margin-bottom: 1.15rem;
+  gap: 0.25rem;
+}
+
+.method-sub-btn {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
-  padding: 0.6rem 1rem;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
   border: none;
   background: transparent;
   color: #64748B;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  border-radius: 9px;
+  border-radius: 7px;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.15s ease;
 }
 
-.auth-mode-tab-btn:hover {
-  color: #0F172A;
-}
-
-.auth-mode-tab-btn.active {
+.method-sub-btn.active {
   background: #FFFFFF;
-  color: #4F46E5;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+  color: #0F172A;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* DEMO QUICK LOGIN BANNER */
+/* ==================== QR LOGIN SECTION ==================== */
+.qr-login-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0.5rem 0.5rem 1rem 0.5rem;
+}
+
+.qr-box-wrapper {
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 0.85rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  margin-bottom: 1rem;
+}
+
+.qr-svg-graphic {
+  width: 170px;
+  height: 170px;
+  display: block;
+}
+
+.qr-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 1.25rem;
+  max-width: 320px;
+}
+
+.qr-step-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.82rem;
+  color: #475569;
+  text-align: left;
+}
+
+.qr-step-icon {
+  color: #6366F1;
+  flex-shrink: 0;
+}
+
+.qr-demo-instant-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.25rem;
+  background: #EEF2FF;
+  border: 1px solid #C7D2FE;
+  color: #4F46E5;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.qr-demo-instant-btn:hover {
+  background: #E0E7FF;
+  transform: translateY(-1px);
+}
+
+/* ==================== DEMO BANNER ==================== */
 .demo-quick-login-banner {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.07) 0%, rgba(236, 72, 153, 0.04) 100%);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(236, 72, 153, 0.03) 100%);
   border: 1px dashed rgba(99, 102, 241, 0.35);
-  border-radius: 14px;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1.15rem;
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 1rem;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .demo-quick-login-banner:hover {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(236, 72, 153, 0.08) 100%);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(236, 72, 153, 0.06) 100%);
   border-color: #6366F1;
-  transform: translateY(-1px);
 }
 
 .demo-login-badge {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 800;
   text-transform: uppercase;
   color: #FFFFFF;
-  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  letter-spacing: 0.05em;
+  background: #6366F1;
+  padding: 0.2rem 0.45rem;
+  border-radius: 5px;
+  letter-spacing: 0.04em;
   flex-shrink: 0;
 }
 
@@ -216,91 +365,45 @@
 }
 
 .demo-login-text strong {
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   color: #1E293B;
 }
 
 .demo-login-text span {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: #64748B;
 }
 
 .demo-arrow {
   color: #6366F1;
-  transition: transform 0.2s ease;
 }
 
-.demo-quick-login-banner:hover .demo-arrow {
-  transform: translateX(3px);
-}
-
-/* Error banner */
-.auth-error-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: #FEE2E2;
-  border: 1px solid #FCA5A5;
-  color: #DC2626;
-  padding: 0.65rem 0.85rem;
-  border-radius: var(--radius-md);
-  font-size: 0.84rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-}
-
-.auth-success-icon {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 3rem 1.5rem;
-  text-align: center;
-}
-
-.auth-success-icon {
-  margin-bottom: 1rem;
-  animation: pulse-live 1.5s infinite;
-}
-
-.auth-success-screen h3 {
-  font-size: 1.4rem;
-  font-weight: 800;
-  color: var(--color-text);
-  margin-bottom: 0.5rem;
-}
-
-.auth-success-screen p {
-  font-size: 0.92rem;
-  color: var(--color-text-secondary);
-}
-
-/* OAuth */
+/* ==================== OAUTH ==================== */
 .oauth-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
 }
 
 .oauth-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
-  padding: 0.65rem 1rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  border-radius: var(--radius-md);
-  font-size: 0.88rem;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  border-radius: 8px;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: var(--color-text);
+  color: #334155;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.15s ease;
 }
 
 .oauth-btn:hover {
-  background: var(--color-bg-secondary);
+  background: #F8FAFC;
   border-color: #CBD5E1;
 }
 
@@ -308,40 +411,47 @@
   display: flex;
   align-items: center;
   text-align: center;
-  margin: 1.25rem 0;
+  margin: 1rem 0;
 }
 
 .auth-divider::before,
 .auth-divider::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid #E2E8F0;
 }
 
 .auth-divider span {
-  padding: 0 0.75rem;
-  font-size: 0.75rem;
-  color: var(--color-text-tertiary);
+  padding: 0 0.65rem;
+  font-size: 0.72rem;
+  color: #94A3B8;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
+/* ==================== FORM FIELDS ==================== */
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.85rem;
+}
+
+.auth-inputs-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
 }
 
 .auth-field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .auth-field label {
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: var(--color-text);
+  color: #334155;
 }
 
 .auth-input-wrapper {
@@ -352,8 +462,8 @@
 
 .auth-input-icon {
   position: absolute;
-  left: 0.85rem;
-  color: var(--color-text-tertiary);
+  left: 0.8rem;
+  color: #94A3B8;
   pointer-events: none;
 }
 
@@ -361,45 +471,45 @@
   position: absolute;
   left: 0.85rem;
   font-weight: 700;
-  color: var(--color-accent);
-  font-size: 0.95rem;
+  color: #6366F1;
+  font-size: 0.9rem;
 }
 
 .auth-input-wrapper input {
   width: 100%;
-  padding: 0.65rem 1rem 0.65rem 2.4rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 0.88rem;
-  background: var(--color-bg-secondary);
-  color: var(--color-text);
+  padding: 0.6rem 0.85rem 0.6rem 2.3rem;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  background: #F8FAFC;
+  color: #0F172A;
   outline: none;
-  transition: all var(--transition-fast);
+  transition: all 0.15s ease;
 }
 
 .auth-input-wrapper input:focus {
   background: #FFFFFF;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+  border-color: #6366F1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
 }
 
 .auth-extras {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 
 .remember-me {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  color: var(--color-text-secondary);
+  gap: 0.35rem;
+  color: #64748B;
   cursor: pointer;
 }
 
 .forgot-link {
-  color: var(--color-accent);
+  color: #6366F1;
   text-decoration: none;
   font-weight: 600;
 }
@@ -412,22 +522,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.8rem 1.5rem;
-  background: var(--color-accent);
+  gap: 0.45rem;
+  padding: 0.75rem 1.25rem;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
   color: #FFFFFF;
   border: none;
-  border-radius: var(--radius-md);
-  font-size: 0.92rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all 0.2s ease;
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
-  margin-top: 0.5rem;
+  margin-top: 0.35rem;
 }
 
 .auth-submit-btn:hover:not(:disabled) {
-  background: var(--color-accent-hover);
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
 }
@@ -437,18 +546,18 @@
   cursor: not-allowed;
 }
 
-/* Section Step 2 */
+/* ==================== STEP 2 (RELIGIONS & ROLES) ==================== */
 .auth-section {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  margin-bottom: 0.5rem;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 
 .auth-section-title {
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   font-weight: 700;
-  color: var(--color-text);
+  color: #1E293B;
 }
 
 .belief-title-row {
@@ -460,38 +569,36 @@
 .belief-title-flex {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
 }
 
 .belief-compass-icon {
-  color: var(--color-accent);
+  color: #6366F1;
 }
 
 .belief-tag-badge {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 700;
   color: #059669;
   background: #ECFDF5;
   border: 1px solid #A7F3D0;
-  padding: 0.15rem 0.45rem;
-  border-radius: var(--radius-full);
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
 }
 
 .auth-field-hint {
-  font-size: 0.74rem;
-  color: var(--color-text-tertiary);
+  font-size: 0.72rem;
+  color: #64748B;
   margin: 0;
-  line-height: 1.35;
 }
 
-/* RELIGIONS GRID WITH SACRED GOLD ICONS */
 .religion-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 0.65rem;
-  max-height: 240px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem;
+  max-height: 210px;
   overflow-y: auto;
-  padding: 0.35rem 0.2rem;
+  padding: 0.2rem 0.2rem 0.2rem 0;
   scrollbar-width: thin;
 }
 
@@ -500,38 +607,36 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 0.65rem 0.4rem;
-  border-radius: 12px;
-  border: 1.5px solid var(--color-border);
+  padding: 0.55rem 0.35rem;
+  border-radius: 10px;
+  border: 1.5px solid #E2E8F0;
   background: #FFFFFF;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   position: relative;
 }
 
 .religion-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+  transform: translateY(-1px);
+  border-color: #CBD5E1;
 }
 
 .religion-card.selected {
   border-color: #F59E0B;
-  background: linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, rgba(99, 102, 241, 0.05) 100%);
-  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35);
+  background: #FFFBEB;
+  box-shadow: 0 0 0 1.5px rgba(245, 158, 11, 0.3);
 }
 
 .religion-symbol-frame {
   position: relative;
-  width: 54px;
-  height: 54px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: #080C1C;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.45rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  margin-bottom: 0.35rem;
   border: 1.5px solid #F59E0B;
   overflow: hidden;
 }
@@ -540,115 +645,135 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  image-rendering: -webkit-optimize-contrast;
-  transition: transform 0.2s ease;
-}
-
-.religion-card:hover .religion-symbol-img {
-  transform: scale(1.08);
 }
 
 .religion-check-dot {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: #10B981;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #FFFFFF;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.religion-text-block {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
+  border: 1.5px solid #FFFFFF;
 }
 
 .religion-card-name {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 700;
-  color: var(--color-text);
-  line-height: 1.2;
+  color: #1E293B;
+  line-height: 1.15;
 }
 
 .religion-card-symbol {
-  font-size: 0.68rem;
-  color: var(--color-text-tertiary);
+  font-size: 0.65rem;
+  color: #64748B;
   margin-top: 1px;
 }
 
 .religion-none-option {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem 0.85rem;
-  border-radius: 10px;
-  border: 1px dashed var(--color-border);
-  background: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
-  font-size: 0.78rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px dashed #CBD5E1;
+  background: #F8FAFC;
+  color: #64748B;
+  font-size: 0.75rem;
   cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.religion-none-option:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text);
 }
 
 .religion-none-option.selected {
-  border-color: var(--color-accent);
-  background: rgba(99, 102, 241, 0.08);
-  color: var(--color-accent);
+  border-color: #6366F1;
+  background: #EEF2FF;
+  color: #4F46E5;
   font-weight: 600;
+}
+
+.privacy-toggle-box {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+}
+
+.privacy-shield-icon {
+  color: #6366F1;
+  flex-shrink: 0;
+}
+
+.privacy-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.privacy-text strong {
+  font-size: 0.75rem;
+  color: #1E293B;
+}
+
+.privacy-text span {
+  font-size: 0.68rem;
+  color: #64748B;
+}
+
+.privacy-select {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  background: #FFFFFF;
+  color: #1E293B;
+  outline: none;
 }
 
 /* Role Cards Grid */
 .role-cards-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.6rem;
+  gap: 0.55rem;
 }
 
 .role-card {
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 0.75rem 0.6rem;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 0.65rem 0.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   cursor: pointer;
-  transition: all var(--transition-fast);
   background: #FFFFFF;
+  transition: all 0.15s ease;
 }
 
 .role-card:hover {
   border-color: #CBD5E1;
-  transform: translateY(-2px);
 }
 
 .role-card.active {
-  border-color: var(--color-accent);
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.02) 100%);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  border-color: #6366F1;
+  background: #EEF2FF;
 }
 
 .role-icon-box {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: rgba(99, 102, 241, 0.1);
-  color: var(--color-accent);
+  color: #6366F1;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.35rem;
 }
 
 .role-icon-box.creator {
@@ -663,76 +788,31 @@
 
 .role-info strong {
   display: block;
-  font-size: 0.8rem;
-  color: var(--color-text);
-  margin-bottom: 0.15rem;
+  font-size: 0.78rem;
+  color: #1E293B;
 }
 
 .role-info span {
-  font-size: 0.68rem;
-  color: var(--color-text-tertiary);
-  line-height: 1.25;
-  display: block;
-}
-
-/* Privacy toggle */
-.privacy-toggle-box {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 0.85rem;
-  background: #F8FAFC;
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-md);
-  margin-top: 0.25rem;
-}
-
-.privacy-shield-icon {
-  color: var(--color-accent);
-  flex-shrink: 0;
-}
-
-.privacy-text {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.privacy-text strong {
-  font-size: 0.78rem;
-  color: var(--color-text);
-}
-
-.privacy-text span {
-  font-size: 0.7rem;
-  color: var(--color-text-tertiary);
-}
-
-.privacy-select {
-  padding: 0.35rem 0.55rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  background: #FFFFFF;
-  color: var(--color-text);
-  outline: none;
+  font-size: 0.66rem;
+  color: #64748B;
+  line-height: 1.2;
 }
 
 .terms-checkbox {
   display: flex;
   align-items: flex-start;
-  gap: 0.5rem;
-  margin-top: 0.25rem;
+  gap: 0.45rem;
+  margin-top: 0.2rem;
 }
 
 .terms-checkbox input {
-  margin-top: 0.2rem;
+  margin-top: 0.15rem;
   cursor: pointer;
 }
 
 .terms-checkbox label {
-  font-size: 0.74rem;
-  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  color: #64748B;
   line-height: 1.3;
   cursor: pointer;
 }
@@ -740,53 +820,67 @@
 .auth-action-buttons {
   display: grid;
   grid-template-columns: 1fr 2fr;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
+  gap: 0.65rem;
+  margin-top: 0.4rem;
 }
 
 .auth-back-btn {
-  padding: 0.75rem;
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 0.88rem;
+  padding: 0.65rem;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 0.84rem;
   font-weight: 600;
-  color: var(--color-text);
+  color: #334155;
   cursor: pointer;
-  transition: all var(--transition-fast);
 }
 
 .auth-back-btn:hover {
-  background: var(--color-bg-tertiary);
+  background: #E2E8F0;
 }
 
-.auth-footer {
-  margin-top: 1.5rem;
-  text-align: center;
+/* ==================== SUCCESS SCREEN & ERRORS ==================== */
+.auth-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #FEE2E2;
+  border: 1px solid #FCA5A5;
+  color: #DC2626;
+  padding: 0.55rem 0.8rem;
+  border-radius: 8px;
   font-size: 0.82rem;
-  color: var(--color-text-secondary);
-  border-top: 1px solid var(--color-border-light);
-  padding-top: 1rem;
+  font-weight: 600;
+  margin: 0.85rem 1.75rem 0 1.75rem;
 }
 
-.auth-footer p {
+.auth-success-screen {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-success-icon {
+  margin-bottom: 0.85rem;
+}
+
+.auth-success-screen h3 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 0.4rem 0;
+}
+
+.auth-success-screen p {
+  font-size: 0.88rem;
+  color: #64748B;
   margin: 0;
 }
 
-.auth-toggle-btn {
-  background: none;
-  border: none;
-  color: var(--color-accent);
-  font-weight: 600;
-  cursor: pointer;
-  padding: 0;
-  font-size: 0.82rem;
-}
-
-.auth-toggle-btn:hover {
-  text-decoration: underline;
-}
-
+/* ==================== ANIMATIONS ==================== */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -795,7 +889,7 @@
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(16px) scale(0.98);
+    transform: translateY(12px) scale(0.98);
   }
   to {
     opacity: 1;
@@ -803,14 +897,27 @@
   }
 }
 
-@media (max-width: 600px) {
-  .auth-modal-card {
-    padding: 1.5rem 1.2rem;
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 768px) {
+  .auth-modal-horizontal-card {
+    flex-direction: column;
+    max-width: 480px;
+    max-height: 92vh;
   }
+
+  .auth-modal-left-panel {
+    display: none;
+  }
+
+  .religion-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .role-cards-grid {
     grid-template-columns: 1fr;
   }
-  .religion-cards-grid {
-    grid-template-columns: repeat(2, 1fr);
+
+  .auth-inputs-grid-2 {
+    grid-template-columns: 1fr;
   }
 }
