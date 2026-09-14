@@ -429,19 +429,21 @@ export function Header() {
           <span className="btn-text">Конференция</span>
         </button>
 
-        {/* AI Guru Quick Trigger */}
+        {/* Cosmic AI Oracle / AI Guru Trigger */}
         <button
           className="header-action-btn ai-guru-quick-btn"
           onClick={() => navigate('/spiritual/livezen')}
-          style={{
-            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(99, 102, 241, 0.25))',
-            borderColor: 'rgba(168, 85, 247, 0.4)',
-            color: '#c084fc'
-          }}
-          title="ИИ-Духовный Наставник & Live Zen"
+          title="Спросить ИИ-Оракула и Наставника Live Zen"
         >
-          <Bot size={17} />
-          <span className="btn-text">ИИ-Гуру</span>
+          <div className="ai-guru-btn-glow" />
+          <div className="ai-guru-icon-box">
+            <Sparkles size={14} className="ai-guru-sparkle" />
+            <Bot size={16} className="ai-guru-bot" />
+          </div>
+          <div className="ai-guru-text-wrapper">
+            <span className="ai-guru-title">ИИ Оракул</span>
+            <span className="ai-guru-badge-pulse">LIVE ZEN</span>
+          </div>
         </button>
 
         {/* Language Switcher Dropdown */}
