@@ -7,6 +7,19 @@
   --color-bg-hover: #F8FAFC;
   --color-bg-active: #EEF2F6;
 
+  /* Совместимость со старыми переменными */
+  --bg-main: var(--color-bg);
+  --bg-card: var(--color-bg-card);
+  --bg-secondary: var(--color-bg-secondary);
+  --bg-tertiary: var(--color-bg-tertiary);
+  --border-color: var(--color-border);
+  --border-light: var(--color-border-light);
+  --text-main: var(--color-text);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-tertiary);
+  --primary: var(--color-accent);
+  --primary-hover: var(--color-accent-hover);
+
   /* Акценты (Премиальный индиго / ультрамарин с градиентами) */
   --color-accent: #6366F1;
   --color-accent-hover: #4F46E5;
@@ -67,6 +80,19 @@
   --color-bg-hover: #1E293B;
   --color-bg-active: #26334D;
 
+  /* Совместимость со старыми переменными */
+  --bg-main: var(--color-bg);
+  --bg-card: var(--color-bg-card);
+  --bg-secondary: var(--color-bg-secondary);
+  --bg-tertiary: var(--color-bg-tertiary);
+  --border-color: var(--color-border);
+  --border-light: var(--color-border-light);
+  --text-main: var(--color-text);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-tertiary);
+  --primary: var(--color-accent);
+  --primary-hover: var(--color-accent-hover);
+
   /* Акценты */
   --color-accent: #818CF8;
   --color-accent-hover: #6366F1;
@@ -96,4 +122,115 @@
   --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 12px 28px -4px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 20px 36px -6px rgba(0, 0, 0, 0.6);
+}
+
+/* ========================================================================= */
+/* ГЛОБАЛЬНЫЕ СТИЛИ ДЛЯ ТЁМНОЙ ТЕМЫ (ОБЕСПЕЧЕНИЕ 100% ПОКРЫТИЯ)             */
+/* ========================================================================= */
+[data-theme="dark"] body {
+  background: var(--color-bg) !important;
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .spiritual-tabs-bar,
+[data-theme="dark"] .meditation-timer-card,
+[data-theme="dark"] .meditation-tracks-column,
+[data-theme="dark"] .yoga-intro-box,
+[data-theme="dark"] .routine-card,
+[data-theme="dark"] .wisdom-quote-hero,
+[data-theme="dark"] .wisdom-book-card,
+[data-theme="dark"] .affirm-custom-creator,
+[data-theme="dark"] .affirm-deck-card,
+[data-theme="dark"] .breathing-pattern-card,
+[data-theme="dark"] .breathing-visual-container,
+[data-theme="dark"] .sound-track-row,
+[data-theme="dark"] .course-commercial-card,
+[data-theme="dark"] .create-course-modal,
+[data-theme="dark"] .profile-header-card,
+[data-theme="dark"] .market-card,
+[data-theme="dark"] .community-card,
+[data-theme="dark"] .kpi-card,
+[data-theme="dark"] .breakdown-card,
+[data-theme="dark"] .mod-card,
+[data-theme="dark"] .channel-card,
+[data-theme="dark"] .video-card-item,
+[data-theme="dark"] .podcast-channel-card,
+[data-theme="dark"] .service-card-item,
+[data-theme="dark"] .auth-modal-box {
+  background: var(--color-bg-card) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .track-card,
+[data-theme="dark"] .sound-opt-btn,
+[data-theme="dark"] .p-item,
+[data-theme="dark"] .user-profile-card,
+[data-theme="dark"] .cat-pill-btn,
+[data-theme="dark"] .market-sort-box,
+[data-theme="dark"] .timer-reset-btn {
+  background: var(--color-bg-secondary) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .sound-opt-btn.active,
+[data-theme="dark"] .track-card:hover {
+  background: var(--color-bg-hover) !important;
+  border-color: var(--color-accent) !important;
+}
+
+[data-theme="dark"] .section-card-title,
+[data-theme="dark"] .box-title,
+[data-theme="dark"] .rec-name,
+[data-theme="dark"] .feed-my-name,
+[data-theme="dark"] .hero-stat-item strong,
+[data-theme="dark"] .profile-fullname,
+[data-theme="dark"] .card-handle,
+[data-theme="dark"] .name-row h3 {
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .section-desc,
+[data-theme="dark"] .rec-handle,
+[data-theme="dark"] .feed-my-handle,
+[data-theme="dark"] .hero-stat-item span,
+[data-theme="dark"] .profile-bio,
+[data-theme="dark"] .spiritual-tab-btn {
+  color: var(--color-text-secondary) !important;
+}
+
+[data-theme="dark"] .spiritual-tab-btn:hover {
+  background: var(--color-bg-hover) !important;
+  color: var(--color-accent) !important;
+}
+
+[data-theme="dark"] .spiritual-tab-btn.active {
+  background: var(--gradient-primary) !important;
+  color: #FFFFFF !important;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background: var(--color-bg-secondary) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+  border-color: var(--color-accent) !important;
+  background: var(--color-bg-card) !important;
+}
+
+[data-theme="dark"] .meta-belief {
+  background: var(--color-bg-card) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+[data-theme="dark"] .card-avatar,
+[data-theme="dark"] .profile-main-avatar {
+  border-color: var(--color-bg-card) !important;
 }
