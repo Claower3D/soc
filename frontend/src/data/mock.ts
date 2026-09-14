@@ -144,6 +144,9 @@ export interface Story {
   user: User;
   viewed: boolean;
   image?: string;
+  gradient?: string;
+  text?: string;
+  textPosition?: 'center' | 'bottom' | 'top';
   timestamp?: string;
 }
 

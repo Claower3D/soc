@@ -57,8 +57,11 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       id: `story_${Date.now()}`,
       user: currentUser,
       viewed: false,
-      image: selectedImage || undefined,
-      timestamp: 'РўРѕР»СЊРєРѕ С‡С‚Рѕ',
+      image: selectedGradient ? undefined : selectedImage,
+      gradient: selectedGradient || undefined,
+      text: storyText.trim() || undefined,
+      textPosition,
+      timestamp: 'Только что',
     };
 
     onCreateStory(newStory);
@@ -82,7 +85,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
         <div className="create-story-header">
           <div className="create-story-title-row">
             <Camera size={20} className="story-header-icon" />
-            <h3>РќРѕРІР°СЏ РёСЃС‚РѕСЂРёСЏ</h3>
+            <h3>Новая история</h3>
           </div>
           <button className="create-story-close-btn" onClick={onClose}>
             <X size={20} />
@@ -103,7 +106,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                 <img src={currentUser.avatar} alt={currentUser.name} className="story-author-avatar" />
                 <div className="story-author-text">
                   <span className="story-author-name">{currentUser.name}</span>
-                  <span className="story-author-tag">Р’Р°С€Р° РёСЃС‚РѕСЂРёСЏ</span>
+                  <span className="story-author-tag">Ваша история</span>
                 </div>
               </div>
             </div>
@@ -120,26 +123,26 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
           <div className="create-story-controls">
             {/* Upload Custom Photo Button */}
             <div className="control-group">
-              <label className="control-group-title">Р¤РѕС‚РѕРіСЂР°С„РёСЏ РёСЃС‚РѕСЂРёРё</label>
+              <label className="control-group-title">Фотография истории</label>
               <button 
                 type="button" 
                 className="upload-story-btn" 
                 onClick={() => fileInputRef.current?.click()}
               >
                 <ImageIcon size={18} />
-                <span>Р—Р°РіСЂСѓР·РёС‚СЊ СЃ СѓСЃС‚СЂРѕР№СЃС‚РІР°</span>
+                <span>Загрузить с устройства</span>
               </button>
             </div>
 
             {/* Presets Gallery */}
             <div className="control-group">
-              <label className="control-group-title">РР»Рё РІС‹Р±РµСЂРёС‚Рµ С„РѕРЅ:</label>
+              <label className="control-group-title">Или выберите фон:</label>
               <div className="story-presets-grid">
                 {STORY_PRESETS.map((preset, idx) => (
                   <button
                     key={idx}
                     type="button"
-                    className={`preset-thumb ${selectedImage === preset && !selectedGradient ? "active" : ""}`}
+                    className={`preset-thumb ${selectedImage === preset && !selectedGradient ? 'active' : ''}`}
                     onClick={() => {
                       setSelectedImage(preset);
                       setSelectedGradient(null);
@@ -156,13 +159,13 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
 
             {/* Color Gradients */}
             <div className="control-group">
-              <label className="control-group-title">Р“СЂР°РґРёРµРЅС‚РЅС‹Рµ С„РѕРЅС‹:</label>
+              <label className="control-group-title">Градиентные фоны:</label>
               <div className="gradient-presets-row">
                 {GRADIENT_PRESETS.map((grad, idx) => (
                   <button
                     key={idx}
                     type="button"
-                    className={`grad-circle ${selectedGradient === grad ? "active" : ""}`}
+                    className={`grad-circle ${selectedGradient === grad ? 'active' : ''}`}
                     style={{ background: grad }}
                     onClick={() => setSelectedGradient(grad)}
                   />
@@ -174,37 +177,37 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
             <div className="control-group">
               <div className="text-header-row">
                 <label className="control-group-title">
-                  <Type size={14} /> РўРµРєСЃС‚ РЅР° РёСЃС‚РѕСЂРёРё
+                  <Type size={14} /> Текст на истории
                 </label>
                 <div className="pos-buttons">
                   <button 
                     type="button" 
-                    className={`pos-btn ${textPosition === "top" ? "active" : ""}`}
+                    className={`pos-btn ${textPosition === 'top' ? 'active' : ''}`}
                     onClick={() => setTextPosition('top')}
-                    title="РЎРІРµСЂС…Сѓ"
+                    title="Сверху"
                   >
-                    Р’РІРµСЂС…
+                    Вверх
                   </button>
                   <button 
                     type="button" 
-                    className={`pos-btn ${textPosition === "center" ? "active" : ""}`}
+                    className={`pos-btn ${textPosition === 'center' ? 'active' : ''}`}
                     onClick={() => setTextPosition('center')}
-                    title="РџРѕ С†РµРЅС‚СЂСѓ"
+                    title="По центру"
                   >
-                    Р¦РµРЅС‚СЂ
+                    Центр
                   </button>
                   <button 
                     type="button" 
-                    className={`pos-btn ${textPosition === "bottom" ? "active" : ""}`}
+                    className={`pos-btn ${textPosition === 'bottom' ? 'active' : ''}`}
                     onClick={() => setTextPosition('bottom')}
-                    title="Р’РЅРёР·Сѓ"
+                    title="Внизу"
                   >
-                    РќРёР·
+                    Низ
                   </button>
                 </div>
               </div>
               <textarea
-                placeholder="Р”РѕР±Р°РІСЊС‚Рµ РїРѕРґРїРёСЃСЊ, СЃС‚РёРєРµСЂ РёР»Рё РјС‹СЃР»СЊ Рє РёСЃС‚РѕСЂРёРё..."
+                placeholder="Добавьте подпись, стикер или мысль к истории..."
                 value={storyText}
                 onChange={e => setStoryText(e.target.value)}
                 maxLength={140}
@@ -217,14 +220,14 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
             {/* Action Buttons */}
             <div className="story-actions-footer">
               <button type="button" className="btn-cancel-story" onClick={onClose}>
-                РћС‚РјРµРЅР°
+                Отмена
               </button>
               <button 
                 type="button" 
                 className="btn-publish-story"
                 onClick={handlePublish}
               >
-                <Sparkles size={16} /> РћРїСѓР±Р»РёРєРѕРІР°С‚СЊ РёСЃС‚РѕСЂРёСЋ
+                <Sparkles size={16} /> Опубликовать историю
               </button>
             </div>
           </div>
