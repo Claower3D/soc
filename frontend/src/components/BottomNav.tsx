@@ -1,5 +1,5 @@
-import { NavLink } from 'react-router-dom';
-import { Home, Video, MessageCircle, PhoneCall, Headphones, User } from 'lucide-react';
+﻿import { NavLink } from 'react-router-dom';
+import { Home, Video, MessageCircle, Layers, User } from 'lucide-react';
 import './BottomNav.css';
 
 export function BottomNav() {
@@ -20,14 +20,9 @@ export function BottomNav() {
         <span className="bottom-nav-label">Чат</span>
       </NavLink>
 
-      <NavLink to="/conferences" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-        <PhoneCall className="bottom-nav-icon" size={20} />
-        <span className="bottom-nav-label">Конференции</span>
-      </NavLink>
-
-      <NavLink to="/podcasts" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-        <Headphones className="bottom-nav-icon" size={20} />
-        <span className="bottom-nav-label">Подкасты</span>
+      <NavLink to="/services" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
+        <Layers className="bottom-nav-icon" size={20} />
+        <span className="bottom-nav-label">Сервисы</span>
       </NavLink>
 
       <NavLink to="/profile/me" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>

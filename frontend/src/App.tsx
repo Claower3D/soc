@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+﻿import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { BottomNav } from './components/BottomNav';
 import { Header } from './components/Header';
@@ -9,6 +9,7 @@ import { ConferencesPage } from './pages/CallsPage';
 import { PodcastsPage } from './pages/PodcastsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { ChannelPage } from './pages/ChannelPage';
+import { ServicesPage } from './pages/ServicesPage';
 import { MarketplacePage } from './pages/MarketplacePage';
 import { CommunitiesPage } from './pages/CommunitiesPage';
 import { CommunityDetailPage } from './pages/CommunityDetailPage';
@@ -35,6 +36,7 @@ function App() {
               <Route path="/conferences" element={<ConferencesPage />} />
               <Route path="/calls" element={<Navigate to="/conferences" replace />} />
               <Route path="/podcasts" element={<PodcastsPage />} />
+              <Route path="/services" element={<ServicesPage />} />
               <Route path="/marketplace" element={<MarketplacePage />} />
               <Route path="/communities" element={<CommunitiesPage />} />
               <Route path="/community/:id" element={<CommunityDetailPage />} />
