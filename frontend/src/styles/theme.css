@@ -168,6 +168,7 @@
 [data-theme="dark"] .editor-side-tools-column,
 [data-theme="dark"] .editor-timeline-section,
 [data-theme="dark"] .export-modal-box,
+[data-theme="dark"] .legal-modal-card,
 [data-theme="dark"] .auth-modal-box {
   background: var(--color-bg-card) !important;
   border-color: var(--color-border) !important;

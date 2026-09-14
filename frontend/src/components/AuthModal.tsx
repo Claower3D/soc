@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { RELIGIONS_CATALOG, type UserRole, type BeliefPrivacy } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { LegalModal } from './LegalModal';
 import logoImg from '../assets/logo.png';
 import './AuthModal.css';
 
@@ -35,6 +36,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [agreedToTerms, setAgreedToTerms] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loginSuccessMessage, setLoginSuccessMessage] = useState(false);
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalTab, setLegalTab] = useState<'privacy' | 'terms'>('privacy');
 
   if (!isOpen) return null;
 
@@ -424,6 +427,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           </div>
                         </div>
 
+                        <div className="register-legal-notice">
+                          <span>
+                            Продолжая, вы соглашаетесь с{' '}
+                            <button 
+                              type="button" 
+                              className="legal-link-btn"
+                              onClick={() => { setLegalTab('terms'); setLegalModalOpen(true); }}
+                            >
+                              Правилами сообщества
+                            </button>{' '}
+                            и{' '}
+                            <button 
+                              type="button" 
+                              className="legal-link-btn"
+                              onClick={() => { setLegalTab('privacy'); setLegalModalOpen(true); }}
+                            >
+                              Политикой конфиденциальности
+                            </button>
+                          </span>
+                        </div>
+
                         <button type="submit" className="auth-submit-btn">
                           Продолжить к выбору веры и роли <ArrowRight size={18} />
                         </button>
@@ -559,7 +583,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             onChange={e => setAgreedToTerms(e.target.checked)} 
                           />
                           <label htmlFor="terms">
-                            Я согласен с правилами сообщества New Age и политикой конфиденциальности
+                            Я согласен с{' '}
+                            <button
+                              type="button"
+                              className="legal-link-btn"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setLegalTab('terms');
+                                setLegalModalOpen(true);
+                              }}
+                            >
+                              правилами сообщества New Age
+                            </button>{' '}
+                            и{' '}
+                            <button
+                              type="button"
+                              className="legal-link-btn"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setLegalTab('privacy');
+                                setLegalModalOpen(true);
+                              }}
+                            >
+                              политикой конфиденциальности (GDPR/ФЗ-152)
+                            </button>
                           </label>
                         </div>
 
@@ -580,6 +629,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Модальное окно политики конфиденциальности и правил */}
+      <LegalModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialTab={legalTab}
+      />
     </div>
   );
 };

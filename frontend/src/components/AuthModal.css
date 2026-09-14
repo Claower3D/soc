@@ -518,6 +518,13 @@
   text-decoration: underline;
 }
 
+.register-legal-notice {
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin: 0.2rem 0 0.5rem 0;
+}
+
 .auth-submit-btn {
   display: flex;
   align-items: center;
