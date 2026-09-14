@@ -18,14 +18,18 @@ import { WalletPage } from './pages/WalletPage';
 import { AdminPage } from './pages/AdminPage';
 import { SpiritualPage } from './pages/SpiritualPage';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
 import './styles/theme.css';
 import './App.css';
 
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <div className="app-layout">
+      <ThemeProvider>
+        <NotificationProvider>
+          <AuthProvider>
+            <div className="app-layout">
         <Sidebar />
         <div className="app-main-area">
           <Header />
@@ -54,11 +58,13 @@ function App() {
             </Routes>
           </main>
         </div>
-        <BottomNav />
-      </div>
-    </AuthProvider>
-  </BrowserRouter>
-  );
-}
+          <BottomNav />
+        </div>
+            </AuthProvider>
+          </NotificationProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    );
+  }
 
 export default App;

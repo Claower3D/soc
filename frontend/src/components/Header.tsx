@@ -1,17 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Video, Headphones, MessageCircle, User as UserIcon, Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, Users, Film, LogIn } from 'lucide-react';
+import { 
+  Search, X, Video, Headphones, MessageCircle, User as UserIcon, 
+  Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
+  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing
+} from 'lucide-react';
 import { initialUsers, posts, videos, podcasts, type User } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationContext';
 import { AuthModal } from './AuthModal';
 import './Header.css';
 
 export function Header() {
   const { currentUser, isAuthenticated } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const { preferences, updatePreferences, triggerTestPush, requestDesktopPermission, browserPermission } = useNotifications();
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'users' | 'videos' | 'podcasts' | 'posts'>('all');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifTab, setNotifTab] = useState<'alerts' | 'push_settings'>('alerts');
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
@@ -358,6 +367,15 @@ export function Header() {
           <span className="btn-text">Конференция</span>
         </button>
 
+        {/* Theme Toggle Button (Day / Night mode) */}
+        <button
+          className="header-icon-btn theme-toggle-btn"
+          onClick={toggleTheme}
+          title={theme === 'dark' ? "Переключить на дневную тему" : "Переключить на ночную тему (Zen Night)"}
+        >
+          {theme === 'dark' ? <Sun size={19} className="theme-sun-icon" /> : <Moon size={19} className="theme-moon-icon" />}
+        </button>
+
         {/* Auth / Profile Area */}
         {isAuthenticated ? (
           <>
@@ -365,7 +383,7 @@ export function Header() {
               <button
                 className={`header-icon-btn ${notificationsOpen ? 'active' : ''}`}
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                title="Уведомления"
+                title="Уведомления и Push-напоминания"
               >
                 <Bell size={20} />
                 <span className="notification-badge" />
@@ -374,32 +392,132 @@ export function Header() {
               {notificationsOpen && (
                 <div className="notifications-popover">
                   <div className="notifications-header">
-                    <h3>Уведомления</h3>
-                    <span className="notifications-mark-read"><Check size={14} /> Все прочитаны</span>
+                    <div className="notif-popover-tabs">
+                      <button 
+                        className={`notif-tab-btn ${notifTab === 'alerts' ? 'active' : ''}`}
+                        onClick={() => setNotifTab('alerts')}
+                      >
+                        События
+                      </button>
+                      <button 
+                        className={`notif-tab-btn ${notifTab === 'push_settings' ? 'active' : ''}`}
+                        onClick={() => setNotifTab('push_settings')}
+                      >
+                        Push-напоминания
+                      </button>
+                    </div>
+                    {notifTab === 'alerts' && (
+                      <span className="notifications-mark-read"><Check size={14} /> Прочитано</span>
+                    )}
                   </div>
-                  <div className="notifications-list">
-                    <div className="notification-item unread">
-                      <img src={initialUsers[1].avatar} alt="Алиса" />
-                      <div className="notif-content">
-                        <p><strong>Алиса Иванова</strong> оценила вашу публикацию</p>
-                        <span className="notif-time">5 минут назад</span>
+
+                  {notifTab === 'alerts' ? (
+                    <div className="notifications-list">
+                      <div className="notification-item unread">
+                        <img src={initialUsers[1].avatar} alt="Алиса" />
+                        <div className="notif-content">
+                          <p><strong>Алиса Иванова</strong> оценила вашу публикацию</p>
+                          <span className="notif-time">5 минут назад</span>
+                        </div>
+                      </div>
+                      <div className="notification-item unread">
+                        <img src={initialUsers[2].avatar} alt="Максим" />
+                        <div className="notif-content">
+                          <p><strong>Максим Петров</strong> пригласил вас в <strong>Конференцию</strong></p>
+                          <span className="notif-time">12 минут назад</span>
+                        </div>
+                      </div>
+                      <div className="notification-item">
+                        <img src={initialUsers[3].avatar} alt="Екатерина" />
+                        <div className="notif-content">
+                          <p><strong>Екатерина Смирнова</strong> подписалась на ваши обновления</p>
+                          <span className="notif-time">1 час назад</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="notification-item unread">
-                      <img src={initialUsers[2].avatar} alt="Максим" />
-                      <div className="notif-content">
-                        <p><strong>Максим Петров</strong> пригласил вас в <strong>Конференцию</strong></p>
-                        <span className="notif-time">12 минут назад</span>
+                  ) : (
+                    <div className="push-settings-panel">
+                      <div className="push-settings-intro">
+                        <BellRing size={16} className="intro-bell-icon" />
+                        <span>Умные уведомления о практиках и состояниях</span>
+                      </div>
+
+                      {browserPermission !== 'granted' && (
+                        <button 
+                          className="enable-browser-push-btn"
+                          onClick={requestDesktopPermission}
+                        >
+                          <Bell size={14} />
+                          <span>Включить Push в браузере</span>
+                        </button>
+                      )}
+
+                      <div className="push-toggles-list">
+                        <label className="push-toggle-row">
+                          <div className="toggle-text">
+                            <Sparkles size={16} className="text-amber" />
+                            <div>
+                              <strong>Утренняя аффирмация</strong>
+                              <span>Ежедневный фокус и настрой (09:00)</span>
+                            </div>
+                          </div>
+                          <input 
+                            type="checkbox" 
+                            checked={preferences.morningAffirmation}
+                            onChange={e => updatePreferences({ morningAffirmation: e.target.checked })}
+                            className="push-switch-input"
+                          />
+                        </label>
+
+                        <label className="push-toggle-row">
+                          <div className="toggle-text">
+                            <Wind size={16} className="text-cyan" />
+                            <div>
+                              <strong>Дневной антистресс</strong>
+                              <span>Пауза на дыхание 4-7-8 (14:00)</span>
+                            </div>
+                          </div>
+                          <input 
+                            type="checkbox" 
+                            checked={preferences.afternoonBreathing}
+                            onChange={e => updatePreferences({ afternoonBreathing: e.target.checked })}
+                            className="push-switch-input"
+                          />
+                        </label>
+
+                        <label className="push-toggle-row">
+                          <div className="toggle-text">
+                            <Heart size={16} className="text-pink" />
+                            <div>
+                              <strong>Вечерняя благодарность</strong>
+                              <span>Запись в дневник осознанности (21:30)</span>
+                            </div>
+                          </div>
+                          <input 
+                            type="checkbox" 
+                            checked={preferences.eveningGratitude}
+                            onChange={e => updatePreferences({ eveningGratitude: e.target.checked })}
+                            className="push-switch-input"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="push-test-buttons-row">
+                        <button 
+                          className="test-push-btn"
+                          onClick={() => triggerTestPush('affirmation')}
+                        >
+                          <span>Тест: Аффирмация</span>
+                        </button>
+                        <button 
+                          className="test-push-btn"
+                          onClick={() => triggerTestPush('breathing')}
+                        >
+                          <span>Тест: Дыхание</span>
+                        </button>
                       </div>
                     </div>
-                    <div className="notification-item">
-                      <img src={initialUsers[3].avatar} alt="Екатерина" />
-                      <div className="notif-content">
-                        <p><strong>Екатерина Смирнова</strong> подписалась на ваши обновления</p>
-                        <span className="notif-time">1 час назад</span>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>

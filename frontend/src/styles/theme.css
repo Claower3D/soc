@@ -57,3 +57,43 @@
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+[data-theme="dark"] {
+  /* Основные фоны (Глубокий космический тёмный стиль New Age) */
+  --color-bg: #0B0F19;
+  --color-bg-secondary: #111827;
+  --color-bg-tertiary: #1E293B;
+  --color-bg-card: #151D30;
+  --color-bg-hover: #1E293B;
+  --color-bg-active: #26334D;
+
+  /* Акценты */
+  --color-accent: #818CF8;
+  --color-accent-hover: #6366F1;
+  --color-accent-light: rgba(99, 102, 241, 0.2);
+  --color-accent-subtle: rgba(99, 102, 241, 0.3);
+  --gradient-glass: linear-gradient(180deg, rgba(21, 29, 48, 0.95) 0%, rgba(15, 23, 42, 0.85) 100%);
+
+  /* Статусы */
+  --color-danger-light: rgba(239, 68, 68, 0.2);
+  --color-success-light: rgba(16, 185, 129, 0.2);
+  --color-warning-light: rgba(245, 158, 11, 0.2);
+
+  /* Текст */
+  --color-text: #F8FAFC;
+  --color-text-secondary: #94A3B8;
+  --color-text-tertiary: #64748B;
+  --color-text-inverse: #0F172A;
+
+  /* Границы и разделители */
+  --color-border: #232E48;
+  --color-border-light: #1A2338;
+  --color-border-focus: #818CF8;
+
+  /* Тени для тёмного режима */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 28px -4px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 36px -6px rgba(0, 0, 0, 0.6);
+}

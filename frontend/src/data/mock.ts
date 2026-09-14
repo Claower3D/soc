@@ -1,6 +1,6 @@
 // ==================== ТИПЫ ====================
 
-export type UserRole = 'user' | 'creator' | 'business' | 'admin';
+export type UserRole = 'user' | 'creator' | 'business' | 'admin' | 'expert' | 'critic';
 export type BeliefPrivacy = 'public' | 'followers' | 'private';
 
 export interface ReligionItem {
