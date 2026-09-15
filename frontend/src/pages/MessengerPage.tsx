@@ -25,6 +25,10 @@ export function MessengerPage() {
     }
   };
 
+  const handleUpdateChat = (chatId: string, updates: Partial<Chat>) => {
+    setChatList(prev => prev.map(c => c.id === chatId ? { ...c, ...updates } : c));
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="messenger-guest-lock-container">
@@ -47,6 +51,7 @@ export function MessengerPage() {
           onSelectChat={setActiveChatId}
           onDeleteChat={handleDeleteChat}
           onCreateGroup={handleCreateGroup}
+          onUpdateChat={handleUpdateChat}
         />
       </div>
       <div className={`messenger-chat ${!activeChatId ? 'hide-mobile' : ''}`}>
@@ -54,6 +59,7 @@ export function MessengerPage() {
           chat={activeChat} 
           onBack={() => setActiveChatId(null)} 
           onDeleteChat={handleDeleteChat}
+          onUpdateChat={handleUpdateChat}
         />
       </div>
     </div>

@@ -1779,3 +1779,99 @@
   color: #ec4899;
   background: rgba(236, 72, 153, 0.12);
 }
+
+/* ==================== THEME CUSTOMIZATION MODAL ==================== */
+.tg-theme-modal-box {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  width: 90%;
+  max-width: 520px;
+  overflow: hidden;
+  animation: scaleUp 0.15s ease;
+}
+
+.theme-modal-body {
+  padding: 1.25rem;
+}
+
+.theme-modal-desc {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 1rem;
+}
+
+.themes-grid-picker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.85rem;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.theme-card-option {
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--color-bg-secondary);
+  transition: all 0.2s ease;
+}
+
+.theme-card-option:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-accent);
+}
+
+.theme-card-option.selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-subtle);
+}
+
+.theme-card-preview {
+  height: 95px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+}
+
+.preview-bubble {
+  padding: 4px 8px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+  width: fit-content;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.preview-bubble.mock-them {
+  align-self: flex-start;
+  border-bottom-left-radius: 2px;
+}
+
+.preview-bubble.mock-me {
+  align-self: flex-end;
+  border-bottom-right-radius: 2px;
+}
+
+.theme-card-footer {
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-bg-card);
+  border-top: 1px solid var(--color-border);
+}
+
+.theme-card-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.theme-checked-icon {
+  color: var(--color-accent);
+}

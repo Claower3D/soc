@@ -6,14 +6,69 @@
 }
 
 .chat-list-header {
-  padding: 0.85rem 1rem;
+  padding: 0.75rem 1rem 0.5rem 1rem;
   border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
 .chat-list-header-top {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+/* Tabs Bar */
+.chat-list-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow-x: auto;
+}
+
+.chat-tab-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 0.3rem 0.75rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.chat-tab-pill:hover {
+  color: var(--color-text);
+  background: var(--color-bg-tertiary);
+}
+
+.chat-tab-pill.active {
+  background: var(--color-accent);
+  color: #FFFFFF;
+  border-color: var(--color-accent);
+}
+
+.tab-counter-badge {
+  font-size: 0.68rem;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.25);
+  font-weight: 700;
+}
+
+.chat-tab-pill:not(.active) .tab-counter-badge {
+  background: var(--color-border);
+  color: var(--color-text-tertiary);
+}
+
+.unlocked-icon {
+  color: #10B981;
 }
 
 .search-bar {
@@ -190,6 +245,171 @@
 .chat-delete-quick-btn:hover {
   background: var(--color-danger-light);
   color: var(--color-danger);
+}
+
+.chat-action-quick-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  transition: all var(--transition-fast);
+}
+
+.chat-item:hover .chat-action-quick-btn {
+  display: flex;
+}
+
+.chat-action-quick-btn:hover {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.chat-action-quick-btn.locked-active {
+  color: var(--color-danger);
+}
+
+.archive-tag-inline {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.locked-badge-circle {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: var(--color-danger);
+  color: white;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--color-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-tab-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 2rem 1rem;
+}
+
+/* PIN Entry Modal & Numpad */
+.tg-pin-modal-box {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  width: 100%;
+  max-width: 340px;
+  padding: 1.75rem 1.5rem;
+  text-align: center;
+  animation: scaleUp 0.15s ease;
+}
+
+.pin-modal-icon-badge {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem auto;
+}
+
+.pin-modal-desc {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  margin-bottom: 1.25rem;
+}
+
+.pin-dots-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+
+.pin-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.pin-dot.filled {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  transform: scale(1.15);
+}
+
+.pin-dots-row.error .pin-dot {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.pin-error-text {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--color-danger);
+  font-weight: 600;
+  margin-bottom: 0.85rem;
+}
+
+.pin-numpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  max-width: 220px;
+  margin: 0 auto 1.25rem auto;
+}
+
+.numpad-btn {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 1.15rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.numpad-btn:hover {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+  transform: scale(1.06);
+}
+
+.numpad-btn.action {
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+}
+
+.pin-modal-cancel {
+  display: flex;
+  justify-content: center;
 }
 
 .chat-preview {

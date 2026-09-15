@@ -299,6 +299,87 @@ export interface Message {
   };
 }
 
+export interface ChatTheme {
+  id: string;
+  name: string;
+  previewBg: string;
+  background: string;
+  bubbleMeBg?: string;
+  bubbleMeColor?: string;
+  bubbleThemBg?: string;
+  bubbleThemColor?: string;
+  accentColor?: string;
+}
+
+export const CHAT_THEMES: ChatTheme[] = [
+  {
+    id: 'default',
+    name: 'Классическая',
+    previewBg: '#F8FAFC',
+    background: 'var(--color-bg)',
+    bubbleMeBg: '#6366F1',
+    bubbleMeColor: '#FFFFFF',
+    bubbleThemBg: 'var(--color-bg-card)',
+    bubbleThemColor: 'var(--color-text)',
+    accentColor: '#6366F1'
+  },
+  {
+    id: 'space',
+    name: 'Космический Zen',
+    previewBg: 'linear-gradient(135deg, #0F172A 0%, #1E1B4B 100%)',
+    background: 'linear-gradient(160deg, #0b0f19 0%, #17153b 50%, #0d1117 100%)',
+    bubbleMeBg: 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)',
+    bubbleMeColor: '#FFFFFF',
+    bubbleThemBg: 'rgba(30, 41, 59, 0.75)',
+    bubbleThemColor: '#F1F5F9',
+    accentColor: '#8B5CF6'
+  },
+  {
+    id: 'cyberpunk',
+    name: 'Неон & Киберпанк',
+    previewBg: 'linear-gradient(135deg, #18052B 0%, #3B0764 100%)',
+    background: 'linear-gradient(150deg, #10001f 0%, #290838 50%, #080010 100%)',
+    bubbleMeBg: 'linear-gradient(135deg, #EC4899 0%, #A855F7 100%)',
+    bubbleMeColor: '#FFFFFF',
+    bubbleThemBg: 'rgba(59, 7, 100, 0.55)',
+    bubbleThemColor: '#FDF4FF',
+    accentColor: '#EC4899'
+  },
+  {
+    id: 'emerald',
+    name: 'Изумрудный Оазис',
+    previewBg: 'linear-gradient(135deg, #022C22 0%, #064E3B 100%)',
+    background: 'linear-gradient(150deg, #021a14 0%, #063d2e 50%, #021b14 100%)',
+    bubbleMeBg: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+    bubbleMeColor: '#FFFFFF',
+    bubbleThemBg: 'rgba(6, 78, 59, 0.45)',
+    bubbleThemColor: '#ECFDF5',
+    accentColor: '#10B981'
+  },
+  {
+    id: 'sunset',
+    name: 'Солнечный Закат',
+    previewBg: 'linear-gradient(135deg, #431407 0%, #7C2D12 100%)',
+    background: 'linear-gradient(150deg, #1f0802 0%, #4a1908 50%, #1c0602 100%)',
+    bubbleMeBg: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
+    bubbleMeColor: '#FFFFFF',
+    bubbleThemBg: 'rgba(124, 45, 18, 0.45)',
+    bubbleThemColor: '#FFF7ED',
+    accentColor: '#F97316'
+  },
+  {
+    id: 'minimal_dark',
+    name: 'Темный Минимализм',
+    previewBg: '#1E293B',
+    background: '#0F172A',
+    bubbleMeBg: '#334155',
+    bubbleMeColor: '#FFFFFF',
+    bubbleThemBg: '#1E293B',
+    bubbleThemColor: '#E2E8F0',
+    accentColor: '#94A3B8'
+  }
+];
+
 export interface Chat {
   id: string;
   user: User; // For 1-on-1 or group creator
@@ -313,6 +394,10 @@ export interface Chat {
   conferenceId?: string;
   isPinned?: boolean;
   isSystem?: boolean;
+  isArchived?: boolean;
+  isLocked?: boolean;
+  pinCode?: string;
+  customTheme?: ChatTheme;
 }
 
 export interface Conference {

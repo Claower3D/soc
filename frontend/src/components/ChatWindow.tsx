@@ -6,11 +6,12 @@ import {
   Image as ImageIcon, Video as VideoIcon, 
   CheckCheck, X, Trash2, Edit2, Reply, Copy, Check, MoreVertical,
   Camera, FileText, Headphones, UserCheck, BarChart2, Calendar, 
-  Sparkles, ShoppingBag, Zap, VolumeX
+  Sparkles, ShoppingBag, Zap, VolumeX, Palette, Archive, ArchiveRestore, Lock, Unlock
 } from 'lucide-react';
 import { 
   type Chat, type Message, type PollData, type EventData, 
-  type ProductData, type ContactData, initialUsers, initialProducts 
+  type ProductData, type ContactData, type ChatTheme, CHAT_THEMES, 
+  initialUsers, initialProducts 
 } from '../data/mock';
 import './ChatWindow.css';
 
@@ -18,6 +19,7 @@ interface ChatWindowProps {
   chat: Chat | null;
   onBack: () => void;
   onDeleteChat?: (chatId: string) => void;
+  onUpdateChat?: (chatId: string, updates: Partial<Chat>) => void;
 }
 
 const quickEmojis = ['😊', '😂', '🔥', '👍', '❤️', '🚀', '🎉', '👏', '👀', '💯', '🙌', '✨', '🧘', '🌟', '💎', '🕊️', '🤝', '🌞', '💡', '🌈'];
@@ -38,10 +40,14 @@ const sampleGifs = [
   { id: 'g4', title: 'Код 💻', url: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=400&q=80' }
 ];
 
-export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
+export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWindowProps) {
   const navigate = useNavigate();
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<Message[]>(chat?.messages || []);
+  
+  // Theme state
+  const [showThemeModal, setShowThemeModal] = useState(false);
+  const currentTheme: ChatTheme = chat?.customTheme || CHAT_THEMES[0];
   
   // Voice recording
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
@@ -154,6 +160,30 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
       </div>
     );
   }
+
+  const handleSelectTheme = (theme: ChatTheme) => {
+    if (chat && onUpdateChat) {
+      onUpdateChat(chat.id, { customTheme: theme });
+    }
+    setShowThemeModal(false);
+  };
+
+  const handleToggleArchiveFromChat = () => {
+    if (chat && onUpdateChat) {
+      onUpdateChat(chat.id, { isArchived: !chat.isArchived });
+    }
+    setShowChatMenu(false);
+  };
+
+  const handleToggleLockFromChat = () => {
+    if (chat && onUpdateChat) {
+      onUpdateChat(chat.id, { 
+        isLocked: !chat.isLocked,
+        pinCode: !chat.isLocked ? '1234' : undefined
+      });
+    }
+    setShowChatMenu(false);
+  };
 
   const formatVoiceTime = (sec: number) => {
     const mins = Math.floor(sec / 60);
@@ -709,6 +739,58 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
 
             {showChatMenu && (
               <div className="chat-options-dropdown">
+                {/* Custom Theme selection */}
+                <button 
+                  className="chat-option-row"
+                  onClick={() => {
+                    setShowChatMenu(false);
+                    setShowThemeModal(true);
+                  }}
+                >
+                  <Palette size={16} color="var(--color-accent)" />
+                  <span>Тема оформления</span>
+                </button>
+
+                {/* Toggle Archive */}
+                {chat.id !== 'ai_guru_bot' && (
+                  <button 
+                    className="chat-option-row"
+                    onClick={handleToggleArchiveFromChat}
+                  >
+                    {chat.isArchived ? (
+                      <>
+                        <ArchiveRestore size={16} color="var(--color-accent)" />
+                        <span>Извлечь из архива</span>
+                      </>
+                    ) : (
+                      <>
+                        <Archive size={16} color="var(--color-text-secondary)" />
+                        <span>Поместить в архив</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Toggle Lock PIN */}
+                {chat.id !== 'ai_guru_bot' && (
+                  <button 
+                    className="chat-option-row"
+                    onClick={handleToggleLockFromChat}
+                  >
+                    {chat.isLocked ? (
+                      <>
+                        <Unlock size={16} color="#10B981" />
+                        <span>Снять защиту PIN</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock size={16} color="var(--color-danger)" />
+                        <span>Закрыть чат (PIN)</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
                 <button 
                   className="chat-option-row"
                   onClick={() => {
@@ -719,6 +801,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
                   <Trash2 size={16} color="var(--color-danger)" />
                   <span>Очистить переписку</span>
                 </button>
+
                 {/* AI GURU cannot be deleted! */}
                 {onDeleteChat && chat.id !== 'ai_guru_bot' && (
                   <button 
@@ -738,8 +821,13 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
         </div>
       </div>
 
-      {/* Messages Feed Area */}
-      <div className="tg-messages-scroll">
+      {/* Messages Feed Area with custom per-chat theme background */}
+      <div 
+        className="tg-messages-scroll"
+        style={{
+          background: currentTheme.background !== 'var(--color-bg)' ? currentTheme.background : undefined
+        }}
+      >
         {messages.length === 0 ? (
           <div className="empty-messages-notice">
             <span>Сообщений пока нет. Начните диалог первым!</span>
@@ -980,7 +1068,17 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
 
                   {/* Standard Text, Image, Voice, Conference Recording */}
                   {!isVideoNote && !isSticker && !isGif && !isPoll && !isEvent && !isProduct && !isContact && !isDoc && (
-                    <div className={`tg-bubble ${isMe ? 'bubble-me' : 'bubble-them'}`}>
+                    <div 
+                      className={`tg-bubble ${isMe ? 'bubble-me' : 'bubble-them'}`}
+                      style={{
+                        background: isMe 
+                          ? (currentTheme.bubbleMeBg || undefined) 
+                          : (currentTheme.bubbleThemBg || undefined),
+                        color: isMe 
+                          ? (currentTheme.bubbleMeColor || undefined) 
+                          : (currentTheme.bubbleThemColor || undefined),
+                      }}
+                    >
                       {/* Conference Recording Card */}
                       {isRec && msg.conferenceRecording && (
                         <div className="tg-rec-card">
@@ -1714,6 +1812,84 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
             <div className="tg-rec-modal-footer">
               <span>Длительность: {selectedRecording.duration} · Full HD 1080p</span>
               <button className="btn btn-primary" onClick={() => setSelectedRecording(null)}>
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chat Theme Customization Modal */}
+      {showThemeModal && (
+        <div className="tg-modal-overlay" onClick={() => setShowThemeModal(false)}>
+          <div className="tg-theme-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="group-modal-header">
+              <div className="group-modal-header-title">
+                <Palette size={20} className="group-modal-icon" />
+                <h3>Оформление этого диалога</h3>
+              </div>
+              <button 
+                type="button" 
+                className="group-modal-close-btn"
+                onClick={() => setShowThemeModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="theme-modal-body">
+              <p className="theme-modal-desc">
+                Выберите индивидуальную цветовую палитру и фон для чата с <strong>«{chat.groupTitle || chat.user.name}»</strong>:
+              </p>
+
+              <div className="themes-grid-picker">
+                {CHAT_THEMES.map(theme => {
+                  const isSelected = currentTheme.id === theme.id;
+                  return (
+                    <div 
+                      key={theme.id}
+                      className={`theme-card-option ${isSelected ? 'selected' : ''}`}
+                      onClick={() => handleSelectTheme(theme)}
+                    >
+                      <div 
+                        className="theme-card-preview"
+                        style={{ background: theme.previewBg }}
+                      >
+                        <div 
+                          className="preview-bubble mock-them"
+                          style={{ 
+                            background: theme.bubbleThemBg || 'var(--color-bg-card)', 
+                            color: theme.bubbleThemColor || 'var(--color-text)' 
+                          }}
+                        >
+                          Привет!
+                        </div>
+                        <div 
+                          className="preview-bubble mock-me"
+                          style={{ 
+                            background: theme.bubbleMeBg || 'var(--color-accent)', 
+                            color: theme.bubbleMeColor || '#FFFFFF' 
+                          }}
+                        >
+                          Здравствуйте ✨
+                        </div>
+                      </div>
+                      <div className="theme-card-footer">
+                        <span className="theme-card-name">{theme.name}</span>
+                        {isSelected && <Check size={14} className="theme-checked-icon" />}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="group-modal-footer">
+              <button 
+                type="button" 
+                className="modal-btn cancel" 
+                onClick={() => setShowThemeModal(false)}
+              >
                 Закрыть
               </button>
             </div>
