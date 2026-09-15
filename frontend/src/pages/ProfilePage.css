@@ -323,11 +323,25 @@
   border-color: #F59E0B !important;
 }
 
+[data-theme="dark"] .critic-stat-card {
+  background: rgba(245, 158, 11, 0.12) !important;
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+[data-theme="dark"] .critic-stat-card:hover {
+  background: rgba(245, 158, 11, 0.22) !important;
+  border-color: #F59E0B !important;
+}
+
 .critic-number {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
   color: #D97706;
+}
+
+[data-theme="dark"] .critic-number {
+  color: #FBBF24 !important;
 }
 
 .critic-flame-icon {
@@ -353,10 +367,28 @@
   border-color: #F59E0B;
 }
 
+[data-theme="dark"] .btn-critic-toggle {
+  background: rgba(245, 158, 11, 0.15);
+  color: #FBBF24;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="dark"] .btn-critic-toggle:hover {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: #F59E0B;
+}
+
 .btn-critic-toggle.active {
   background: #F59E0B;
   color: #FFFFFF;
   border-color: #D97706;
+}
+
+[data-theme="dark"] .btn-critic-toggle.active {
+  background: #F59E0B !important;
+  color: #0F172A !important;
+  border-color: #FBBF24 !important;
+  font-weight: 700;
 }
 
 .stat-number {

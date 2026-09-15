@@ -19,7 +19,11 @@ import {
   getStoredFollowingIds, 
   isUserFollowed, 
   toggleUserFollow, 
-  getFollowersForUser, 
+  getFollowersForUser,
+  getFollowingForUser,
+  getCriticsForUser,
+  isUserCritic,
+  toggleUserCritic,
   getAllUsersPool 
 } from '../utils/followStorage';
 import './ProfilePage.css';
@@ -66,38 +70,46 @@ export function ProfilePage() {
   }, [isMe, cleanParam, currentUser, allAccounts]);
 
   const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds());
+  const [socialRevision, setSocialRevision] = useState(0);
   const isFollowing = useMemo(() => isUserFollowed(user.id), [user.id, followingIds]);
 
-  // Dynamic real counts
-  const realFollowersCount = useMemo(() => {
-    const pool = getAllUsersPool(currentUser, allAccounts);
-    const followers = getFollowersForUser(user.id, pool, currentUser?.id);
-    return Math.max(followers.length, user.followersCount || 1);
-  }, [user.id, user.followersCount, currentUser, allAccounts]);
+  // Live sync with external follow & critic changes
+  useEffect(() => {
+    const handleSync = () => {
+      setFollowingIds(getStoredFollowingIds());
+      setSocialRevision(r => r + 1);
+    };
+    window.addEventListener('follow_change', handleSync);
+    return () => window.removeEventListener('follow_change', handleSync);
+  }, []);
 
-  const realFollowingCount = useMemo(() => {
-    if (isMe) {
-      return followingIds.length;
-    }
-    return user.followingCount || 0;
-  }, [isMe, followingIds.length, user.followingCount]);
+  // Dynamic real user lists & counts that exactly match FollowersModal
+  const poolUsers = useMemo(() => {
+    return getAllUsersPool(currentUser, allAccounts);
+  }, [currentUser, allAccounts]);
 
-  const [isCritic, setIsCritic] = useState(user.isCritic ?? false);
-  const [criticsCount, setCriticsCount] = useState(user.criticsCount ?? 148);
+  const realFollowersList = useMemo(() => {
+    return getFollowersForUser(user.id, poolUsers, currentUser?.id);
+  }, [user.id, poolUsers, currentUser?.id, socialRevision]);
+
+  const realFollowingList = useMemo(() => {
+    return getFollowingForUser(user.id, poolUsers, !!isMe);
+  }, [user.id, poolUsers, isMe, socialRevision]);
+
+  const realCriticsList = useMemo(() => {
+    return getCriticsForUser(user.id, poolUsers);
+  }, [user.id, poolUsers, socialRevision]);
+
+  const isCritic = useMemo(() => {
+    if (!currentUser?.id) return false;
+    return isUserCritic(user.id, currentUser.id);
+  }, [user.id, currentUser?.id, socialRevision]);
+
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'podcasts' | 'saved' | 'shop'>('posts');
   const [modalType, setModalType] = useState<'Подписчики' | 'Подписки' | 'Критики' | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-
-  // Live sync with external follow changes
-  useEffect(() => {
-    const handleSync = () => {
-      setFollowingIds(getStoredFollowingIds());
-    };
-    window.addEventListener('follow_change', handleSync);
-    return () => window.removeEventListener('follow_change', handleSync);
-  }, []);
 
   const activeUser = isMe ? currentUser : user;
 
@@ -258,12 +270,8 @@ export function ProfilePage() {
                         setAuthModalOpen(true);
                         return;
                       }
-                      if (isCritic) {
-                        setIsCritic(false);
-                        setCriticsCount(c => c - 1);
-                      } else {
-                        setIsCritic(true);
-                        setCriticsCount(c => c + 1);
+                      if (currentUser?.id) {
+                        toggleUserCritic(user.id, currentUser.id);
                       }
                     }}
                     title="Стать критиком (следить с акцентом на разбор и рецензии)"
@@ -375,23 +383,23 @@ export function ProfilePage() {
           {/* Statistics Counters: Публикации, Подписчики, Подписки, Критики */}
           <div className="profile-stats-row four-stats">
             <div className="stat-card">
-              <span className="stat-number">{userPosts.length || user.postsCount}</span>
+              <span className="stat-number">{userPosts.length}</span>
               <span className="stat-label">публикаций</span>
             </div>
             <div className="stat-card clickable" onClick={() => setModalType('Подписчики')}>
-              <span className="stat-number">{realFollowersCount.toLocaleString('ru-RU')}</span>
+              <span className="stat-number">{realFollowersList.length.toLocaleString('ru-RU')}</span>
               <span className="stat-label">подписчиков</span>
               <ChevronRight size={14} className="stat-arrow" />
             </div>
             <div className="stat-card clickable" onClick={() => setModalType('Подписки')}>
-              <span className="stat-number">{realFollowingCount.toLocaleString('ru-RU')}</span>
+              <span className="stat-number">{realFollowingList.length.toLocaleString('ru-RU')}</span>
               <span className="stat-label">подписок</span>
               <ChevronRight size={14} className="stat-arrow" />
             </div>
             <div className="stat-card clickable critic-stat-card" onClick={() => setModalType('Критики')} title="Пользователи, следящие за профилем в режиме конструктивной критики">
               <span className="stat-number critic-number">
                 <Flame size={14} className="critic-flame-icon" />
-                {criticsCount.toLocaleString('ru-RU')}
+                {realCriticsList.length.toLocaleString('ru-RU')}
               </span>
               <span className="stat-label">критиков</span>
               <ChevronRight size={14} className="stat-arrow" />

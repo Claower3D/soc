@@ -1,8 +1,9 @@
-import { initialUsers, type User } from '../data/mock';
+﻿import { initialUsers, type User } from '../data/mock';
 import type { RegisteredAccount } from '../context/AuthContext';
 
 const STORAGE_KEY_FOLLOWING = 'new_age_following_map';
 const STORAGE_KEY_FOLLOWERS_MAP = 'new_age_custom_followers_map';
+const STORAGE_KEY_CRITICS_MAP = 'new_age_critics_map';
 
 // Get all available system users (mock + registered accounts)
 export function getAllUsersPool(currentUser?: User, allAccounts: RegisteredAccount[] = []): User[] {
@@ -16,7 +17,7 @@ export function getAllUsersPool(currentUser?: User, allAccounts: RegisteredAccou
     website: a.website,
     location: a.location,
     online: false,
-    followersCount: a.followersCount || 1,
+    followersCount: a.followersCount || 0,
     followingCount: a.followingCount || 0,
     criticsCount: a.criticsCount || 0,
     postsCount: a.postsCount || 0,
@@ -47,11 +48,14 @@ export function getAllUsersPool(currentUser?: User, allAccounts: RegisteredAccou
 export function getStoredFollowingIds(): string[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_FOLLOWING);
-    if (raw) return JSON.parse(raw);
+    if (raw !== null) return JSON.parse(raw);
   } catch {
     // ignore
   }
-  return ['1', '3', '4', '8'];
+  // Initial default: 1 follow (Алиса Иванова)
+  const defaultFollowing = ['1'];
+  localStorage.setItem(STORAGE_KEY_FOLLOWING, JSON.stringify(defaultFollowing));
+  return defaultFollowing;
 }
 
 // Save following IDs
@@ -85,30 +89,53 @@ export function toggleUserFollow(targetUserId: string): boolean {
   return isNowFollowing;
 }
 
-// Get realistic list of follower User objects for any profile
-export function getFollowersForUser(targetUserId: string, allUsers: User[], currentUserId?: string): User[] {
-  const candidates = allUsers.filter(u => u.id !== targetUserId && u.id !== 'guest');
-  
+// --- FOLLOWERS MAP STORAGE ---
+export function getStoredFollowersMap(): Record<string, string[]> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_FOLLOWERS_MAP);
-    if (raw) {
-      const map: Record<string, string[]> = JSON.parse(raw);
-      if (map[targetUserId] && Array.isArray(map[targetUserId])) {
-        const idSet = new Set(map[targetUserId]);
-        return candidates.filter(u => idSet.has(u.id));
-      }
-    }
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+export function setStoredFollowersMap(map: Record<string, string[]>): void {
+  localStorage.setItem(STORAGE_KEY_FOLLOWERS_MAP, JSON.stringify(map));
+  window.dispatchEvent(new Event('follow_change'));
+}
+
+// Get realistic list of follower User objects for any profile
+export function getFollowersForUser(targetUserId: string, allUsers: User[], currentUserId?: string): User[] {
+  const map = getStoredFollowersMap();
+  const candidates = allUsers.filter(u => u.id !== targetUserId && u.id !== 'guest');
+
+  // If we already saved custom followers for this user
+  if (map[targetUserId] && Array.isArray(map[targetUserId])) {
+    const idSet = new Set(map[targetUserId]);
+    return candidates.filter(u => idSet.has(u.id));
+  }
+
+  // Initial defaults based on mock data or registered accounts:
+  let defaultIds: string[] = [];
+  if (targetUserId === 'me' || targetUserId === currentUserId) {
+    // Current user has 6 real followers (users 1, 2, 3, 4, 5, 6)
+    defaultIds = ['1', '2', '3', '4', '5', '6'];
+  } else {
+    // For other users, deterministic slice
+    defaultIds = candidates.slice(0, 4).map(u => u.id);
+  }
+
+  // Save to map so count is 100% exact and stable
+  map[targetUserId] = defaultIds;
+  try {
+    localStorage.setItem(STORAGE_KEY_FOLLOWERS_MAP, JSON.stringify(map));
   } catch {
     // ignore
   }
 
-  // Realistic deterministic follower assignment
-  const followers = candidates.filter((u, index) => {
-    if (currentUserId && u.id === currentUserId) return false;
-    return index % 2 === 0 || index % 3 === 0;
-  });
-
-  return followers.length > 0 ? followers : candidates.slice(0, 4);
+  const idSet = new Set(defaultIds);
+  return candidates.filter(u => idSet.has(u.id));
 }
 
 // Get following User objects for any profile
@@ -120,11 +147,70 @@ export function getFollowingForUser(targetUserId: string, allUsers: User[], isMe
     return candidates.filter(u => myFollowingIds.has(u.id));
   }
 
-  return candidates.filter((_, idx) => idx % 2 === 1).slice(0, 5);
+  return candidates.filter((_, idx) => idx === 0);
+}
+
+// --- CRITICS MAP STORAGE ---
+export function getStoredCriticsMap(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CRITICS_MAP);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
+export function setStoredCriticsMap(map: Record<string, string[]>): void {
+  localStorage.setItem(STORAGE_KEY_CRITICS_MAP, JSON.stringify(map));
+  window.dispatchEvent(new Event('follow_change'));
 }
 
 // Get critics User objects for any profile
 export function getCriticsForUser(targetUserId: string, allUsers: User[]): User[] {
+  const map = getStoredCriticsMap();
   const candidates = allUsers.filter(u => u.id !== targetUserId && u.id !== 'guest');
-  return candidates.filter((u, idx) => u.role === 'critic' || idx === 1 || idx === 4);
+
+  if (map[targetUserId] && Array.isArray(map[targetUserId])) {
+    const idSet = new Set(map[targetUserId]);
+    return candidates.filter(u => idSet.has(u.id));
+  }
+
+  // Realistic critics initial list (e.g. 3 users: 2, 4, 7)
+  const defaultCritics = candidates.filter((u, idx) => u.role === 'critic' || idx === 1 || idx === 3 || idx === 6);
+  const criticIds = defaultCritics.map(u => u.id);
+  map[targetUserId] = criticIds;
+  try {
+    localStorage.setItem(STORAGE_KEY_CRITICS_MAP, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+
+  return defaultCritics;
+}
+
+// Toggle user as critic for target user
+export function toggleUserCritic(targetUserId: string, currentUserId: string): boolean {
+  const map = getStoredCriticsMap();
+  const list = map[targetUserId] ? [...map[targetUserId]] : [];
+  const index = list.indexOf(currentUserId);
+  let isNowCritic = false;
+
+  if (index >= 0) {
+    list.splice(index, 1);
+    isNowCritic = false;
+  } else {
+    list.push(currentUserId);
+    isNowCritic = true;
+  }
+
+  map[targetUserId] = list;
+  setStoredCriticsMap(map);
+  return isNowCritic;
+}
+
+export function isUserCritic(targetUserId: string, currentUserId: string): boolean {
+  const map = getStoredCriticsMap();
+  const list = map[targetUserId] || [];
+  return list.includes(currentUserId);
 }
