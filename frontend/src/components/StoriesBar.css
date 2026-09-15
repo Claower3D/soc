@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    Instagram-Style Stories Tray & Fullscreen Story Viewer
    ========================================================================== */
 
@@ -60,6 +60,33 @@
 .insta-avatar-ring.ring-gradient {
   background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
   box-shadow: 0 3px 10px rgba(220, 39, 67, 0.25);
+}
+
+/* LIVE Ring: Pulsing vivid red */
+.insta-avatar-ring.ring-live {
+  background: linear-gradient(45deg, #EF4444 0%, #DC2626 50%, #991B1B 100%);
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.6);
+  animation: liveRingPulse 1.8s infinite;
+}
+
+@keyframes liveRingPulse {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.insta-live-tag-badge {
+  position: absolute;
+  bottom: -4px;
+  background: #EF4444;
+  color: white;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-surface);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
 }
 
 /* Viewed Ring: subtle gray border */
@@ -293,8 +320,35 @@
 
 .insta-header-text {
   display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.insta-header-title-row {
+  display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.viewer-live-badge {
+  background: #EF4444;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  letter-spacing: 0.05em;
+}
+
+.viewer-live-badge .live-red-dot {
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+  animation: blink 1s infinite;
 }
 
 .insta-header-name {
@@ -306,7 +360,27 @@
 
 .insta-header-time {
   color: rgba(255, 255, 255, 0.75);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+}
+
+.insta-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.story-meta-pill {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .insta-header-icon-btn {
@@ -324,6 +398,16 @@
 
 .insta-header-icon-btn:hover {
   opacity: 1;
+}
+
+.viewer-ar-mask-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Media Box */

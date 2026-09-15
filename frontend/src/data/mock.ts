@@ -145,6 +145,11 @@ export interface Story {
   viewed: boolean;
   image?: string;
   gradient?: string;
+  videoUrl?: string;
+  isLive?: boolean;
+  liveViewers?: number;
+  filter?: string;
+  mask?: string;
   text?: string;
   textPosition?: 'center' | 'bottom' | 'top';
   timestamp?: string;
@@ -526,6 +531,10 @@ export const stories: Story[] = initialUsers.slice(1, 8).map((user, i) => ({
   id: `story-${i}`,
   user,
   viewed: i > 3,
+  isLive: i === 0, // First story is live broadcast
+  liveViewers: i === 0 ? 42 : undefined,
+  filter: i === 1 ? 'Paris (Мягкий)' : i === 2 ? 'Tokyo (Неон)' : undefined,
+  mask: i === 0 ? '✨ Блестки' : i === 1 ? '🕶️ Крутые очки' : undefined,
   image: [
     'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
     'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
@@ -535,7 +544,9 @@ export const stories: Story[] = initialUsers.slice(1, 8).map((user, i) => ({
     'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=800&q=80',
     'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=800&q=80',
   ][i % 7],
-  timestamp: `${(i + 1) * 2} ч назад`,
+  text: i === 0 ? '🔴 В прямом эфире! Обсуждаем новинки' : undefined,
+  textPosition: 'center',
+  timestamp: i === 0 ? 'В ЭФИРЕ' : `${(i + 1) * 2} ч назад`,
 }));
 
 // ==================== ПОСТЫ (ЛЕНТА) ====================

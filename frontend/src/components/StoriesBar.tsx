@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, X, Heart, Send, ChevronLeft, ChevronRight, 
-  Pause, Play 
+  Pause, Play, Sparkles, Wand2 
 } from 'lucide-react';
 import { type Story, type User } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
-import { CreateStoryModal } from './CreateStoryModal';
+import { CreateStoryModal, STORY_FILTERS } from './CreateStoryModal';
 import './StoriesBar.css';
 
 interface StoriesBarProps {
@@ -192,21 +192,25 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
           {/* 2. Other Users' Stories with Instagram Gradient Rings */}
           {stories.map((story, index) => {
             const isViewed = viewedStoryIds.has(story.id) || story.viewed;
+            const isLiveStory = story.isLive;
             return (
               <div 
                 key={story.id} 
-                className={`insta-story-item ${isViewed ? 'viewed' : 'unviewed'}`}
+                className={`insta-story-item ${isLiveStory ? 'live-story' : (isViewed ? 'viewed' : 'unviewed')}`}
                 onClick={() => handleOpenStory(index)}
               >
-                <div className={`insta-avatar-ring ${isViewed ? 'ring-viewed' : 'ring-gradient'}`}>
+                <div className={`insta-avatar-ring ${isLiveStory ? 'ring-live' : (isViewed ? 'ring-viewed' : 'ring-gradient')}`}>
                   <div className="insta-avatar-inner">
                     <img 
                       src={story.user.avatar} 
                       alt={story.user.name} 
                       className="insta-avatar-img" 
                     />
-                    {story.user.online && <span className="insta-online-indicator" />}
+                    {story.user.online && !isLiveStory && <span className="insta-online-indicator" />}
                   </div>
+                  {isLiveStory && (
+                    <span className="insta-live-tag-badge">LIVE</span>
+                  )}
                 </div>
                 <span className="insta-story-username">{story.user.name.split(' ')[0]}</span>
               </div>
@@ -281,78 +285,127 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
               })}
             </div>
 
-            {/* Top Author Header */}
-            <div className="insta-story-header">
-              <div 
-                className="insta-header-user"
-                onClick={(e) => handleAuthorClick(activeStory.user, e)}
-              >
-                <img 
-                  src={activeStory.user.avatar} 
-                  alt={activeStory.user.name} 
-                  className="insta-header-avatar" 
-                />
-                <div className="insta-header-text">
-                  <span className="insta-header-name">{activeStory.user.name}</span>
-                  <span className="insta-header-time">{activeStory.timestamp || '2 ч'}</span>
-                </div>
-              </div>
-
-              {/* Pause/Play Toggle Button */}
-              <div className="insta-header-actions">
-                <button 
-                  type="button" 
-                  className="insta-header-icon-btn" 
-                  onClick={() => setIsPaused(p => !p)}
-                  title={isPaused ? 'Продолжить' : 'Пауза'}
+              {/* Top Author Header */}
+              <div className="insta-story-header">
+                <div 
+                  className="insta-header-user"
+                  onClick={(e) => handleAuthorClick(activeStory.user, e)}
                 >
-                  {isPaused ? <Play size={18} /> : <Pause size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Story Visual Content */}
-            <div 
-              className="insta-story-media"
-              style={{
-                background: activeStory.gradient 
-                  ? activeStory.gradient 
-                  : `url(${activeStory.image || activeStory.user.avatar}) center/cover no-repeat`
-              }}
-            >
-              {activeStory.image && !activeStory.gradient && (
-                <img 
-                  src={activeStory.image} 
-                  alt="Story content" 
-                  className="insta-story-full-img" 
-                />
-              )}
-
-              {/* Story Overlay Caption / Text */}
-              {activeStory.text && (
-                <div className={`insta-story-text-badge pos-${activeStory.textPosition || 'center'}`}>
-                  <p>{activeStory.text}</p>
+                  <img 
+                    src={activeStory.user.avatar} 
+                    alt={activeStory.user.name} 
+                    className="insta-header-avatar" 
+                  />
+                  <div className="insta-header-text">
+                    <div className="insta-header-title-row">
+                      <span className="insta-header-name">{activeStory.user.name}</span>
+                      {activeStory.isLive && (
+                        <span className="viewer-live-badge">
+                          <span className="live-red-dot" /> LIVE
+                        </span>
+                      )}
+                    </div>
+                    <span className="insta-header-time">
+                      {activeStory.isLive ? `${activeStory.liveViewers || 14} зрителей` : (activeStory.timestamp || '2 ч')}
+                    </span>
+                  </div>
                 </div>
-              )}
 
-              {/* Interactive Left/Right Tap Areas */}
-              <div className="insta-tap-zones">
-                <div 
-                  className="insta-tap-zone-left" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePrev();
-                  }} 
-                />
-                <div 
-                  className="insta-tap-zone-right" 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleNext();
-                  }} 
-                />
+                {/* Filter and Mask Badge & Controls */}
+                <div className="insta-header-actions">
+                  {activeStory.filter && (
+                    <span className="story-meta-pill" title="Применен фильтр">
+                      <Wand2 size={11} /> {activeStory.filter}
+                    </span>
+                  )}
+                  {activeStory.mask && (
+                    <span className="story-meta-pill" title="Применена маска">
+                      <Sparkles size={11} /> {activeStory.mask}
+                    </span>
+                  )}
+                  <button 
+                    type="button" 
+                    className="insta-header-icon-btn" 
+                    onClick={() => setIsPaused(p => !p)}
+                    title={isPaused ? 'Продолжить' : 'Пауза'}
+                  >
+                    {isPaused ? <Play size={18} /> : <Pause size={18} />}
+                  </button>
+                </div>
               </div>
-            </div>
+
+              {/* Story Visual Content (Image or Video) */}
+              {(() => {
+                const appliedFilter = STORY_FILTERS.find(f => f.name === activeStory.filter)?.filterCss || 'none';
+
+                return (
+                  <div 
+                    className="insta-story-media"
+                    style={{
+                      background: activeStory.gradient 
+                        ? activeStory.gradient 
+                        : (activeStory.videoUrl ? '#000000' : `url(${activeStory.image || activeStory.user.avatar}) center/cover no-repeat`),
+                      filter: appliedFilter,
+                    }}
+                  >
+                    {/* Video Player if recorded story */}
+                    {activeStory.videoUrl ? (
+                      <video
+                        src={activeStory.videoUrl}
+                        autoPlay
+                        loop
+                        playsInline
+                        className="insta-story-full-img"
+                      />
+                    ) : (
+                      activeStory.image && !activeStory.gradient && (
+                        <img 
+                          src={activeStory.image} 
+                          alt="Story content" 
+                          className="insta-story-full-img" 
+                        />
+                      )
+                    )}
+
+                    {/* AR Mask Overlay in Viewer */}
+                    {activeStory.mask && (
+                      <div className="viewer-ar-mask-overlay">
+                        {activeStory.mask.includes('очки') && <span className="mask-element ar-glasses">🕶️</span>}
+                        {activeStory.mask.includes('корона') && <span className="mask-element ar-crown">👑</span>}
+                        {activeStory.mask.includes('ушки') && <span className="mask-element ar-cat-ears">🐱</span>}
+                        {activeStory.mask.includes('Нимб') && <span className="mask-element ar-halo">😇</span>}
+                        {activeStory.mask.includes('визор') && <span className="mask-element ar-visor">🥽</span>}
+                        {activeStory.mask.includes('Сияние') && <span className="mask-element ar-sparkles">✨</span>}
+                      </div>
+                    )}
+
+                    {/* Story Overlay Caption / Text */}
+                    {activeStory.text && (
+                      <div className={`insta-story-text-badge pos-${activeStory.textPosition || 'center'}`}>
+                        <p>{activeStory.text}</p>
+                      </div>
+                    )}
+
+                    {/* Interactive Left/Right Tap Areas */}
+                    <div className="insta-tap-zones">
+                      <div 
+                        className="insta-tap-zone-left" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePrev();
+                        }} 
+                      />
+                      <div 
+                        className="insta-tap-zone-right" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleNext();
+                        }} 
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
 
             {/* Bottom Interactive Instagram Footer */}
             <div className="insta-story-footer" onClick={e => e.stopPropagation()}>
