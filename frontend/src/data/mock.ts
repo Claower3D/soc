@@ -191,6 +191,33 @@ export interface Video {
   likesCount?: number;
 }
 
+export interface ClipComment {
+  id: string;
+  user: User;
+  text: string;
+  timeAgo: string;
+  likes?: number;
+}
+
+export interface Clip {
+  id: string;
+  user: User;
+  videoUrl?: string;
+  poster: string;
+  caption: string;
+  musicTitle?: string;
+  musicAuthor?: string;
+  likesCount: number;
+  commentsCount: number;
+  sharesCount: number;
+  viewsCount: number;
+  isLiked?: boolean;
+  isSaved?: boolean;
+  tags?: string[];
+  comments?: ClipComment[];
+  timeAgo?: string;
+}
+
 export interface Message {
   id: string;
   text?: string;
@@ -642,6 +669,115 @@ export const videos: Video[] = [
     likesCount: 4200,
     description: 'Полный обзор инноваций React: новые хуки useActionState, useOptimistic, улучшения типизации и ускорение рендеринга.',
   },
+];
+
+// ==================== КЛИПЫ (ВЕРТИКАЛЬНЫЕ ВИДЕО / REELS) ====================
+
+export const initialClips: Clip[] = [
+  {
+    id: 'clip_1',
+    user: initialUsers[1],
+    poster: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    caption: 'Морской прибой на закате 🌊 Когда ум успокаивается, открывается истинный взор. Практикуем тишину!',
+    musicTitle: 'Медитация Океана • 432 Гц',
+    musicAuthor: 'New Age Sound',
+    likesCount: 14200,
+    commentsCount: 384,
+    sharesCount: 1250,
+    viewsCount: 89000,
+    isLiked: false,
+    isSaved: false,
+    tags: ['осознанность', 'море', 'клипы', 'медитация'],
+    timeAgo: '2 ч назад',
+    comments: [
+      { id: 'cc1', user: initialUsers[2], text: 'Очень вдохновляющая атмосфера! Музыка в самое сердце 🙏', timeAgo: '1 ч назад', likes: 24 },
+      { id: 'cc2', user: initialUsers[4], text: 'Звук волн невероятный, сразу снимает напряжение', timeAgo: '30 мин назад', likes: 11 },
+      { id: 'cc3', user: initialUsers[6], text: 'Какой класс сознания нужен, чтобы так глубоко слышать природу? ✨', timeAgo: '15 мин назад', likes: 7 }
+    ]
+  },
+  {
+    id: 'clip_2',
+    user: initialUsers[4],
+    poster: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    caption: 'Горный хребет сквозь утренний туман 🏔️ Подъем на высоту 2500м. Тело дышит праной!',
+    musicTitle: 'Дыхание Гор • Этническая флейта',
+    musicAuthor: 'Алиса Смирнова',
+    likesCount: 28900,
+    commentsCount: 712,
+    sharesCount: 3400,
+    viewsCount: 174000,
+    isLiked: true,
+    isSaved: true,
+    tags: ['горы', 'йога', 'пранаяма', 'путешествия'],
+    timeAgo: '5 ч назад',
+    comments: [
+      { id: 'cc4', user: initialUsers[1], text: 'Вид просто завораживает! Красота мира бесконечна 🔥', timeAgo: '4 ч назад', likes: 52 },
+      { id: 'cc5', user: initialUsers[5], text: 'На какой объектив снято? Плавность потрясающая!', timeAgo: '2 ч назад', likes: 19 }
+    ]
+  },
+  {
+    id: 'clip_3',
+    user: initialUsers[6],
+    poster: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
+    caption: 'Кодим алгоритм распределения заявок в девизе «Спасение служба» 💻 3% честная комиссия и открытый код!',
+    musicTitle: 'Cyber Ambient • Synthwave Flow',
+    musicAuthor: 'Dev Studio Music',
+    likesCount: 9800,
+    commentsCount: 245,
+    sharesCount: 890,
+    viewsCount: 65000,
+    isLiked: false,
+    isSaved: false,
+    tags: ['код', 'разработка', 'спасениеслужба', 'стартап'],
+    timeAgo: '1 день назад',
+    comments: [
+      { id: 'cc6', user: initialUsers[3], text: 'Вот это подход! Наконец-то прозрачная экосистема без грабительских комиссий 👏', timeAgo: '18 ч назад', likes: 45 },
+      { id: 'cc7', user: initialUsers[7], text: 'Go + React в клипе выглядит мощно!', timeAgo: '12 ч назад', likes: 14 }
+    ]
+  },
+  {
+    id: 'clip_4',
+    user: initialUsers[2],
+    poster: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
+    caption: 'Звучание тибетской чаши в резонансе 528 Гц 🔔 Положите телефон, закройте глаза и сделайте 3 глубоких вдоха.',
+    musicTitle: 'Поющая Чаша 528 Гц • ДНК исцеление',
+    musicAuthor: 'Мастер Ананта',
+    likesCount: 34100,
+    commentsCount: 980,
+    sharesCount: 5120,
+    viewsCount: 220000,
+    isLiked: true,
+    isSaved: false,
+    tags: ['саундхилинг', 'чаши', 'звук', 'покой'],
+    timeAgo: '2 дня назад',
+    comments: [
+      { id: 'cc8', user: initialUsers[1], text: 'С мурашками по коже! Очень глубокая вибрация 💫', timeAgo: '1 день назад', likes: 88 }
+    ]
+  },
+  {
+    id: 'clip_5',
+    user: initialUsers[5],
+    poster: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    caption: 'Живой сет с винила на закате 🎧 Музыка объединяет сердца во всех уголках планеты!',
+    musicTitle: 'Sunset Vinyl Sessions • Deep House',
+    musicAuthor: 'DJ Sunset',
+    likesCount: 18700,
+    commentsCount: 420,
+    sharesCount: 1980,
+    viewsCount: 112000,
+    isLiked: false,
+    isSaved: true,
+    tags: ['музыка', 'диджей', 'винил', 'вечер'],
+    timeAgo: '3 дня назад',
+    comments: [
+      { id: 'cc9', user: initialUsers[4], text: 'Качает нереально! Где полный сет послушать?', timeAgo: '2 дня назад', likes: 30 }
+    ]
+  }
 ];
 
 // ==================== ЧАТЫ (С МЕДИА, ГОЛОСОВЫМИ И ГРУППАМИ КОНФЕРЕНЦИЙ) ====================

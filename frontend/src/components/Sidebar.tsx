@@ -58,6 +58,20 @@ export function Sidebar() {
           <span className="nav-label">Поиск</span>
         </NavLink>
 
+        <NavLink to="/clips" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Film className="nav-icon" size={19} />
+          <span className="nav-label">{t('nav.clips')}</span>
+          <span className="nav-badge-hot" style={{
+            fontSize: '10px',
+            background: 'linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)',
+            color: '#fff',
+            padding: '1px 6px',
+            borderRadius: '10px',
+            fontWeight: 700,
+            marginLeft: 'auto'
+          }}>HOT</span>
+        </NavLink>
+
         <NavLink to="/video" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Video className="nav-icon" size={19} />
           <span className="nav-label">{t('nav.video')}</span>

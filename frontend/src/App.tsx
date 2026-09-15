@@ -4,6 +4,7 @@ import { BottomNav } from './components/BottomNav';
 import { Header } from './components/Header';
 import { FeedPage } from './pages/FeedPage';
 import { VideoPage } from './pages/VideoPage';
+import { ClipsPage } from './pages/ClipsPage';
 import { MessengerPage } from './pages/MessengerPage';
 import { ConferencesPage } from './pages/CallsPage';
 import { PodcastsPage } from './pages/PodcastsPage';
@@ -52,6 +53,8 @@ function AppContent() {
             <Route path="/" element={<FeedPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/explore" element={<Navigate to="/search" replace />} />
+            <Route path="/clips" element={<ClipsPage />} />
+            <Route path="/reels" element={<Navigate to="/clips" replace />} />
             <Route path="/video" element={<VideoPage />} />
             <Route path="/channel/:channelId" element={<ChannelPage />} />
             <Route path="/channel/me" element={<ChannelPage />} />

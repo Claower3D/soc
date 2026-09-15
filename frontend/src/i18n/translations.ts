@@ -22,6 +22,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
   ru: {
     'brand.name': 'Новая Эра',
     'nav.feed': 'Лента',
+    'nav.clips': 'Клипы',
     'nav.video': 'Видео',
     'nav.messenger': 'Мессенджер',
     'nav.calls': 'Звонки',
@@ -79,6 +80,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
   en: {
     'brand.name': 'New Era',
     'nav.feed': 'Feed',
+    'nav.clips': 'Clips',
     'nav.video': 'Video',
     'nav.messenger': 'Messenger',
     'nav.calls': 'Calls',
@@ -135,7 +137,8 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
   },
   es: {
     'brand.name': 'Nueva Era',
-    'nav.feed': 'Feed',
+    'nav.feed': 'Inicio',
+    'nav.clips': 'Clips',
     'nav.video': 'Vídeos',
     'nav.messenger': 'Mensajes',
     'nav.calls': 'Llamadas',
@@ -193,6 +196,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
   de: {
     'brand.name': 'Neue Ära',
     'nav.feed': 'Feed',
+    'nav.clips': 'Clips',
     'nav.video': 'Videos',
     'nav.messenger': 'Nachrichten',
     'nav.calls': 'Anrufe',
@@ -250,6 +254,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
   zh: {
     'brand.name': '新纪元',
     'nav.feed': '动态',
+    'nav.clips': '短视频',
     'nav.video': '视频',
     'nav.messenger': '消息',
     'nav.calls': '通话',
@@ -307,6 +312,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
   fr: {
     'brand.name': 'Nouvelle Ère',
     'nav.feed': "Fil d'actualité",
+    'nav.clips': 'Clips',
     'nav.video': 'Vidéos',
     'nav.messenger': 'Messagerie',
     'nav.calls': 'Appels',
@@ -364,6 +370,7 @@ export const translations: Record<SupportedLanguage, Record<string, string>> = {
   ar: {
     'brand.name': 'العصر الجديد',
     'nav.feed': 'الرئيسية',
+    'nav.clips': 'مقاطع',
     'nav.video': 'الفيديو',
     'nav.messenger': 'المراسلات',
     'nav.calls': 'المكالمات',
