@@ -1,14 +1,15 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   X, Camera, MapPin, Globe, Sparkles, Shield, ShoppingBag, 
   Video, User as UserIcon, Check, Image as ImageIcon,
-  Flame, Award, Eye
+  Flame, Award, Eye, Calendar, Moon, Sun
 } from 'lucide-react';
 import { 
   currentUser, type User, type UserRole, type BeliefPrivacy, 
   RELIGIONS_CATALOG 
 } from '../data/mock';
 import { spiritualAudio } from '../utils/spiritualAudio';
+import { calculateZodiacProfile, type ZodiacInfo } from '../utils/astrology';
 import './EditProfileModal.css';
 
 interface EditProfileModalProps {
@@ -17,7 +18,7 @@ interface EditProfileModalProps {
   onSave: (updatedUser: User) => void;
 }
 
-type EditTab = 'general' | 'appearance' | 'spiritual' | 'privacy';
+type EditTab = 'general' | 'astrology' | 'appearance' | 'spiritual' | 'privacy';
 
 const SAMPLE_AVATARS = [
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
@@ -80,6 +81,24 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
   const [beliefType, setBeliefType] = useState<string>(currentUser.beliefType || 'Христианство');
   const [beliefPrivacy, setBeliefPrivacy] = useState<BeliefPrivacy>(currentUser.beliefPrivacy || 'public');
 
+  // Личные данные: Дата рождения, Знак зодиака, Пол
+  const [birthDate, setBirthDate] = useState(currentUser.birthDate || '1995-04-12');
+  const [gender, setGender] = useState<'male' | 'female' | 'other' | 'hidden'>(currentUser.gender || 'male');
+  const [showBirthDate, setShowBirthDate] = useState(currentUser.showBirthDate ?? true);
+  const [showZodiac, setShowZodiac] = useState(currentUser.showZodiac ?? true);
+
+  // Вычисленные зодиакальные параметры
+  const [zodiacInfo, setZodiacInfo] = useState<ZodiacInfo | null>(() => calculateZodiacProfile(currentUser.birthDate || '1995-04-12'));
+
+  useEffect(() => {
+    if (birthDate) {
+      const info = calculateZodiacProfile(birthDate);
+      setZodiacInfo(info);
+    } else {
+      setZodiacInfo(null);
+    }
+  }, [birthDate]);
+
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -126,6 +145,12 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
       role,
       beliefType,
       beliefPrivacy,
+      birthDate,
+      zodiacSign: zodiacInfo?.sign,
+      easternZodiac: zodiacInfo ? `${zodiacInfo.easternElement} ${zodiacInfo.easternSign}` : undefined,
+      gender,
+      showBirthDate,
+      showZodiac
     };
 
     Object.assign(currentUser, updated);
@@ -161,6 +186,15 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
           >
             <UserIcon size={16} />
             <span>Основное</span>
+          </button>
+
+          <button 
+            type="button"
+            className={`edit-tab-item ${activeTab === 'astrology' ? 'active' : ''}`}
+            onClick={() => setActiveTab('astrology')}
+          >
+            <Moon size={16} />
+            <span>Астрология и Данные</span>
           </button>
 
           <button 
@@ -300,6 +334,123 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB: АСТРОЛОГИЯ И ДАННЫЕ (ДАТА РОЖДЕНИЯ, ЗНАК ЗОДИАКА, ПОЛ) */}
+          {/* ========================================================================= */}
+          {activeTab === 'astrology' && (
+            <div className="edit-tab-pane">
+              <div className="astrology-highlight-banner">
+                <div className="astro-banner-icon">
+                  <Sun size={28} className="astro-sun-icon" />
+                </div>
+                <div className="astro-banner-info">
+                  <h4 className="astro-banner-title">Натальная карта и Знак Зодиака</h4>
+                  <p className="astro-banner-desc">
+                    Укажите дату рождения, и система автоматически рассчитает ваш западный знак зодиака, 
+                    стихию, планету-покровителя и знак восточного календаря.
+                  </p>
+                </div>
+              </div>
+
+              {/* Date of Birth & Gender Fields */}
+              <div className="form-two-cols">
+                <div className="edit-field-group">
+                  <label className="edit-field-label">Дата рождения</label>
+                  <div className="input-with-icon-left">
+                    <Calendar size={16} className="input-icon-left" />
+                    <input
+                      type="date"
+                      value={birthDate}
+                      onChange={e => setBirthDate(e.target.value)}
+                      className="edit-input-ctrl has-icon"
+                      max={new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
+                  <span className="field-hint-text">Используется для расчёта зодиака и возраста</span>
+                </div>
+
+                <div className="edit-field-group">
+                  <label className="edit-field-label">Пол</label>
+                  <select
+                    value={gender}
+                    onChange={e => setGender(e.target.value as any)}
+                    className="edit-input-ctrl edit-select-ctrl"
+                  >
+                    <option value="male">Мужской ♂</option>
+                    <option value="female">Женский ♀</option>
+                    <option value="other">Другой ✦</option>
+                    <option value="hidden">Не указывать / Скрыто</option>
+                  </select>
+                  <span className="field-hint-text">Отображается в профиле по вашему выбору</span>
+                </div>
+              </div>
+
+              {/* Live Calculated Astrology Card */}
+              {zodiacInfo && (
+                <div className="astro-calculated-card">
+                  <div className="astro-card-header">
+                    <div className="astro-symbol-giant">{zodiacInfo.symbol}</div>
+                    <div className="astro-primary-titles">
+                      <div className="astro-sign-name">{zodiacInfo.sign}</div>
+                      <div className="astro-element-tag">{zodiacInfo.element} • Планета {zodiacInfo.planet}</div>
+                    </div>
+                    <div className="astro-age-badge">
+                      Возраст: <strong>{zodiacInfo.age} лет</strong>
+                    </div>
+                  </div>
+
+                  <div className="astro-details-grid">
+                    <div className="astro-metric-box">
+                      <span className="metric-label">Восточный зодиак</span>
+                      <strong className="metric-val">{zodiacInfo.easternSign}</strong>
+                    </div>
+                    <div className="astro-metric-box">
+                      <span className="metric-label">Стихия года</span>
+                      <strong className="metric-val">{zodiacInfo.easternElement}</strong>
+                    </div>
+                    <div className="astro-metric-box">
+                      <span className="metric-label">Управляющая планета</span>
+                      <strong className="metric-val">{zodiacInfo.planet}</strong>
+                    </div>
+                    <div className="astro-metric-box">
+                      <span className="metric-label">Стихия знака</span>
+                      <strong className="metric-val">{zodiacInfo.element}</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Visibility Settings for Astrology and Birthday */}
+              <div className="privacy-settings-box">
+                <label className="privacy-toggle-card">
+                  <div>
+                    <strong className="toggle-heading">Показывать знак зодиака в профиле</strong>
+                    <span className="toggle-subtext">Значок зодиака и восточного знака будет виден гостям и друзьям</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={showZodiac}
+                    onChange={e => setShowZodiac(e.target.checked)}
+                    className="custom-switch-check"
+                  />
+                </label>
+
+                <label className="privacy-toggle-card">
+                  <div>
+                    <strong className="toggle-heading">Показывать дату рождения и возраст</strong>
+                    <span className="toggle-subtext">Отображать день рождения и количество лет в шапке профиля</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={showBirthDate}
+                    onChange={e => setShowBirthDate(e.target.checked)}
+                    className="custom-switch-check"
+                  />
+                </label>
               </div>
             </div>
           )}

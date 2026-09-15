@@ -4,9 +4,11 @@ import {
   Grid, Video as VideoIcon, Headphones, Bookmark, 
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Share2, Edit3, Heart, MessageSquare,
-  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn, Plus, Brain, Sparkles
+  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn, Plus, Brain, Sparkles,
+  Calendar, Moon
 } from 'lucide-react';
 import { initialUsers, posts, stories, videos, podcasts, initialProducts, RELIGIONS_CATALOG, type User, type Post } from '../data/mock';
+import { calculateZodiacProfile } from '../utils/astrology';
 import { useAuth } from '../context/AuthContext';
 import { FollowersModal } from '../components/FollowersModal';
 import { PostDetailModal } from '../components/PostDetailModal';
@@ -415,6 +417,36 @@ export function ProfilePage() {
                   </button>
                 )
               )}
+
+              {/* Дата рождения и возраст */}
+              {activeUser.birthDate && (isMe || activeUser.showBirthDate !== false) && (() => {
+                const astro = calculateZodiacProfile(activeUser.birthDate);
+                const dateObj = new Date(activeUser.birthDate);
+                const formattedDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+                return (
+                  <div className="meta-item meta-birthdate" title="Дата рождения и возраст">
+                    <Calendar size={15} />
+                    <span>{formattedDate} {astro ? `(${astro.age} лет)` : ''}</span>
+                  </div>
+                );
+              })()}
+
+              {/* Знак Зодиака и Восточный знак */}
+              {activeUser.birthDate && (isMe || activeUser.showZodiac !== false) && (() => {
+                const astro = calculateZodiacProfile(activeUser.birthDate);
+                if (!astro) return null;
+                return (
+                  <div 
+                    className="meta-item meta-zodiac" 
+                    title={`Стихия: ${astro.element}, Планета: ${astro.planet}. Восточный знак: ${astro.easternElement} ${astro.easternSign}`}
+                  >
+                    <Moon size={15} className="zodiac-icon-spin" />
+                    <span className="zodiac-sign-bold">{astro.sign}</span>
+                    <span className="zodiac-element-pill">{astro.element}</span>
+                    <span className="zodiac-eastern-pill">{astro.easternSign}</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

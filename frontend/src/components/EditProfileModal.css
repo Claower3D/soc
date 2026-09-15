@@ -832,3 +832,162 @@
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
 }
+
+/* ========================================================================= */
+/* ASTROLOGY & BIRTHDAY STYLES                                               */
+/* ========================================================================= */
+.astrology-highlight-banner {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1.1rem 1.4rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(236, 72, 153, 0.12) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.05);
+}
+
+.astro-banner-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b, #ec4899);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.astro-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.astro-banner-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.astro-banner-desc {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.field-hint-text {
+  font-size: 0.74rem;
+  color: var(--color-text-tertiary);
+  margin-top: 0.15rem;
+}
+
+.edit-select-ctrl {
+  cursor: pointer;
+}
+
+/* Calculated Live Zodiac Card */
+.astro-calculated-card {
+  background: var(--color-bg-secondary);
+  border: 1.5px solid var(--color-border);
+  border-radius: 16px;
+  padding: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.astro-card-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.astro-symbol-giant {
+  font-size: 2.4rem;
+  line-height: 1;
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #8b5cf6, #d946ef);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px rgba(139, 92, 246, 0.35);
+}
+
+.astro-primary-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+}
+
+.astro-sign-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.astro-element-tag {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.astro-age-badge {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+  padding: 0.4rem 0.85rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.astro-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .astro-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.astro-metric-box {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.astro-metric-box .metric-label {
+  font-size: 0.76rem;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.astro-metric-box .metric-val {
+  font-size: 0.95rem;
+  color: var(--color-text);
+  font-weight: 700;
+}

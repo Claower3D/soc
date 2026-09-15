@@ -23,6 +23,12 @@ export interface RegisteredAccount {
   consciousnessLevel?: number;
   consciousnessTitle?: string;
   cognitionVector?: 'spiritual' | 'exact_sciences' | 'visual_analogies' | 'philosophical' | 'pragmatic';
+  birthDate?: string;
+  zodiacSign?: string;
+  easternZodiac?: string;
+  gender?: 'male' | 'female' | 'other' | 'hidden';
+  showBirthDate?: boolean;
+  showZodiac?: boolean;
   createdAt: string;
 }
 

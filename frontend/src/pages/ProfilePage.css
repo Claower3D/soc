@@ -260,6 +260,66 @@
   border-radius: 9999px;
 }
 
+/* Zodiac & Birthday Profile Badges */
+.meta-birthdate {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-full);
+  padding: 0.25rem 0.75rem;
+  color: var(--color-text);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.meta-birthdate:hover {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.meta-zodiac {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(139, 92, 246, 0.12));
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-full);
+  padding: 0.25rem 0.75rem;
+  color: var(--color-text);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.08);
+  transition: all 0.2s ease;
+}
+
+.meta-zodiac:hover {
+  border-color: #f59e0b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);
+}
+
+.zodiac-sign-bold {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.zodiac-element-pill {
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.12);
+  padding: 0.1rem 0.45rem;
+  border-radius: 12px;
+}
+
+.zodiac-eastern-pill {
+  font-size: 0.76rem;
+  color: #d97706;
+  font-weight: 600;
+}
+
 .meta-consciousness-empty {
   background: transparent;
   border: 1px dashed rgba(139, 92, 246, 0.5);

@@ -134,6 +134,12 @@ export interface User {
   consciousnessLevel?: number; // Класс сознания от 1 до 11
   consciousnessTitle?: string; // Название класса сознания
   cognitionVector?: 'spiritual' | 'exact_sciences' | 'visual_analogies' | 'philosophical' | 'pragmatic'; // Вектор восприятия
+  birthDate?: string; // Дата рождения (ГГГГ-ММ-ДД)
+  zodiacSign?: string; // Знак зодиака (Овен, Телец...)
+  easternZodiac?: string; // Восточный знак (Дракон, Тигр...)
+  gender?: 'male' | 'female' | 'other' | 'hidden'; // Пол
+  showBirthDate?: boolean; // Показывать дату рождения
+  showZodiac?: boolean; // Показывать знак зодиака
 }
 
 export interface Highlight {
@@ -576,6 +582,12 @@ export const currentUser: User = {
   verified: true,
   rating: 4.95,
   salesCount: 25,
+  birthDate: '1995-04-12',
+  zodiacSign: 'Овен ♈',
+  easternZodiac: 'Деревянная Свинья (Кабан) 🐗',
+  gender: 'male',
+  showBirthDate: true,
+  showZodiac: true,
   highlights: [
     { id: 'h1', title: 'Проекты', cover: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=150&q=80' },
     { id: 'h2', title: 'Путешествия', cover: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=150&q=80' },
