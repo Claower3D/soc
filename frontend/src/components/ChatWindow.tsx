@@ -6,7 +6,8 @@ import {
   Image as ImageIcon, Video as VideoIcon, 
   CheckCheck, X, Trash2, Edit2, Reply, Copy, Check, MoreVertical,
   Camera, FileText, Headphones, UserCheck, BarChart2, Calendar, 
-  Sparkles, ShoppingBag, Zap, VolumeX, Palette, Archive, ArchiveRestore, Lock, Unlock
+  Sparkles, ShoppingBag, Zap, VolumeX, Palette, Archive, ArchiveRestore, Lock, Unlock,
+  Pin, Languages, Forward, CheckSquare
 } from 'lucide-react';
 import { 
   type Chat, type Message, type PollData, type EventData, 
@@ -23,6 +24,7 @@ interface ChatWindowProps {
 }
 
 const quickEmojis = ['😊', '😂', '🔥', '👍', '❤️', '🚀', '🎉', '👏', '👀', '💯', '🙌', '✨', '🧘', '🌟', '💎', '🕊️', '🤝', '🌞', '💡', '🌈'];
+const REACTION_EMOJIS = ['❤️', '👍', '👎', '🔥', '🥰', '👏', '😂'];
 
 const stickerPacks = [
   { id: 'stk_1', title: 'Осознанность', url: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=250&q=80' },
@@ -98,6 +100,28 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [confirmClearChat, setConfirmClearChat] = useState(false);
+
+  // Right-Click Context Menu State (Screenshot 4)
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    message: Message | null;
+  }>({ visible: false, x: 0, y: 0, message: null });
+
+  // Selected messages mode
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
+
+  // Close context menu on any outside click
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      if (contextMenu.visible) {
+        setContextMenu({ visible: false, x: 0, y: 0, message: null });
+      }
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, [contextMenu.visible]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const docInputRef = useRef<HTMLInputElement>(null);
@@ -189,6 +213,83 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
     const mins = Math.floor(sec / 60);
     const s = sec % 60;
     return `${mins}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Toggle Reaction on a message (hover bar or context menu - Screenshot 4 & 5)
+  const handleToggleReaction = (msgId: string, emoji: string) => {
+    setMessages(prev => prev.map(m => {
+      if (m.id !== msgId) return m;
+      const currentReactions = m.reactions ? [...m.reactions] : [];
+      const existingIdx = currentReactions.findIndex(r => r.emoji === emoji);
+
+      if (existingIdx >= 0) {
+        const item = currentReactions[existingIdx];
+        if (item.fromMe) {
+          // Remove my reaction
+          if (item.count <= 1) {
+            currentReactions.splice(existingIdx, 1);
+          } else {
+            currentReactions[existingIdx] = { ...item, count: item.count - 1, fromMe: false };
+          }
+        } else {
+          // Add my reaction
+          currentReactions[existingIdx] = { ...item, count: item.count + 1, fromMe: true };
+        }
+      } else {
+        // New reaction
+        currentReactions.push({ emoji, count: 1, fromMe: true });
+      }
+
+      return { ...m, reactions: currentReactions };
+    }));
+
+    // Close context menu if open
+    setContextMenu({ visible: false, x: 0, y: 0, message: null });
+  };
+
+  // Right Click Context Menu Handler
+  const handleContextMenu = (e: React.MouseEvent, msg: Message) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Prevent menu going offscreen
+    const menuWidth = 240;
+    const menuHeight = 360;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+
+    setContextMenu({
+      visible: true,
+      x: Math.max(10, x),
+      y: Math.max(10, y),
+      message: msg
+    });
+  };
+
+  // Pin / Unpin message
+  const handleTogglePinMessage = (msg: Message) => {
+    setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, isPinned: !m.isPinned } : m));
+    setContextMenu({ visible: false, x: 0, y: 0, message: null });
+  };
+
+  // Translate simulated
+  const handleTranslateMessage = (msg: Message) => {
+    if (!msg.text) return;
+    const translated = `[Переведено]: ${msg.text}`;
+    setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, text: translated } : m));
+    setContextMenu({ visible: false, x: 0, y: 0, message: null });
+  };
+
+  // Forward simulated
+  const handleForwardMessage = (msg: Message) => {
+    alert(`Сообщение «${(msg.text || 'Медиа').slice(0, 30)}...» скопировано для пересылки!`);
+    setContextMenu({ visible: false, x: 0, y: 0, message: null });
+  };
+
+  // Select message
+  const handleSelectMessage = (msg: Message) => {
+    setSelectedMessageIds(prev => prev.includes(msg.id) ? prev.filter(id => id !== msg.id) : [...prev, msg.id]);
+    setContextMenu({ visible: false, x: 0, y: 0, message: null });
   };
 
   // Helper to render delivery & read ticks
@@ -867,6 +968,32 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
         </div>
       </div>
 
+      {/* PINNED MESSAGE BANNER (TELEGRAM STYLE) */}
+      {messages.some(m => m.isPinned) && (
+        <div className="tg-pinned-bar">
+          <div className="pinned-bar-content">
+            <Pin size={15} className="pinned-icon" />
+            <div className="pinned-text-wrap">
+              <span className="pinned-label">Закрепленное сообщение</span>
+              <span className="pinned-preview">
+                {messages.find(m => m.isPinned)?.text || 'Вложение'}
+              </span>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            className="pinned-unpin-btn" 
+            onClick={() => {
+              const pinned = messages.find(m => m.isPinned);
+              if (pinned) handleTogglePinMessage(pinned);
+            }}
+            title="Открепить"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
       {/* Messages Feed Area with custom per-chat theme background */}
       <div 
         className="tg-messages-scroll"
@@ -894,10 +1021,33 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
             const isRec = Boolean(msg.conferenceRecording);
 
             return (
-              <div key={msg.id} className={`tg-msg-row ${isMe ? 'outgoing' : 'incoming'}`}>
+              <div 
+                key={msg.id} 
+                className={`tg-msg-row ${isMe ? 'outgoing' : 'incoming'} ${selectedMessageIds.includes(msg.id) ? 'selected-msg' : ''}`}
+                onContextMenu={(e) => handleContextMenu(e, msg)}
+              >
                 {/* Floating message actions toolbar on hover */}
                 <div className="tg-msg-wrapper">
                   <div className="tg-msg-actions-toolbar">
+                    {/* Hover Reaction Bar (Screenshot 4 top) */}
+                    <div className="hover-reactions-strip">
+                      {REACTION_EMOJIS.map(emoji => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          className="hover-reaction-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleReaction(msg.id, emoji);
+                          }}
+                          title={`Поставить ${emoji}`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="toolbar-divider" />
                     <button 
                       className="msg-action-btn"
                       onClick={() => setReplyingToMessage(msg)}
@@ -1196,10 +1346,29 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                         <div className="tg-text">{msg.text}</div>
                       )}
 
-                      {/* Timestamp & Seen ticks */}
+                      {/* Timestamp, Seen ticks & Attached Reactions (Screenshot 5) */}
                       <div className="tg-meta">
                         <span className="tg-time">{msg.time}</span>
                         {isMe && renderMessageTicks(msg)}
+                        {msg.reactions && msg.reactions.length > 0 && (
+                          <div className="msg-reaction-badges-row">
+                            {msg.reactions.map((r, rIdx) => (
+                              <button
+                                key={rIdx}
+                                type="button"
+                                className={`msg-reaction-badge ${r.fromMe ? 'my-reaction' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleReaction(msg.id, r.emoji);
+                                }}
+                                title={`Реакция ${r.emoji}: ${r.count}`}
+                              >
+                                <span>{r.emoji}</span>
+                                {r.count > 1 && <span className="reaction-count">{r.count}</span>}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1256,7 +1425,114 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
         </div>
       )}
 
-            {/* Standard Telegram Bottom Input Bar */}
+            {/* TELEGRAM RIGHT-CLICK CONTEXT MENU (EXACT SCREENSHOT 4) */}
+      {contextMenu.visible && contextMenu.message && (
+        <div 
+          className="tg-context-menu" 
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Top Emoji Reactions Strip */}
+          <div className="context-reactions-bar">
+            {REACTION_EMOJIS.map(emoji => (
+              <button
+                key={emoji}
+                type="button"
+                className="context-reaction-btn"
+                onClick={() => handleToggleReaction(contextMenu.message!.id, emoji)}
+                title={emoji}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
+          <div className="context-menu-divider" />
+
+          {/* 1. Ответить */}
+          <button 
+            type="button" 
+            className="context-menu-row"
+            onClick={() => {
+              setReplyingToMessage(contextMenu.message);
+              setContextMenu({ visible: false, x: 0, y: 0, message: null });
+            }}
+          >
+            <Reply size={16} />
+            <span>Ответить</span>
+          </button>
+
+          {/* 2. Копировать */}
+          <button 
+            type="button" 
+            className="context-menu-row"
+            onClick={() => {
+              handleCopyMessage(contextMenu.message!);
+              setContextMenu({ visible: false, x: 0, y: 0, message: null });
+            }}
+          >
+            <Copy size={16} />
+            <span>Копировать</span>
+          </button>
+
+          {/* 3. Перевести */}
+          <button 
+            type="button" 
+            className="context-menu-row"
+            onClick={() => handleTranslateMessage(contextMenu.message!)}
+          >
+            <Languages size={16} />
+            <span>Перевести</span>
+          </button>
+
+          {/* 4. Закрепить */}
+          <button 
+            type="button" 
+            className="context-menu-row"
+            onClick={() => handleTogglePinMessage(contextMenu.message!)}
+          >
+            <Pin size={16} />
+            <span>{contextMenu.message.isPinned ? 'Открепить' : 'Закрепить'}</span>
+          </button>
+
+          {/* 5. Переслать */}
+          <button 
+            type="button" 
+            className="context-menu-row"
+            onClick={() => handleForwardMessage(contextMenu.message!)}
+          >
+            <Forward size={16} />
+            <span>Переслать</span>
+          </button>
+
+          {/* 6. Выбрать */}
+          <button 
+            type="button" 
+            className="context-menu-row"
+            onClick={() => handleSelectMessage(contextMenu.message!)}
+          >
+            <CheckSquare size={16} />
+            <span>Выбрать</span>
+          </button>
+
+          <div className="context-menu-divider" />
+
+          {/* 7. Удалить */}
+          <button 
+            type="button" 
+            className="context-menu-row danger"
+            onClick={() => {
+              setMessageToDelete(contextMenu.message);
+              setContextMenu({ visible: false, x: 0, y: 0, message: null });
+            }}
+          >
+            <Trash2 size={16} />
+            <span>Удалить</span>
+          </button>
+        </div>
+      )}
+
+      {/* Standard Telegram Bottom Input Bar */}
       <div className="tg-bottom-bar">
         {/* Backdrop for popovers to close when clicked outside */}
         {(showMediaTabs || showAttachMenu) && (

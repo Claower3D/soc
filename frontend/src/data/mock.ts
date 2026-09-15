@@ -292,6 +292,8 @@ export interface Message {
   productData?: ProductData;
   contactData?: ContactData;
   status?: 'sent' | 'delivered' | 'read';
+  reactions?: Array<{ emoji: string; count: number; fromMe?: boolean }>;
+  isPinned?: boolean;
   conferenceRecording?: {
     title: string;
     duration: string;
@@ -299,6 +301,19 @@ export interface Message {
     code: string;
   };
 }
+
+export interface ChatTag {
+  id: string;
+  title: string;
+  color: string;
+}
+
+export const CHAT_TAGS: ChatTag[] = [
+  { id: 'new_client', title: 'Новый клиент', color: '#3B82F6' },
+  { id: 'order_completed', title: 'Заказ выполнен', color: '#10B981' },
+  { id: 'in_progress', title: 'В работе', color: '#F59E0B' },
+  { id: 'payment_waiting', title: 'Ожидает оплаты', color: '#EC4899' },
+];
 
 export interface ChatTheme {
   id: string;
@@ -399,6 +414,9 @@ export interface Chat {
   isLocked?: boolean;
   pinCode?: string;
   customTheme?: ChatTheme;
+  isFavorite?: boolean;
+  isImportant?: boolean;
+  tagId?: string;
 }
 
 export interface Conference {
@@ -994,9 +1012,18 @@ export const initialChats: Chat[] = [
     lastMessage: 'Слушай, а голосовые сообщения теперь тоже можно отправлять? 🎙️',
     time: '12:45',
     unread: 2,
+    isFavorite: true,
+    tagId: 'new_client',
     messages: [
       { id: 'm1', text: 'Привет, Алексей! 👋', fromMe: false, time: '12:30' },
-      { id: 'm2', text: 'Привет, Алиса! Всё отлично, обновляем дизайн мессенджера.', fromMe: true, time: '12:32', status: 'read' },
+      { 
+        id: 'm2', 
+        text: 'Привет, Алиса! Всё отлично, обновляем дизайн мессенджера.', 
+        fromMe: true, 
+        time: '12:32', 
+        status: 'read',
+        reactions: [{ emoji: '❤️', count: 1, fromMe: true }]
+      },
       { 
         id: 'm3_voice', 
         fromMe: false, 
@@ -1012,7 +1039,8 @@ export const initialChats: Chat[] = [
         mediaType: 'image', 
         mediaUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', 
         text: 'Вот новые макеты с прикреплением файлов!',
-        status: 'delivered'
+        status: 'delivered',
+        reactions: [{ emoji: '🔥', count: 2, fromMe: false }]
       },
       { id: 'm5', text: 'Слушай, а голосовые сообщения теперь тоже можно отправлять? 🎙️', fromMe: false, time: '12:45' },
     ],
@@ -1020,6 +1048,8 @@ export const initialChats: Chat[] = [
   {
     id: 'ch2',
     user: initialUsers[2],
+    isImportant: true,
+    tagId: 'order_completed',
     lastMessage: 'Подключись в закрытую конференцию по ссылке в 16:00',
     time: '11:20',
     unread: 0,

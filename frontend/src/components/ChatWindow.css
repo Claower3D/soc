@@ -1895,3 +1895,223 @@
 .theme-checked-icon {
   color: var(--color-accent);
 }
+
+/* ==================== PINNED MESSAGE BANNER (TELEGRAM STYLE) ==================== */
+.tg-pinned-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 1.25rem;
+  background: var(--color-bg-card);
+  border-bottom: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  animation: fadeIn 0.15s ease;
+  z-index: 10;
+}
+
+.pinned-bar-content {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  overflow: hidden;
+}
+
+.pinned-icon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.pinned-text-wrap {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pinned-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.pinned-preview {
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 380px;
+}
+
+.pinned-unpin-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 4px;
+}
+
+.pinned-unpin-btn:hover {
+  color: var(--color-text);
+  background: var(--color-bg-secondary);
+}
+
+/* ==================== HOVER REACTION STRIP (SCREENSHOT 4) ==================== */
+.hover-reactions-strip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 3px;
+}
+
+.hover-reaction-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.05rem;
+  cursor: pointer;
+  padding: 1px 3px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.hover-reaction-btn:hover {
+  transform: scale(1.3);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.toolbar-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--color-border);
+  margin: 0 4px;
+}
+
+/* Selected message row */
+.tg-msg-row.selected-msg .tg-bubble {
+  box-shadow: 0 0 0 2px var(--color-accent) !important;
+}
+
+/* ==================== REACTION BADGES ON MESSAGE (SCREENSHOT 5) ==================== */
+.msg-reaction-badges-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.msg-reaction-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 12px;
+  padding: 2px 7px;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+:root[data-theme='dark'] .msg-reaction-badge,
+.theme-dark .msg-reaction-badge,
+.tg-chat-container .msg-reaction-badge {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.msg-reaction-badge:hover {
+  transform: scale(1.1);
+  background: rgba(99, 102, 241, 0.2);
+  border-color: var(--color-accent);
+}
+
+.msg-reaction-badge.my-reaction {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: var(--color-accent);
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.2);
+}
+
+.reaction-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+/* ==================== TELEGRAM RIGHT-CLICK CONTEXT MENU (SCREENSHOT 4) ==================== */
+.tg-context-menu {
+  position: fixed;
+  background: #18222d;
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7);
+  padding: 6px;
+  width: 220px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: fadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.context-reactions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  margin-bottom: 4px;
+}
+
+.context-reaction-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px;
+  border-radius: 6px;
+  transition: transform 0.15s;
+}
+
+.context-reaction-btn:hover {
+  transform: scale(1.3);
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 3px 0;
+}
+
+.context-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  border: none;
+  color: #f1f5f9;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.context-menu-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.context-menu-row.danger {
+  color: #f87171;
+}
+
+.context-menu-row.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+}

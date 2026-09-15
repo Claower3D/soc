@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { 
   Search, Users, Trash2, Plus, Sparkles, X, Check, 
-  Archive, ArchiveRestore, Lock, Unlock, KeyRound, Shield
+  Archive, ArchiveRestore, Lock, Unlock, KeyRound, Shield,
+  Star, ChevronDown, Tag, Heart, AlertCircle
 } from 'lucide-react';
-import { initialUsers, currentUser, type Chat } from '../data/mock';
+import { initialUsers, currentUser, stories, type Chat, CHAT_TAGS } from '../data/mock';
 import './ChatList.css';
 
 interface ChatListProps {
@@ -23,8 +24,20 @@ export function ChatList({
   onCreateGroup,
   onUpdateChat 
 }: ChatListProps) {
-  const [activeTab, setActiveTab] = useState<'all' | 'archive' | 'locked'>('all');
+  type TabType = 'all' | 'unread' | 'favorites' | 'groups' | 'important' | 'archive' | 'locked';
+  const [activeTab, setActiveTab] = useState<TabType>('all');
+  const [activeTagId, setActiveTagId] = useState<string | null>(null);
+  const [showTagsMenu, setShowTagsMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [customTags, setCustomTags] = useState(CHAT_TAGS);
+  const [showNewTagModal, setShowNewTagModal] = useState(false);
+  const [newTagTitle, setNewTagTitle] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#3B82F6');
+
+  // Messenger Stories viewer
+  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+  const [storyReply, setStoryReply] = useState('');
+  const [storyLiked, setStoryLiked] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [groupTitle, setGroupTitle] = useState('');
@@ -43,12 +56,29 @@ export function ChatList({
 
   const archivedCount = chats.filter(c => c.isArchived).length;
   const lockedCount = chats.filter(c => c.isLocked).length;
+  const unreadCount = chats.filter(c => !c.isArchived && !c.isLocked && c.unread > 0).length;
+  const favoritesCount = chats.filter(c => !c.isArchived && !c.isLocked && c.isFavorite).length;
+  const groupsCount = chats.filter(c => !c.isArchived && !c.isLocked && c.isGroup).length;
+  const importantCount = chats.filter(c => !c.isArchived && !c.isLocked && c.isImportant).length;
 
   const filteredChats = chats.filter(chat => {
+    // Tag filter
+    if (activeTagId) {
+      if (chat.tagId !== activeTagId) return false;
+    }
+
     // Tab filter
     if (activeTab === 'all') {
       if (chat.isArchived) return false;
       if (chat.isLocked) return false;
+    } else if (activeTab === 'unread') {
+      if (chat.isArchived || chat.isLocked || chat.unread === 0) return false;
+    } else if (activeTab === 'favorites') {
+      if (chat.isArchived || chat.isLocked || !chat.isFavorite) return false;
+    } else if (activeTab === 'groups') {
+      if (chat.isArchived || chat.isLocked || !chat.isGroup) return false;
+    } else if (activeTab === 'important') {
+      if (chat.isArchived || chat.isLocked || !chat.isImportant) return false;
     } else if (activeTab === 'archive') {
       if (!chat.isArchived) return false;
     } else if (activeTab === 'locked') {
@@ -78,7 +108,8 @@ export function ChatList({
     onSelectChat(chat.id);
   };
 
-  const handleTabClick = (tab: 'all' | 'archive' | 'locked') => {
+  const handleTabClick = (tab: TabType) => {
+    setActiveTagId(null);
     if (tab === 'locked' && !isLockedUnlocked) {
       setTargetLockedChatId('unlock_tab');
       setEnteredPin('');
@@ -87,6 +118,40 @@ export function ChatList({
       return;
     }
     setActiveTab(tab);
+  };
+
+  const handleSelectTag = (tagId: string) => {
+    setActiveTagId(tagId);
+    setActiveTab('all');
+    setShowTagsMenu(false);
+  };
+
+  const handleToggleFavorite = (chatId: string, currentFav?: boolean) => {
+    if (onUpdateChat) {
+      onUpdateChat(chatId, { isFavorite: !currentFav });
+    }
+  };
+
+  const handleToggleImportant = (chatId: string, currentImp?: boolean) => {
+    if (onUpdateChat) {
+      onUpdateChat(chatId, { isImportant: !currentImp });
+    }
+  };
+
+  const handleAddCustomTag = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTagTitle.trim()) return;
+    const newTag = {
+      id: `tag_${Date.now()}`,
+      title: newTagTitle.trim(),
+      color: newTagColor
+    };
+    setCustomTags(prev => [...prev, newTag]);
+    setActiveTagId(newTag.id);
+    setActiveTab('all');
+    setShowNewTagModal(false);
+    setShowTagsMenu(false);
+    setNewTagTitle('');
   };
 
   const handlePinDigit = (digit: string) => {
@@ -210,33 +275,170 @@ export function ChatList({
           </button>
         </div>
 
-        {/* Filter Tabs: Все / Архив / Закрытые */}
+        {/* USER STORIES BAR (EXACT SCREENSHOT MATCH 3) */}
+        <div className="messenger-stories-bar">
+          <div className="messenger-stories-scroll">
+            {stories.map((story, sIdx) => (
+              <div 
+                key={story.id} 
+                className="messenger-story-item"
+                onClick={() => {
+                  setActiveStoryIndex(sIdx);
+                  setStoryLiked(false);
+                }}
+              >
+                <div className={`messenger-story-ring ${story.isLive ? 'live' : ''}`}>
+                  <img src={story.user.avatar} alt={story.user.name} className="messenger-story-img" />
+                  {story.isLive && <span className="messenger-live-badge">LIVE</span>}
+                </div>
+                <span className="messenger-story-name">{story.user.name.split(' ')[0]}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* BIRTHDAY BANNER NOTICE (EXACT SCREENSHOT MATCH 3) */}
+        <div className="messenger-birthday-card" onClick={() => alert('Поздравление отправлено Алине! 🎂')}>
+          <div className="birthday-avatar-badge">
+            <span>А</span>
+          </div>
+          <div className="birthday-card-info">
+            <span className="birthday-title">Алина празднует день рождения! 🎂</span>
+            <span className="birthday-action-link">Отправить подарок / пожелание</span>
+          </div>
+        </div>
+
+        {/* FOLDER TABS & LABELS (EXACT SCREENSHOT MATCH 1 & 2) */}
         <div className="chat-list-filter-tabs">
           <button
             type="button"
-            className={`chat-tab-pill ${activeTab === 'all' ? 'active' : ''}`}
+            className={`chat-tab-pill ${activeTab === 'all' && !activeTagId ? 'active' : ''}`}
             onClick={() => handleTabClick('all')}
           >
             Все
           </button>
+
+          <button
+            type="button"
+            className={`chat-tab-pill ${activeTab === 'unread' ? 'active' : ''}`}
+            onClick={() => handleTabClick('unread')}
+          >
+            <span>Непрочитанное</span>
+            {unreadCount > 0 && <span className="tab-counter-badge">{unreadCount}</span>}
+          </button>
+
+          <button
+            type="button"
+            className={`chat-tab-pill ${activeTab === 'favorites' ? 'active' : ''}`}
+            onClick={() => handleTabClick('favorites')}
+          >
+            <Star size={13} className="tab-star-icon" />
+            <span>Избранное</span>
+            {favoritesCount > 0 && <span className="tab-counter-badge">{favoritesCount}</span>}
+          </button>
+
+          <button
+            type="button"
+            className={`chat-tab-pill ${activeTab === 'groups' ? 'active' : ''}`}
+            onClick={() => handleTabClick('groups')}
+          >
+            <Users size={13} />
+            <span>Группы</span>
+            {groupsCount > 0 && <span className="tab-counter-badge">{groupsCount}</span>}
+          </button>
+
+          <button
+            type="button"
+            className={`chat-tab-pill ${activeTab === 'important' ? 'active' : ''}`}
+            onClick={() => handleTabClick('important')}
+          >
+            <span className="tab-important-pip" />
+            <span>Важные</span>
+            {importantCount > 0 && <span className="tab-counter-badge">{importantCount}</span>}
+          </button>
+
           <button
             type="button"
             className={`chat-tab-pill ${activeTab === 'archive' ? 'active' : ''}`}
             onClick={() => handleTabClick('archive')}
           >
-            <Archive size={14} />
+            <Archive size={13} />
             <span>Архив</span>
             {archivedCount > 0 && <span className="tab-counter-badge">{archivedCount}</span>}
           </button>
+
           <button
             type="button"
             className={`chat-tab-pill ${activeTab === 'locked' ? 'active' : ''}`}
             onClick={() => handleTabClick('locked')}
           >
-            {isLockedUnlocked ? <Unlock size={14} className="unlocked-icon" /> : <Lock size={14} />}
+            {isLockedUnlocked ? <Unlock size={13} className="unlocked-icon" /> : <Lock size={13} />}
             <span>Закрытые</span>
             {lockedCount > 0 && <span className="tab-counter-badge">{lockedCount}</span>}
           </button>
+
+          {/* TAGS DROPDOWN (WHATSAPP BUSINESS STYLE - SCREENSHOT 2) */}
+          <div className="chat-tags-dropdown-wrap">
+            <button
+              type="button"
+              className={`chat-tab-pill dropdown-trigger ${activeTagId ? 'active' : ''}`}
+              onClick={() => setShowTagsMenu(prev => !prev)}
+              title="Метки и списки клиентов"
+            >
+              {activeTagId ? (
+                <>
+                  <span className="tag-color-pip" style={{ background: customTags.find(t => t.id === activeTagId)?.color || '#3B82F6' }} />
+                  <span>{customTags.find(t => t.id === activeTagId)?.title || 'Метка'}</span>
+                </>
+              ) : (
+                <>
+                  <Tag size={13} />
+                  <ChevronDown size={13} />
+                </>
+              )}
+            </button>
+
+            {showTagsMenu && (
+              <div className="chat-tags-menu-dark">
+                {customTags.map(tag => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    className={`tag-menu-item ${activeTagId === tag.id ? 'selected' : ''}`}
+                    onClick={() => handleSelectTag(tag.id)}
+                  >
+                    <span className="tag-color-pip" style={{ background: tag.color }} />
+                    <span>{tag.title}</span>
+                  </button>
+                ))}
+                <div className="tag-menu-divider" />
+                <button
+                  type="button"
+                  className="tag-menu-item new-list-action"
+                  onClick={() => {
+                    setShowTagsMenu(false);
+                    setShowNewTagModal(true);
+                  }}
+                >
+                  <Plus size={14} />
+                  <span>Новый список / метка</span>
+                </button>
+                {activeTagId && (
+                  <button
+                    type="button"
+                    className="tag-menu-item reset-action"
+                    onClick={() => {
+                      setActiveTagId(null);
+                      setShowTagsMenu(false);
+                    }}
+                  >
+                    <X size={14} />
+                    <span>Сбросить фильтр</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -296,6 +498,20 @@ export function ChatList({
                     <span className="chat-name">
                       {displayName}
                       {isAi && <span className="ai-tag-inline">ИИ</span>}
+                      {chat.isFavorite && <Star size={12} className="chat-star-badge" fill="#F59E0B" color="#F59E0B" />}
+                      {chat.isImportant && <span className="chat-important-dot" title="Важный контакт" />}
+                      {chat.tagId && (
+                        <span 
+                          className="chat-tag-pill-badge" 
+                          style={{ 
+                            background: `${customTags.find(t => t.id === chat.tagId)?.color || '#3B82F6'}22`, 
+                            color: customTags.find(t => t.id === chat.tagId)?.color || '#3B82F6',
+                            borderColor: `${customTags.find(t => t.id === chat.tagId)?.color || '#3B82F6'}55` 
+                          }}
+                        >
+                          {customTags.find(t => t.id === chat.tagId)?.title || 'Метка'}
+                        </span>
+                      )}
                       {chat.isArchived && <span className="archive-tag-inline">Архив</span>}
                     </span>
                     <span className="chat-time">{chat.time}</span>
@@ -308,6 +524,36 @@ export function ChatList({
                     <div className="chat-item-actions-wrap">
                       {chat.unread > 0 && (
                         <span className="unread-badge">{chat.unread}</span>
+                      )}
+
+                      {/* Quick Action: Star Favorite */}
+                      {!isAi && (
+                        <button
+                          type="button"
+                          className={`chat-action-quick-btn ${chat.isFavorite ? 'favorite-active' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleFavorite(chat.id, chat.isFavorite);
+                          }}
+                          title={chat.isFavorite ? "Убрать из избранного" : "В избранное"}
+                        >
+                          <Star size={13} fill={chat.isFavorite ? "#F59E0B" : "none"} color={chat.isFavorite ? "#F59E0B" : "currentColor"} />
+                        </button>
+                      )}
+
+                      {/* Quick Action: Important tag */}
+                      {!isAi && (
+                        <button
+                          type="button"
+                          className={`chat-action-quick-btn ${chat.isImportant ? 'important-active' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleImportant(chat.id, chat.isImportant);
+                          }}
+                          title={chat.isImportant ? "Снять метку Важное" : "Пометить как Важное"}
+                        >
+                          <AlertCircle size={13} color={chat.isImportant ? "#f43f5e" : "currentColor"} />
+                        </button>
                       )}
 
                       {/* Quick Action Buttons: Archive / Unarchive */}
@@ -588,6 +834,121 @@ export function ChatList({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* NEW TAG CREATION MODAL */}
+      {showNewTagModal && (
+        <div className="chat-list-modal-overlay" onClick={() => setShowNewTagModal(false)}>
+          <div className="chat-list-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="group-modal-header">
+              <h3>Создать новую метку / список</h3>
+              <button type="button" className="close-modal-btn" onClick={() => setShowNewTagModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleAddCustomTag} className="group-modal-form">
+              <div className="group-form-group">
+                <label>Название метки (например «Оптовый клиент», «VIP»):</label>
+                <input 
+                  type="text" 
+                  className="group-input" 
+                  placeholder="Введите название..." 
+                  value={newTagTitle}
+                  onChange={e => setNewTagTitle(e.target.value)}
+                  autoFocus
+                  required
+                />
+              </div>
+              <div className="group-form-group">
+                <label>Цвет индикатора:</label>
+                <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+                  {['#3B82F6', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6', '#EF4444', '#06B6D4'].map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setNewTagColor(c)}
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        background: c,
+                        border: newTagColor === c ? '3px solid white' : 'none',
+                        boxShadow: newTagColor === c ? '0 0 0 2px var(--color-accent)' : 'none',
+                        cursor: 'pointer'
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="group-modal-footer">
+                <button type="button" className="modal-btn cancel" onClick={() => setShowNewTagModal(false)}>
+                  Отмена
+                </button>
+                <button type="submit" className="modal-btn create" disabled={!newTagTitle.trim()}>
+                  Создать метку
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MESSENGER STORY VIEWER MODAL */}
+      {activeStoryIndex !== null && stories[activeStoryIndex] && (
+        <div className="messenger-story-viewer-overlay" onClick={() => setActiveStoryIndex(null)}>
+          <div className="messenger-story-viewer-card" onClick={e => e.stopPropagation()}>
+            <div className="story-viewer-top-bar">
+              <div className="story-viewer-progress-bar">
+                <div className="story-viewer-progress-fill" style={{ width: '100%' }} />
+              </div>
+              <div className="story-viewer-header">
+                <img src={stories[activeStoryIndex].user.avatar} alt="author" className="story-viewer-avatar" />
+                <div className="story-viewer-user-info">
+                  <span className="story-viewer-name">{stories[activeStoryIndex].user.name}</span>
+                  <span className="story-viewer-time">{stories[activeStoryIndex].timestamp}</span>
+                </div>
+                <button type="button" className="story-viewer-close-btn" onClick={() => setActiveStoryIndex(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="story-viewer-image-container">
+              <img 
+                src={stories[activeStoryIndex].image} 
+                alt="Story content" 
+                className="story-viewer-media" 
+              />
+              {stories[activeStoryIndex].text && (
+                <div className="story-viewer-caption">
+                  {stories[activeStoryIndex].text}
+                </div>
+              )}
+            </div>
+
+            <div className="story-viewer-footer">
+              <input 
+                type="text" 
+                placeholder={`Ответить пользователю ${stories[activeStoryIndex].user.name.split(' ')[0]}...`}
+                className="story-viewer-input"
+                value={storyReply}
+                onChange={e => setStoryReply(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && storyReply.trim()) {
+                    alert(`Ответ отправлен ${stories[activeStoryIndex].user.name}: "${storyReply}"`);
+                    setStoryReply('');
+                  }
+                }}
+              />
+              <button 
+                type="button" 
+                className={`story-viewer-like-btn ${storyLiked ? 'liked' : ''}`}
+                onClick={() => setStoryLiked(!storyLiked)}
+              >
+                <Heart size={22} fill={storyLiked ? '#EF4444' : 'none'} color={storyLiked ? '#EF4444' : '#FFFFFF'} />
+              </button>
+            </div>
           </div>
         </div>
       )}
