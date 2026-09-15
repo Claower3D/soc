@@ -216,6 +216,10 @@ export interface Clip {
   tags?: string[];
   comments?: ClipComment[];
   timeAgo?: string;
+  isAiGenerated?: boolean;
+  audioTrackArt?: string;
+  overlayTitle?: string;
+  isHorizontal?: boolean;
 }
 
 export interface PollOption {
@@ -844,6 +848,82 @@ export const videos: Video[] = [
 
 export const initialClips: Clip[] = [
   {
+    id: 'clip_soulhelp',
+    user: {
+      id: 'soulhelp_way',
+      name: 'soulhelp.way',
+      username: 'soulhelp.way',
+      avatar: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=150&q=80',
+      online: true,
+      verified: true,
+      role: 'creator',
+      bio: 'Путь пробуждения силы и осознанности.',
+      consciousnessLevel: 12,
+      consciousnessTitle: 'Мастер Пробуждения',
+      followersCount: 18400,
+      followingCount: 42,
+      postsCount: 156
+    },
+    poster: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    caption: 'Как понять, что внутри тебя пробуждается древняя Сила? ⚡ Когда привычный мир вокруг перестает казаться устойчивым, а душа ищет глубинный смысл... #пробуждение #сила #духовность #осознанность',
+    musicTitle: 'arya x • no sleep',
+    musicAuthor: 'arya x',
+    audioTrackArt: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=100&q=80',
+    overlayTitle: 'КАК ПОНЯТЬ, ЧТО ПРОБУЖДАЕТСЯ СИЛА?',
+    isAiGenerated: true,
+    likesCount: 2849,
+    commentsCount: 129,
+    sharesCount: 56,
+    viewsCount: 48200,
+    isLiked: false,
+    isSaved: false,
+    tags: ['пробуждение', 'сила', 'духовность', 'эзотерика', 'самопознание'],
+    timeAgo: '4 ч назад',
+    comments: [
+      { id: 'c_sh1', user: initialUsers[2], text: 'В точку! Именно такие трансформации происходят прямо сейчас 🙏', timeAgo: '2 ч назад', likes: 42 },
+      { id: 'c_sh2', user: initialUsers[4], text: 'Трек arya x идеально подчеркивает глубину атмосферы 🔥', timeAgo: '1 ч назад', likes: 18 },
+      { id: 'c_sh3', user: initialUsers[1], text: 'Мурашки от слов и музыки. Благодарю за напоминание!', timeAgo: '35 мин назад', likes: 9 }
+    ]
+  },
+  {
+    id: 'clip_nature_ai',
+    user: {
+      id: 'mystic_nature',
+      name: 'mystic.realm',
+      username: 'mystic.realm',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+      online: true,
+      verified: true,
+      role: 'creator',
+      bio: 'ИИ-визуализация высших миров и тайн Вселенной.',
+      consciousnessLevel: 9,
+      consciousnessTitle: 'Квантовый Архитектор',
+      followersCount: 29500,
+      followingCount: 88,
+      postsCount: 312
+    },
+    poster: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    caption: 'Портал в измерение света 🌌 Визуализировано нейросетью New Age AI в резонансе с космическими частотами. Какую энергию вы чувствуете?',
+    musicTitle: 'Celestial Waves • 528 Hz Love Frequency',
+    musicAuthor: 'Cosmic AI Harmonics',
+    audioTrackArt: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=100&q=80',
+    overlayTitle: 'КВАНТОВЫЙ РЕЗОНАНС СЕРДЦА',
+    isAiGenerated: true,
+    likesCount: 15420,
+    commentsCount: 387,
+    sharesCount: 1240,
+    viewsCount: 94000,
+    isLiked: true,
+    isSaved: true,
+    tags: ['ии', 'нейросеть', 'космос', 'вибрации', '528hz'],
+    timeAgo: '7 ч назад',
+    comments: [
+      { id: 'c_m1', user: initialUsers[5], text: 'Невероятное качество графики и звука!', timeAgo: '5 ч назад', likes: 27 }
+    ]
+  },
+  {
     id: 'clip_1',
     user: initialUsers[1],
     poster: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
@@ -851,6 +931,7 @@ export const initialClips: Clip[] = [
     caption: 'Морской прибой на закате 🌊 Когда ум успокаивается, открывается истинный взор. Практикуем тишину!',
     musicTitle: 'Медитация Океана • 432 Гц',
     musicAuthor: 'New Age Sound',
+    audioTrackArt: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=100&q=80',
     likesCount: 14200,
     commentsCount: 384,
     sharesCount: 1250,
@@ -873,6 +954,7 @@ export const initialClips: Clip[] = [
     caption: 'Горный хребет сквозь утренний туман 🏔️ Подъем на высоту 2500м. Тело дышит праной!',
     musicTitle: 'Дыхание Гор • Этническая флейта',
     musicAuthor: 'Алиса Смирнова',
+    audioTrackArt: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=100&q=80',
     likesCount: 28900,
     commentsCount: 712,
     sharesCount: 3400,
@@ -894,6 +976,7 @@ export const initialClips: Clip[] = [
     caption: 'Кодим алгоритм распределения заявок в девизе «Спасение служба» 💻 3% честная комиссия и открытый код!',
     musicTitle: 'Cyber Ambient • Synthwave Flow',
     musicAuthor: 'Dev Studio Music',
+    audioTrackArt: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=100&q=80',
     likesCount: 9800,
     commentsCount: 245,
     sharesCount: 890,
@@ -915,6 +998,7 @@ export const initialClips: Clip[] = [
     caption: 'Звучание тибетской чаши в резонансе 528 Гц 🔔 Положите телефон, закройте глаза и сделайте 3 глубоких вдоха.',
     musicTitle: 'Поющая Чаша 528 Гц • ДНК исцеление',
     musicAuthor: 'Мастер Ананта',
+    audioTrackArt: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=100&q=80',
     likesCount: 34100,
     commentsCount: 980,
     sharesCount: 5120,
@@ -935,6 +1019,7 @@ export const initialClips: Clip[] = [
     caption: 'Живой сет с винила на закате 🎧 Музыка объединяет сердца во всех уголках планеты!',
     musicTitle: 'Sunset Vinyl Sessions • Deep House',
     musicAuthor: 'DJ Sunset',
+    audioTrackArt: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=100&q=80',
     likesCount: 18700,
     commentsCount: 420,
     sharesCount: 1980,

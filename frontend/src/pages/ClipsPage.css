@@ -2,18 +2,19 @@
   position: relative;
   width: 100%;
   height: calc(100vh - 64px);
-  background: #0b0f19;
+  background: #000000;
   display: flex;
   justify-content: center;
   align-items: center;
   overflow: hidden;
+  user-select: none;
 }
 
 /* Feed Wrapper */
 .clips-feed-wrapper {
   position: relative;
   width: 100%;
-  max-width: 480px;
+  max-width: 620px;
   height: 100%;
   display: flex;
   justify-content: center;
@@ -35,7 +36,7 @@
   display: none; /* Chrome, Safari, Opera */
 }
 
-/* Individual Clip Card */
+/* Individual Clip Card: holds Video and External Right Action Column */
 .clip-item-card {
   position: relative;
   width: 100%;
@@ -45,25 +46,42 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: 16px;
   background: #000;
-  overflow: hidden;
+  padding: 16px 0;
+  box-sizing: border-box;
 }
 
-/* Video Player in 9:16 format */
+/* Central Video Container (Aspect Ratio 9:16 on desktop, like Instagram Reels) */
+.clip-video-wrapper {
+  position: relative;
+  height: calc(100vh - 96px);
+  max-height: 840px;
+  aspect-ratio: 9 / 16;
+  background: #050505;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Video Player in 9:16 */
 .clip-video-element {
   width: 100%;
   height: 100%;
   object-fit: cover;
   cursor: pointer;
-  background: #05070c;
+  background: #000;
 }
 
 /* Top Floating Bar */
 .clip-top-bar {
   position: absolute;
-  top: 16px;
-  left: 16px;
-  right: 16px;
+  top: 14px;
+  left: 14px;
+  right: 14px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -75,45 +93,44 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(12px);
+  padding: 5px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 20px;
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.3px;
 }
 
 .clip-brand-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
 }
 
 .clip-create-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
   color: #fff;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 20px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
   transition: all 0.2s ease;
   text-decoration: none;
 }
 
 .clip-create-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.6);
+  background: rgba(255, 255, 255, 0.25);
   color: #fff;
 }
 
@@ -123,10 +140,10 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 72px;
-  height: 72px;
+  width: 68px;
+  height: 68px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
@@ -152,113 +169,71 @@
   }
 }
 
-/* Right Actions Sidebar */
-.clip-right-actions {
+/* Gothic/Aesthetic Spiritual Subtitle Overlay Banner (Screenshot 1) */
+.clip-overlay-title-banner {
+  position: absolute;
+  top: 22%;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  z-index: 18;
+  pointer-events: none;
+}
+
+.clip-overlay-title-text {
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9), 0 0 20px rgba(168, 85, 247, 0.6);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 8px 18px;
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  line-height: 1.3;
+}
+
+/* In-Video Mute Button (Bottom Right inside video) */
+.clip-invideo-mute-btn {
   position: absolute;
   right: 14px;
-  bottom: 80px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  z-index: 25;
-}
-
-.clip-action-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.clip-action-btn {
-  width: 46px;
-  height: 46px;
+  bottom: 14px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: rgba(20, 24, 39, 0.75);
-  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
   border: 1px solid rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 25;
+  transition: transform 0.15s ease, background 0.15s ease;
 }
 
-.clip-action-btn:hover {
+.clip-invideo-mute-btn:hover {
   transform: scale(1.1);
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.85);
 }
 
-.clip-action-btn.liked {
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.4);
-}
-
-.clip-action-btn.saved {
-  color: #eab308;
-  background: rgba(234, 179, 8, 0.2);
-  border-color: rgba(234, 179, 8, 0.4);
-}
-
-.clip-action-count {
-  font-size: 11px;
-  font-weight: 600;
-  color: #fff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
-}
-
-/* Sound Toggle & Sound Disc */
-.clip-sound-disc {
-  position: relative;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #111;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-  cursor: pointer;
-}
-
-.clip-disc-art {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  animation: discSpin 4s linear infinite;
-}
-
-.clip-sound-disc.paused .clip-disc-art {
-  animation-play-state: paused;
-}
-
-@keyframes discSpin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Bottom Overlay Info (Author, Description, Audio) */
+/* Bottom Info inside Video (Author, Follow, AI badge, Caption, Music) */
 .clip-bottom-info {
   position: absolute;
   left: 0;
-  right: 70px;
+  right: 50px;
   bottom: 0;
-  padding: 24px 16px 20px 16px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.6) 60%, transparent 100%);
+  padding: 32px 14px 14px 14px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.4) 65%, transparent 100%);
   z-index: 20;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   pointer-events: none;
 }
 
@@ -275,140 +250,247 @@
 
 .clip-author-avatar-wrap {
   position: relative;
+  flex-shrink: 0;
 }
 
 .clip-author-avatar {
-  width: 42px;
-  height: 42px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #a855f7;
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
 }
 
-.clip-author-names {
+.clip-author-info-col {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.clip-author-display-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
+.clip-author-names-line {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.clip-level-badge {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 10px;
-  background: rgba(168, 85, 247, 0.25);
-  border: 1px solid rgba(168, 85, 247, 0.5);
-  color: #d8b4fe;
-  font-weight: 600;
+.clip-author-username {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ffffff;
+  text-decoration: none;
+  letter-spacing: 0.1px;
+}
+
+.clip-author-username:hover {
+  text-decoration: underline;
+}
+
+.clip-dot-sep {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
 }
 
 .clip-follow-btn {
-  padding: 4px 12px;
-  border-radius: 16px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  color: #fff;
+  border: none;
+  color: #0095f6;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0 4px;
+  transition: opacity 0.15s ease;
 }
 
 .clip-follow-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: #fff;
+  color: #38bdf8;
+  opacity: 0.9;
 }
 
 .clip-follow-btn.following {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+/* AI Generated Content Badge Pill (Instagram-style) */
+.clip-ai-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(8px);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
   color: #e2e8f0;
+  max-width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 2px;
+}
+
+.clip-ai-sparkle {
+  font-size: 11px;
+  color: #c084fc;
 }
 
 /* Caption & Tags */
 .clip-caption-wrap {
-  font-size: 13.5px;
-  line-height: 1.4;
-  color: #f1f5f9;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  font-size: 13px;
+  line-height: 1.35;
+  color: #f8fafc;
+}
+
+.clip-caption-author {
+  font-weight: 700;
+  color: #ffffff;
 }
 
 .clip-caption-text {
   margin: 0;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
 .clip-caption-wrap.expanded .clip-caption-text {
   display: block;
-  max-height: 180px;
+  max-height: 140px;
   overflow-y: auto;
 }
 
 .clip-more-toggle {
   background: none;
   border: none;
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.65);
   font-size: 12px;
   cursor: pointer;
   padding: 0;
-  margin-top: 4px;
+  margin-left: 6px;
+  font-weight: 600;
 }
 
-.clip-tags-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
-
-.clip-tag-item {
-  font-size: 11px;
-  color: #c084fc;
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.clip-tag-item:hover {
-  text-decoration: underline;
+.clip-more-toggle:hover {
+  color: #ffffff;
 }
 
 /* Music Ticker */
 .clip-music-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 12px;
-  color: #e2e8f0;
+  color: #ffffff;
   padding-top: 2px;
 }
 
 .clip-music-icon {
-  color: #a855f7;
+  color: #ffffff;
   flex-shrink: 0;
 }
 
-.clip-music-name {
-  white-space: nowrap;
+.clip-music-ticker-wrap {
   overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clip-music-name {
   font-weight: 500;
+  color: #f1f5f9;
+}
+
+/* Right Action Column (Outside Video on Desktop, exactly like Instagram Reels) */
+.clip-right-actions-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding-bottom: 8px;
+  z-index: 25;
+}
+
+.clip-action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.clip-action-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  padding: 0;
+}
+
+.clip-action-btn:hover {
+  transform: scale(1.15);
+  opacity: 0.85;
+}
+
+.clip-action-btn.liked {
+  color: #ef4444;
+}
+
+.clip-action-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 0.2px;
+}
+
+.clip-dots-icon {
+  font-size: 20px;
+  line-height: 1;
+  color: #ffffff;
+  letter-spacing: 1px;
+}
+
+/* Audio Track Thumbnail (Spinning square with rounded corners) */
+.clip-sound-cover-btn {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 2px solid #ffffff;
+  overflow: hidden;
+  cursor: pointer;
+  margin-top: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.clip-audio-art-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: audioRotate 6s linear infinite;
+}
+
+.clip-audio-art-thumb.paused {
+  animation-play-state: paused;
+}
+
+@keyframes audioRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Navigation Arrows (Desktop) */
 .clip-nav-arrows {
   position: absolute;
-  right: -60px;
+  right: -56px;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -418,27 +500,27 @@
 }
 
 .clip-arrow-btn {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  background: rgba(30, 41, 59, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #fff;
+  background: rgba(38, 38, 38, 0.85);
+  border: none;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .clip-arrow-btn:hover:not(:disabled) {
-  background: #7c3aed;
+  background: rgba(255, 255, 255, 0.2);
   transform: scale(1.08);
 }
 
 .clip-arrow-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.2;
   cursor: not-allowed;
 }
 
@@ -647,17 +729,31 @@
     height: calc(100vh - 56px - 60px);
   }
 
-  .clips-nav-arrows {
+  .clip-nav-arrows {
     display: none;
+  }
+
+  .clip-item-card {
+    padding: 0;
+    gap: 0;
+  }
+
+  .clip-video-wrapper {
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    width: 100%;
+  }
+
+  .clip-right-actions-column {
+    position: absolute;
+    right: 10px;
+    bottom: 40px;
+    gap: 12px;
   }
 
   .clip-bottom-info {
     right: 64px;
     padding-bottom: 16px;
-  }
-
-  .clip-right-actions {
-    right: 10px;
-    bottom: 40px;
   }
 }

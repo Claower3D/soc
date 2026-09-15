@@ -2,8 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, 
-  Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send, 
-  Check
+  Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send
 } from 'lucide-react';
 import { initialClips } from '../data/mock';
 import type { Clip, ClipComment } from '../data/mock';
@@ -277,35 +276,129 @@ export function ClipsPage() {
 
             return (
               <div key={clip.id} className="clip-item-card">
-                <div className="clip-top-bar">
-                  <div className="clip-brand-tag">
-                    <span className="clip-brand-dot" />
-                    <span>Клипы • New Age</span>
+                {/* Central Video Container */}
+                <div className="clip-video-wrapper">
+                  {/* Top Floating Badge */}
+                  <div className="clip-top-bar">
+                    <div className="clip-brand-tag">
+                      <span className="clip-brand-dot" />
+                      <span>Reels • New Age</span>
+                    </div>
+                    <Link to="/editor" className="clip-create-btn" title="Снять свой ролик">
+                      <Plus size={15} />
+                      <span>Создать</span>
+                    </Link>
                   </div>
-                  <Link to="/editor" className="clip-create-btn" title="Снять свой клип">
-                    <Plus size={15} />
-                    <span>Создать клип</span>
-                  </Link>
+
+                  {/* Video Player */}
+                  <video
+                    ref={el => { videoRefs.current[clip.id] = el; }}
+                    className="clip-video-element"
+                    src={clip.videoUrl}
+                    poster={clip.poster}
+                    loop
+                    playsInline
+                    muted={isMuted}
+                    onClick={togglePlayPause}
+                  />
+
+                  {/* Big Play/Pause Center Indicator */}
+                  {isCurrent && showPlayAnim && (
+                    <div className="clip-center-play-indicator">
+                      {isPlaying ? <Play size={36} fill="#fff" /> : <Pause size={36} fill="#fff" />}
+                    </div>
+                  )}
+
+                  {/* Aesthetic Gothic / Spiritual Subtitle Overlay like in screenshot */}
+                  {clip.overlayTitle && (
+                    <div className="clip-overlay-title-banner">
+                      <div className="clip-overlay-title-text">{clip.overlayTitle}</div>
+                    </div>
+                  )}
+
+                  {/* In-Video Mute / Unmute Button (Bottom Right) */}
+                  <button 
+                    type="button"
+                    className="clip-invideo-mute-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleMute();
+                    }}
+                    title={isMuted ? 'Включить звук' : 'Выключить звук'}
+                  >
+                    {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                  </button>
+
+                  {/* Bottom Info inside Video (Author, Follow, AI badge, Caption, Music) */}
+                  <div className="clip-bottom-info">
+                    {/* Author Row */}
+                    <div className="clip-author-row">
+                      <Link to="/profile" className="clip-author-avatar-wrap">
+                        <img 
+                          src={clip.user.avatar} 
+                          alt={clip.user.name} 
+                          className="clip-author-avatar" 
+                        />
+                      </Link>
+                      <div className="clip-author-info-col">
+                        <div className="clip-author-names-line">
+                          <Link to="/profile" className="clip-author-username">
+                            {clip.user.name}
+                          </Link>
+                          <span className="clip-dot-sep">•</span>
+                          {clip.user.id !== currentUser.id && (
+                            <button 
+                              type="button"
+                              className={`clip-follow-btn ${isFollowed ? 'following' : ''}`}
+                              onClick={() => handleToggleFollow(clip.user.id)}
+                            >
+                              {isFollowed ? 'Подписки' : 'Подписаться'}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* AI Generated Content badge from screenshot */}
+                        {clip.isAiGenerated && (
+                          <div className="clip-ai-badge-pill" title="Профиль, сгенерированный ИИ • ИИ-контент">
+                            <span className="clip-ai-sparkle">✨</span>
+                            <span>Профиль, сгенерированный ИИ • ИИ-контент</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Caption / Description with "... еще" */}
+                    <div className={`clip-caption-wrap ${isCaptionExpanded ? 'expanded' : ''}`}>
+                      <p className="clip-caption-text">
+                        <span className="clip-caption-author">{clip.user.name}</span>{' '}
+                        {clip.caption}
+                      </p>
+                      {clip.caption.length > 60 && (
+                        <button 
+                          type="button"
+                          className="clip-more-toggle"
+                          onClick={() => setExpandedCaptions(p => ({ ...p, [clip.id]: !p[clip.id] }))}
+                        >
+                          {isCaptionExpanded ? 'Свернуть' : '... ещё'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Music track ticker row */}
+                    <div className="clip-music-row">
+                      <Music size={13} className="clip-music-icon" />
+                      <div className="clip-music-ticker-wrap">
+                        <span className="clip-music-name">
+                          {clip.musicTitle || 'Оригинальный звук'} • {clip.musicAuthor || clip.user.name}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <video
-                  ref={el => { videoRefs.current[clip.id] = el; }}
-                  className="clip-video-element"
-                  src={clip.videoUrl}
-                  poster={clip.poster}
-                  loop
-                  playsInline
-                  muted={isMuted}
-                  onClick={togglePlayPause}
-                />
-
-                {isCurrent && showPlayAnim && (
-                  <div className="clip-center-play-indicator">
-                    {isPlaying ? <Play size={36} fill="#fff" /> : <Pause size={36} fill="#fff" />}
-                  </div>
-                )}
-
-                <div className="clip-right-actions">
+                {/* Right Action Column (Outside Video on Desktop, exactly like Instagram Reels) */}
+                <div className="clip-right-actions-column">
+                  {/* Like */}
                   <div className="clip-action-item">
                     <button 
                       type="button"
@@ -313,11 +406,12 @@ export function ClipsPage() {
                       onClick={() => handleLike(clip.id)}
                       title={clip.isLiked ? 'Нравится' : 'Поставить лайк'}
                     >
-                      <Heart size={22} fill={clip.isLiked ? '#ef4444' : 'none'} />
+                      <Heart size={24} fill={clip.isLiked ? '#ef4444' : 'none'} color={clip.isLiked ? '#ef4444' : '#fff'} />
                     </button>
                     <span className="clip-action-count">{formatCount(clip.likesCount)}</span>
                   </div>
 
+                  {/* Comment */}
                   <div className="clip-action-item">
                     <button 
                       type="button"
@@ -325,23 +419,12 @@ export function ClipsPage() {
                       onClick={() => openComments(clip)}
                       title="Комментарии"
                     >
-                      <MessageCircle size={22} />
+                      <MessageCircle size={24} color="#fff" />
                     </button>
                     <span className="clip-action-count">{formatCount(clip.commentsCount)}</span>
                   </div>
 
-                  <div className="clip-action-item">
-                    <button 
-                      type="button"
-                      className={`clip-action-btn ${clip.isSaved ? 'saved' : ''}`}
-                      onClick={() => handleSave(clip.id)}
-                      title={clip.isSaved ? 'Сохранено' : 'Сохранить клип'}
-                    >
-                      <Bookmark size={22} fill={clip.isSaved ? '#eab308' : 'none'} />
-                    </button>
-                    <span className="clip-action-count">В закладки</span>
-                  </div>
-
+                  {/* Share / Repost */}
                   <div className="clip-action-item">
                     <button 
                       type="button"
@@ -349,103 +432,46 @@ export function ClipsPage() {
                       onClick={() => handleShare(clip)}
                       title="Поделиться"
                     >
-                      <Share2 size={21} />
+                      <Share2 size={23} color="#fff" />
                     </button>
-                    <span className="clip-action-count">{formatCount(clip.sharesCount)}</span>
+                    <span className="clip-action-count">{clip.sharesCount || 56}</span>
                   </div>
 
+                  {/* Save / Bookmark */}
+                  <div className="clip-action-item">
+                    <button 
+                      type="button"
+                      className={`clip-action-btn ${clip.isSaved ? 'saved' : ''}`}
+                      onClick={() => handleSave(clip.id)}
+                      title={clip.isSaved ? 'Сохранено' : 'Сохранить'}
+                    >
+                      <Bookmark size={24} fill={clip.isSaved ? '#fff' : 'none'} color="#fff" />
+                    </button>
+                  </div>
+
+                  {/* More Options (...) */}
                   <div className="clip-action-item">
                     <button 
                       type="button"
                       className="clip-action-btn"
-                      onClick={toggleMute}
-                      title={isMuted ? 'Включить звук' : 'Выключить звук'}
+                      onClick={() => handleShare(clip)}
+                      title="Параметры"
                     >
-                      {isMuted ? <VolumeX size={21} /> : <Volume2 size={21} />}
+                      <span className="clip-dots-icon">•••</span>
                     </button>
                   </div>
 
+                  {/* Audio Track Thumbnail (Spinning square or circle with album art) */}
                   <div 
-                    className={`clip-sound-disc ${!isPlaying ? 'paused' : ''}`}
+                    className="clip-sound-cover-btn"
                     onClick={toggleMute}
-                    title={clip.musicTitle || 'Музыкальная дорожка'}
+                    title={clip.musicTitle || 'Аудиодорожка'}
                   >
                     <img 
-                      src={clip.user.avatar || clip.poster} 
-                      alt="Disc cover" 
-                      className="clip-disc-art" 
+                      src={clip.audioTrackArt || clip.user.avatar || clip.poster} 
+                      alt="Audio Art" 
+                      className={`clip-audio-art-thumb ${!isPlaying ? 'paused' : ''}`} 
                     />
-                  </div>
-                </div>
-
-                <div className="clip-bottom-info">
-                  <div className="clip-author-row">
-                    <Link to="/profile" className="clip-author-avatar-wrap">
-                      <img 
-                        src={clip.user.avatar} 
-                        alt={clip.user.name} 
-                        className="clip-author-avatar" 
-                      />
-                    </Link>
-                    <div className="clip-author-names">
-                      <div className="clip-author-display-name">
-                        <Link to="/profile" style={{ color: '#fff', textDecoration: 'none' }}>
-                          {clip.user.name}
-                        </Link>
-                        {clip.user.consciousnessLevel && (
-                          <span className="clip-level-badge">
-                            {clip.user.consciousnessLevel} кл. • {clip.user.consciousnessTitle || 'Осознанность'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    {clip.user.id !== currentUser.id && (
-                      <button 
-                        type="button"
-                        className={`clip-follow-btn ${isFollowed ? 'following' : ''}`}
-                        onClick={() => handleToggleFollow(clip.user.id)}
-                      >
-                        {isFollowed ? (
-                          <>
-                            <Check size={13} style={{ display: 'inline', marginRight: 4 }} />
-                            Вы подписаны
-                          </>
-                        ) : (
-                          '+ Подписаться'
-                        )}
-                      </button>
-                    )}
-                  </div>
-
-                  <div className={`clip-caption-wrap ${isCaptionExpanded ? 'expanded' : ''}`}>
-                    <p className="clip-caption-text">
-                      {clip.caption}
-                    </p>
-                    {clip.caption.length > 70 && (
-                      <button 
-                        type="button"
-                        className="clip-more-toggle"
-                        onClick={() => setExpandedCaptions(p => ({ ...p, [clip.id]: !p[clip.id] }))}
-                      >
-                        {isCaptionExpanded ? 'Свернуть' : 'ещё...'}
-                      </button>
-                    )}
-                    {clip.tags && clip.tags.length > 0 && (
-                      <div className="clip-tags-row">
-                        {clip.tags.map((tag, tIdx) => (
-                          <span key={tIdx} className="clip-tag-item">
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="clip-music-row">
-                    <Music size={14} className="clip-music-icon" />
-                    <span className="clip-music-name">
-                      {clip.musicTitle || 'Оригинальный звук'} • {clip.musicAuthor || clip.user.name}
-                    </span>
                   </div>
                 </div>
               </div>
