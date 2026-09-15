@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, Image as ImageIcon, Video, Headphones, Sparkles, LogIn, ArrowRight } from 'lucide-react';
+import { TrendingUp, Image as ImageIcon, Video, Headphones, Sparkles, LogIn, ArrowRight, ShieldCheck, LifeBuoy } from 'lucide-react';
 import { StoriesBar } from '../components/StoriesBar';
 import { PostCard } from '../components/PostCard';
 import { PostDetailModal } from '../components/PostDetailModal';
@@ -81,6 +81,20 @@ export function FeedPage() {
       {/* Main Feed Column */}
       <div className="feed-main-col">
         <StoriesBar stories={feedStories} onAddStory={handleAddStory} />
+
+        {/* Official Motto Banner */}
+        <div className="feed-motto-banner">
+          <div className="motto-badge-icon">
+            <LifeBuoy size={18} className="motto-icon" />
+          </div>
+          <div className="motto-text-content">
+            <span className="motto-quote">«Спасение служба»</span>
+            <span className="motto-sub">Официальный девиз платформы • Помощь, взаимная поддержка и безопасность каждого участника</span>
+          </div>
+          <div className="motto-shield-pill">
+            <ShieldCheck size={14} /> <span>Экосистема доверия</span>
+          </div>
+        </div>
 
         {/* Create Post Input Bar or Guest Welcome Banner */}
         {isAuthenticated ? (

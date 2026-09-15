@@ -107,6 +107,20 @@
   margin-top: 1px;
 }
 
+.brand-motto-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #38BDF8;
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-full);
+  width: fit-content;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
 .sidebar-nav {
   flex: 1;
   padding: 0.85rem 0.55rem;
