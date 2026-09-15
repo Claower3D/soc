@@ -4,7 +4,7 @@ import {
   Grid, Video as VideoIcon, Headphones, Bookmark, 
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Share2, Edit3, Heart, MessageSquare,
-  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn, Plus
+  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn, Plus, Brain, Sparkles
 } from 'lucide-react';
 import { initialUsers, posts, stories, videos, podcasts, initialProducts, RELIGIONS_CATALOG, type User, type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,7 @@ import { CreatePostModal } from '../components/CreatePostModal';
 import { CreateStoryModal } from '../components/CreateStoryModal';
 import { AuthModal } from '../components/AuthModal';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
+import { ConsciousnessClassModal } from '../components/ConsciousnessClassModal';
 import { 
   getStoredFollowingIds, 
   isUserFollowed, 
@@ -110,6 +111,7 @@ export function ProfilePage() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isConsciousnessModalOpen, setIsConsciousnessModalOpen] = useState(false);
 
   const activeUser = isMe ? currentUser : user;
 
@@ -376,6 +378,42 @@ export function ProfilePage() {
                     </div>
                   );
                 })()
+              )}
+
+              {/* Класс сознания и язык общения */}
+              {activeUser.consciousnessLevel ? (
+                <div 
+                  className="meta-item meta-consciousness" 
+                  onClick={() => setIsConsciousnessModalOpen(true)}
+                  style={{ cursor: 'pointer' }}
+                  title="Класс сознания и ведущий язык восприятия человека. Нажмите для подробностей"
+                >
+                  <Brain size={15} className="consciousness-icon" />
+                  <span className="consciousness-level-badge">{activeUser.consciousnessLevel} класс</span>
+                  <span className="consciousness-title-text">{activeUser.consciousnessTitle || 'Осознанность'}</span>
+                  {activeUser.cognitionVector && (
+                    <span className="consciousness-vector-tag">
+                      {activeUser.cognitionVector === 'visual_analogies' && '🍏 на яблоках'}
+                      {activeUser.cognitionVector === 'exact_sciences' && '📐 логика и факты'}
+                      {activeUser.cognitionVector === 'pragmatic' && '⚡ польза и действие'}
+                      {activeUser.cognitionVector === 'philosophical' && '📖 смыслы'}
+                      {activeUser.cognitionVector === 'spiritual' && '✨ паттерны и единство'}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                isMe && (
+                  <button 
+                    type="button" 
+                    className="meta-item meta-consciousness-empty"
+                    onClick={() => setIsConsciousnessModalOpen(true)}
+                    title="Пройти диагностику класса сознания и определить свой язык общения"
+                  >
+                    <Brain size={15} />
+                    <span>Определить класс сознания</span>
+                    <Sparkles size={12} className="meta-sparkle" />
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -709,6 +747,19 @@ export function ProfilePage() {
           stories.unshift(newStory);
           setIsCreateStoryOpen(false);
           alert('История успешно опубликована!');
+        }}
+      />
+
+      {/* Consciousness Class Modal */}
+      <ConsciousnessClassModal
+        isOpen={isConsciousnessModalOpen}
+        onClose={() => setIsConsciousnessModalOpen(false)}
+        onSaved={(res) => {
+          updateProfile({
+            consciousnessLevel: res.level,
+            consciousnessTitle: res.classInfo.title,
+            cognitionVector: res.dominantVector
+          });
         }}
       />
     </div>

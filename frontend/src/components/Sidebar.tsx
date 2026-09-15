@@ -5,7 +5,7 @@ import {
   User as UserIcon, Tv, ShoppingBag, Users, Film, Wallet, ShieldAlert,
   ChevronDown, ChevronRight, Layers, ExternalLink,
   Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles, GraduationCap, Lock,
-  Compass, Calendar as CalendarIcon, Bot
+  Compass, Calendar as CalendarIcon, Bot, Brain
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
@@ -224,6 +224,12 @@ export function Sidebar() {
                   <span className="nav-label">Live Zen & ИИ</span>
                   <span className="spiritual-sub-badge" style={{ background: '#22c55e', color: '#fff' }}>LIVE</span>
                 </NavLink>
+
+                <NavLink to="/spiritual/consciousness" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <Brain className="nav-icon spiritual-icon-flower" size={18} />
+                  <span className="nav-label">Класс Сознания</span>
+                  <span className="spiritual-sub-badge" style={{ background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', color: '#fff' }}>1-11</span>
+                </NavLink>
               </>
             ) : (
               <>
@@ -290,6 +296,12 @@ export function Sidebar() {
                 <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
                   <Bot className="nav-icon spiritual-icon-waves" size={18} />
                   <span className="nav-label">Live Zen & ИИ</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Brain className="nav-icon spiritual-icon-flower" size={18} />
+                  <span className="nav-label">Класс Сознания</span>
                   <span className="nav-lock-badge"><Lock size={12} /></span>
                 </div>
               </>

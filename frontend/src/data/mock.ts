@@ -131,6 +131,9 @@ export interface User {
   businessCategory?: string;
   rating?: number;
   salesCount?: number;
+  consciousnessLevel?: number; // Класс сознания от 1 до 11
+  consciousnessTitle?: string; // Название класса сознания
+  cognitionVector?: 'spiritual' | 'exact_sciences' | 'visual_analogies' | 'philosophical' | 'pragmatic'; // Вектор восприятия
 }
 
 export interface Highlight {

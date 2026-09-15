@@ -20,6 +20,9 @@ export interface RegisteredAccount {
   followingCount: number;
   criticsCount: number;
   postsCount: number;
+  consciousnessLevel?: number;
+  consciousnessTitle?: string;
+  cognitionVector?: 'spiritual' | 'exact_sciences' | 'visual_analogies' | 'philosophical' | 'pragmatic';
   createdAt: string;
 }
 

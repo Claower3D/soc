@@ -5,7 +5,7 @@ import {
   Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, 
   CheckCircle2, Plus, Trash2, Heart, ChevronLeft, ChevronRight,
   GraduationCap, Megaphone, Star, Check, X,
-  Compass, Calendar as CalendarIcon, Bot, Users, LayoutGrid, ArrowRight
+  Compass, Calendar as CalendarIcon, Bot, Users, LayoutGrid, ArrowRight, Brain
 } from 'lucide-react';
 import { 
   MEDITATION_TRACKS, YOGA_ROUTINES, INITIAL_AFFIRMATIONS, 
@@ -23,9 +23,10 @@ import { AiGuruModal } from '../components/AiGuruModal';
 import { LiveZenRoom } from '../components/LiveZenRoom';
 import { KarmaTreeWidget } from '../components/KarmaTreeWidget';
 import { MasterBookingModal } from '../components/MasterBookingModal';
+import { ConsciousnessClassModal } from '../components/ConsciousnessClassModal';
 import './SpiritualPage.css';
 
-type TabType = 'all' | 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom' | 'courses' | 'tarot' | 'astrology' | 'calendar' | 'livezen';
+type TabType = 'all' | 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom' | 'courses' | 'tarot' | 'astrology' | 'calendar' | 'livezen' | 'consciousness';
 
 interface SpiritualPracticeCard {
   id: TabType;
@@ -160,6 +161,17 @@ const SPIRITUAL_PRACTICES_CARDS: SpiritualPracticeCard[] = [
     badgeClass: 'badge-gold',
     gradient: 'linear-gradient(135deg, #D97706, #B45309)',
     stats: 'Мультивалютная оплата'
+  },
+  {
+    id: 'consciousness',
+    title: 'Класс Сознания',
+    category: 'Диагностика & Когниции',
+    description: 'Определение вашего класса сознания (1-11) и стиля восприятия: на яблоках, формулах или паттернах психосоматики.',
+    icon: Brain,
+    badge: '1-11 Класс',
+    badgeClass: 'badge-pink',
+    gradient: 'linear-gradient(135deg, #8B5CF6, #EC4899)',
+    stats: 'Интерактивная диагностика'
   }
 ];
 
@@ -169,7 +181,7 @@ export function SpiritualPage() {
   const navigate = useNavigate();
 
   // Active Tab: if no tab or tab is 'all' / 'overview', show card catalog
-  const validTabs: TabType[] = ['all', 'meditation', 'yoga', 'affirmations', 'breathing', 'sounds', 'wisdom', 'courses', 'tarot', 'astrology', 'calendar', 'livezen'];
+  const validTabs: TabType[] = ['all', 'meditation', 'yoga', 'affirmations', 'breathing', 'sounds', 'wisdom', 'courses', 'tarot', 'astrology', 'calendar', 'livezen', 'consciousness'];
   const activeTab: TabType = (tab && validTabs.includes(tab as TabType)) 
     ? (tab as TabType) 
     : 'all';
@@ -305,6 +317,7 @@ export function SpiritualPage() {
   const [isTarotOpen, setIsTarotOpen] = useState(false);
   const [isAiGuruOpen, setIsAiGuruOpen] = useState(false);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [isConsciousnessModalOpen, setIsConsciousnessModalOpen] = useState(false);
   const [preselectedExpert, setPreselectedExpert] = useState('tarot');
 
   // --- KARMA TREE STATE ---
@@ -771,6 +784,16 @@ export function SpiritualPage() {
               <Bot size={14} />
               <span>Спросить ИИ-Гуру</span>
             </button>
+            <button
+              type="button"
+              className="chime-test-btn"
+              style={{ borderColor: 'rgba(139, 92, 246, 0.4)', color: '#A855F7', background: 'rgba(139, 92, 246, 0.1)' }}
+              onClick={() => setIsConsciousnessModalOpen(true)}
+              title="Узнать свой класс сознания и стиль восприятия"
+            >
+              <Brain size={14} />
+              <span>Класс Сознания</span>
+            </button>
           </div>
         </div>
       </div>
@@ -874,6 +897,15 @@ export function SpiritualPage() {
           <GraduationCap size={18} />
           <span>Курсы & Маркет</span>
           <span className="tab-hot-badge">PRO</span>
+        </button>
+
+        <button 
+          className={`spiritual-tab-btn ${activeTab === 'consciousness' ? 'active' : ''}`}
+          onClick={() => handleTabChange('consciousness')}
+        >
+          <Brain size={18} />
+          <span>Класс Сознания</span>
+          <span className="tab-hot-badge" style={{ background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', color: '#fff' }}>1-11</span>
         </button>
       </div>
 
@@ -1729,6 +1761,23 @@ export function SpiritualPage() {
       )}
 
       {/* ========================================================================= */}
+      {/* TAB 12: КЛАССЫ СОЗНАНИЯ (1-11 КЛАСС & ЯЗЫК ОБЩЕНИЯ) */}
+      {/* ========================================================================= */}
+      {activeTab === 'consciousness' && (
+        <div className="spiritual-tab-content">
+          <div className="spiritual-consciousness-inline-wrap">
+            <ConsciousnessClassModal
+              isOpen={true}
+              onClose={() => handleTabChange('all')}
+              onSaved={(_res) => {
+                handleEarnKarmaXp(50, 'Определение класса сознания');
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* MODAL: CREATE / PUBLISH COURSE OR AD */}
       {/* ========================================================================= */}
       {isCreateCourseModalOpen && (
@@ -2030,6 +2079,17 @@ export function SpiritualPage() {
         preselectedMasterType={preselectedExpert}
         onConferenceCreated={(_roomName, _inviteLink) => {
           handleEarnKarmaXp(100, 'Запись на консультацию к наставнику');
+        }}
+      />
+
+      {/* ========================================================================= */}
+      {/* CONSCIOUSNESS CLASS MODAL (GLOBAL POPUP) */}
+      {/* ========================================================================= */}
+      <ConsciousnessClassModal
+        isOpen={isConsciousnessModalOpen}
+        onClose={() => setIsConsciousnessModalOpen(false)}
+        onSaved={(_res) => {
+          handleEarnKarmaXp(50, 'Определение класса сознания');
         }}
       />
     </div>
