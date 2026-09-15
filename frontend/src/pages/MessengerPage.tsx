@@ -13,6 +13,11 @@ export function MessengerPage() {
 
   const activeChat = chatList.find(c => c.id === activeChatId) ?? null;
 
+  const handleCreateGroup = (newGroup: Chat) => {
+    setChatList(prev => [newGroup, ...prev]);
+    setActiveChatId(newGroup.id);
+  };
+
   const handleDeleteChat = (id: string) => {
     setChatList(prev => prev.filter(c => c.id !== id));
     if (activeChatId === id) {
@@ -41,6 +46,7 @@ export function MessengerPage() {
           activeChatId={activeChatId}
           onSelectChat={setActiveChatId}
           onDeleteChat={handleDeleteChat}
+          onCreateGroup={handleCreateGroup}
         />
       </div>
       <div className={`messenger-chat ${!activeChatId ? 'hide-mobile' : ''}`}>

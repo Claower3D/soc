@@ -218,16 +218,79 @@ export interface Clip {
   timeAgo?: string;
 }
 
+export interface PollOption {
+  id: string;
+  text: string;
+  votes: number;
+}
+
+export interface PollData {
+  id?: string;
+  question: string;
+  options: PollOption[];
+  totalVotes: number;
+  votedOptionId?: string;
+  userVotedOptionId?: string;
+  isMultiple?: boolean;
+  isClosed?: boolean;
+}
+
+export interface EventData {
+  id?: string;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  attendeesCount?: number;
+  participantsCount?: number;
+  isAttending?: boolean;
+}
+
+export interface ProductData {
+  id: string;
+  title: string;
+  price: number;
+  currency?: string;
+  image?: string;
+  imageUrl?: string;
+  type?: 'product' | 'service';
+  category?: string;
+  sellerName?: string;
+  commissionPercent?: number;
+  rating?: number;
+  authorName?: string;
+}
+
+export interface ContactData {
+  id?: string;
+  name: string;
+  username: string;
+  avatar: string;
+  phone?: string;
+  consciousnessLevel?: number;
+  role?: string;
+}
+
 export interface Message {
   id: string;
   text?: string;
   fromMe: boolean;
   time: string;
   mediaUrl?: string;
-  mediaType?: 'image' | 'voice' | 'file';
+  mediaType?: 'image' | 'voice' | 'file' | 'video_note' | 'poll' | 'event' | 'product' | 'contact' | 'sticker' | 'gif' | 'audio' | 'document';
   voiceDuration?: string;
+  voiceBlobUrl?: string;
+  videoNoteUrl?: string;
+  stickerUrl?: string;
+  gifUrl?: string;
+  audioTitle?: string;
+  audioAuthor?: string;
   fileName?: string;
   fileSize?: string;
+  pollData?: PollData;
+  eventData?: EventData;
+  productData?: ProductData;
+  contactData?: ContactData;
   conferenceRecording?: {
     title: string;
     duration: string;
@@ -248,6 +311,8 @@ export interface Chat {
   groupAvatar?: string;
   membersCount?: number;
   conferenceId?: string;
+  isPinned?: boolean;
+  isSystem?: boolean;
 }
 
 export interface Conference {
@@ -801,6 +866,8 @@ export const initialChats: Chat[] = [
     lastMessage: 'Мир твоему сердцу, путник. Что сейчас волнует твою душу? ✨',
     time: 'Только что',
     unread: 1,
+    isPinned: true,
+    isSystem: true,
     messages: [
       { id: 'm_guru_1', text: 'Мир твоему сердцу, путник. Я твой персональный ИИ-наставник по практикам и самопознанию.', fromMe: false, time: '12:00' },
       { id: 'm_guru_2', text: 'Ты можешь открыть 3D-колоду Таро, рассчитать натальную карту или начать совместную медитацию в Live Zen.', fromMe: false, time: '12:01' },

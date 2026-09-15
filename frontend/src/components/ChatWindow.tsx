@@ -4,9 +4,14 @@ import {
   Send, ArrowLeft, PhoneCall, User as UserIcon, 
   Paperclip, Smile, Mic, Play, Pause, 
   Image as ImageIcon, Video as VideoIcon, 
-  CheckCheck, X, Trash2, Edit2, Reply, Copy, Check, MoreVertical
+  CheckCheck, X, Trash2, Edit2, Reply, Copy, Check, MoreVertical,
+  Camera, FileText, Headphones, UserCheck, BarChart2, Calendar, 
+  Sparkles, ShoppingBag, Zap, VolumeX
 } from 'lucide-react';
-import type { Chat, Message } from '../data/mock';
+import { 
+  type Chat, type Message, type PollData, type EventData, 
+  type ProductData, type ContactData, initialUsers, initialProducts 
+} from '../data/mock';
 import './ChatWindow.css';
 
 interface ChatWindowProps {
@@ -15,20 +20,69 @@ interface ChatWindowProps {
   onDeleteChat?: (chatId: string) => void;
 }
 
-const quickEmojis = ['😊', '😂', '🔥', '👍', '❤️', '🚀', '🎉', '👏', '👀', '💯', '🙌', '✨'];
+const quickEmojis = ['😊', '😂', '🔥', '👍', '❤️', '🚀', '🎉', '👏', '👀', '💯', '🙌', '✨', '🧘', '🌟', '💎', '🕊️', '🤝', '🌞', '💡', '🌈'];
+
+const stickerPacks = [
+  { id: 'stk_1', title: 'Осознанность', url: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=250&q=80' },
+  { id: 'stk_2', title: 'Сердце', url: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=250&q=80' },
+  { id: 'stk_3', title: 'Медитация', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=250&q=80' },
+  { id: 'stk_4', title: 'Энергия', url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=250&q=80' },
+  { id: 'stk_5', title: 'Океан', url: 'https://images.unsplash.com/photo-1507525428033-b723cf961d3e?auto=format&fit=crop&w=250&q=80' },
+  { id: 'stk_6', title: 'Космос', url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=250&q=80' }
+];
+
+const sampleGifs = [
+  { id: 'g1', title: 'Салют ✨', url: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=400&q=80' },
+  { id: 'g2', title: 'Огонь 🔥', url: 'https://images.unsplash.com/photo-1542332213-9b5a5a3fad35?auto=format&fit=crop&w=400&q=80' },
+  { id: 'g3', title: 'Покой 🌿', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=400&q=80' },
+  { id: 'g4', title: 'Код 💻', url: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=400&q=80' }
+];
 
 export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
   const navigate = useNavigate();
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<Message[]>(chat?.messages || []);
+  
+  // Voice recording
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const [voiceSeconds, setVoiceSeconds] = useState(0);
-  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
-  const [voiceSpeed, setVoiceSpeed] = useState<number>(1);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  // Mode: Voice vs Video Note (Кружочек)
+  const [inputMode, setInputMode] = useState<'mic' | 'camera'>('mic');
+  const [isVideoNoteRecording, setIsVideoNoteRecording] = useState(false);
+  const [videoNoteSeconds, setVideoNoteSeconds] = useState(0);
+  const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+
+  // Popups & Attachments
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showMediaTabs, setShowMediaTabs] = useState(false);
+  const [activeMediaTab, setActiveMediaTab] = useState<'emoji' | 'stickers' | 'gif'>('emoji');
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [selectedRecording, setSelectedRecording] = useState<{ title: string; duration: string } | null>(null);
+
+  // Modals for Attachments
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOption1, setPollOption1] = useState('');
+  const [pollOption2, setPollOption2] = useState('');
+  const [pollOption3, setPollOption3] = useState('');
+
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventDate, setEventDate] = useState('20 сентября 2026');
+  const [eventTime, setEventTime] = useState('18:00');
+  const [eventLocation, setEventLocation] = useState('Онлайн • Live Zen');
+
+  const [showCatalogModal, setShowCatalogModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+
+  // Video note sound toggle in feed
+  const [playingVideoNoteId, setPlayingVideoNoteId] = useState<string | null>(null);
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const [voiceSpeed, setVoiceSpeed] = useState<number>(1);
   
   // Deleting & Editing state
   const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
@@ -40,8 +94,10 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
   const [confirmClearChat, setConfirmClearChat] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recordingTimerRef = useRef<number | null>(null);
+  const videoNoteTimerRef = useRef<number | null>(null);
 
   // Sync messages when chat changes
   useEffect(() => {
@@ -50,7 +106,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
     setAttachedImage(null);
     setIsRecordingVoice(false);
     setShowAttachMenu(false);
-    setShowEmojiPicker(false);
+    setShowMediaTabs(false);
     setEditingMessage(null);
     setReplyingToMessage(null);
     setMessageToDelete(null);
@@ -76,6 +132,21 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
     };
   }, [isRecordingVoice]);
 
+  // Video note recording timer
+  useEffect(() => {
+    if (isVideoNoteRecording) {
+      setVideoNoteSeconds(0);
+      videoNoteTimerRef.current = window.setInterval(() => {
+        setVideoNoteSeconds(s => s + 1);
+      }, 1000);
+    } else {
+      if (videoNoteTimerRef.current) clearInterval(videoNoteTimerRef.current);
+    }
+    return () => {
+      if (videoNoteTimerRef.current) clearInterval(videoNoteTimerRef.current);
+    };
+  }, [isVideoNoteRecording]);
+
   if (!chat) {
     return (
       <div className="chat-window-empty">
@@ -95,7 +166,6 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
     if (!inputValue.trim() && !attachedImage) return;
 
     if (editingMessage) {
-      // Save edited message
       setMessages(prev =>
         prev.map(m =>
           m.id === editingMessage.id
@@ -126,7 +196,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
     setAttachedImage(null);
     setReplyingToMessage(null);
     setShowAttachMenu(false);
-    setShowEmojiPicker(false);
+    setShowMediaTabs(false);
 
     // If talking to AI Guru, generate interactive reply
     if (chat?.id === 'ai_guru_bot') {
@@ -191,25 +261,127 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
     setShowChatMenu(false);
   };
 
-  // Finish and send voice note
+  // Voice recording handlers (with real getUserMedia / MediaRecorder fallback)
+  const handleStartVoiceRecord = async () => {
+    setIsRecordingVoice(true);
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+        
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunksRef.current.push(event.data);
+          }
+        };
+        mediaRecorder.start();
+      }
+    } catch {
+      // In case mic is blocked, the visual animated recorder still runs smoothly
+    }
+  };
+
   const handleSendVoiceMessage = () => {
-    const durationStr = formatVoiceTime(voiceSeconds || 3);
+    let voiceBlobUrl: string | undefined = undefined;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+      } catch {
+        // ignore
+      }
+    }
+
+    if (audioChunksRef.current.length > 0) {
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      voiceBlobUrl = URL.createObjectURL(audioBlob);
+    }
+
+    const durationStr = formatVoiceTime(voiceSeconds || 4);
     const newVoiceMsg: Message = {
       id: `voice_${Date.now()}`,
       fromMe: true,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       mediaType: 'voice',
       voiceDuration: durationStr,
+      voiceBlobUrl,
       text: 'Голосовое сообщение',
     };
     setMessages(prev => [...prev, newVoiceMsg]);
     setIsRecordingVoice(false);
     setVoiceSeconds(0);
+    audioChunksRef.current = [];
   };
 
   const handleCancelVoice = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
+      } catch {
+        // ignore
+      }
+    }
     setIsRecordingVoice(false);
     setVoiceSeconds(0);
+    audioChunksRef.current = [];
+  };
+
+  // Video Note (Кружочек) handlers
+  const handleOpenVideoNoteRecorder = async () => {
+    setIsVideoNoteRecording(true);
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'user', width: 480, height: 480 },
+          audio: true 
+        });
+        cameraStreamRef.current = stream;
+        if (cameraVideoRef.current) {
+          cameraVideoRef.current.srcObject = stream;
+          cameraVideoRef.current.play().catch(() => {});
+        }
+      }
+    } catch {
+      // Fallback: camera simulation is displayed
+    }
+  };
+
+  const handleCloseVideoNoteRecorder = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach(t => t.stop());
+      cameraStreamRef.current = null;
+    }
+    setIsVideoNoteRecording(false);
+    setVideoNoteSeconds(0);
+  };
+
+  const handleSendVideoNote = () => {
+    const sampleVideoNotes = [
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4'
+    ];
+    const pickedVideo = sampleVideoNotes[Math.floor(Math.random() * sampleVideoNotes.length)];
+
+    const newVideoNoteMsg: Message = {
+      id: `vidnote_${Date.now()}`,
+      fromMe: true,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      mediaType: 'video_note',
+      videoNoteUrl: pickedVideo,
+      text: 'Видео-сообщение'
+    };
+
+    setMessages(prev => [...prev, newVideoNoteMsg]);
+    handleCloseVideoNoteRecorder();
+  };
+
+  // Toggle video note sound
+  const togglePlayVideoNote = (id: string) => {
+    setPlayingVideoNoteId(prev => prev === id ? null : id);
   };
 
   // Image upload
@@ -225,6 +397,22 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
     }
   };
 
+  // Document upload handler
+  const handleDocChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const docMsg: Message = {
+        id: `doc_${Date.now()}`,
+        fromMe: true,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        text: file.name,
+        mediaType: 'document'
+      };
+      setMessages(prev => [...prev, docMsg]);
+      setShowAttachMenu(false);
+    }
+  };
+
   // Sample media attach
   const handleAttachSamplePhoto = () => {
     const samples = [
@@ -237,12 +425,185 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
     setShowAttachMenu(false);
   };
 
-  const togglePlayVoice = (id: string) => {
-    if (playingVoiceId === id) {
-      setPlayingVoiceId(null);
-    } else {
-      setPlayingVoiceId(id);
+  // Send Sticker
+  const handleSendSticker = (stickerUrl: string) => {
+    const newMsg: Message = {
+      id: `stk_${Date.now()}`,
+      fromMe: true,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      mediaType: 'sticker',
+      stickerUrl
+    };
+    setMessages(prev => [...prev, newMsg]);
+    setShowMediaTabs(false);
+  };
+
+  // Send GIF
+  const handleSendGif = (gifUrl: string) => {
+    const newMsg: Message = {
+      id: `gif_${Date.now()}`,
+      fromMe: true,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      mediaType: 'gif',
+      gifUrl
+    };
+    setMessages(prev => [...prev, newMsg]);
+    setShowMediaTabs(false);
+  };
+
+  // Poll Handlers
+  const handleCreatePoll = () => {
+    if (!pollQuestion.trim()) return;
+    const options = [
+      { id: 'opt_1', text: pollOption1.trim() || 'Вариант 1', votes: 1 },
+      { id: 'opt_2', text: pollOption2.trim() || 'Вариант 2', votes: 0 },
+    ];
+    if (pollOption3.trim()) {
+      options.push({ id: 'opt_3', text: pollOption3.trim(), votes: 0 });
     }
+
+    const pollData: PollData = {
+      id: `poll_${Date.now()}`,
+      question: pollQuestion.trim(),
+      options,
+      totalVotes: 1,
+      isClosed: false,
+      userVotedOptionId: 'opt_1'
+    };
+
+    const newMsg: Message = {
+      id: `msg_poll_${Date.now()}`,
+      fromMe: true,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      mediaType: 'poll',
+      pollData
+    };
+
+    setMessages(prev => [...prev, newMsg]);
+    setShowPollModal(false);
+    setPollQuestion('');
+    setPollOption1('');
+    setPollOption2('');
+    setPollOption3('');
+  };
+
+  const handleVotePoll = (msgId: string, optId: string) => {
+    setMessages(prev => prev.map(m => {
+      if (m.id !== msgId || !m.pollData) return m;
+      const poll = m.pollData;
+      if (poll.userVotedOptionId) return m;
+
+      const updatedOptions = poll.options.map(opt => {
+        if (opt.id === optId) return { ...opt, votes: opt.votes + 1 };
+        return opt;
+      });
+
+      return {
+        ...m,
+        pollData: {
+          ...poll,
+          options: updatedOptions,
+          totalVotes: poll.totalVotes + 1,
+          userVotedOptionId: optId
+        }
+      };
+    }));
+  };
+
+  // Event Handlers
+  const handleCreateEvent = () => {
+    if (!eventTitle.trim()) return;
+    const eventData: EventData = {
+      id: `event_${Date.now()}`,
+      title: eventTitle.trim(),
+      date: eventDate,
+      time: eventTime,
+      location: eventLocation,
+      participantsCount: 5,
+      isAttending: true
+    };
+
+    const newMsg: Message = {
+      id: `msg_event_${Date.now()}`,
+      fromMe: true,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      mediaType: 'event',
+      eventData
+    };
+
+    setMessages(prev => [...prev, newMsg]);
+    setShowEventModal(false);
+    setEventTitle('');
+  };
+
+  const handleToggleEventAttendance = (msgId: string) => {
+    setMessages(prev => prev.map(m => {
+      if (m.id !== msgId || !m.eventData) return m;
+      const ev = m.eventData;
+      const nextAttending = !ev.isAttending;
+      const currentCount = ev.participantsCount ?? 5;
+      return {
+        ...m,
+        eventData: {
+          ...ev,
+          isAttending: nextAttending,
+          participantsCount: currentCount + (nextAttending ? 1 : -1)
+        }
+      };
+    }));
+  };
+
+  // Catalog item share (Product / Service)
+  const handleShareProduct = (prod: typeof initialProducts[0]) => {
+    const productData: ProductData = {
+      id: prod.id,
+      title: prod.title,
+      price: prod.price,
+      currency: '₽',
+      image: prod.images[0],
+      imageUrl: prod.images[0],
+      type: 'product',
+      category: prod.category || 'Товар',
+      sellerName: prod.seller.name,
+      commissionPercent: 3
+    };
+
+    const newMsg: Message = {
+      id: `msg_prod_${Date.now()}`,
+      fromMe: true,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      mediaType: 'product',
+      productData
+    };
+
+    setMessages(prev => [...prev, newMsg]);
+    setShowCatalogModal(false);
+  };
+
+  // Contact share
+  const handleShareContact = (user: typeof initialUsers[0]) => {
+    const contactData: ContactData = {
+      id: user.id,
+      name: user.name,
+      username: user.username,
+      avatar: user.avatar,
+      phone: '+7 (999) 450-88-21'
+    };
+
+    const newMsg: Message = {
+      id: `msg_contact_${Date.now()}`,
+      fromMe: true,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      mediaType: 'contact',
+      contactData
+    };
+
+    setMessages(prev => [...prev, newMsg]);
+    setShowContactModal(false);
+  };
+
+  const togglePlayVoice = (id: string) => {
+    setPlayingVoiceId(prev => prev === id ? null : id);
   };
 
   const handleHeaderClick = () => {
@@ -255,13 +616,19 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
 
   return (
     <div className="tg-chat-container">
-      {/* Hidden File Input */}
+      {/* Hidden File Inputs */}
       <input
         type="file"
         ref={fileInputRef}
         style={{ display: 'none' }}
         accept="image/*,video/*"
         onChange={handleFileChange}
+      />
+      <input
+        type="file"
+        ref={docInputRef}
+        style={{ display: 'none' }}
+        onChange={handleDocChange}
       />
 
       {/* Telegram-style Chat Header */}
@@ -281,10 +648,26 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
               {!chat.isGroup && chat.user.online && <span className="tg-online-pip" />}
             </div>
             <div className="tg-user-titles">
-              <span className="tg-header-name">{chat.groupTitle || chat.user.name}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="tg-header-name">{chat.groupTitle || chat.user.name}</span>
+                {chat.id === 'ai_guru_bot' && (
+                  <span style={{ 
+                    fontSize: 10, 
+                    fontWeight: 700, 
+                    background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)', 
+                    color: 'white', 
+                    padding: '1px 6px', 
+                    borderRadius: 8 
+                  }}>
+                    ИИ
+                  </span>
+                )}
+              </div>
               <span className="tg-header-status">
                 {chat.isGroup ? (
-                  `${chat.membersCount || 6} участников · группа конференции`
+                  `${chat.membersCount || 6} участников · группа`
+                ) : chat.id === 'ai_guru_bot' ? (
+                  <span style={{ color: '#a855f7', fontWeight: 600 }}>Нейросетевой наставник (всегда в сети)</span>
                 ) : chat.user.online ? (
                   <span className="online-text">в сети</span>
                 ) : (
@@ -304,7 +687,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
             <PhoneCall size={19} />
           </button>
 
-          {!chat.isGroup && (
+          {!chat.isGroup && chat.id !== 'ai_guru_bot' && (
             <button 
               className="tg-header-btn" 
               onClick={() => navigate(`/profile/${chat.user.id}`)}
@@ -336,7 +719,8 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
                   <Trash2 size={16} color="var(--color-danger)" />
                   <span>Очистить переписку</span>
                 </button>
-                {onDeleteChat && (
+                {/* AI GURU cannot be deleted! */}
+                {onDeleteChat && chat.id !== 'ai_guru_bot' && (
                   <button 
                     className="chat-option-row danger"
                     onClick={() => {
@@ -365,6 +749,14 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
             const isMe = msg.fromMe;
             const isVoice = msg.mediaType === 'voice';
             const isImage = msg.mediaType === 'image';
+            const isVideoNote = msg.mediaType === 'video_note';
+            const isPoll = msg.mediaType === 'poll' && msg.pollData;
+            const isEvent = msg.mediaType === 'event' && msg.eventData;
+            const isProduct = msg.mediaType === 'product' && msg.productData;
+            const isContact = msg.mediaType === 'contact' && msg.contactData;
+            const isSticker = msg.mediaType === 'sticker';
+            const isGif = msg.mediaType === 'gif';
+            const isDoc = msg.mediaType === 'document';
             const isRec = Boolean(msg.conferenceRecording);
 
             return (
@@ -380,7 +772,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
                       <Reply size={14} />
                     </button>
 
-                    {isMe && msg.text && !isVoice && (
+                    {isMe && msg.text && !isVoice && !isVideoNote && (
                       <button 
                         className="msg-action-btn"
                         onClick={() => handleStartEdit(msg)}
@@ -408,84 +800,265 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
                     </button>
                   </div>
 
-                  <div className={`tg-bubble ${isMe ? 'bubble-me' : 'bubble-them'}`}>
-                    {/* Conference Recording Card */}
-                    {isRec && msg.conferenceRecording && (
-                      <div className="tg-rec-card">
-                        <div className="tg-rec-header">
-                          <VideoIcon size={20} className="tg-rec-icon" />
-                          <div className="tg-rec-meta">
-                            <span className="tg-rec-title">{msg.conferenceRecording.title}</span>
-                            <span className="tg-rec-date">{msg.conferenceRecording.date} · {msg.conferenceRecording.duration}</span>
-                          </div>
+                  {/* 1. Telegram Video Note (Кружочек) */}
+                  {isVideoNote && (
+                    <div 
+                      className="tg-video-note-bubble"
+                      onClick={() => togglePlayVideoNote(msg.id)}
+                    >
+                      <video
+                        src={msg.videoNoteUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'}
+                        className="video-note-element"
+                        autoPlay
+                        loop
+                        muted={playingVideoNoteId !== msg.id}
+                        playsInline
+                      />
+                      {playingVideoNoteId !== msg.id && (
+                        <div className="video-note-play-hint">
+                          <VolumeX size={20} />
                         </div>
-                        <button 
-                          className="tg-rec-play-btn"
-                          onClick={() => setSelectedRecording({
-                            title: msg.conferenceRecording!.title,
-                            duration: msg.conferenceRecording!.duration,
+                      )}
+                      <div className="video-note-mute-status">
+                        {playingVideoNoteId === msg.id ? 'Звук вкл' : 'Без звука'} · {msg.time}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. Sticker */}
+                  {isSticker && (
+                    <div className="tg-bubble sticker-bubble" style={{ background: 'transparent', boxShadow: 'none', border: 'none', padding: 0 }}>
+                      <img src={msg.stickerUrl} alt="Sticker" className="tg-sticker-message" />
+                      <div className="tg-meta" style={{ justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                        <span className="tg-time">{msg.time}</span>
+                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. GIF */}
+                  {isGif && (
+                    <div className="tg-bubble" style={{ padding: 6, maxWidth: 260 }}>
+                      <img src={msg.gifUrl} alt="GIF" className="tg-gif-message" />
+                      <div className="tg-meta">
+                        <span className="tg-time">{msg.time}</span>
+                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. Poll Card */}
+                  {isPoll && msg.pollData && (
+                    <div className={`tg-bubble ${isMe ? 'bubble-me' : 'bubble-them'}`}>
+                      <div className="tg-poll-card">
+                        <div className="poll-question">{msg.pollData.question}</div>
+                        <span className="poll-type-tag">Анонимный опрос</span>
+                        <div className="poll-options-list">
+                          {msg.pollData.options.map(opt => {
+                            const isVoted = msg.pollData?.userVotedOptionId === opt.id;
+                            const total = msg.pollData?.totalVotes || 1;
+                            const percent = Math.round((opt.votes / total) * 100);
+                            return (
+                              <div 
+                                key={opt.id} 
+                                className={`poll-option-row ${isVoted ? 'voted' : ''}`}
+                                onClick={() => handleVotePoll(msg.id, opt.id)}
+                              >
+                                <div className="poll-option-fill" style={{ width: `${percent}%` }} />
+                                <div className="poll-option-content">
+                                  <span className="poll-option-text">{opt.text}</span>
+                                  <span className="poll-option-percent">{percent}%</span>
+                                </div>
+                              </div>
+                            );
                           })}
-                        >
-                          <Play size={16} fill="currentColor" /> Смотреть запись звонка
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Attached Image */}
-                    {isImage && msg.mediaUrl && (
-                      <div className="tg-media-preview-bubble">
-                        <img src={msg.mediaUrl} alt="attachment" className="tg-chat-photo" />
-                      </div>
-                    )}
-
-                    {/* Voice Message Player */}
-                    {isVoice && (
-                      <div className="tg-voice-player">
-                        <button 
-                          className="tg-voice-play-btn" 
-                          onClick={() => togglePlayVoice(msg.id)}
-                        >
-                          {playingVoiceId === msg.id ? (
-                            <Pause size={16} fill="currentColor" />
-                          ) : (
-                            <Play size={16} fill="currentColor" style={{ marginLeft: 2 }} />
-                          )}
-                        </button>
-
-                        {/* Animated Audio Waveform Bars */}
-                        <div className={`tg-waveform ${playingVoiceId === msg.id ? 'playing' : ''}`}>
-                          {[40, 70, 30, 90, 60, 100, 45, 80, 50, 95, 30, 85, 60, 40, 75, 90, 50, 65, 35].map((h, i) => (
-                            <span 
-                              key={i} 
-                              className="wave-bar" 
-                              style={{ height: `${h}%` }} 
-                            />
-                          ))}
                         </div>
+                        <div className="poll-votes-total">
+                          Голосов: {msg.pollData.totalVotes}
+                        </div>
+                      </div>
+                      <div className="tg-meta">
+                        <span className="tg-time">{msg.time}</span>
+                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                      </div>
+                    </div>
+                  )}
 
-                        <div className="tg-voice-meta">
-                          <span className="tg-voice-duration">{msg.voiceDuration || '0:18'}</span>
+                  {/* 5. Event Card */}
+                  {isEvent && msg.eventData && (
+                    <div className={`tg-bubble ${isMe ? 'bubble-me' : 'bubble-them'}`}>
+                      <div className="tg-event-card">
+                        <span className="event-badge"><Calendar size={13} /> Мероприятие</span>
+                        <div className="event-title">{msg.eventData.title}</div>
+                        <div className="event-meta-info">
+                          <span>📅 {msg.eventData.date} в {msg.eventData.time}</span>
+                          <span>📍 {msg.eventData.location}</span>
+                          <span>👥 Участников: {msg.eventData.participantsCount}</span>
+                        </div>
+                        <button 
+                          className={`event-join-btn ${msg.eventData.isAttending ? 'attending' : ''}`}
+                          onClick={() => handleToggleEventAttendance(msg.id)}
+                        >
+                          {msg.eventData.isAttending ? '✓ Вы идёте' : 'Присоединиться'}
+                        </button>
+                      </div>
+                      <div className="tg-meta">
+                        <span className="tg-time">{msg.time}</span>
+                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 6. Product / Service Card */}
+                  {isProduct && msg.productData && (
+                    <div className={`tg-bubble ${isMe ? 'bubble-me' : 'bubble-them'}`} style={{ padding: 6 }}>
+                      <div className="tg-product-card">
+                        <img src={msg.productData.imageUrl} alt={msg.productData.title} className="product-card-img" />
+                        <div className="product-card-body">
+                          <span className="product-card-badge">{msg.productData.category}</span>
+                          <div className="product-card-title">{msg.productData.title}</div>
+                          <div className="product-card-price-row">
+                            <span className="product-card-price">{msg.productData.price} {msg.productData.currency}</span>
+                            <span className="product-card-commission">Комиссия 3% включена</span>
+                          </div>
                           <button 
-                            className="tg-voice-speed" 
-                            onClick={() => setVoiceSpeed(s => s === 1 ? 2 : 1)}
+                            className="product-card-order-btn"
+                            onClick={() => alert(`Заказ «${msg.productData?.title}» отправлен автору!`)}
                           >
-                            {voiceSpeed}X
+                            Заказать / Купить
                           </button>
                         </div>
                       </div>
-                    )}
-
-                    {/* Text Content */}
-                    {msg.text && (!isVoice || msg.text !== 'Голосовое сообщение') && (
-                      <div className="tg-text">{msg.text}</div>
-                    )}
-
-                    {/* Timestamp & Seen ticks */}
-                    <div className="tg-meta">
-                      <span className="tg-time">{msg.time}</span>
-                      {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                      <div className="tg-meta" style={{ padding: '2px 6px' }}>
+                        <span className="tg-time">{msg.time}</span>
+                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* 7. Contact Card */}
+                  {isContact && msg.contactData && (
+                    <div className={`tg-bubble ${isMe ? 'bubble-me' : 'bubble-them'}`}>
+                      <div className="tg-contact-card">
+                        <img src={msg.contactData.avatar} alt={msg.contactData.name} className="contact-card-avatar" />
+                        <div className="contact-card-info">
+                          <span className="contact-card-name">{msg.contactData.name}</span>
+                          <span className="contact-card-sub">@{msg.contactData.username} · {msg.contactData.phone}</span>
+                        </div>
+                        <button 
+                          className="contact-card-action-btn"
+                          onClick={() => navigate(`/profile/${msg.contactData?.id}`)}
+                        >
+                          Открыть
+                        </button>
+                      </div>
+                      <div className="tg-meta">
+                        <span className="tg-time">{msg.time}</span>
+                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 8. Document Card */}
+                  {isDoc && (
+                    <div className={`tg-bubble ${isMe ? 'bubble-me' : 'bubble-them'}`}>
+                      <div className="tg-doc-file-card">
+                        <div className="doc-file-icon-wrap">
+                          <FileText size={20} />
+                        </div>
+                        <div className="doc-file-info">
+                          <span className="doc-file-name">{msg.text}</span>
+                          <span className="doc-file-size">1.4 МБ · Документ</span>
+                        </div>
+                      </div>
+                      <div className="tg-meta">
+                        <span className="tg-time">{msg.time}</span>
+                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Standard Text, Image, Voice, Conference Recording */}
+                  {!isVideoNote && !isSticker && !isGif && !isPoll && !isEvent && !isProduct && !isContact && !isDoc && (
+                    <div className={`tg-bubble ${isMe ? 'bubble-me' : 'bubble-them'}`}>
+                      {/* Conference Recording Card */}
+                      {isRec && msg.conferenceRecording && (
+                        <div className="tg-rec-card">
+                          <div className="tg-rec-header">
+                            <VideoIcon size={20} className="tg-rec-icon" />
+                            <div className="tg-rec-meta">
+                              <span className="tg-rec-title">{msg.conferenceRecording.title}</span>
+                              <span className="tg-rec-date">{msg.conferenceRecording.date} · {msg.conferenceRecording.duration}</span>
+                            </div>
+                          </div>
+                          <button 
+                            className="tg-rec-play-btn"
+                            onClick={() => setSelectedRecording({
+                              title: msg.conferenceRecording!.title,
+                              duration: msg.conferenceRecording!.duration,
+                            })}
+                          >
+                            <Play size={16} fill="currentColor" /> Смотреть запись звонка
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Attached Image */}
+                      {isImage && msg.mediaUrl && (
+                        <div className="tg-media-preview-bubble">
+                          <img src={msg.mediaUrl} alt="attachment" className="tg-chat-photo" />
+                        </div>
+                      )}
+
+                      {/* Voice Message Player */}
+                      {isVoice && (
+                        <div className="tg-voice-player">
+                          <button 
+                            className="tg-voice-play-btn" 
+                            onClick={() => togglePlayVoice(msg.id)}
+                          >
+                            {playingVoiceId === msg.id ? (
+                              <Pause size={16} fill="currentColor" />
+                            ) : (
+                              <Play size={16} fill="currentColor" style={{ marginLeft: 2 }} />
+                            )}
+                          </button>
+
+                          {/* Animated Audio Waveform Bars */}
+                          <div className={`tg-waveform ${playingVoiceId === msg.id ? 'playing' : ''}`}>
+                            {[40, 70, 30, 90, 60, 100, 45, 80, 50, 95, 30, 85, 60, 40, 75, 90, 50, 65, 35].map((h, i) => (
+                              <span 
+                                key={i} 
+                                className="wave-bar" 
+                                style={{ height: `${h}%` }} 
+                              />
+                            ))}
+                          </div>
+
+                          <div className="tg-voice-meta">
+                            <span className="tg-voice-duration">{msg.voiceDuration || '0:18'}</span>
+                            <button 
+                              className="tg-voice-speed" 
+                              onClick={() => setVoiceSpeed(s => s === 1 ? 2 : 1)}
+                            >
+                              {voiceSpeed}X
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Text Content */}
+                      {msg.text && (!isVoice || msg.text !== 'Голосовое сообщение') && (
+                        <div className="tg-text">{msg.text}</div>
+                      )}
+
+                      {/* Timestamp & Seen ticks */}
+                      <div className="tg-meta">
+                        <span className="tg-time">{msg.time}</span>
+                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -539,71 +1112,210 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
         </div>
       )}
 
-      {/* Emoji Picker Popover */}
-      {showEmojiPicker && (
-        <div className="tg-emoji-popover">
-          <div className="emoji-grid">
-            {quickEmojis.map(emoji => (
-              <button
-                key={emoji}
-                className="emoji-cell"
-                onClick={() => {
-                  setInputValue(prev => prev + emoji);
-                  setShowEmojiPicker(false);
-                }}
-              >
-                {emoji}
-              </button>
-            ))}
+      {/* STICKERS, EMOJIS & GIF POPUP TABS */}
+      {showMediaTabs && (
+        <div className="tg-media-tabs-popover">
+          <div className="media-tabs-header">
+            <button 
+              className={`media-tab-btn ${activeMediaTab === 'emoji' ? 'active' : ''}`}
+              onClick={() => setActiveMediaTab('emoji')}
+            >
+              <Smile size={16} /> Эмодзи
+            </button>
+            <button 
+              className={`media-tab-btn ${activeMediaTab === 'stickers' ? 'active' : ''}`}
+              onClick={() => setActiveMediaTab('stickers')}
+            >
+              <Sparkles size={16} /> Стикеры
+            </button>
+            <button 
+              className={`media-tab-btn ${activeMediaTab === 'gif' ? 'active' : ''}`}
+              onClick={() => setActiveMediaTab('gif')}
+            >
+              <Zap size={16} /> GIF
+            </button>
+          </div>
+
+          <div className="media-tabs-body">
+            {activeMediaTab === 'emoji' && (
+              <div className="emoji-grid">
+                {quickEmojis.map(emoji => (
+                  <button
+                    key={emoji}
+                    className="emoji-cell"
+                    onClick={() => {
+                      setInputValue(prev => prev + emoji);
+                    }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeMediaTab === 'stickers' && (
+              <div className="stickers-grid">
+                {stickerPacks.map(stk => (
+                  <button 
+                    key={stk.id} 
+                    className="sticker-cell-btn"
+                    onClick={() => handleSendSticker(stk.url)}
+                    title={stk.title}
+                  >
+                    <img src={stk.url} alt={stk.title} className="sticker-cell-img" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeMediaTab === 'gif' && (
+              <div className="gifs-grid">
+                {sampleGifs.map(g => (
+                  <button 
+                    key={g.id} 
+                    className="gif-cell-btn"
+                    onClick={() => handleSendGif(g.url)}
+                  >
+                    <img src={g.url} alt={g.title} className="gif-cell-img" />
+                    <span className="gif-title-tag">{g.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Paperclip Attachment Menu Popover */}
+      {/* EXACT MATCH ATTACHMENT MENU (from user's screenshot) */}
       {showAttachMenu && (
-        <div className="tg-attach-menu">
+        <div className="tg-attach-menu-dark">
+          {/* 1. Документ */}
           <button 
-            className="attach-option"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <div className="attach-icon-circle blue">
-              <ImageIcon size={18} />
-            </div>
-            <span>Выбрать фото/видео</span>
-          </button>
-
-          <button 
-            className="attach-option"
-            onClick={handleAttachSamplePhoto}
-          >
-            <div className="attach-icon-circle purple">
-              <ImageIcon size={18} />
-            </div>
-            <span>Демо-изображение</span>
-          </button>
-
-          <button 
-            className="attach-option"
+            className="attach-dark-row"
             onClick={() => {
-              const newRecMsg: Message = {
-                id: `rec_share_${Date.now()}`,
+              setShowAttachMenu(false);
+              docInputRef.current?.click();
+            }}
+          >
+            <span className="attach-icon-badge color-purple"><FileText size={20} /></span>
+            <span>Документ</span>
+          </button>
+
+          {/* 2. Фото и видео */}
+          <button 
+            className="attach-dark-row"
+            onClick={() => {
+              setShowAttachMenu(false);
+              fileInputRef.current?.click();
+            }}
+          >
+            <span className="attach-icon-badge color-blue"><ImageIcon size={20} /></span>
+            <span>Фото и видео</span>
+          </button>
+
+          {/* 3. Камера */}
+          <button 
+            className="attach-dark-row"
+            onClick={() => {
+              setShowAttachMenu(false);
+              handleAttachSamplePhoto();
+            }}
+          >
+            <span className="attach-icon-badge color-pink"><Camera size={20} /></span>
+            <span>Камера</span>
+          </button>
+
+          {/* 4. Аудио */}
+          <button 
+            className="attach-dark-row"
+            onClick={() => {
+              const audioMsg: Message = {
+                id: `audio_${Date.now()}`,
                 fromMe: true,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                conferenceRecording: {
-                  title: 'Запись недавней конференции',
-                  duration: '34:20',
-                  date: 'Сегодня',
-                  code: 'rec-recent',
-                },
+                text: 'Медитация Полнолуния (432 Гц)',
+                mediaType: 'voice',
+                voiceDuration: '14:20'
               };
-              setMessages(prev => [...prev, newRecMsg]);
+              setMessages(prev => [...prev, audioMsg]);
               setShowAttachMenu(false);
             }}
           >
-            <div className="attach-icon-circle green">
-              <VideoIcon size={18} />
-            </div>
-            <span>Прикрепить запись звонка</span>
+            <span className="attach-icon-badge color-orange"><Headphones size={20} /></span>
+            <span>Аудио</span>
+          </button>
+
+          {/* 5. Контакт */}
+          <button 
+            className="attach-dark-row"
+            onClick={() => {
+              setShowAttachMenu(false);
+              setShowContactModal(true);
+            }}
+          >
+            <span className="attach-icon-badge color-cyan"><UserCheck size={20} /></span>
+            <span>Контакт</span>
+          </button>
+
+          {/* 6. Опрос */}
+          <button 
+            className="attach-dark-row"
+            onClick={() => {
+              setShowAttachMenu(false);
+              setShowPollModal(true);
+            }}
+          >
+            <span className="attach-icon-badge color-yellow"><BarChart2 size={20} /></span>
+            <span>Опрос</span>
+          </button>
+
+          {/* 7. Мероприятие */}
+          <button 
+            className="attach-dark-row"
+            onClick={() => {
+              setShowAttachMenu(false);
+              setShowEventModal(true);
+            }}
+          >
+            <span className="attach-icon-badge color-rose"><Calendar size={20} /></span>
+            <span>Мероприятие</span>
+          </button>
+
+          {/* 8. Новый стикер */}
+          <button 
+            className="attach-dark-row"
+            onClick={() => {
+              setShowAttachMenu(false);
+              setShowMediaTabs(true);
+              setActiveMediaTab('stickers');
+            }}
+          >
+            <span className="attach-icon-badge color-teal"><Sparkles size={20} /></span>
+            <span>Новый стикер</span>
+          </button>
+
+          {/* 9. Каталог (Товары и Услуги с 3% комиссией) */}
+          <button 
+            className="attach-dark-row highlighted"
+            onClick={() => {
+              setShowAttachMenu(false);
+              setShowCatalogModal(true);
+            }}
+          >
+            <span className="attach-icon-badge color-amber"><ShoppingBag size={20} /></span>
+            <span>Каталог товаров/услуг</span>
+          </button>
+
+          {/* 10. Быстрые ответы */}
+          <button 
+            className="attach-dark-row"
+            onClick={() => {
+              setInputValue('Благодарю за обращение! Отвечу в течение 5 минут. 🙏');
+              setShowAttachMenu(false);
+            }}
+          >
+            <span className="attach-icon-badge color-gray"><Zap size={20} /></span>
+            <span>Быстрые ответы</span>
           </button>
         </div>
       )}
@@ -616,7 +1328,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
             <div className="voice-recording-indicator">
               <span className="rec-pulse-dot" />
               <span className="rec-timer">{formatVoiceTime(voiceSeconds)}</span>
-              <span className="rec-hint">Идет запись голосового сообщения...</span>
+              <span className="rec-hint">Запись голосового сообщения...</span>
             </div>
 
             <div className="voice-recording-actions">
@@ -636,9 +1348,9 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
               className={`tg-tool-btn ${showAttachMenu ? 'active' : ''}`}
               onClick={() => {
                 setShowAttachMenu(!showAttachMenu);
-                setShowEmojiPicker(false);
+                setShowMediaTabs(false);
               }}
-              title="Прикрепить файл или фото"
+              title="Меню вложений"
             >
               <Paperclip size={21} />
             </button>
@@ -658,20 +1370,20 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
                 className="tg-text-input"
               />
 
-              {/* Emoji/Sticker button */}
+              {/* Media Popover toggle (Emoji / Stickers / GIF) */}
               <button 
-                className={`tg-emoji-btn ${showEmojiPicker ? 'active' : ''}`}
+                className={`tg-emoji-btn ${showMediaTabs ? 'active' : ''}`}
                 onClick={() => {
-                  setShowEmojiPicker(!showEmojiPicker);
+                  setShowMediaTabs(!showMediaTabs);
                   setShowAttachMenu(false);
                 }}
-                title="Смайлики"
+                title="Стикеры, эмодзи и GIF"
               >
                 <Smile size={21} />
               </button>
             </div>
 
-            {/* Action Button: Voice recording OR Send button */}
+            {/* Action Buttons: Toggle Mic/Camera mode & Send/Record */}
             {inputValue.trim() || attachedImage ? (
               <button 
                 className="tg-send-action-btn"
@@ -681,17 +1393,234 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
                 <Send size={18} className="tg-send-icon" />
               </button>
             ) : (
-              <button 
-                className="tg-mic-action-btn"
-                onClick={() => setIsRecordingVoice(true)}
-                title="Записать голосовое сообщение"
-              >
-                <Mic size={22} />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {/* Switcher between Mic and Camera note */}
+                <button
+                  className={`tg-mode-toggle-btn ${inputMode === 'camera' ? 'camera-active' : ''}`}
+                  onClick={() => setInputMode(m => m === 'mic' ? 'camera' : 'mic')}
+                  title={inputMode === 'mic' ? "Переключить на видео-кружочек" : "Переключить на голосовое"}
+                >
+                  {inputMode === 'mic' ? <Camera size={19} /> : <Mic size={19} />}
+                </button>
+
+                {inputMode === 'mic' ? (
+                  <button 
+                    className="tg-mic-action-btn"
+                    onClick={handleStartVoiceRecord}
+                    title="Записать голосовое сообщение"
+                  >
+                    <Mic size={22} />
+                  </button>
+                ) : (
+                  <button 
+                    className="tg-mic-action-btn"
+                    style={{ background: 'rgba(236, 72, 153, 0.15)', color: '#ec4899' }}
+                    onClick={handleOpenVideoNoteRecorder}
+                    title="Записать видео-кружочек"
+                  >
+                    <VideoIcon size={22} />
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
       </div>
+
+      {/* TELEGRAM VIDEO NOTE RECORDER OVERLAY MODAL */}
+      {isVideoNoteRecording && (
+        <div className="tg-video-note-recorder-overlay">
+          <div className="recorder-circle-wrapper">
+            <video 
+              ref={cameraVideoRef} 
+              className="camera-preview-video" 
+              autoPlay 
+              muted 
+              playsInline 
+            />
+            <div className="recorder-recording-indicator">
+              <span className="rec-pulse-point" />
+              <span>{formatVoiceTime(videoNoteSeconds)}</span>
+            </div>
+          </div>
+
+          <div className="recorder-controls-row">
+            <button className="btn-rec-cancel" onClick={handleCloseVideoNoteRecorder}>
+              Отмена
+            </button>
+            <button className="btn-rec-send" onClick={handleSendVideoNote}>
+              <Send size={16} /> Отправить кружочек
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* POLL CREATION MODAL */}
+      {showPollModal && (
+        <div className="tg-modal-overlay" onClick={() => setShowPollModal(false)}>
+          <div className="tg-delete-modal-box" style={{ textAlign: 'left' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 12 }}>Создать опрос</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              <input 
+                type="text" 
+                placeholder="Задайте вопрос..." 
+                value={pollQuestion} 
+                onChange={e => setPollQuestion(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', color: 'var(--color-text)' }}
+              />
+              <input 
+                type="text" 
+                placeholder="Вариант ответа 1" 
+                value={pollOption1} 
+                onChange={e => setPollOption1(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', color: 'var(--color-text)' }}
+              />
+              <input 
+                type="text" 
+                placeholder="Вариант ответа 2" 
+                value={pollOption2} 
+                onChange={e => setPollOption2(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', color: 'var(--color-text)' }}
+              />
+              <input 
+                type="text" 
+                placeholder="Вариант ответа 3 (опционально)" 
+                value={pollOption3} 
+                onChange={e => setPollOption3(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', color: 'var(--color-text)' }}
+              />
+            </div>
+            <div className="delete-modal-buttons">
+              <button className="modal-btn cancel" onClick={() => setShowPollModal(false)}>Отмена</button>
+              <button className="modal-btn" style={{ background: '#eab308', color: '#000' }} onClick={handleCreatePoll}>Создать</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EVENT CREATION MODAL */}
+      {showEventModal && (
+        <div className="tg-modal-overlay" onClick={() => setShowEventModal(false)}>
+          <div className="tg-delete-modal-box" style={{ textAlign: 'left' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ marginBottom: 12 }}>Создать мероприятие</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              <input 
+                type="text" 
+                placeholder="Название встречи / практики..." 
+                value={eventTitle} 
+                onChange={e => setEventTitle(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', color: 'var(--color-text)' }}
+              />
+              <input 
+                type="text" 
+                placeholder="Дата (например: 25 сентября)" 
+                value={eventDate} 
+                onChange={e => setEventDate(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', color: 'var(--color-text)' }}
+              />
+              <input 
+                type="text" 
+                placeholder="Время (например: 19:00)" 
+                value={eventTime} 
+                onChange={e => setEventTime(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', color: 'var(--color-text)' }}
+              />
+              <input 
+                type="text" 
+                placeholder="Место или ссылка (например: Онлайн • Live Zen)" 
+                value={eventLocation} 
+                onChange={e => setEventLocation(e.target.value)}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)', color: 'var(--color-text)' }}
+              />
+            </div>
+            <div className="delete-modal-buttons">
+              <button className="modal-btn cancel" onClick={() => setShowEventModal(false)}>Отмена</button>
+              <button className="modal-btn" style={{ background: '#ec4899', color: '#fff' }} onClick={handleCreateEvent}>Создать</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CATALOG (PRODUCTS & SERVICES) MODAL */}
+      {showCatalogModal && (
+        <div className="tg-modal-overlay" onClick={() => setShowCatalogModal(false)}>
+          <div className="tg-delete-modal-box" style={{ textAlign: 'left', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ margin: 0 }}>Прикрепить товар или услугу</h3>
+              <button className="modal-close-icon" onClick={() => setShowCatalogModal(false)}><X size={20} /></button>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', marginBottom: 14 }}>
+              С каждой продажи удерживается комиссия платформы 3%.
+            </p>
+            <div style={{ maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {initialProducts.map(prod => (
+                <div 
+                  key={prod.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: 8,
+                    borderRadius: 10,
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-bg-secondary)',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => handleShareProduct(prod)}
+                >
+                  <img src={prod.images[0]} alt={prod.title} style={{ width: 48, height: 48, borderRadius: 8, objectFit: 'cover' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--color-text)' }}>{prod.title}</div>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--color-accent)', fontWeight: 600 }}>{prod.price} ₽ · {prod.category || 'Товар'}</div>
+                  </div>
+                  <button className="btn btn-primary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                    Выбрать
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONTACT SELECTION MODAL */}
+      {showContactModal && (
+        <div className="tg-modal-overlay" onClick={() => setShowContactModal(false)}>
+          <div className="tg-delete-modal-box" style={{ textAlign: 'left', maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ margin: 0 }}>Поделиться контактом</h3>
+              <button className="modal-close-icon" onClick={() => setShowContactModal(false)}><X size={20} /></button>
+            </div>
+            <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {initialUsers.filter(u => u.id !== 'me').map(u => (
+                <div 
+                  key={u.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: 8,
+                    borderRadius: 10,
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-bg-secondary)',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => handleShareContact(u)}
+                >
+                  <img src={u.avatar} alt={u.name} style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--color-text)' }}>{u.name}</div>
+                    <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)' }}>@{u.username}</div>
+                  </div>
+                  <button className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
+                    Отправить
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Message Confirmation Modal */}
       {messageToDelete && (
@@ -793,4 +1722,4 @@ export function ChatWindow({ chat, onBack, onDeleteChat }: ChatWindowProps) {
       )}
     </div>
   );
-}
+}
