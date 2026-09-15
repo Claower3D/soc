@@ -191,6 +191,43 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
     return `${mins}:${s.toString().padStart(2, '0')}`;
   };
 
+  // Helper to render delivery & read ticks
+  const renderMessageTicks = (msg: Message) => {
+    // 1 gray tick: msg.status === 'sent' or recipient is offline
+    // 2 gray ticks: msg.status === 'delivered'
+    // 2 blue ticks: msg.status === 'read' (or default fallback for online recipients)
+    let status = msg.status;
+    if (!status) {
+      if (chat?.isGroup || chat?.id === 'ai_guru_bot') {
+        status = 'read';
+      } else if (chat && !chat.user.online) {
+        status = 'sent';
+      } else {
+        status = 'read';
+      }
+    }
+
+    if (status === 'sent') {
+      return (
+        <span title="Не доставлено (нет связи)">
+          <Check size={14} className="tg-ticks sent" />
+        </span>
+      );
+    }
+    if (status === 'delivered') {
+      return (
+        <span title="Доставлено (не прочитано)">
+          <CheckCheck size={14} className="tg-ticks delivered" />
+        </span>
+      );
+    }
+    return (
+      <span title="Доставлено и прочитано">
+        <CheckCheck size={14} className="tg-ticks read" />
+      </span>
+    );
+  };
+
   // Send or Edit message
   const handleSendMessage = () => {
     if (!inputValue.trim() && !attachedImage) return;
@@ -212,6 +249,9 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
       ? `💬 [В ответ]: ${replyingToMessage.text ? replyingToMessage.text.slice(0, 30) + '...' : 'вложение'}\n`
       : '';
 
+    const isRecipientOnline = chat ? (chat.isGroup || chat.id === 'ai_guru_bot' || chat.user.online) : false;
+    const initialStatus: 'sent' | 'delivered' = isRecipientOnline ? 'delivered' : 'sent';
+
     const newMsg: Message = {
       id: `msg_${Date.now()}`,
       text: replyPrefix ? replyPrefix + inputValue.trim() : (inputValue.trim() || undefined),
@@ -219,9 +259,15 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       mediaUrl: attachedImage || undefined,
       mediaType: attachedImage ? 'image' : undefined,
+      status: initialStatus,
     };
 
     setMessages(prev => [...prev, newMsg]);
+    if (isRecipientOnline) {
+      setTimeout(() => {
+        setMessages(curr => curr.map(m => m.id === newMsg.id ? { ...m, status: 'read' } : m));
+      }, 2500);
+    }
     setInputValue('');
     setAttachedImage(null);
     setReplyingToMessage(null);
@@ -919,7 +965,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                       <img src={msg.stickerUrl} alt="Sticker" className="tg-sticker-message" />
                       <div className="tg-meta" style={{ justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
                         <span className="tg-time">{msg.time}</span>
-                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                        {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
                   )}
@@ -930,7 +976,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                       <img src={msg.gifUrl} alt="GIF" className="tg-gif-message" />
                       <div className="tg-meta">
                         <span className="tg-time">{msg.time}</span>
-                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                        {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
                   )}
@@ -967,7 +1013,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                       </div>
                       <div className="tg-meta">
                         <span className="tg-time">{msg.time}</span>
-                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                        {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
                   )}
@@ -992,7 +1038,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                       </div>
                       <div className="tg-meta">
                         <span className="tg-time">{msg.time}</span>
-                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                        {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
                   )}
@@ -1019,7 +1065,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                       </div>
                       <div className="tg-meta" style={{ padding: '2px 6px' }}>
                         <span className="tg-time">{msg.time}</span>
-                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                        {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
                   )}
@@ -1042,7 +1088,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                       </div>
                       <div className="tg-meta">
                         <span className="tg-time">{msg.time}</span>
-                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                        {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
                   )}
@@ -1061,7 +1107,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                       </div>
                       <div className="tg-meta">
                         <span className="tg-time">{msg.time}</span>
-                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                        {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
                   )}
@@ -1153,7 +1199,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                       {/* Timestamp & Seen ticks */}
                       <div className="tg-meta">
                         <span className="tg-time">{msg.time}</span>
-                        {isMe && <CheckCheck size={14} className="tg-ticks" />}
+                        {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
                   )}
@@ -1210,7 +1256,20 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
         </div>
       )}
 
-      {/* STICKERS, EMOJIS & GIF POPUP TABS */}
+            {/* Standard Telegram Bottom Input Bar */}
+      <div className="tg-bottom-bar">
+        {/* Backdrop for popovers to close when clicked outside */}
+        {(showMediaTabs || showAttachMenu) && (
+          <div 
+            className="tg-popover-backdrop" 
+            onClick={() => {
+              setShowMediaTabs(false);
+              setShowAttachMenu(false);
+            }} 
+          />
+        )}
+
+{/* STICKERS, EMOJIS & GIF POPUP TABS */}
       {showMediaTabs && (
         <div className="tg-media-tabs-popover">
           <div className="media-tabs-header">
@@ -1418,8 +1477,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
         </div>
       )}
 
-      {/* Standard Telegram Bottom Input Bar */}
-      <div className="tg-bottom-bar">
+
         {/* Voice recording mode */}
         {isRecordingVoice ? (
           <div className="tg-voice-recording-row">
@@ -1444,8 +1502,9 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
             {/* Attachment Button (Paperclip) */}
             <button 
               className={`tg-tool-btn ${showAttachMenu ? 'active' : ''}`}
-              onClick={() => {
-                setShowAttachMenu(!showAttachMenu);
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAttachMenu(prev => !prev);
                 setShowMediaTabs(false);
               }}
               title="Меню вложений"
@@ -1471,8 +1530,9 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
               {/* Media Popover toggle (Emoji / Stickers / GIF) */}
               <button 
                 className={`tg-emoji-btn ${showMediaTabs ? 'active' : ''}`}
-                onClick={() => {
-                  setShowMediaTabs(!showMediaTabs);
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMediaTabs(prev => !prev);
                   setShowAttachMenu(false);
                 }}
                 title="Стикеры, эмодзи и GIF"
@@ -1898,4 +1958,4 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
       )}
     </div>
   );
-}
+}

@@ -309,7 +309,19 @@
 }
 
 .tg-ticks {
-  color: var(--color-accent);
+  transition: color var(--transition-fast);
+}
+
+.tg-ticks.sent {
+  color: #94A3B8; /* 1 серая галочка: не доставлено */
+}
+
+.tg-ticks.delivered {
+  color: #94A3B8; /* 2 серые галочки: доставлено, не прочитано */
+}
+
+.tg-ticks.read {
+  color: #2563EB; /* 2 синие галочки: доставлено и прочитано */
 }
 
 /* Media Attachment in Chat */
@@ -565,6 +577,14 @@
   border-top: 1px solid var(--color-border);
   padding: 0.65rem 1.25rem;
   position: relative;
+  z-index: 60;
+}
+
+.tg-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: transparent;
 }
 
 .tg-input-row {

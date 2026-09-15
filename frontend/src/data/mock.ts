@@ -291,6 +291,7 @@ export interface Message {
   eventData?: EventData;
   productData?: ProductData;
   contactData?: ContactData;
+  status?: 'sent' | 'delivered' | 'read';
   conferenceRecording?: {
     title: string;
     duration: string;
@@ -995,7 +996,7 @@ export const initialChats: Chat[] = [
     unread: 2,
     messages: [
       { id: 'm1', text: 'Привет, Алексей! 👋', fromMe: false, time: '12:30' },
-      { id: 'm2', text: 'Привет, Алиса! Всё отлично, обновляем дизайн мессенджера.', fromMe: true, time: '12:32' },
+      { id: 'm2', text: 'Привет, Алиса! Всё отлично, обновляем дизайн мессенджера.', fromMe: true, time: '12:32', status: 'read' },
       { 
         id: 'm3_voice', 
         fromMe: false, 
@@ -1010,7 +1011,8 @@ export const initialChats: Chat[] = [
         time: '12:40', 
         mediaType: 'image', 
         mediaUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80', 
-        text: 'Вот новые макеты с прикреплением файлов!' 
+        text: 'Вот новые макеты с прикреплением файлов!',
+        status: 'delivered'
       },
       { id: 'm5', text: 'Слушай, а голосовые сообщения теперь тоже можно отправлять? 🎙️', fromMe: false, time: '12:45' },
     ],
@@ -1022,7 +1024,7 @@ export const initialChats: Chat[] = [
     time: '11:20',
     unread: 0,
     messages: [
-      { id: 'm6', text: 'Привет! Готов к сегодняшнему синку?', fromMe: true, time: '10:00' },
+      { id: 'm6', text: 'Привет! Готов к сегодняшнему синку?', fromMe: true, time: '10:00', status: 'read' },
       { id: 'm7', text: 'Да, презентацию собрал. Код протестирован.', fromMe: false, time: '10:05' },
       { id: 'm8', text: 'Подключись в закрытую конференцию по ссылке в 16:00', fromMe: false, time: '11:20' },
     ],
@@ -1034,7 +1036,7 @@ export const initialChats: Chat[] = [
     time: 'Вчера',
     unread: 0,
     messages: [
-      { id: 'm9', text: 'Екатерина, взгляни пожалуйста на новые карточки профиля.', fromMe: true, time: 'Вчера' },
+      { id: 'm9', text: 'Екатерина, взгляни пожалуйста на новые карточки профиля.', fromMe: true, time: 'Вчера', status: 'sent' },
       { id: 'm10', text: 'Посмотрела! Типографика и тени выглядят очень чисто.', fromMe: false, time: 'Вчера' },
       { id: 'm11', text: 'Макеты светлого интерфейса просто отличные! 👍', fromMe: false, time: 'Вчера' },
     ],
