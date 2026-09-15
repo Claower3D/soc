@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, ShoppingBag, Image as ImageIcon, Sparkles, Tag, Layers, DollarSign } from 'lucide-react';
+import { X, ShoppingBag, Image as ImageIcon, Sparkles, Tag, Layers, DollarSign, Percent, Info, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { type Product } from '../data/mock';
 import './CreateProductModal.css';
@@ -171,7 +171,7 @@ export function CreateProductModal({ isOpen, onClose, onCreateProduct }: CreateP
                   </label>
                   <input
                     type="number"
-                    placeholder="3500"
+                    placeholder="5000"
                     value={price}
                     onChange={e => setPrice(e.target.value)}
                     className="product-input"
@@ -191,6 +191,49 @@ export function CreateProductModal({ isOpen, onClose, onCreateProduct }: CreateP
                   />
                 </div>
               </div>
+
+              {/* Расчёт комиссии 3% за объявление / продажу */}
+              {(() => {
+                const numericPrice = Number(price) || 0;
+                const commissionRate = 0.03; // 3%
+                const commissionAmount = Math.round(numericPrice * commissionRate);
+                const sellerReceives = Math.max(0, numericPrice - commissionAmount);
+
+                return (
+                  <div className="product-fee-card">
+                    <div className="fee-card-header">
+                      <div className="fee-title-wrap">
+                        <span className="fee-badge">
+                          <Percent size={12} /> Комиссия сервиса 3%
+                        </span>
+                        <span className="fee-subtitle">Удерживается при успешной сделке</span>
+                      </div>
+                      <span className="fee-amount">
+                        {numericPrice > 0 ? `-${commissionAmount.toLocaleString('ru-RU')} ₽` : '0 ₽'}
+                      </span>
+                    </div>
+
+                    <div className="fee-details-list">
+                      <div className="fee-row">
+                        <span className="fee-row-label">Стоимость товара для покупателя:</span>
+                        <span className="fee-row-val">{numericPrice.toLocaleString('ru-RU')} ₽</span>
+                      </div>
+                      <div className="fee-row fee-deduction">
+                        <span className="fee-row-label">
+                          <Info size={13} /> Комиссия маркетплейса (3%):
+                        </span>
+                        <span className="fee-row-val">-{commissionAmount.toLocaleString('ru-RU')} ₽</span>
+                      </div>
+                      <div className="fee-row fee-payout-row">
+                        <span className="fee-row-label">
+                          <ShieldCheck size={14} className="fee-payout-icon" /> Вы получите на счет:
+                        </span>
+                        <strong className="fee-payout-val">{sellerReceives.toLocaleString('ru-RU')} ₽</strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="product-prices-row">
                 <div className="product-field-group">
