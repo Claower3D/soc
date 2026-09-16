@@ -114,12 +114,14 @@ export interface DatingProfile {
   online?: boolean;
   lastActive?: string;
   compatibilityScore?: number; // 0-100%
+  distanceKm?: number; // Расстояние в километрах (по близости)
   lookingFor?: {
     gender?: 'all' | 'male' | 'female';
     ageMin?: number;
     ageMax?: number;
     goals?: DatingGoalType[];
     city?: string;
+    country?: string;
   };
 }
 
@@ -159,7 +161,8 @@ export const INITIAL_DATING_PROFILES: DatingProfile[] = [
     spiritualTradition: 'Буддизм & Даосизм',
     verified: true,
     online: true,
-    compatibilityScore: 94
+    compatibilityScore: 94,
+    distanceKm: 3
   },
   {
     id: 'dp-2',
@@ -196,7 +199,8 @@ export const INITIAL_DATING_PROFILES: DatingProfile[] = [
     spiritualTradition: 'Гуманизм & Стоицизм',
     verified: true,
     online: true,
-    compatibilityScore: 91
+    compatibilityScore: 91,
+    distanceKm: 12
   },
   {
     id: 'dp-3',
@@ -233,7 +237,8 @@ export const INITIAL_DATING_PROFILES: DatingProfile[] = [
     verified: true,
     online: false,
     lastActive: '15 минут назад',
-    compatibilityScore: 88
+    compatibilityScore: 88,
+    distanceKm: 8
   },
   {
     id: 'dp-4',
@@ -269,7 +274,8 @@ export const INITIAL_DATING_PROFILES: DatingProfile[] = [
     spiritualTradition: 'Даосизм & Христианство',
     verified: true,
     online: true,
-    compatibilityScore: 96
+    compatibilityScore: 96,
+    distanceKm: 45
   },
   {
     id: 'dp-5',
@@ -305,7 +311,8 @@ export const INITIAL_DATING_PROFILES: DatingProfile[] = [
     spiritualTradition: 'Гуманизм',
     verified: true,
     online: true,
-    compatibilityScore: 89
+    compatibilityScore: 89,
+    distanceKm: 25
   },
   {
     id: 'dp-6',
@@ -314,8 +321,8 @@ export const INITIAL_DATING_PROFILES: DatingProfile[] = [
     age: 31,
     birthDate: '1994-01-16',
     gender: 'male',
-    city: 'Новосибирск',
-    country: 'Россия',
+    city: 'Алматы',
+    country: 'Казахстан',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&q=80',
     photos: [
       'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
@@ -342,7 +349,45 @@ export const INITIAL_DATING_PROFILES: DatingProfile[] = [
     verified: true,
     online: false,
     lastActive: '1 час назад',
-    compatibilityScore: 92
+    compatibilityScore: 92,
+    distanceKm: 180
+  },
+  {
+    id: 'dp-7',
+    name: 'Камилла Саттарова',
+    username: 'kamilla_bali',
+    age: 25,
+    birthDate: '2000-05-14',
+    gender: 'female',
+    city: 'Убуд (Бали)',
+    country: 'Индонезия',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&q=80',
+    photos: [
+      'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80'
+    ],
+    goals: ['love', 'spiritual', 'travel'],
+    bio: 'Живу в Убуде, организую ретриты по йоге и кундалини. Изучаю дыхательные техники и траволечение. Мечтаю встретить однодуховца для создания гармоничной семьи и вдохновляющих путешествий по планете.',
+    occupation: 'Кундалини-инструктор & Основатель ретритов',
+    interests: ['Кундалини-йога', 'Убуд', 'Аюрведа', 'Медитация', 'Свободный танец', 'Океан'],
+    achievements: [
+      'Провела 15 международных ретритов на Бали и в Таиланде',
+      'Дипломированный мастер классической аюрведы',
+      'Свободно владею английским и индонезийским языками'
+    ],
+    lifeGoals: [
+      'Создать семейное эко-пространство гармонии и радости',
+      'Открыть школу осознанного дыхания онлайн',
+      'Исследовать древние храмы Тибета'
+    ],
+    consciousnessLevel: 8,
+    consciousnessTitle: 'Класс 8 • Гармонизатор Пространств',
+    zodiacSign: 'Телец',
+    spiritualTradition: 'Кундалини & Аюрведа',
+    verified: true,
+    online: true,
+    compatibilityScore: 95,
+    distanceKm: 980
   }
 ];
 

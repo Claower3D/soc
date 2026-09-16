@@ -24,7 +24,7 @@ export function ChatList({
   onCreateGroup,
   onUpdateChat 
 }: ChatListProps) {
-  type TabType = 'all' | 'unread' | 'favorites' | 'groups' | 'important' | 'archive' | 'locked';
+  type TabType = 'all' | 'unread' | 'favorites' | 'matches' | 'groups' | 'important' | 'archive' | 'locked';
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [activeTagId, setActiveTagId] = useState<string | null>(null);
   const [showTagsMenu, setShowTagsMenu] = useState(false);
@@ -58,6 +58,7 @@ export function ChatList({
   const lockedCount = chats.filter(c => c.isLocked).length;
   const unreadCount = chats.filter(c => !c.isArchived && !c.isLocked && c.unread > 0).length;
   const favoritesCount = chats.filter(c => !c.isArchived && !c.isLocked && c.isFavorite).length;
+  const matchesCount = chats.filter(c => !c.isArchived && !c.isLocked && (c.tagId === 'dating_match' || c.id.startsWith('chat_dating_'))).length;
   const groupsCount = chats.filter(c => !c.isArchived && !c.isLocked && c.isGroup).length;
   const importantCount = chats.filter(c => !c.isArchived && !c.isLocked && c.isImportant).length;
 
@@ -75,6 +76,8 @@ export function ChatList({
       if (chat.isArchived || chat.isLocked || chat.unread === 0) return false;
     } else if (activeTab === 'favorites') {
       if (chat.isArchived || chat.isLocked || !chat.isFavorite) return false;
+    } else if (activeTab === 'matches') {
+      if (chat.isArchived || chat.isLocked || !(chat.tagId === 'dating_match' || chat.id.startsWith('chat_dating_'))) return false;
     } else if (activeTab === 'groups') {
       if (chat.isArchived || chat.isLocked || !chat.isGroup) return false;
     } else if (activeTab === 'important') {
@@ -335,6 +338,21 @@ export function ChatList({
             <Star size={13} className="tab-star-icon" />
             <span>Избранное</span>
             {favoritesCount > 0 && <span className="tab-counter-badge">{favoritesCount}</span>}
+          </button>
+
+          <button
+            type="button"
+            className={`chat-tab-pill chat-tab-matches ${activeTab === 'matches' ? 'active' : ''}`}
+            onClick={() => handleTabClick('matches')}
+            title="Диалоги со знакомств и взаимные симпатии"
+          >
+            <Heart size={13} style={{ color: '#ec4899' }} className={activeTab === 'matches' ? 'fill-current' : ''} />
+            <span>Симпатии</span>
+            {matchesCount > 0 && (
+              <span className="tab-counter-badge" style={{ background: '#ec4899', color: '#fff' }}>
+                {matchesCount}
+              </span>
+            )}
           </button>
 
           <button

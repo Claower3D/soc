@@ -44,8 +44,11 @@ export const DatingProfileModal: React.FC<DatingProfileModalProps> = ({
   };
 
   const handleOpenChat = () => {
+    if (onLike && !isLiked) {
+      onLike(profile.id);
+    }
     onClose();
-    navigate('/messenger');
+    navigate(`/messenger?datingProfile=${encodeURIComponent(profile.id)}`);
   };
 
   const handleShare = () => {

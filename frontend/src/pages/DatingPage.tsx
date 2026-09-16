@@ -1,9 +1,11 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Heart, Sparkles, Search, MapPin, 
   MessageCircle, ShieldCheck, Edit3, 
   ChevronRight, ArrowRight, Users,
-  Check, RotateCcw, Filter, SlidersHorizontal, X
+  Check, RotateCcw, Filter, SlidersHorizontal, X,
+  Navigation, Globe
 } from 'lucide-react';
 import { 
   INITIAL_DATING_PROFILES, 
@@ -21,6 +23,8 @@ type DatingViewMode = 'feed' | 'grid' | 'matches' | 'my_profile';
 
 export const DatingPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
+
+  const navigate = useNavigate();
 
   // Mode: Лента свайпов, Каталог анкет, Мэтчи/лайки, Моя анкета
   const [viewMode, setViewMode] = useState<DatingViewMode>('feed');
@@ -52,34 +56,67 @@ export const DatingPage: React.FC = () => {
     return ['dp-1'];
   });
 
+  // Всплывающее окно взаимной симпатии (Мэтч!)
+  const [mutualMatchProfile, setMutualMatchProfile] = useState<DatingProfile | null>(null);
+
   // Индекс активной карточки для свайп-ленты
   const [currentSwipeIndex, setCurrentSwipeIndex] = useState(0);
 
   // Фильтры
   const [selectedGoalFilter, setSelectedGoalFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Гео-фильтрация: по близости (радиус км) либо по городам и странам
+  const [locationMode, setLocationMode] = useState<'any' | 'proximity' | 'city_country'>('any');
+  const [maxDistanceKm, setMaxDistanceKm] = useState<number>(50); // радиус поиска по близости (до 500 км)
+  const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [selectedCity, setSelectedCity] = useState('all');
+
   const [genderFilter, setGenderFilter] = useState<'all' | 'male' | 'female'>('all');
   const [consciousnessFilter, setConsciousnessFilter] = useState<string>('all');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [minAgeFilter, setMinAgeFilter] = useState<number>(18);
   const [maxAgeFilter, setMaxAgeFilter] = useState<number>(80);
 
+  // Список уникальных стран и городов
+  const uniqueCountries = useMemo(() => {
+    const countries = new Set<string>();
+    profiles.forEach(p => {
+      if (p.country) countries.add(p.country);
+    });
+    return Array.from(countries);
+  }, [profiles]);
+
+  const uniqueCities = useMemo(() => {
+    const cities = new Set<string>();
+    profiles.forEach(p => {
+      if (selectedCountry === 'all' || p.country === selectedCountry) {
+        cities.add(p.city);
+      }
+    });
+    return Array.from(cities);
+  }, [profiles, selectedCountry]);
+
   // Подсчёт активных фильтров (кроме строки поиска)
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     if (selectedGoalFilter !== 'all') count++;
     if (genderFilter !== 'all') count++;
-    if (selectedCity !== 'all') count++;
+    if (locationMode === 'proximity') count++;
+    if (locationMode === 'city_country' && (selectedCountry !== 'all' || selectedCity !== 'all')) count++;
+    if (selectedCity !== 'all' && locationMode !== 'city_country') count++;
     if (consciousnessFilter !== 'all') count++;
     if (minAgeFilter > 18 || maxAgeFilter < 80) count++;
     return count;
-  }, [selectedGoalFilter, genderFilter, selectedCity, consciousnessFilter, minAgeFilter, maxAgeFilter]);
+  }, [selectedGoalFilter, genderFilter, locationMode, selectedCountry, selectedCity, consciousnessFilter, minAgeFilter, maxAgeFilter]);
 
   const handleResetFilters = () => {
     setSelectedGoalFilter('all');
     setGenderFilter('all');
+    setLocationMode('any');
+    setSelectedCountry('all');
     setSelectedCity('all');
+    setMaxDistanceKm(50);
     setConsciousnessFilter('all');
     setMinAgeFilter(18);
     setMaxAgeFilter(80);
@@ -90,12 +127,6 @@ export const DatingPage: React.FC = () => {
   // Модальные окна
   const [inspectedProfile, setInspectedProfile] = useState<DatingProfile | null>(null);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-
-  // Список уникальных городов
-  const uniqueCities = useMemo(() => {
-    const cities = new Set(profiles.map(p => p.city));
-    return Array.from(cities);
-  }, [profiles]);
 
   // Фильтрация анкет
   const filteredProfiles = useMemo(() => {
@@ -113,9 +144,25 @@ export const DatingPage: React.FC = () => {
         if (profile.gender !== genderFilter) return false;
       }
 
-      // Фильтр по городу
-      if (selectedCity !== 'all') {
-        if (profile.city !== selectedCity) return false;
+      // Гео-фильтрация:
+      if (locationMode === 'proximity') {
+        // Фильтр по близости: расстояние не должно превышать выбранный радиус
+        const dist = profile.distanceKm ?? 25;
+        if (dist > maxDistanceKm) return false;
+      } else if (locationMode === 'city_country') {
+        // Фильтр по стране
+        if (selectedCountry !== 'all' && profile.country !== selectedCountry) {
+          return false;
+        }
+        // Фильтр по городу
+        if (selectedCity !== 'all' && profile.city !== selectedCity) {
+          return false;
+        }
+      } else {
+        // Режим 'any' — если выбран конкретный город в выпадающем списке
+        if (selectedCity !== 'all' && profile.city !== selectedCity) {
+          return false;
+        }
       }
 
       // Фильтр по классу сознания
@@ -133,31 +180,101 @@ export const DatingPage: React.FC = () => {
         const q = searchQuery.toLowerCase();
         const matchName = profile.name.toLowerCase().includes(q);
         const matchCity = profile.city.toLowerCase().includes(q);
+        const matchCountry = (profile.country || '').toLowerCase().includes(q);
         const matchBio = profile.bio.toLowerCase().includes(q);
         const matchInterests = profile.interests.some(i => i.toLowerCase().includes(q));
-        if (!matchName && !matchCity && !matchBio && !matchInterests) return false;
+        if (!matchName && !matchCity && !matchCountry && !matchBio && !matchInterests) return false;
       }
 
       return true;
     });
-  }, [profiles, myProfile, selectedGoalFilter, genderFilter, selectedCity, consciousnessFilter, minAgeFilter, maxAgeFilter, searchQuery]);
+  }, [profiles, myProfile, selectedGoalFilter, genderFilter, locationMode, maxDistanceKm, selectedCountry, selectedCity, consciousnessFilter, minAgeFilter, maxAgeFilter, searchQuery]);
 
   // Карточки для ленты свайпа
   const activeSwipeCard = filteredProfiles[currentSwipeIndex] || null;
 
+  // Обработка лайка и регистрация взаимной симпатии
   const handleLike = (profileId: string) => {
+    const isAlreadyLiked = likedIds.includes(profileId);
+    const targetProfile = profiles.find(p => p.id === profileId);
+
     setLikedIds(prev => {
-      const updated = prev.includes(profileId) 
+      const updated = isAlreadyLiked 
         ? prev.filter(id => id !== profileId) 
         : [...prev, profileId];
       localStorage.setItem('newage_dating_likes', JSON.stringify(updated));
       return updated;
     });
 
+    // Если поставили лайк (а не убрали), регистрируем взаимную симпатию и открываем окно мэтча
+    if (!isAlreadyLiked && targetProfile) {
+      // Имитируем ответную взаимную симпатию и создаем чат
+      setMutualMatchProfile(targetProfile);
+      createOrUpdateMatchChat(targetProfile);
+    }
+
     // Переход к следующей карточке в режиме свайпа
     if (viewMode === 'feed') {
       setCurrentSwipeIndex(prev => (prev + 1 < filteredProfiles.length ? prev + 1 : 0));
     }
+  };
+
+  // Создание диалога в мессенджере при взаимной симпатии
+  const createOrUpdateMatchChat = (profile: DatingProfile) => {
+    const matchChatId = `chat_dating_${profile.id}`;
+    const savedChatsStr = localStorage.getItem('newage_messenger_chats');
+    let currentChats: any[] = [];
+    if (savedChatsStr) {
+      try { currentChats = JSON.parse(savedChatsStr); } catch { /* ignore */ }
+    }
+
+    const existingChat = currentChats.find(c => c.id === matchChatId);
+    if (!existingChat) {
+      const newChat = {
+        id: matchChatId,
+        user: {
+          id: profile.id,
+          name: profile.name,
+          username: profile.username || profile.id,
+          avatar: profile.avatar || (profile.photos && profile.photos[0]) || '',
+          online: profile.online ?? true,
+          verified: profile.verified ?? true,
+          followersCount: 420,
+          followingCount: 140,
+          postsCount: 18,
+          consciousnessLevel: profile.consciousnessLevel,
+          consciousnessTitle: profile.consciousnessTitle,
+          zodiacSign: profile.zodiacSign
+        },
+        lastMessage: `💖 Взаимная симпатия! Резонанс ${profile.compatibilityScore || 95}%`,
+        time: 'Только что',
+        unread: 1,
+        isFavorite: true,
+        tagId: 'dating_match',
+        messages: [
+          {
+            id: `m_match_${Date.now()}_1`,
+            text: `✨ Поздравляем! У вас взаимная симпатия с ${profile.name} (${profile.age} лет, ${profile.city}). Резонанс душ: ${profile.compatibilityScore || 95}%!`,
+            fromMe: false,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: 'read'
+          },
+          {
+            id: `m_match_${Date.now()}_2`,
+            text: `Привет! Твоя анкета очень отозвалась в моем сердце. Рада познакомиться и пообщаться поближе ✨`,
+            fromMe: false,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: 'sent'
+          }
+        ]
+      };
+      const updated = [newChat, ...currentChats.filter(c => c.id !== matchChatId)];
+      localStorage.setItem('newage_messenger_chats', JSON.stringify(updated));
+    }
+  };
+
+  const handleOpenMessengerWithProfile = (profileId: string) => {
+    navigate(`/messenger?datingProfile=${encodeURIComponent(profileId)}`);
   };
 
   const handlePass = () => {
@@ -381,23 +498,131 @@ export const DatingPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Город */}
-            <div className="filter-field-group">
-              <label className="filter-label">Локация / Город:</label>
-              <select 
-                value={selectedCity} 
-                onChange={e => {
-                  setSelectedCity(e.target.value);
-                  setCurrentSwipeIndex(0);
-                }}
-                className="filter-panel-select"
-              >
-                <option value="all">🌍 Все города и страны</option>
-                {uniqueCities.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+            {/* Локация: Переключатель режима поиска (По близости / По городам и странам) */}
+            <div className="filter-field-group filter-field-group-wide">
+              <label className="filter-label">Геолокация и охват:</label>
+              <div className="filter-segmented-control">
+                <button 
+                  className={`segmented-btn ${locationMode === 'any' ? 'active' : ''}`}
+                  onClick={() => { setLocationMode('any'); setCurrentSwipeIndex(0); }}
+                >
+                  <Globe size={13} style={{ display: 'inline', marginRight: 4 }} />
+                  Все регионы
+                </button>
+                <button 
+                  className={`segmented-btn ${locationMode === 'proximity' ? 'active' : ''}`}
+                  onClick={() => { setLocationMode('proximity'); setCurrentSwipeIndex(0); }}
+                >
+                  <Navigation size={13} style={{ display: 'inline', marginRight: 4 }} />
+                  По близости (рядом)
+                </button>
+                <button 
+                  className={`segmented-btn ${locationMode === 'city_country' ? 'active' : ''}`}
+                  onClick={() => { setLocationMode('city_country'); setCurrentSwipeIndex(0); }}
+                >
+                  <MapPin size={13} style={{ display: 'inline', marginRight: 4 }} />
+                  По городам & странам
+                </button>
+              </div>
             </div>
+
+            {/* Если выбран режим "По близости" */}
+            {locationMode === 'proximity' && (
+              <div className="filter-field-group">
+                <label className="filter-label">
+                  Радиус поиска: до <span style={{ color: '#8b5cf6', fontWeight: 800 }}>{maxDistanceKm} км</span>
+                </label>
+                <div className="filter-proximity-input-row">
+                  <input 
+                    type="range" 
+                    min="5" 
+                    max="500" 
+                    step="5"
+                    value={maxDistanceKm} 
+                    onChange={e => {
+                      setMaxDistanceKm(Number(e.target.value));
+                      setCurrentSwipeIndex(0);
+                    }}
+                    className="filter-range-slider"
+                  />
+                  <div className="proximity-pills">
+                    {[10, 25, 50, 100, 250].map(km => (
+                      <button 
+                        key={km}
+                        type="button"
+                        className={`proximity-quick-pill ${maxDistanceKm === km ? 'active' : ''}`}
+                        onClick={() => {
+                          setMaxDistanceKm(km);
+                          setCurrentSwipeIndex(0);
+                        }}
+                      >
+                        {km} км
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Если выбран режим "По городам и странам" */}
+            {locationMode === 'city_country' && (
+              <>
+                <div className="filter-field-group">
+                  <label className="filter-label">Страна:</label>
+                  <select 
+                    value={selectedCountry} 
+                    onChange={e => {
+                      setSelectedCountry(e.target.value);
+                      setSelectedCity('all');
+                      setCurrentSwipeIndex(0);
+                    }}
+                    className="filter-panel-select"
+                  >
+                    <option value="all">🌍 Любая страна</option>
+                    {uniqueCountries.map(cnt => (
+                      <option key={cnt} value={cnt}>{cnt}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="filter-field-group">
+                  <label className="filter-label">Город:</label>
+                  <select 
+                    value={selectedCity} 
+                    onChange={e => {
+                      setSelectedCity(e.target.value);
+                      setCurrentSwipeIndex(0);
+                    }}
+                    className="filter-panel-select"
+                  >
+                    <option value="all">🏙️ Любой город</option>
+                    {uniqueCities.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {/* Если режим 'any' - быстрый выбор города */}
+            {locationMode === 'any' && (
+              <div className="filter-field-group">
+                <label className="filter-label">Локация / Город:</label>
+                <select 
+                  value={selectedCity} 
+                  onChange={e => {
+                    setSelectedCity(e.target.value);
+                    setCurrentSwipeIndex(0);
+                  }}
+                  className="filter-panel-select"
+                >
+                  <option value="all">🌍 Все города и страны</option>
+                  {uniqueCities.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Класс сознания */}
             <div className="filter-field-group">
@@ -522,6 +747,14 @@ export const DatingPage: React.FC = () => {
                     <div className="swipe-location-line">
                       <MapPin size={14} />
                       <span>{activeSwipeCard.city}</span>
+                      {activeSwipeCard.distanceKm !== undefined && (
+                        <>
+                          <span>•</span>
+                          <span className="card-distance-pill">
+                            <Navigation size={12} /> {activeSwipeCard.distanceKm} км от вас
+                          </span>
+                        </>
+                      )}
                       <span>•</span>
                       <span>⭐ {activeSwipeCard.zodiacSign}</span>
                       {activeSwipeCard.occupation && (
@@ -644,7 +877,12 @@ export const DatingPage: React.FC = () => {
                       </div>
                       <div className="card-bottom-bar">
                         <span className="card-name">{profile.name}, {profile.age}</span>
-                        <span className="card-city"><MapPin size={12} /> {profile.city}</span>
+                        <div className="card-location-meta">
+                          <span className="card-city"><MapPin size={12} /> {profile.city}</span>
+                          {profile.distanceKm !== undefined && (
+                            <span className="card-dist-tag"><Navigation size={10} /> {profile.distanceKm} км</span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -854,6 +1092,87 @@ export const DatingPage: React.FC = () => {
         onSave={handleSaveMyProfile}
         initialProfile={myProfile}
       />
+
+      {/* Всплывающее окно взаимной симпатии (Mutual Match Modal) */}
+      {mutualMatchProfile && (
+        <div className="mutual-match-overlay" onClick={() => setMutualMatchProfile(null)}>
+          <div className="mutual-match-modal" onClick={e => e.stopPropagation()}>
+            <button 
+              className="mutual-match-close-btn" 
+              onClick={() => setMutualMatchProfile(null)}
+              title="Закрыть"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="mutual-match-sparkle-icon">
+              <Sparkles size={32} color="#ec4899" />
+            </div>
+
+            <h2 className="mutual-match-title">Взаимная симпатия!</h2>
+            <p className="mutual-match-subtitle">
+              Вы и <strong>{mutualMatchProfile.name}</strong> понравились друг другу. Резонанс душ: <span className="mutual-match-compat-pct">{mutualMatchProfile.compatibilityScore || 95}%</span>!
+            </p>
+
+            {/* Двойные аватарки / фото */}
+            <div className="mutual-match-avatars-row">
+              <div className="match-avatar-circle user">
+                <img 
+                  src={myProfile?.avatar || (myProfile?.photos && myProfile.photos[0]) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'} 
+                  alt="Вы" 
+                />
+                <span className="match-avatar-label">Вы</span>
+              </div>
+              <div className="match-heart-center">
+                <Heart size={28} className="fill-current" />
+              </div>
+              <div className="match-avatar-circle target">
+                <img 
+                  src={mutualMatchProfile.avatar || (mutualMatchProfile.photos && mutualMatchProfile.photos[0]) || ''} 
+                  alt={mutualMatchProfile.name} 
+                />
+                <span className="match-avatar-label">{mutualMatchProfile.name}</span>
+              </div>
+            </div>
+
+            <div className="mutual-match-info-box">
+              <div className="match-location-text">
+                <MapPin size={14} />
+                <span>{mutualMatchProfile.city}{mutualMatchProfile.country ? `, ${mutualMatchProfile.country}` : ''}</span>
+                {mutualMatchProfile.distanceKm !== undefined && (
+                  <span className="match-distance-badge">
+                    <Navigation size={11} /> {mutualMatchProfile.distanceKm} км от вас
+                  </span>
+                )}
+              </div>
+              <p className="match-bio-preview">«{mutualMatchProfile.bio}»</p>
+            </div>
+
+            <div className="mutual-match-actions">
+              <button 
+                type="button"
+                className="btn-match-chat"
+                onClick={() => {
+                  const targetId = mutualMatchProfile.id;
+                  setMutualMatchProfile(null);
+                  handleOpenMessengerWithProfile(targetId);
+                }}
+              >
+                <MessageCircle size={18} />
+                <span>Написать в мессенджере</span>
+              </button>
+
+              <button 
+                type="button"
+                className="btn-match-continue"
+                onClick={() => setMutualMatchProfile(null)}
+              >
+                Продолжить поиск
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
