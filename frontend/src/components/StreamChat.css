@@ -1,0 +1,263 @@
+.stream-chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 480px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.stream-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.stream-chat-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.live-stream-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  letter-spacing: 0.5px;
+}
+
+.live-pulsing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+  animation: pulse-stream-dot 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse-stream-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.4); }
+}
+
+.stream-viewers-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.stream-channel-tag {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.stream-donation-popup {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #ffffff;
+  padding: 0.6rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  animation: slideDownDonation 0.3s ease;
+}
+
+@keyframes slideDownDonation {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.stream-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: var(--color-bg-card);
+  max-height: 520px;
+}
+
+.stream-msg-line {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.stream-msg-line.donation-line {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 0.45rem 0.65rem;
+  border-radius: var(--radius-sm);
+}
+
+.donation-card-highlight {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #d97706;
+}
+
+.stream-msg-content {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.stream-msg-time {
+  font-size: 0.72rem;
+  color: var(--color-text-tertiary);
+  margin-right: 0.15rem;
+}
+
+.stream-badge-pill {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.stream-badge-pill.badge-vip {
+  background: #ec4899;
+  color: #fff;
+}
+
+.stream-badge-pill.badge-mod {
+  background: #10b981;
+  color: #fff;
+}
+
+.stream-badge-pill.badge-sub {
+  background: #8b5cf6;
+  color: #fff;
+}
+
+.stream-badge-pill.badge-pro {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.stream-badge-pill.badge-вы {
+  background: #6366f1;
+  color: #fff;
+}
+
+.stream-msg-user {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stream-msg-text {
+  color: var(--color-text);
+}
+
+.stream-quick-donations {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.85rem;
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border);
+}
+
+.quick-don-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  margin-right: 0.2rem;
+}
+
+.btn-don-chip {
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-don-chip:hover {
+  border-color: #f59e0b;
+  color: #d97706;
+  transform: translateY(-1px);
+}
+
+.btn-don-chip.gold {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #b45309;
+}
+
+.stream-chat-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  background: var(--color-bg-card);
+  border-top: 1px solid var(--color-border);
+}
+
+.stream-chat-input {
+  flex: 1;
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  font-size: 0.84rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.stream-chat-input:focus {
+  border-color: var(--color-accent);
+  background: var(--color-bg-card);
+}
+
+.stream-chat-send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.stream-chat-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

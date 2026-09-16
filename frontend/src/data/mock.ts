@@ -192,6 +192,28 @@ export interface VideoComment {
   likes: number;
 }
 
+export interface StreamChatMessage {
+  id: string;
+  username: string;
+  color?: string;
+  badge?: string;
+  text: string;
+  time: string;
+  isDonation?: boolean;
+  donationAmount?: string;
+}
+
+export interface SeriesEpisode {
+  id: string;
+  title: string;
+  seasonNumber: number;
+  episodeNumber: number;
+  duration: string;
+  thumbnail: string;
+  videoUrl?: string;
+  description?: string;
+}
+
 export interface Video {
   id: string;
   title: string;
@@ -204,12 +226,26 @@ export interface Video {
   description: string;
   likesCount?: number;
   category?: string;
+  type?: 'video' | 'movie' | 'series' | 'cartoon' | 'stream';
   isKids?: boolean;
   isMovie?: boolean;
-  rating?: number; // Рейтинг Кинопоиск/IMDb для фильмов (e.g. 8.4)
+  isSeries?: boolean;
+  isStream?: boolean;
+  streamGameOrTopic?: string;
+  viewersCount?: number;
+  streamChat?: StreamChatMessage[];
+  seriesInfo?: {
+    seasonsCount: number;
+    episodesCount: number;
+    currentSeason?: number;
+    currentEpisode?: number;
+    episodes?: SeriesEpisode[];
+  };
+  rating?: number; // Рейтинг Кинопоиск/IMDb для фильмов и сериалов (e.g. 8.4)
   ageRating?: string; // 0+, 6+, 12+, 16+, 18+
   genre?: string;
   releaseYear?: number;
+  isFromSubscription?: boolean;
   comments?: VideoComment[];
 }
 
@@ -1073,6 +1109,226 @@ export const videos: Video[] = [
     description: 'Учим цвета, числа и добрые поступки вместе с маленькими зверятами в волшебной цветущей долине.',
     comments: [
       { id: 'cm_k3', user: initialUsers[7], text: 'Безопасный и полезный контент для малышей, спасибо разработчикам за детский режим!', timeAgo: '4 часа назад', likes: 31 },
+    ]
+  },
+  // ==================== РАЗДЕЛ: СТРИМЫ (TWITCH LIVE ZONE) ====================
+  {
+    id: 'st1',
+    title: 'Cyberpunk 2077: Phantom Liberty — Прохождение на максималках 4K RTX',
+    channel: {
+      id: 'streamer_alex',
+      name: 'AlexCyber 🎮',
+      username: 'alex_cyber',
+      avatar: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?auto=format&fit=crop&w=200&q=80',
+      online: true,
+      verified: true,
+      role: 'creator',
+      followersCount: 184000,
+      followingCount: 30,
+      postsCount: 420
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    views: '14.2K зрителей',
+    duration: 'LIVE',
+    timeAgo: 'В эфире 2 часа',
+    likesCount: 12400,
+    category: 'Игры',
+    type: 'stream',
+    isStream: true,
+    viewersCount: 14280,
+    streamGameOrTopic: 'Cyberpunk 2077',
+    genre: 'Стрим, Игры, Экшен',
+    description: 'Исследуем Пёсий город на максимальной сложности со всеми графическими модами и трассировкой путей. Общаемся в чате, розыгрыши ключей каждый час!',
+    streamChat: [
+      { id: 'sc1', username: 'PixelMaster', color: '#3b82f6', badge: 'VIP', text: 'Какая графика нереальная! Сколько FPS держит?', time: '16:02' },
+      { id: 'sc2', username: 'CyberKatya', color: '#ec4899', badge: 'MOD', text: 'Всем привет в чате! Не забывайте про правила стрима ✨', time: '16:04' },
+      { id: 'sc3', username: 'Gamer_99', color: '#10b981', text: 'Билд на нетраннера просто имба 🔥', time: '16:05' },
+      { id: 'sc4', username: 'Dmitry_K', color: '#f59e0b', badge: 'SUB', isDonation: true, donationAmount: '500 ₽', text: 'На новый SSD диск! Отличный стрим, бро!', time: '16:07' },
+      { id: 'sc5', username: 'V_NightCity', color: '#8b5cf6', text: 'Смотрим до финала сегодня? 🚀', time: '16:08' },
+    ]
+  },
+  {
+    id: 'st2',
+    title: 'Live Coding: Разрабатываем микросервисы на Go 1.26 и React 19 с нуля',
+    channel: initialUsers[6], // Артём Волков
+    thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    views: '3.9K зрителей',
+    duration: 'LIVE',
+    timeAgo: 'В эфире 45 мин',
+    likesCount: 5100,
+    category: 'Разработка',
+    type: 'stream',
+    isStream: true,
+    viewersCount: 3920,
+    streamGameOrTopic: 'Software Engineering',
+    genre: 'IT, Программирование, Образование',
+    description: 'Прямой эфир с разбором чистого кода, горутин, оптимизации запросов и построения веб-сокетов для высоконагруженных соцсетей.',
+    streamChat: [
+      { id: 'sc6', username: 'CodeNinja', color: '#10b981', badge: 'PRO', text: 'Go в связке с gRPC просто летает!', time: '16:10' },
+      { id: 'sc7', username: 'Max_Dev', color: '#3b82f6', text: 'А как организован пул воркеров в этом модуле?', time: '16:11' },
+      { id: 'sc8', username: 'Elena_QA', color: '#ec4899', isDonation: true, donationAmount: '1 000 ₽', text: 'Спасибо за супер-информативные стримы! Ждем архитектурную книгу.', time: '16:14' },
+    ]
+  },
+  {
+    id: 'st3',
+    title: 'Lo-Fi Chill & Synthwave Session: Музыкальный джем в реальном времени 🎧',
+    channel: {
+      id: 'lofi_lab',
+      name: 'Lo-Fi Universe 🎵',
+      username: 'lofi_universe',
+      avatar: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=200&q=80',
+      online: true,
+      verified: true,
+      role: 'creator',
+      followersCount: 96000,
+      followingCount: 12,
+      postsCount: 150
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    views: '6.4K зрителей',
+    duration: 'LIVE',
+    timeAgo: 'В эфире 5 часов',
+    likesCount: 8900,
+    category: 'Музыка',
+    type: 'stream',
+    isStream: true,
+    viewersCount: 6410,
+    streamGameOrTopic: 'Музыка и Творчество',
+    genre: 'Lo-Fi, Музыка, Отдых',
+    description: 'Уютная атмосфера для работы, учёбы и медитации. Живое сведение аналоговых синтезаторов и тёплых виниловых сэмплов.',
+    streamChat: [
+      { id: 'sc9', username: 'SleepyCat', color: '#f59e0b', text: 'Идеальный трек под ночной кодинг ☕', time: '16:15' },
+      { id: 'sc10', username: 'ArtVision', color: '#8b5cf6', badge: 'SUB', text: 'Визуал просто космос, спасибо за вайб!', time: '16:16' }
+    ]
+  },
+  // ==================== РАЗДЕЛ: СЕРИАЛЫ ====================
+  {
+    id: 's1',
+    title: 'Кремниевая долина: Новая эра искусственного интеллекта',
+    channel: {
+      id: 'cinema_official',
+      name: 'New Age Cinema 🎬',
+      username: 'cinema_official',
+      avatar: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=200&q=80',
+      online: true,
+      verified: true,
+      role: 'business',
+      followersCount: 245000,
+      followingCount: 15,
+      postsCount: 420
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    views: '4.1M просмотров',
+    duration: '1 сезон • 8 серий',
+    timeAgo: '1 неделю назад',
+    likesCount: 240000,
+    category: 'Сериалы',
+    type: 'series',
+    isSeries: true,
+    rating: 8.9,
+    ageRating: '16+',
+    genre: 'Комедия, Драма, IT',
+    releaseYear: 2024,
+    description: 'Команда молодых разработчиков пытается запустить прорывной квантовый ИИ-стартап в сердце Кремниевой долины, сталкиваясь с безумными венчурными фондами и корпоративными гигантами.',
+    seriesInfo: {
+      seasonsCount: 3,
+      episodesCount: 24,
+      currentSeason: 1,
+      currentEpisode: 1,
+      episodes: [
+        { id: 'ep1', title: '1. Алгоритм сингулярности', seasonNumber: 1, episodeNumber: 1, duration: '48 мин', thumbnail: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=400&q=80' },
+        { id: 'ep2', title: '2. Питч на миллиард', seasonNumber: 1, episodeNumber: 2, duration: '52 мин', thumbnail: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=400&q=80' },
+        { id: 'ep3', title: '3. Атака на сервера', seasonNumber: 1, episodeNumber: 3, duration: '45 мин', thumbnail: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=400&q=80' },
+      ]
+    },
+    comments: [
+      { id: 'cs1', user: initialUsers[2], text: 'Юмор про деплой в пятницу вечером — жизненно до слёз! Жду продолжения.', timeAgo: '2 дня назад', likes: 140 },
+    ]
+  },
+  {
+    id: 's2',
+    title: 'Тьма и Квантовые Лабиринты: Тайна исчезновения во времени',
+    channel: {
+      id: 'cinema_official',
+      name: 'New Age Cinema 🎬',
+      username: 'cinema_official',
+      avatar: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=200&q=80',
+      online: true,
+      verified: true,
+      role: 'business',
+      followersCount: 245000,
+      followingCount: 15,
+      postsCount: 420
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    views: '2.8M просмотров',
+    duration: '2 сезона • 16 серий',
+    timeAgo: '3 недели назад',
+    likesCount: 198000,
+    category: 'Сериалы',
+    type: 'series',
+    isSeries: true,
+    rating: 8.7,
+    ageRating: '18+',
+    genre: 'Триллер, Фантастика, Детектив',
+    releaseYear: 2023,
+    description: 'В маленьком уединенном городке загадочно пропадают дети. Четыре семьи пытаются раскрыть правду и сталкиваются с временной аномалией, повторяющейся каждые 33 года.',
+    seriesInfo: {
+      seasonsCount: 2,
+      episodesCount: 16,
+      currentSeason: 1,
+      currentEpisode: 1,
+      episodes: [
+        { id: 'ep4', title: '1. Пещера теней', seasonNumber: 1, episodeNumber: 1, duration: '56 мин', thumbnail: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=400&q=80' },
+        { id: 'ep5', title: '2. Часовщик и петля', seasonNumber: 1, episodeNumber: 2, duration: '54 мин', thumbnail: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80' },
+      ]
+    },
+    comments: [
+      { id: 'cs2', user: initialUsers[4], text: 'Сюжет продуман до мельчайших деталей! Поразительный сериал.', timeAgo: '4 дня назад', likes: 88 },
+    ]
+  },
+  // ==================== РАЗДЕЛ: ИЗ ВАШИХ ПОДПИСОК ====================
+  {
+    id: 'sub1',
+    title: 'UI/UX Дизайн тренды 2026: Неоморфизм, Глассморфизм и Микроанимации',
+    channel: initialUsers[1], // Алиса Иванова (в подписках)
+    thumbnail: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    views: '54K просмотров',
+    duration: '22:15',
+    timeAgo: 'Вчера',
+    likesCount: 3800,
+    category: 'Дизайн',
+    type: 'video',
+    isFromSubscription: true,
+    genre: 'Дизайн, Интерфейсы',
+    description: 'Разбираем, как изменились визуальные стандарты сайтов и приложений: глубина, плавный свет, адаптивные микро-интеракции.',
+    comments: [
+      { id: 'csub1', user: currentUser, text: 'Очень полезно для нашего нового проекта, спасибо за разбор!', timeAgo: '3 часа назад', likes: 12 },
+    ]
+  },
+  {
+    id: 'sub2',
+    title: 'Осознанность и медитация в ритме мегаполиса: Практический гид',
+    channel: initialUsers[3], // Екатерина Смирнова
+    thumbnail: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    views: '32K просмотров',
+    duration: '15:40',
+    timeAgo: '2 дня назад',
+    likesCount: 2900,
+    category: 'Самопознание',
+    type: 'video',
+    isFromSubscription: true,
+    genre: 'Медитация, Психология',
+    description: 'Как сохранять внутренний баланс и ясность мысли в потоке ежедневных задач и дедлайнов.',
+    comments: [
+      { id: 'csub2', user: initialUsers[5], text: 'Техника дыхания из видео отлично помогает расслабиться вечером 🙏', timeAgo: '1 день назад', likes: 21 },
     ]
   }
 ];

@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Play, ThumbsUp, ThumbsDown, 
   Share2, ChevronDown, ChevronUp, UserCheck, UserPlus, Check, 
-  Film, Baby, MessageSquare, Send, Bookmark
+  Film, Baby, MessageSquare, Send, Bookmark, Radio, Tv
 } from 'lucide-react';
-import type { Video, VideoComment } from '../data/mock';
+import type { Video, VideoComment, SeriesEpisode } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { StreamChat } from './StreamChat';
 import './VideoPlayer.css';
 
 interface VideoPlayerProps {
@@ -26,6 +27,7 @@ export function VideoPlayer({ video, isKidsMode }: VideoPlayerProps) {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [activeEpisode, setActiveEpisode] = useState<SeriesEpisode | null>(null);
   // Playback & comments state
   const [isPlaying, setIsPlaying] = useState(false);
   const [comments, setComments] = useState<VideoComment[]>(() => video?.comments || []);
@@ -160,6 +162,18 @@ export function VideoPlayer({ video, isKidsMode }: VideoPlayerProps) {
         )}
 
         {/* Video Mode Badges */}
+        {video.isStream && (
+          <div className="video-player-stream-badge">
+            <Radio size={14} className="animate-spin-slow" />
+            <span>В ЭФИРЕ • {video.viewersCount ? `${video.viewersCount.toLocaleString('ru-RU')} зрителей` : 'LIVE'}</span>
+          </div>
+        )}
+        {video.isSeries && (
+          <div className="video-player-series-badge">
+            <Tv size={14} />
+            <span>Сериал • {video.seriesInfo ? `${video.seriesInfo.seasonsCount} сезона` : ''} • ★ {video.rating}</span>
+          </div>
+        )}
         {video.isKids && (
           <div className="video-player-kids-badge">
             <Baby size={15} />
@@ -284,9 +298,46 @@ export function VideoPlayer({ video, isKidsMode }: VideoPlayerProps) {
         </div>
 
         {/* ========================================================================= */}
-        {/* COMMENTS SECTION (YOUTUBE STYLE) */}
+        {/* SERIES EPISODES SELECTOR (IF SERIES) */}
         {/* ========================================================================= */}
-        <div className="video-comments-section">
+        {video.isSeries && video.seriesInfo?.episodes && (
+          <div className="series-episodes-section">
+            <div className="series-header-row">
+              <span className="series-title-tag"><Tv size={15} /> Эпизоды ({video.seriesInfo.episodes.length})</span>
+              <span className="series-seasons-badge">{video.seriesInfo.seasonsCount} сезона в каталоге</span>
+            </div>
+            <div className="series-episodes-grid">
+              {video.seriesInfo.episodes.map((ep) => (
+                <button 
+                  key={ep.id}
+                  type="button"
+                  className={`episode-chip-card ${(activeEpisode?.id === ep.id || (!activeEpisode && ep.episodeNumber === 1)) ? 'active' : ''}`}
+                  onClick={() => setActiveEpisode(ep)}
+                >
+                  <img src={ep.thumbnail} alt={ep.title} className="episode-thumb-mini" />
+                  <div className="episode-chip-text">
+                    <span className="episode-chip-title">{ep.title}</span>
+                    <span className="episode-chip-dur">{ep.duration}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* STREAM LIVE CHAT (TWITCH STYLE) OR COMMENTS (YOUTUBE STYLE) */}
+        {/* ========================================================================= */}
+        {video.isStream ? (
+          <div className="video-stream-chat-wrapper">
+            <StreamChat 
+              initialMessages={video.streamChat || []} 
+              viewersCount={video.viewersCount || 14200}
+              channelName={video.channel.name}
+            />
+          </div>
+        ) : (
+          <div className="video-comments-section">
           <div className="comments-header">
             <h3 className="comments-count">
               <MessageSquare size={18} />
@@ -359,6 +410,7 @@ export function VideoPlayer({ video, isKidsMode }: VideoPlayerProps) {
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );
