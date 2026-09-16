@@ -38,6 +38,16 @@ export function FeedPage() {
     stories.unshift(newStory);
   };
 
+  const handleDeleteStory = (storyId: string) => {
+    setFeedStories(prev => {
+      const updated = prev.filter(s => s.id !== storyId);
+      cacheService.set('feed_stories_cache', updated, 3600 * 24, 'stories');
+      return updated;
+    });
+    const sIdx = stories.findIndex(s => s.id === storyId);
+    if (sIdx !== -1) stories.splice(sIdx, 1);
+  };
+
   const handleCreatePost = (newPost: Post) => {
     setPosts(prev => {
       const updated = [newPost, ...prev];
@@ -95,7 +105,7 @@ export function FeedPage() {
     <div className="feed-page-layout">
       {/* Main Feed Column */}
       <div className="feed-main-col">
-        <StoriesBar stories={feedStories} onAddStory={handleAddStory} />
+        <StoriesBar stories={feedStories} onAddStory={handleAddStory} onDeleteStory={handleDeleteStory} />
 
         {/* Official Motto Banner */}
         <div className="feed-motto-banner">

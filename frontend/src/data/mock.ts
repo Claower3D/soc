@@ -148,6 +148,39 @@ export interface Highlight {
   cover: string;
 }
 
+export interface StoryViewerUser {
+  id: string;
+  name: string;
+  username: string;
+  avatar: string;
+  viewedAt?: string;
+  liked?: boolean;
+  isFollower?: boolean;
+}
+
+export interface StoryStats {
+  viewsCount: number;
+  followersPercent: number;
+  nonFollowersPercent: number;
+  uniqueViewersCount: number;
+  interactionsCount: number;
+  storyInteractionsCount: number;
+  likesCount: number;
+  sharesCount: number;
+  repliesCount: number;
+  engagedAccountsCount?: number | string;
+  navigationTotal: number;
+  navigationForward: number;
+  navigationExits: number;
+  navigationNext: number;
+  profileActions: number;
+  profileVisits: number;
+  linkClicks: number;
+  companyAddressClicks: number;
+  followsCount: number;
+  viewers: StoryViewerUser[];
+}
+
 export interface Story {
   id: string;
   user: User;
@@ -162,6 +195,10 @@ export interface Story {
   text?: string;
   textPosition?: 'center' | 'bottom' | 'top';
   timestamp?: string;
+  stats?: StoryStats;
+  viewsCount?: number;
+  musicTrack?: string;
+  reelsSourceTitle?: string;
 }
 
 export interface Post {
@@ -797,27 +834,187 @@ export const initialUsers: User[] = [
 
 // ==================== СТОРИС ====================
 
-export const stories: Story[] = initialUsers.slice(1, 8).map((user, i) => ({
-  id: `story-${i}`,
-  user,
-  viewed: i > 3,
-  isLive: i === 0, // First story is live broadcast
-  liveViewers: i === 0 ? 42 : undefined,
-  filter: i === 1 ? 'Paris (Мягкий)' : i === 2 ? 'Tokyo (Неон)' : undefined,
-  mask: i === 0 ? '✨ Блестки' : i === 1 ? '🕶️ Крутые очки' : undefined,
-  image: [
-    'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=800&q=80',
-  ][i % 7],
-  text: i === 0 ? '🔴 В прямом эфире! Обсуждаем новинки' : undefined,
-  textPosition: 'center',
-  timestamp: i === 0 ? 'В ЭФИРЕ' : `${(i + 1) * 2} ч назад`,
-}));
+export const mockStoryViewers: StoryViewerUser[] = [
+  { id: 'v1', name: 'Алиса Иванова', username: 'alice_iv', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80', viewedAt: '15 мин назад', liked: true, isFollower: true },
+  { id: 'v2', name: 'Максим Петров', username: 'max_p', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80', viewedAt: '32 мин назад', liked: true, isFollower: true },
+  { id: 'v3', name: 'Екатерина Смирнова', username: 'kate_s', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80', viewedAt: '45 мин назад', liked: false, isFollower: true },
+  { id: 'v4', name: 'Дмитрий Козлов', username: 'dima_k', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80', viewedAt: '1 ч назад', liked: true, isFollower: true },
+  { id: 'v5', name: 'София Новикова', username: 'sofia_n', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80', viewedAt: '1 ч назад', liked: false, isFollower: true },
+  { id: 'v6', name: 'Алексей Морозов', username: 'alex_m', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80', viewedAt: '2 ч назад', liked: false, isFollower: true },
+  { id: 'v7', name: 'Мария Лебедева', username: 'maria_l', avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80', viewedAt: '2 ч назад', liked: true, isFollower: false },
+  { id: 'v8', name: 'Артем Попов', username: 'artem_p', avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=400&q=80', viewedAt: '3 ч назад', liked: false, isFollower: true },
+  { id: 'v9', name: 'Полина Васильева', username: 'polina_v', avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80', viewedAt: '4 ч назад', liked: false, isFollower: true },
+  { id: 'v10', name: 'Кирилл Романов', username: 'kirill_r', avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80', viewedAt: '5 ч назад', liked: true, isFollower: true },
+  { id: 'v11', name: 'Дарья Соколова', username: 'daria_s', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80', viewedAt: '5 ч назад', liked: false, isFollower: false },
+  { id: 'v12', name: 'Игорь Федоров', username: 'igor_f', avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&fit=crop&w=400&q=80', viewedAt: '6 ч назад', liked: false, isFollower: true },
+];
+
+export const createMockStats = (viewsCount = 13, followersPct = 92.3): StoryStats => ({
+  viewsCount,
+  followersPercent: followersPct,
+  nonFollowersPercent: Math.round((100 - followersPct) * 10) / 10,
+  uniqueViewersCount: Math.max(1, viewsCount - 2),
+  interactionsCount: 4,
+  storyInteractionsCount: 4,
+  likesCount: 3,
+  sharesCount: 1,
+  repliesCount: 0,
+  engagedAccountsCount: '--',
+  navigationTotal: Math.max(1, viewsCount - 1),
+  navigationForward: Math.round(viewsCount * 0.5),
+  navigationExits: Math.round(viewsCount * 0.3),
+  navigationNext: Math.round(viewsCount * 0.2),
+  profileActions: 0,
+  profileVisits: 0,
+  linkClicks: 0,
+  companyAddressClicks: 0,
+  followsCount: 0,
+  viewers: mockStoryViewers.slice(0, viewsCount),
+});
+
+export const stories: Story[] = [
+  // 1. Истории текущего пользователя (currentUser)
+  {
+    id: 'story-me-1',
+    user: currentUser,
+    viewed: false,
+    image: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
+    text: 'Запустили большое обновление! 💻 Светлая тема и новый плеер',
+    textPosition: 'center',
+    timestamp: 'Только что',
+    viewsCount: 13,
+    stats: createMockStats(13, 92.3),
+    reelsSourceTitle: 'Смотреть видео Reels полностью',
+    musicTrack: 'PHARAOH · OMEGA (feat. Destroy Lonely)',
+  },
+  {
+    id: 'story-me-2',
+    user: currentUser,
+    viewed: false,
+    gradient: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
+    text: 'Спасибо всем за обратную связь и поддержку! 🚀',
+    textPosition: 'center',
+    timestamp: '2 ч назад',
+    viewsCount: 12,
+    stats: createMockStats(12, 90.5),
+  },
+
+  // 2. Алиса Иванова (2 истории, первая - LIVE)
+  {
+    id: 'story-alice-1',
+    user: initialUsers[1],
+    viewed: false,
+    isLive: true,
+    liveViewers: 42,
+    mask: '✨ Блестки',
+    image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
+    text: '🔴 В прямом эфире! Обсуждаем новинки',
+    textPosition: 'center',
+    timestamp: 'В ЭФИРЕ',
+    viewsCount: 42,
+    stats: createMockStats(42, 85.0),
+  },
+  {
+    id: 'story-alice-2',
+    user: initialUsers[1],
+    viewed: false,
+    filter: 'Paris (Мягкий)',
+    image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
+    timestamp: '3 ч назад',
+    viewsCount: 18,
+    stats: createMockStats(18, 94.4),
+    musicTrack: 'Daft Punk · Instant Crush',
+  },
+
+  // 3. Максим Петров (2 истории)
+  {
+    id: 'story-max-1',
+    user: initialUsers[2],
+    viewed: false,
+    filter: 'Tokyo (Неон)',
+    mask: '🕶️ Крутые очки',
+    image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80',
+    text: 'Пишем кастомные хуки на React 19 🔥',
+    textPosition: 'bottom',
+    timestamp: '4 ч назад',
+    viewsCount: 24,
+    stats: createMockStats(24, 87.5),
+    reelsSourceTitle: 'Смотреть видео Reels полностью',
+  },
+  {
+    id: 'story-max-2',
+    user: initialUsers[2],
+    viewed: false,
+    gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    text: 'Новый выпуск подкаста уже в приложении! 🎙️',
+    textPosition: 'center',
+    timestamp: '5 ч назад',
+    viewsCount: 19,
+    stats: createMockStats(19, 89.0),
+  },
+
+  // 4. Екатерина Смирнова (1 история)
+  {
+    id: 'story-kate-1',
+    user: initialUsers[3],
+    viewed: true,
+    image: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=800&q=80',
+    text: 'Кофе и продуктивное утро в Казани ☕',
+    textPosition: 'bottom',
+    timestamp: '6 ч назад',
+    viewsCount: 16,
+    stats: createMockStats(16, 93.8),
+  },
+
+  // 5. Дмитрий Козлов (2 истории)
+  {
+    id: 'story-dima-1',
+    user: initialUsers[4],
+    viewed: true,
+    image: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=800&q=80',
+    text: 'Горы заряжают энергией на всю неделю 🏔️',
+    textPosition: 'bottom',
+    timestamp: '8 ч назад',
+    viewsCount: 31,
+    stats: createMockStats(31, 80.6),
+  },
+  {
+    id: 'story-dima-2',
+    user: initialUsers[4],
+    viewed: true,
+    gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+    text: 'Венчурный хаб: открыт прием заявок для стартапов',
+    textPosition: 'center',
+    timestamp: '9 ч назад',
+    viewsCount: 27,
+    stats: createMockStats(27, 85.2),
+  },
+
+  // 6. София Новикова (1 история)
+  {
+    id: 'story-sofia-1',
+    user: initialUsers[5],
+    viewed: true,
+    image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=800&q=80',
+    timestamp: '12 ч назад',
+    viewsCount: 22,
+    stats: createMockStats(22, 91.0),
+  },
+
+  // 7. Алексей Морозов (1 история)
+  {
+    id: 'story-alex-1',
+    user: initialUsers[6],
+    viewed: true,
+    image: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=800&q=80',
+    text: 'Студийная сессия и новый саундтрек 🎹',
+    textPosition: 'bottom',
+    timestamp: '14 ч назад',
+    viewsCount: 15,
+    stats: createMockStats(15, 93.3),
+    musicTrack: 'The Weeknd · Blinding Lights',
+  },
+];
 
 // ==================== ПОСТЫ (ЛЕНТА) ====================
 

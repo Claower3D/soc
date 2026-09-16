@@ -1,30 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, X, Heart, Send, ChevronLeft, ChevronRight, 
-  Pause, Play, Sparkles, Wand2 
+  Pause, Play, Sparkles, Wand2, Volume2, VolumeX, 
+  MoreHorizontal, User as UserIcon, BarChart2, 
+  Search, Info, CheckCircle2, Music, Film,
+  Share2, ArrowLeft
 } from 'lucide-react';
-import { type Story, type User } from '../data/mock';
+import { type Story, type User, type StoryStats, createMockStats, mockStoryViewers } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { CreateStoryModal, STORY_FILTERS } from './CreateStoryModal';
 import './StoriesBar.css';
 
-interface StoriesBarProps {
+export interface UserStoryGroup {
+  user: User;
   stories: Story[];
-  onAddStory?: (newStory: Story) => void;
+  hasUnviewed: boolean;
+  isLive: boolean;
+  liveViewers?: number;
 }
 
-export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
+export interface StoriesBarProps {
+  stories: Story[];
+  onAddStory?: (newStory: Story) => void;
+  onDeleteStory?: (storyId: string) => void;
+  initialUserId?: string | null;
+  onCloseViewer?: () => void;
+  viewerOnly?: boolean;
+}
+
+export function StoriesBar({ 
+  stories, 
+  onAddStory, 
+  onDeleteStory,
+  initialUserId,
+  onCloseViewer,
+  viewerOnly = false 
+}: StoriesBarProps) {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated, openAuthModal } = useAuth();
   
-  // Active story viewer state
-  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
-  const [progress, setProgress] = useState(0); // 0 to 100%
-  const [isPaused, setIsPaused] = useState(false);
-  const [replyText, setReplyText] = useState('');
-  const [likedMap, setLikedMap] = useState<Record<string, boolean>>({});
-  const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
+  // Track viewed story IDs in localStorage
   const [viewedStoryIds, setViewedStoryIds] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('new_age_viewed_stories');
@@ -34,9 +50,68 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
     }
   });
 
-  const activeStory = activeStoryIndex !== null ? stories[activeStoryIndex] : null;
+  // Group stories by author (UserStoryGroup)
+  const userGroups = useMemo<UserStoryGroup[]>(() => {
+    const groupsMap = new Map<string, Story[]>();
 
-  // Mark stories viewed
+    stories.forEach(s => {
+      const uid = s.user.id;
+      if (!groupsMap.has(uid)) {
+        groupsMap.set(uid, []);
+      }
+      groupsMap.get(uid)!.push(s);
+    });
+
+    const list: UserStoryGroup[] = [];
+    groupsMap.forEach((userStories) => {
+      const user = userStories[0].user;
+      const hasUnviewed = userStories.some(s => !viewedStoryIds.has(s.id) && !s.viewed);
+      const isLive = userStories.some(s => s.isLive);
+      const liveStory = userStories.find(s => s.isLive);
+      list.push({
+        user,
+        stories: userStories,
+        hasUnviewed,
+        isLive,
+        liveViewers: liveStory?.liveViewers,
+      });
+    });
+
+    return list;
+  }, [stories, viewedStoryIds]);
+
+  // Active story viewer state (Active Group Index and Story Index inside that group)
+  const [activeGroupIndex, setActiveGroupIndex] = useState<number | null>(null);
+  const [activeStoryIdxInGroup, setActiveStoryIdxInGroup] = useState<number>(0);
+
+  // Auto-open if initialUserId passed
+  useEffect(() => {
+    if (initialUserId) {
+      const gIdx = userGroups.findIndex(g => g.user.id === initialUserId || g.user.username === initialUserId);
+      if (gIdx !== -1) {
+        setActiveGroupIndex(gIdx);
+        setActiveStoryIdxInGroup(0);
+      }
+    }
+  }, [initialUserId, userGroups]);
+
+  const [progress, setProgress] = useState(0); // 0 to 100%
+  const [isPaused, setIsPaused] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [likedMap, setLikedMap] = useState<Record<string, boolean>>({});
+  const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
+  
+  // Modals inside viewer
+  const [isOptionsMenuOpen, setIsOptionsMenuOpen] = useState(false);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [statsTab, setStatsTab] = useState<'overview' | 'viewers'>('overview');
+  const [viewerSearchQuery, setViewerSearchQuery] = useState('');
+
+  const currentGroup = activeGroupIndex !== null ? userGroups[activeGroupIndex] : null;
+  const activeStory = currentGroup ? currentGroup.stories[activeStoryIdxInGroup] : null;
+
+  // Mark story as viewed
   const markStoryViewed = (storyId: string) => {
     setViewedStoryIds(prev => {
       const next = new Set(prev);
@@ -46,40 +121,73 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
     });
   };
 
-  const handleOpenStory = (index: number) => {
-    setActiveStoryIndex(index);
+  const handleOpenGroup = (groupIndex: number, storyIndex = 0) => {
+    setActiveGroupIndex(groupIndex);
+    setActiveStoryIdxInGroup(storyIndex);
     setProgress(0);
     setIsPaused(false);
+    setIsOptionsMenuOpen(false);
+    setIsStatsOpen(false);
     setReplyText('');
-    const story = stories[index];
+    const story = userGroups[groupIndex]?.stories[storyIndex];
     if (story) {
       markStoryViewed(story.id);
     }
   };
 
   const handleClose = () => {
-    setActiveStoryIndex(null);
+    setActiveGroupIndex(null);
+    setActiveStoryIdxInGroup(0);
     setProgress(0);
     setIsPaused(false);
+    setIsOptionsMenuOpen(false);
+    setIsStatsOpen(false);
+    if (onCloseViewer) {
+      onCloseViewer();
+    }
   };
 
   const handlePrev = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (activeStoryIndex !== null && activeStoryIndex > 0) {
-      const prevIdx = activeStoryIndex - 1;
-      setActiveStoryIndex(prevIdx);
+    if (activeGroupIndex === null || !currentGroup) return;
+
+    if (activeStoryIdxInGroup > 0) {
+      // Previous story of same user
+      const prevIdx = activeStoryIdxInGroup - 1;
+      setActiveStoryIdxInGroup(prevIdx);
       setProgress(0);
-      markStoryViewed(stories[prevIdx].id);
+      markStoryViewed(currentGroup.stories[prevIdx].id);
+    } else if (activeGroupIndex > 0) {
+      // Previous user group (last story of previous user)
+      const prevGroupIdx = activeGroupIndex - 1;
+      const prevUserStories = userGroups[prevGroupIdx].stories;
+      const lastStoryIdx = prevUserStories.length - 1;
+      setActiveGroupIndex(prevGroupIdx);
+      setActiveStoryIdxInGroup(lastStoryIdx);
+      setProgress(0);
+      markStoryViewed(prevUserStories[lastStoryIdx].id);
+    } else {
+      setProgress(0);
     }
   };
 
   const handleNext = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (activeStoryIndex !== null && activeStoryIndex < stories.length - 1) {
-      const nextIdx = activeStoryIndex + 1;
-      setActiveStoryIndex(nextIdx);
+    if (activeGroupIndex === null || !currentGroup) return;
+
+    if (activeStoryIdxInGroup < currentGroup.stories.length - 1) {
+      // Next story of same user
+      const nextIdx = activeStoryIdxInGroup + 1;
+      setActiveStoryIdxInGroup(nextIdx);
       setProgress(0);
-      markStoryViewed(stories[nextIdx].id);
+      markStoryViewed(currentGroup.stories[nextIdx].id);
+    } else if (activeGroupIndex < userGroups.length - 1) {
+      // Next user group (first story)
+      const nextGroupIdx = activeGroupIndex + 1;
+      setActiveGroupIndex(nextGroupIdx);
+      setActiveStoryIdxInGroup(0);
+      setProgress(0);
+      markStoryViewed(userGroups[nextGroupIdx].stories[0].id);
     } else {
       handleClose();
     }
@@ -87,7 +195,7 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
 
   // 5-second automatic progression timer like Instagram
   useEffect(() => {
-    if (activeStoryIndex === null || isPaused) return;
+    if (activeStory === null || isPaused || isOptionsMenuOpen || isStatsOpen) return;
 
     const interval = 50; // Update every 50ms for smooth bar
     const step = 100 / (5000 / interval); // Total 5000ms
@@ -103,27 +211,29 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
     }, interval);
 
     return () => clearInterval(timer);
-  }, [activeStoryIndex, isPaused, stories.length]);
+  }, [activeStory, isPaused, isOptionsMenuOpen, isStatsOpen, activeStoryIdxInGroup, activeGroupIndex, userGroups]);
 
-  // Keyboard navigation (Escape, Left, Right, Space to pause)
+  // Keyboard navigation
   useEffect(() => {
-    if (activeStoryIndex === null) return;
+    if (activeStory === null) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        handleClose();
-      } else if (e.key === 'ArrowRight') {
+        if (isStatsOpen) setIsStatsOpen(false);
+        else if (isOptionsMenuOpen) setIsOptionsMenuOpen(false);
+        else handleClose();
+      } else if (e.key === 'ArrowRight' && !isStatsOpen && !isOptionsMenuOpen) {
         handleNext();
-      } else if (e.key === 'ArrowLeft') {
+      } else if (e.key === 'ArrowLeft' && !isStatsOpen && !isOptionsMenuOpen) {
         handlePrev();
-      } else if (e.key === ' ') {
+      } else if (e.key === ' ' && !isStatsOpen && !isOptionsMenuOpen) {
         setIsPaused(p => !p);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeStoryIndex, stories.length]);
+  }, [activeStory, isStatsOpen, isOptionsMenuOpen, activeStoryIdxInGroup, activeGroupIndex]);
 
   const handleAuthorClick = (user: User, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -159,71 +269,129 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
     setReplyText('');
   };
 
+  const handleDeleteCurrentStory = () => {
+    if (!activeStory) return;
+    if (window.confirm('Удалить эту историю? Это действие нельзя отменить.')) {
+      if (onDeleteStory) {
+        onDeleteStory(activeStory.id);
+      }
+      setIsOptionsMenuOpen(false);
+      // Advance to next or close
+      if (currentGroup && currentGroup.stories.length > 1) {
+        if (activeStoryIdxInGroup > 0) {
+          setActiveStoryIdxInGroup(activeStoryIdxInGroup - 1);
+        } else {
+          setActiveStoryIdxInGroup(0);
+        }
+        setProgress(0);
+      } else {
+        handleClose();
+      }
+    }
+  };
+
+  // Get active story stats fallback
+  const activeStats: StoryStats = useMemo(() => {
+    if (activeStory?.stats) return activeStory.stats;
+    const viewsCount = activeStory?.viewsCount || 13;
+    return createMockStats(viewsCount, 92.3);
+  }, [activeStory]);
+
+  // Filtered viewers list in statistics tab
+  const filteredViewers = useMemo(() => {
+    const list = activeStats.viewers || mockStoryViewers;
+    if (!viewerSearchQuery.trim()) return list;
+    const q = viewerSearchQuery.toLowerCase();
+    return list.filter(v => 
+      v.name.toLowerCase().includes(q) || 
+      v.username.toLowerCase().includes(q)
+    );
+  }, [activeStats, viewerSearchQuery]);
+
+  // Check if current user has active stories
+  const myStoriesGroup = userGroups.find(g => g.user.id === 'me' || g.user.id === currentUser.id);
+
   return (
     <>
-      {/* Instagram Story Horizontal Tray */}
-      <div className="instagram-stories-tray">
-        <div className="stories-scroll-track">
-          
-          {/* 1. Add Story Bubble ("Ваша история" / "+") */}
-          <div 
-            className="insta-story-item own-story-bubble"
-            onClick={() => {
-              if (!isAuthenticated) {
-                openAuthModal('register');
-              } else {
-                setIsCreateStoryOpen(true);
-              }
-            }}
-          >
-            <div className="insta-avatar-ring own-ring">
-              <img 
-                src={currentUser.avatar} 
-                alt="Ваша история" 
-                className="insta-avatar-img" 
-              />
-              <div className="insta-plus-badge">
-                <Plus size={14} strokeWidth={3} />
-              </div>
-            </div>
-            <span className="insta-story-username">Ваша история</span>
-          </div>
-
-          {/* 2. Other Users' Stories with Instagram Gradient Rings */}
-          {stories.map((story, index) => {
-            const isViewed = viewedStoryIds.has(story.id) || story.viewed;
-            const isLiveStory = story.isLive;
-            return (
-              <div 
-                key={story.id} 
-                className={`insta-story-item ${isLiveStory ? 'live-story' : (isViewed ? 'viewed' : 'unviewed')}`}
-                onClick={() => handleOpenStory(index)}
-              >
-                <div className={`insta-avatar-ring ${isLiveStory ? 'ring-live' : (isViewed ? 'ring-viewed' : 'ring-gradient')}`}>
-                  <div className="insta-avatar-inner">
-                    <img 
-                      src={story.user.avatar} 
-                      alt={story.user.name} 
-                      className="insta-avatar-img" 
-                    />
-                    {story.user.online && !isLiveStory && <span className="insta-online-indicator" />}
+      {/* 1. Instagram Horizontal Stories Tray (if not viewerOnly) */}
+      {!viewerOnly && (
+        <div className="instagram-stories-tray">
+          <div className="stories-scroll-track">
+            
+            {/* Own Story Bubble ("Ваша история") */}
+            <div 
+              className={`insta-story-item own-story-bubble ${myStoriesGroup ? (myStoriesGroup.hasUnviewed ? 'unviewed' : 'viewed') : ''}`}
+              onClick={() => {
+                if (myStoriesGroup && myStoriesGroup.stories.length > 0) {
+                  const gIdx = userGroups.findIndex(g => g.user.id === myStoriesGroup.user.id);
+                  handleOpenGroup(gIdx, 0);
+                } else {
+                  if (!isAuthenticated) openAuthModal('register');
+                  else setIsCreateStoryOpen(true);
+                }
+              }}
+            >
+              <div className={`insta-avatar-ring ${myStoriesGroup && myStoriesGroup.stories.length > 0 ? (myStoriesGroup.hasUnviewed ? 'ring-gradient' : 'ring-viewed') : 'own-ring'}`}>
+                <div className="insta-avatar-inner">
+                  <img 
+                    src={currentUser.avatar} 
+                    alt="Ваша история" 
+                    className="insta-avatar-img" 
+                  />
+                  {/* Plus badge */}
+                  <div 
+                    className="insta-plus-badge"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isAuthenticated) openAuthModal('register');
+                      else setIsCreateStoryOpen(true);
+                    }}
+                    title="Создать историю"
+                  >
+                    <Plus size={13} strokeWidth={3} />
                   </div>
-                  {isLiveStory && (
-                    <span className="insta-live-tag-badge">LIVE</span>
-                  )}
                 </div>
-                <span className="insta-story-username">{story.user.name.split(' ')[0]}</span>
               </div>
-            );
-          })}
+              <span className="insta-story-username">Ваша история</span>
+            </div>
 
+            {/* Other Users' Grouped Stories */}
+            {userGroups
+              .filter(group => group.user.id !== 'me' && group.user.id !== currentUser.id)
+              .map((group) => {
+                const groupIdx = userGroups.findIndex(g => g.user.id === group.user.id);
+                return (
+                  <div 
+                    key={group.user.id} 
+                    className={`insta-story-item ${group.isLive ? 'live-story' : (group.hasUnviewed ? 'unviewed' : 'viewed')}`}
+                    onClick={() => handleOpenGroup(groupIdx, 0)}
+                  >
+                    <div className={`insta-avatar-ring ${group.isLive ? 'ring-live' : (group.hasUnviewed ? 'ring-gradient' : 'ring-viewed')}`}>
+                      <div className="insta-avatar-inner">
+                        <img 
+                          src={group.user.avatar} 
+                          alt={group.user.name} 
+                          className="insta-avatar-img" 
+                        />
+                        {group.user.online && !group.isLive && <span className="insta-online-indicator" />}
+                      </div>
+                      {group.isLive && (
+                        <span className="insta-live-tag-badge">LIVE</span>
+                      )}
+                    </div>
+                    <span className="insta-story-username">{group.user.name.split(' ')[0]}</span>
+                  </div>
+                );
+              })}
+
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Fullscreen Instagram Story Viewer Modal */}
-      {activeStory && (
+      {/* 2. Fullscreen Instagram Story Viewer Modal with Split Statistics View */}
+      {activeStory && currentGroup && (
         <div 
-          className="insta-viewer-overlay"
+          className={`insta-viewer-overlay ${isStatsOpen ? 'has-stats-open' : ''}`}
           onClick={handleClose}
         >
           {/* Desktop Navigation Arrows */}
@@ -231,7 +399,7 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
             type="button"
             className="insta-nav-arrow arrow-left" 
             onClick={handlePrev}
-            disabled={activeStoryIndex === 0}
+            disabled={activeGroupIndex === 0 && activeStoryIdxInGroup === 0}
             title="Предыдущая история"
           >
             <ChevronLeft size={28} />
@@ -256,34 +424,36 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
             <X size={26} />
           </button>
 
-          {/* Story Container (Phone Dimensions 9:16) */}
+          {/* Main Viewer Wrapper (Story Card + Optional Right Side Statistics Panel) */}
           <div 
-            className="insta-story-card" 
+            className="insta-viewer-stage"
             onClick={e => e.stopPropagation()}
-            onMouseDown={() => setIsPaused(true)}
-            onMouseUp={() => setIsPaused(false)}
-            onTouchStart={() => setIsPaused(true)}
-            onTouchEnd={() => setIsPaused(false)}
           >
-            {/* Multi-segment Progress Bars */}
-            <div className="insta-progress-row">
-              {stories.map((s, idx) => {
-                let barWidth = '0%';
-                if (activeStoryIndex !== null) {
-                  if (idx < activeStoryIndex) barWidth = '100%';
-                  else if (idx === activeStoryIndex) barWidth = `${progress}%`;
-                }
+            {/* --- STORY CARD (9:16 Phone Aspect Ratio) --- */}
+            <div 
+              className="insta-story-card" 
+              onMouseDown={() => setIsPaused(true)}
+              onMouseUp={() => setIsPaused(false)}
+              onTouchStart={() => setIsPaused(true)}
+              onTouchEnd={() => setIsPaused(false)}
+            >
+              {/* Multi-segment Progress Bars for this specific author */}
+              <div className="insta-progress-row">
+                {currentGroup.stories.map((s, idx) => {
+                  let barWidth = '0%';
+                  if (idx < activeStoryIdxInGroup) barWidth = '100%';
+                  else if (idx === activeStoryIdxInGroup) barWidth = `${progress}%`;
 
-                return (
-                  <div key={s.id} className="insta-progress-segment">
-                    <div 
-                      className="insta-progress-fill" 
-                      style={{ width: barWidth }} 
-                    />
-                  </div>
-                );
-              })}
-            </div>
+                  return (
+                    <div key={s.id} className="insta-progress-segment">
+                      <div 
+                        className="insta-progress-fill" 
+                        style={{ width: barWidth }} 
+                      />
+                    </div>
+                  );
+                })}
+              </div>
 
               {/* Top Author Header */}
               <div className="insta-story-header">
@@ -299,20 +469,35 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
                   <div className="insta-header-text">
                     <div className="insta-header-title-row">
                       <span className="insta-header-name">{activeStory.user.name}</span>
-                      {activeStory.isLive && (
-                        <span className="viewer-live-badge">
-                          <span className="live-red-dot" /> LIVE
-                        </span>
+                      {activeStory.user.verified && (
+                        <CheckCircle2 size={13} className="insta-verified-check" />
                       )}
+                      <span className="insta-header-dot">•</span>
+                      <span className="insta-header-time">
+                        {activeStory.isLive ? 'LIVE' : (activeStory.timestamp || '2 ч')}
+                      </span>
                     </div>
-                    <span className="insta-header-time">
-                      {activeStory.isLive ? `${activeStory.liveViewers || 14} зрителей` : (activeStory.timestamp || '2 ч')}
-                    </span>
+
+                    {/* Reels or Music Subtitle (Screenshots 2 & 3) */}
+                    {activeStory.reelsSourceTitle && (
+                      <div className="insta-header-subrow reels-subrow" title="Перейти к видео Reels">
+                        <Film size={11} className="subrow-icon" />
+                        <span>{activeStory.reelsSourceTitle}</span>
+                        <ChevronRight size={11} />
+                      </div>
+                    )}
+                    {activeStory.musicTrack && (
+                      <div className="insta-header-subrow music-subrow" title="Аудиодорожка">
+                        <Music size={11} className="subrow-icon" />
+                        <span>{activeStory.musicTrack}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* Filter and Mask Badge & Controls */}
+                {/* Right Header Action Icons: Sound, Pause, Three Dots ••• */}
                 <div className="insta-header-actions">
+                  {/* Applied Filter / Mask Pills */}
                   {activeStory.filter && (
                     <span className="story-meta-pill" title="Применен фильтр">
                       <Wand2 size={11} /> {activeStory.filter}
@@ -323,18 +508,50 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
                       <Sparkles size={11} /> {activeStory.mask}
                     </span>
                   )}
+
+                  {/* Volume Toggle */}
                   <button 
                     type="button" 
                     className="insta-header-icon-btn" 
-                    onClick={() => setIsPaused(p => !p)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsMuted(m => !m);
+                    }}
+                    title={isMuted ? 'Включить звук' : 'Без звука'}
+                  >
+                    {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                  </button>
+
+                  {/* Play/Pause Toggle */}
+                  <button 
+                    type="button" 
+                    className="insta-header-icon-btn" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsPaused(p => !p);
+                    }}
                     title={isPaused ? 'Продолжить' : 'Пауза'}
                   >
                     {isPaused ? <Play size={18} /> : <Pause size={18} />}
                   </button>
+
+                  {/* Three Dots Context Menu Button (•••) */}
+                  <button 
+                    type="button" 
+                    className="insta-header-icon-btn options-btn" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsPaused(true);
+                      setIsOptionsMenuOpen(true);
+                    }}
+                    title="Опции истории"
+                  >
+                    <MoreHorizontal size={20} />
+                  </button>
                 </div>
               </div>
 
-              {/* Story Visual Content (Image or Video) */}
+              {/* Story Visual Content (Image, Video or Gradient) */}
               {(() => {
                 const appliedFilter = STORY_FILTERS.find(f => f.name === activeStory.filter)?.filterCss || 'none';
 
@@ -348,12 +565,13 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
                       filter: appliedFilter,
                     }}
                   >
-                    {/* Video Player if recorded story */}
+                    {/* Video Player if recorded video story */}
                     {activeStory.videoUrl ? (
                       <video
                         src={activeStory.videoUrl}
                         autoPlay
                         loop
+                        muted={isMuted}
                         playsInline
                         className="insta-story-full-img"
                       />
@@ -367,7 +585,7 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
                       )
                     )}
 
-                    {/* AR Mask Overlay in Viewer */}
+                    {/* AR Mask Overlay */}
                     {activeStory.mask && (
                       <div className="viewer-ar-mask-overlay">
                         {activeStory.mask.includes('очки') && <span className="mask-element ar-glasses">🕶️</span>}
@@ -375,18 +593,18 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
                         {activeStory.mask.includes('ушки') && <span className="mask-element ar-cat-ears">🐱</span>}
                         {activeStory.mask.includes('Нимб') && <span className="mask-element ar-halo">😇</span>}
                         {activeStory.mask.includes('визор') && <span className="mask-element ar-visor">🥽</span>}
-                        {activeStory.mask.includes('Сияние') && <span className="mask-element ar-sparkles">✨</span>}
+                        {activeStory.mask.includes('Блестки') && <span className="mask-element ar-sparkles">✨</span>}
                       </div>
                     )}
 
-                    {/* Story Overlay Caption / Text */}
+                    {/* Story Caption Text */}
                     {activeStory.text && (
                       <div className={`insta-story-text-badge pos-${activeStory.textPosition || 'center'}`}>
                         <p>{activeStory.text}</p>
                       </div>
                     )}
 
-                    {/* Interactive Left/Right Tap Areas */}
+                    {/* Interactive Tap Zones */}
                     <div className="insta-tap-zones">
                       <div 
                         className="insta-tap-zone-left" 
@@ -407,44 +625,425 @@ export function StoriesBar({ stories, onAddStory }: StoriesBarProps) {
                 );
               })()}
 
-            {/* Bottom Interactive Instagram Footer */}
-            <div className="insta-story-footer" onClick={e => e.stopPropagation()}>
-              <input
-                type="text"
-                className="insta-story-input"
-                placeholder={`Ответить ${activeStory.user.name.split(' ')[0]}...`}
-                value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                onFocus={() => setIsPaused(true)}
-                onBlur={() => setIsPaused(false)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    handleSendReply();
-                  }
+              {/* Bottom Left Viewers Counter & Avatars Stack (Screenshot 2) */}
+              <div 
+                className="insta-story-viewers-pill"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsPaused(true);
+                  setIsStatsOpen(true);
+                  setStatsTab('overview');
                 }}
-              />
-
-              <button 
-                type="button" 
-                className={`insta-story-like-btn ${isCurrentLiked ? 'liked' : ''}`}
-                onClick={handleToggleLike}
-                title="Нравится"
+                title="Посмотреть статистику и зрителей истории"
               >
-                <Heart size={22} fill={isCurrentLiked ? '#ef4444' : 'none'} color={isCurrentLiked ? '#ef4444' : '#ffffff'} />
-              </button>
+                <div className="viewers-avatar-stack">
+                  {(activeStats.viewers || mockStoryViewers).slice(0, 3).map((v, i) => (
+                    <img 
+                      key={v.id || i}
+                      src={v.avatar} 
+                      alt={v.name} 
+                      className="viewer-stack-avatar"
+                      style={{ zIndex: 3 - i }}
+                    />
+                  ))}
+                </div>
+                <span className="viewers-count-label">
+                  Просмотрено: {activeStats.viewsCount || 12}
+                </span>
+              </div>
 
-              {replyText.trim() && (
+              {/* Bottom Interactive Instagram Footer */}
+              <div className="insta-story-footer" onClick={e => e.stopPropagation()}>
+                <input
+                  type="text"
+                  className="insta-story-input"
+                  placeholder={`Ответить ${activeStory.user.name.split(' ')[0]}...`}
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  onFocus={() => setIsPaused(true)}
+                  onBlur={() => setIsPaused(false)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      handleSendReply();
+                    }
+                  }}
+                />
+
                 <button 
                   type="button" 
-                  className="insta-story-send-btn"
-                  onClick={handleSendReply}
-                  title="Отправить"
+                  className={`insta-story-like-btn ${isCurrentLiked ? 'liked' : ''}`}
+                  onClick={handleToggleLike}
+                  title="Нравится"
                 >
-                  <Send size={18} />
+                  <Heart size={22} fill={isCurrentLiked ? '#ef4444' : 'none'} color={isCurrentLiked ? '#ef4444' : '#ffffff'} />
                 </button>
-              )}
+
+                {replyText.trim() && (
+                  <button 
+                    type="button" 
+                    className="insta-story-send-btn"
+                    onClick={handleSendReply}
+                    title="Отправить"
+                  >
+                    <Send size={18} />
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* --- RIGHT SIDE / MODAL INSTAGRAM STORY INSIGHTS (Screenshots 4 & 5) --- */}
+            {isStatsOpen && (
+              <div className="insta-stats-panel" onClick={e => e.stopPropagation()}>
+                {/* Statistics Header */}
+                <div className="stats-panel-header">
+                  <div className="stats-header-title-box">
+                    <button 
+                      type="button" 
+                      className="stats-back-btn" 
+                      onClick={() => setIsStatsOpen(false)}
+                      title="Назад к просмотру"
+                    >
+                      <ArrowLeft size={18} />
+                    </button>
+                    <h3 className="stats-panel-title">Статистика истории</h3>
+                  </div>
+                  <button 
+                    type="button" 
+                    className="stats-close-btn" 
+                    onClick={() => setIsStatsOpen(false)}
+                    title="Закрыть статистику"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Tab Switcher: «Обзор» & «Зрители» */}
+                <div className="stats-nav-tabs">
+                  <button 
+                    type="button"
+                    className={`stats-nav-tab ${statsTab === 'overview' ? 'active' : ''}`}
+                    onClick={() => setStatsTab('overview')}
+                  >
+                    <BarChart2 size={16} /> Обзор
+                  </button>
+                  <button 
+                    type="button"
+                    className={`stats-nav-tab ${statsTab === 'viewers' ? 'active' : ''}`}
+                    onClick={() => setStatsTab('viewers')}
+                  >
+                    <UserIcon size={16} /> Зрители ({activeStats.viewsCount})
+                  </button>
+                </div>
+
+                {/* Tab 1: Overview Analytics (Matching Screenshots 4 & 5) */}
+                {statsTab === 'overview' && (
+                  <div className="stats-panel-scrollable">
+                    
+                    {/* Section 1: Просмотры */}
+                    <div className="stats-metric-card">
+                      <div className="stats-metric-header">
+                        <span className="metric-title">Просмотры</span>
+                        <Info size={15} className="metric-info-icon" />
+                      </div>
+                      <div className="metric-main-stat-row">
+                        <span className="metric-sublabel">Просмотры</span>
+                        <span className="metric-value-bold">{activeStats.viewsCount}</span>
+                      </div>
+
+                      {/* Followers Progress Bar (Magenta #E1306C) */}
+                      <div className="stats-progress-group">
+                        <div className="progress-label-row">
+                          <span className="progress-item-name">Подписчики</span>
+                          <span className="progress-item-pct">{activeStats.followersPercent}%</span>
+                        </div>
+                        <div className="stats-bar-track">
+                          <div 
+                            className="stats-bar-fill fill-magenta" 
+                            style={{ width: `${activeStats.followersPercent}%` }} 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Non-followers Progress Bar (White/Light gray) */}
+                      <div className="stats-progress-group">
+                        <div className="progress-label-row">
+                          <span className="progress-item-name">Неподписчики</span>
+                          <span className="progress-item-pct">{activeStats.nonFollowersPercent}%</span>
+                        </div>
+                        <div className="stats-bar-track">
+                          <div 
+                            className="stats-bar-fill fill-white" 
+                            style={{ width: `${activeStats.nonFollowersPercent}%` }} 
+                          />
+                        </div>
+                      </div>
+
+                      {/* Unique Viewers */}
+                      <div className="metric-single-row">
+                        <span className="metric-sublabel">Зрители</span>
+                        <span className="metric-value-bold">{activeStats.uniqueViewersCount}</span>
+                      </div>
+                    </div>
+
+                    <div className="stats-divider" />
+
+                    {/* Section 2: Взаимодействия */}
+                    <div className="stats-metric-card">
+                      <div className="stats-metric-header">
+                        <span className="metric-title">Взаимодействия</span>
+                        <Info size={15} className="metric-info-icon" />
+                      </div>
+                      <div className="metric-main-stat-row">
+                        <span className="metric-sublabel">Взаимодействия</span>
+                        <span className="metric-value-bold">{activeStats.interactionsCount}</span>
+                      </div>
+
+                      <div className="metric-single-row">
+                        <span className="metric-sublabel">Взаимодействия с историями</span>
+                        <span className="metric-value-bold">{activeStats.storyInteractionsCount}</span>
+                      </div>
+                      <div className="metric-single-row indent-item">
+                        <span className="metric-sublabel flex-icon-label">
+                          <Heart size={14} /> Отметки "Нравится"
+                        </span>
+                        <span className="metric-value-bold">{activeStats.likesCount}</span>
+                      </div>
+                      <div className="metric-single-row indent-item">
+                        <span className="metric-sublabel flex-icon-label">
+                          <Share2 size={14} /> Поделились
+                        </span>
+                        <span className="metric-value-bold">{activeStats.sharesCount}</span>
+                      </div>
+                      <div className="metric-single-row indent-item">
+                        <span className="metric-sublabel flex-icon-label">
+                          <Send size={14} /> Ответы
+                        </span>
+                        <span className="metric-value-bold">{activeStats.repliesCount}</span>
+                      </div>
+                    </div>
+
+                    <div className="stats-divider" />
+
+                    {/* Section 3: Вовлеченные аккаунты */}
+                    <div className="stats-metric-card">
+                      <div className="metric-main-stat-row">
+                        <span className="metric-title">Вовлеченные аккаунты</span>
+                        <span className="metric-value-bold">{activeStats.engagedAccountsCount || '--'}</span>
+                      </div>
+                    </div>
+
+                    <div className="stats-divider" />
+
+                    {/* Section 4: Навигация */}
+                    <div className="stats-metric-card">
+                      <div className="stats-metric-header">
+                        <span className="metric-title">Навигация</span>
+                      </div>
+                      <div className="metric-main-stat-row">
+                        <span className="metric-sublabel">Навигация</span>
+                        <span className="metric-value-bold">{activeStats.navigationTotal}</span>
+                      </div>
+                      <div className="metric-single-row">
+                        <span className="metric-sublabel">Вперед</span>
+                        <span className="metric-value-bold">{activeStats.navigationForward}</span>
+                      </div>
+                      <div className="metric-single-row">
+                        <span className="metric-sublabel">Выходы</span>
+                        <span className="metric-value-bold">{activeStats.navigationExits}</span>
+                      </div>
+                      <div className="metric-single-row">
+                        <span className="metric-sublabel">Следующая история</span>
+                        <span className="metric-value-bold">{activeStats.navigationNext}</span>
+                      </div>
+                    </div>
+
+                    <div className="stats-divider" />
+
+                    {/* Section 5: Профиль */}
+                    <div className="stats-metric-card">
+                      <div className="stats-metric-header">
+                        <span className="metric-title">Профиль</span>
+                        <Info size={15} className="metric-info-icon" />
+                      </div>
+                      <div className="metric-main-stat-row">
+                        <span className="metric-sublabel">Действия в профиле</span>
+                        <span className="metric-value-bold">{activeStats.profileActions}</span>
+                      </div>
+                      <div className="metric-single-row">
+                        <span className="metric-sublabel">Посещения профиля</span>
+                        <span className="metric-value-bold">{activeStats.profileVisits}</span>
+                      </div>
+                      <div className="metric-single-row">
+                        <span className="metric-sublabel">Нажатия на внешнюю ссылку</span>
+                        <span className="metric-value-bold">{activeStats.linkClicks}</span>
+                      </div>
+                      <div className="metric-single-row">
+                        <span className="metric-sublabel">Нажатия на адрес компании</span>
+                        <span className="metric-value-bold">{activeStats.companyAddressClicks}</span>
+                      </div>
+                      <div className="metric-single-row">
+                        <span className="metric-sublabel">Подписки</span>
+                        <span className="metric-value-bold">{activeStats.followsCount}</span>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+
+                {/* Tab 2: Viewers List with Reactions */}
+                {statsTab === 'viewers' && (
+                  <div className="stats-panel-scrollable viewers-tab-content">
+                    <div className="viewers-search-box">
+                      <Search size={15} className="viewers-search-icon" />
+                      <input 
+                        type="text" 
+                        placeholder="Поиск среди зрителей..." 
+                        value={viewerSearchQuery}
+                        onChange={e => setViewerSearchQuery(e.target.value)}
+                        className="viewers-search-input"
+                      />
+                    </div>
+
+                    <div className="viewers-list">
+                      {filteredViewers.map(viewer => (
+                        <div key={viewer.id} className="viewer-list-item">
+                          <img 
+                            src={viewer.avatar} 
+                            alt={viewer.name} 
+                            className="viewer-item-avatar"
+                            onClick={() => {
+                              navigate(`/profile/@${viewer.username}`);
+                              handleClose();
+                            }}
+                          />
+                          <div className="viewer-item-info">
+                            <span 
+                              className="viewer-item-name"
+                              onClick={() => {
+                                navigate(`/profile/@${viewer.username}`);
+                                handleClose();
+                              }}
+                            >
+                              {viewer.name}
+                            </span>
+                            <div className="viewer-item-meta">
+                              <span className="viewer-username">@{viewer.username}</span>
+                              {viewer.viewedAt && (
+                                <>
+                                  <span className="viewer-meta-dot">•</span>
+                                  <span className="viewer-time">{viewer.viewedAt}</span>
+                                </>
+                              )}
+                              {viewer.isFollower && (
+                                <>
+                                  <span className="viewer-meta-dot">•</span>
+                                  <span className="viewer-follower-badge">Подписчик</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="viewer-item-actions">
+                            <button 
+                              type="button" 
+                              className={`viewer-heart-btn ${viewer.liked ? 'active' : ''}`}
+                              title={viewer.liked ? 'Поставил отметку "Нравится"' : 'Зритель'}
+                            >
+                              <Heart size={18} fill={viewer.liked ? '#ef4444' : 'none'} color={viewer.liked ? '#ef4444' : '#6b7280'} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+
+                      {filteredViewers.length === 0 && (
+                        <div className="viewers-empty">
+                          Зрители не найдены
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* --- CONTEXT MENU MODAL (•••) (Screenshot 3) --- */}
+          {isOptionsMenuOpen && (
+            <div 
+              className="insta-options-backdrop"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOptionsMenuOpen(false);
+              }}
+            >
+              <div 
+                className="insta-options-dialog" 
+                onClick={e => e.stopPropagation()}
+              >
+                {/* 1. Удалить (Red text #ed4956) */}
+                <button 
+                  type="button" 
+                  className="options-dialog-item text-danger"
+                  onClick={handleDeleteCurrentStory}
+                >
+                  Удалить
+                </button>
+
+                {/* 2. Об аккаунте */}
+                <button 
+                  type="button" 
+                  className="options-dialog-item"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOptionsMenuOpen(false);
+                    handleAuthorClick(activeStory.user, e);
+                  }}
+                >
+                  Об аккаунте
+                </button>
+
+                {/* 3. Статистика */}
+                <button 
+                  type="button" 
+                  className="options-dialog-item"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOptionsMenuOpen(false);
+                    setIsStatsOpen(true);
+                    setStatsTab('overview');
+                  }}
+                >
+                  Статистика
+                </button>
+
+                {/* 4. Продвигать историю */}
+                <button 
+                  type="button" 
+                  className="options-dialog-item"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    alert('Продвижение истории активировано для целевой аудитории вашего региона 🚀');
+                    setIsOptionsMenuOpen(false);
+                  }}
+                >
+                  Продвигать историю
+                </button>
+
+                {/* 5. Отмена */}
+                <button 
+                  type="button" 
+                  className="options-dialog-item item-cancel"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOptionsMenuOpen(false);
+                  }}
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { 
   initialUsers, posts, stories, videos, podcasts, initialProducts, 
-  RELIGIONS_CATALOG, type User, type Post, type Video as VideoType, 
+  RELIGIONS_CATALOG, type User, type Post, type Story, type Video as VideoType, 
   type Podcast, type Product 
 } from '../data/mock';
 import { calculateZodiacProfile } from '../utils/astrology';
@@ -20,6 +20,7 @@ import { PostDetailModal } from '../components/PostDetailModal';
 import { EditProfileModal } from '../components/EditProfileModal';
 import { CreatePostModal } from '../components/CreatePostModal';
 import { CreateStoryModal } from '../components/CreateStoryModal';
+import { StoriesBar } from '../components/StoriesBar';
 import { UploadVideoModal } from '../components/UploadVideoModal';
 import { UploadPodcastModal } from '../components/UploadPodcastModal';
 import { CreateProductModal } from '../components/CreateProductModal';
@@ -52,9 +53,17 @@ export function ProfilePage() {
   const [isUploadPodcastOpen, setIsUploadPodcastOpen] = useState(false);
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
   const [profilePosts, setProfilePosts] = useState<Post[]>(posts);
+  const [profileStories, setProfileStories] = useState<Story[]>(stories);
+  const [isViewingStory, setIsViewingStory] = useState(false);
   const [profileVideos, setProfileVideos] = useState<VideoType[]>(videos);
   const [profilePodcasts, setProfilePodcasts] = useState<Podcast[]>(podcasts);
   const [profileProducts, setProfileProducts] = useState<Product[]>(initialProducts);
+
+  const handleDeleteStory = (storyId: string) => {
+    setProfileStories(prev => prev.filter(s => s.id !== storyId));
+    const sIdx = stories.findIndex(s => s.id === storyId);
+    if (sIdx !== -1) stories.splice(sIdx, 1);
+  };
 
   // Normalize route param (e.g. '@claower' -> 'claower', 'me', or custom ID)
   const cleanParam = userId ? userId.replace(/^@/, '').toLowerCase() : '';
@@ -132,6 +141,14 @@ export function ProfilePage() {
   const [isConsciousnessModalOpen, setIsConsciousnessModalOpen] = useState(false);
 
   const activeUser = isMe ? currentUser : user;
+
+  const userHasStories = useMemo(() => {
+    return profileStories.some(s => 
+      s.user.id === activeUser.id || 
+      (activeUser.username && s.user.username === activeUser.username) || 
+      (isMe && (s.user.id === 'me' || s.user.id === currentUser.id))
+    );
+  }, [profileStories, activeUser, isMe, currentUser.id]);
 
   // Filter user's posts, videos, and podcasts
   const userPosts = useMemo(() => {
@@ -219,10 +236,19 @@ export function ProfilePage() {
       <div className="profile-header-container">
         <div className="profile-header-card">
           <div className="profile-top-bar">
-            {/* Avatar */}
-            <div className="profile-avatar-wrapper">
+            {/* Avatar with Instagram Story Ring */}
+            <div 
+              className={`profile-avatar-wrapper ${userHasStories ? 'has-story' : ''}`}
+              onClick={() => {
+                if (userHasStories) {
+                  setIsViewingStory(true);
+                }
+              }}
+              title={userHasStories ? 'Нажмите, чтобы посмотреть историю' : undefined}
+            >
               <img src={activeUser.avatar} alt={activeUser.name} className="profile-main-avatar" />
               {activeUser.online && <span className="profile-online-indicator" title="В сети" />}
+              {userHasStories && <span className="profile-story-badge-hint">История</span>}
             </div>
 
             {/* Action Buttons */}
@@ -905,11 +931,23 @@ export function ProfilePage() {
         isOpen={isCreateStoryOpen}
         onClose={() => setIsCreateStoryOpen(false)}
         onCreateStory={(newStory) => {
+          setProfileStories(prev => [newStory, ...prev]);
           stories.unshift(newStory);
           setIsCreateStoryOpen(false);
           alert('История успешно опубликована!');
         }}
       />
+
+      {/* Fullscreen Story Viewer from Profile Avatar Click */}
+      {isViewingStory && (
+        <StoriesBar 
+          stories={profileStories} 
+          initialUserId={activeUser.id} 
+          viewerOnly 
+          onCloseViewer={() => setIsViewingStory(false)}
+          onDeleteStory={handleDeleteStory}
+        />
+      )}
 
       {/* Upload Video Modal */}
       <UploadVideoModal
