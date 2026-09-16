@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { 
-  Search, Users, Trash2, Plus, Sparkles, X, Check, 
+  Search, Users, Trash2, Plus, Sparkles, X, Check, CheckCheck,
   Archive, ArchiveRestore, Lock, Unlock, KeyRound, Shield,
   Star, ChevronDown, Tag, Heart, AlertCircle
 } from 'lucide-react';
@@ -519,7 +519,29 @@ export function ChatList({
 
                   <div className="chat-item-bottom">
                     <span className="chat-preview">
-                      {chat.isLocked && !isLockedUnlocked ? '🔒 Содержимое защищено PIN' : chat.lastMessage}
+                      {(() => {
+                        if (chat.isLocked && !isLockedUnlocked) {
+                          return '🔒 Содержимое защищено PIN';
+                        }
+                        const lastMsg = chat.messages && chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null;
+                        const isOutgoing = lastMsg ? lastMsg.fromMe : false;
+                        const status = lastMsg?.status || 'read';
+
+                        return (
+                          <span className="chat-preview-inner">
+                            {isOutgoing && (
+                              <span className="chat-list-msg-status" title={status === 'read' ? 'Прочитано' : status === 'delivered' ? 'Доставлено' : 'Отправлено'}>
+                                {status === 'sent' ? (
+                                  <Check size={12} className="tg-ticks sent" />
+                                ) : (
+                                  <CheckCheck size={12} className={`tg-ticks ${status === 'read' ? 'read' : 'delivered'}`} />
+                                )}
+                              </span>
+                            )}
+                            <span className="chat-preview-text">{chat.lastMessage}</span>
+                          </span>
+                        );
+                      })()}
                     </span>
                     <div className="chat-item-actions-wrap">
                       {chat.unread > 0 && (

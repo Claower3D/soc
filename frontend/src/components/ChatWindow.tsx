@@ -129,8 +129,16 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
   const recordingTimerRef = useRef<number | null>(null);
   const videoNoteTimerRef = useRef<number | null>(null);
 
-  // Sync messages when chat changes
+  // Sync messages when chat changes and ensure active chat is marked read
   useEffect(() => {
+    if (chat) {
+      const hasUnread = chat.unread > 0;
+      const hasUnreadMessages = chat.messages.some(m => !m.fromMe && m.status !== 'read');
+      if ((hasUnread || hasUnreadMessages) && onUpdateChat) {
+        const readMsgs = chat.messages.map(m => (!m.fromMe || !m.status ? { ...m, status: 'read' as const } : m));
+        onUpdateChat(chat.id, { unread: 0, messages: readMsgs });
+      }
+    }
     setMessages(chat?.messages || []);
     setInputValue('');
     setAttachedImage(null);
@@ -140,7 +148,14 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
     setEditingMessage(null);
     setReplyingToMessage(null);
     setMessageToDelete(null);
-  }, [chat]);
+  }, [chat?.id]);
+
+  // Sync internal messages if chat.messages array reference updates from parent
+  useEffect(() => {
+    if (chat?.messages) {
+      setMessages(chat.messages);
+    }
+  }, [chat?.messages]);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -363,11 +378,27 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
       status: initialStatus,
     };
 
-    setMessages(prev => [...prev, newMsg]);
+    const nextMessages = [...messages, newMsg];
+    setMessages(nextMessages);
+    if (chat && onUpdateChat) {
+      onUpdateChat(chat.id, { 
+        messages: nextMessages,
+        lastMessage: newMsg.text || (attachedImage ? '📷 Изображение' : 'Сообщение'),
+        time: newMsg.time,
+        unread: 0
+      });
+    }
+
     if (isRecipientOnline) {
       setTimeout(() => {
-        setMessages(curr => curr.map(m => m.id === newMsg.id ? { ...m, status: 'read' } : m));
-      }, 2500);
+        setMessages(curr => {
+          const updated = curr.map(m => m.id === newMsg.id ? { ...m, status: 'read' as const } : m);
+          if (chat && onUpdateChat) {
+            onUpdateChat(chat.id, { messages: updated, unread: 0 });
+          }
+          return updated;
+        });
+      }, 2000);
     }
     setInputValue('');
     setAttachedImage(null);
@@ -390,15 +421,26 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
           guruAnswer = 'Мир твоему сердцу, путник! Я всегда рядом, чтобы подсказать практику, совет или толкование символов. О чем думаешь сейчас? 🙏';
         }
 
-        setMessages(mPrev => [
-          ...mPrev,
-          {
-            id: `guru_reply_${Date.now()}`,
-            text: guruAnswer,
-            fromMe: false,
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        const replyMsg: Message = {
+          id: `guru_reply_${Date.now()}`,
+          text: guruAnswer,
+          fromMe: false,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: 'read'
+        };
+
+        setMessages(mPrev => {
+          const list = [...mPrev, replyMsg];
+          if (chat && onUpdateChat) {
+            onUpdateChat(chat.id, {
+              messages: list,
+              lastMessage: guruAnswer,
+              time: replyMsg.time,
+              unread: 0
+            });
           }
-        ]);
+          return list;
+        });
       }, 700);
     }
   };

@@ -8,14 +8,47 @@ import './MessengerPage.css';
 
 export function MessengerPage() {
   const { isAuthenticated } = useAuth();
-  const [chatList, setChatList] = useState<Chat[]>(chats);
+  const [chatList, setChatList] = useState<Chat[]>(() => {
+    // If initial active chat exists, mark it read on initial load
+    const firstId = chats[0]?.id;
+    if (!firstId) return chats;
+    return chats.map(c => {
+      if (c.id === firstId) {
+        return {
+          ...c,
+          unread: 0,
+          messages: c.messages.map(m => (!m.fromMe || !m.status ? { ...m, status: 'read' as const } : m))
+        };
+      }
+      return c;
+    });
+  });
   const [activeChatId, setActiveChatId] = useState<string | null>(chats[0]?.id ?? null);
 
   const activeChat = chatList.find(c => c.id === activeChatId) ?? null;
 
+  const handleSelectChat = (id: string) => {
+    setActiveChatId(id);
+    setChatList(prev => prev.map(c => {
+      if (c.id === id) {
+        return {
+          ...c,
+          unread: 0,
+          messages: c.messages.map(m => (!m.fromMe || !m.status ? { ...m, status: 'read' as const } : m))
+        };
+      }
+      return c;
+    }));
+  };
+
   const handleCreateGroup = (newGroup: Chat) => {
-    setChatList(prev => [newGroup, ...prev]);
-    setActiveChatId(newGroup.id);
+    const readGroup = {
+      ...newGroup,
+      unread: 0,
+      messages: newGroup.messages.map(m => ({ ...m, status: 'read' as const }))
+    };
+    setChatList(prev => [readGroup, ...prev]);
+    setActiveChatId(readGroup.id);
   };
 
   const handleDeleteChat = (id: string) => {
@@ -48,7 +81,7 @@ export function MessengerPage() {
         <ChatList
           chats={chatList}
           activeChatId={activeChatId}
-          onSelectChat={setActiveChatId}
+          onSelectChat={handleSelectChat}
           onDeleteChat={handleDeleteChat}
           onCreateGroup={handleCreateGroup}
           onUpdateChat={handleUpdateChat}
