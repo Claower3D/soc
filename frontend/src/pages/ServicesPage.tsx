@@ -56,6 +56,17 @@ const SERVICES: ServiceItem[] = [
     stats: '300+ ресторанов'
   },
   {
+    id: 'horoscope',
+    title: 'Гороскоп на каждый день',
+    category: 'Астрология и Прогнозы',
+    description: 'Персональный гороскоп день-в-день для 12 знаков зодиака: любовь, деньги, здоровье, расчет по дню, месяцу и году рождения.',
+    icon: Sparkles,
+    route: '/spiritual/horoscope',
+    badge: 'Каждый день',
+    colorGradient: 'linear-gradient(135deg, #F59E0B, #EC4899)',
+    stats: '12 знаков зодиака'
+  },
+  {
     id: 'spiritual',
     title: 'Самопознание и Духовные Практики',
     category: 'Осознанность и Здоровье',

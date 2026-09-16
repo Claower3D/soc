@@ -24,9 +24,10 @@ import { LiveZenRoom } from '../components/LiveZenRoom';
 import { KarmaTreeWidget } from '../components/KarmaTreeWidget';
 import { MasterBookingModal } from '../components/MasterBookingModal';
 import { ConsciousnessClassModal } from '../components/ConsciousnessClassModal';
+import { DailyHoroscopeSection } from '../components/DailyHoroscopeSection';
 import './SpiritualPage.css';
 
-type TabType = 'all' | 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom' | 'courses' | 'tarot' | 'astrology' | 'calendar' | 'livezen' | 'consciousness';
+type TabType = 'all' | 'horoscope' | 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom' | 'courses' | 'tarot' | 'astrology' | 'calendar' | 'livezen' | 'consciousness';
 
 interface SpiritualPracticeCard {
   id: TabType;
@@ -41,6 +42,17 @@ interface SpiritualPracticeCard {
 }
 
 const SPIRITUAL_PRACTICES_CARDS: SpiritualPracticeCard[] = [
+  {
+    id: 'horoscope',
+    title: 'Гороскоп на каждый день',
+    category: 'Астрология & Звезды',
+    description: 'Ежедневный персональный прогноз день-в-день для всех 12 знаков: любовь, карьера, здоровье, совет дня и расчет по дате рождения.',
+    icon: Sparkles,
+    badge: 'Каждый день',
+    badgeClass: 'badge-amber',
+    gradient: 'linear-gradient(135deg, #F59E0B, #EC4899)',
+    stats: '12 знаков • День в день'
+  },
   {
     id: 'meditation',
     title: 'Медитация',
@@ -181,7 +193,7 @@ export function SpiritualPage() {
   const navigate = useNavigate();
 
   // Active Tab: if no tab or tab is 'all' / 'overview', show card catalog
-  const validTabs: TabType[] = ['all', 'meditation', 'yoga', 'affirmations', 'breathing', 'sounds', 'wisdom', 'courses', 'tarot', 'astrology', 'calendar', 'livezen', 'consciousness'];
+  const validTabs: TabType[] = ['all', 'horoscope', 'meditation', 'yoga', 'affirmations', 'breathing', 'sounds', 'wisdom', 'courses', 'tarot', 'astrology', 'calendar', 'livezen', 'consciousness'];
   const activeTab: TabType = (tab && validTabs.includes(tab as TabType)) 
     ? (tab as TabType) 
     : 'all';
@@ -929,6 +941,17 @@ export function SpiritualPage() {
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: ГОРОСКОП НА КАЖДЫЙ ДЕНЬ (ДЕНЬ-В-ДЕНЬ) */}
+      {/* ========================================================================= */}
+      {activeTab === 'horoscope' && (
+        <div className="spiritual-tab-content">
+          <DailyHoroscopeSection 
+            onOpenBooking={handleOpenBooking}
+          />
         </div>
       )}
 

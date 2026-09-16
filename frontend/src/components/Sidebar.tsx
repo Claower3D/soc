@@ -186,6 +186,12 @@ export function Sidebar() {
           <div className="services-subnav spiritual-subnav">
             {isAuthenticated ? (
               <>
+                <NavLink to="/spiritual/horoscope" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
+                  <Sparkles className="nav-icon spiritual-icon-flower" size={18} />
+                  <span className="nav-label">Гороскоп на день</span>
+                  <span className="spiritual-sub-badge" style={{ background: 'linear-gradient(135deg, #F59E0B, #EC4899)', color: '#fff' }}>12 зз</span>
+                </NavLink>
+
                 <NavLink to="/spiritual/meditation" className={({ isActive }) => `nav-item sub-nav-item spiritual-nav-item ${isActive ? 'active' : ''}`}>
                   <Flower2 className="nav-icon spiritual-icon-flower" size={18} />
                   <span className="nav-label">Медитация</span>
@@ -252,6 +258,12 @@ export function Sidebar() {
               </>
             ) : (
               <>
+                <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Sparkles className="nav-icon spiritual-icon-flower" size={18} />
+                  <span className="nav-label">Гороскоп на день</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
                 <div className="nav-item sub-nav-item spiritual-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
                   <Flower2 className="nav-icon spiritual-icon-flower" size={18} />
                   <span className="nav-label">Медитация</span>

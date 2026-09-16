@@ -295,6 +295,34 @@ export function FeedPage() {
           </div>
         </div>
 
+        {/* Daily Horoscope Mini-Widget */}
+        <div 
+          className="feed-horoscope-widget-box"
+          onClick={() => navigate('/spiritual/horoscope')}
+          title="Открыть полный гороскоп на каждый день"
+        >
+          <div className="horoscope-widget-header">
+            <div className="horoscope-widget-badge">
+              <Sparkles size={13} />
+              <span>ГОРОСКОП НА СЕГОДНЯ</span>
+            </div>
+            <span className="horoscope-widget-arrow">Подробнее →</span>
+          </div>
+          <div className="horoscope-widget-body">
+            <div className="horoscope-widget-sign-symbol">♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓</div>
+            <h4 className="horoscope-widget-title">Астропрогноз день-в-день</h4>
+            <p className="horoscope-widget-snippet">
+              Узнайте, что вас ожидает сегодня: персональный расчет по дню, месяцу и году рождения для всех 12 знаков.
+            </p>
+            <div className="horoscope-widget-tags">
+              <span>Любовь</span>
+              <span>Карьера</span>
+              <span>Здоровье</span>
+              <span>Совет дня</span>
+            </div>
+          </div>
+        </div>
+
         {/* Trends Box */}
         <div className="feed-trends-box">
           <div className="box-header">

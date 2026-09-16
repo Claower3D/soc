@@ -399,6 +399,86 @@
   box-shadow: var(--shadow-md);
 }
 
+/* Feed Horoscope Mini Widget */
+.feed-horoscope-widget-box {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%);
+  border: 1.5px solid rgba(245, 158, 11, 0.28);
+  border-radius: var(--radius-md);
+  padding: 1.15rem 1.25rem;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.feed-horoscope-widget-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.horoscope-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.horoscope-widget-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #D97706;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.horoscope-widget-arrow {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.horoscope-widget-sign-symbol {
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  opacity: 0.8;
+  margin-bottom: 0.3rem;
+  color: #F59E0B;
+}
+
+.horoscope-widget-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-text);
+  margin: 0 0 0.35rem 0;
+}
+
+.horoscope-widget-snippet {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+  margin: 0 0 0.65rem 0;
+}
+
+.horoscope-widget-tags {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.horoscope-widget-tags span {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
 .box-header {
   display: flex;
   align-items: center;
