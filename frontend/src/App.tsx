@@ -18,6 +18,9 @@ import { VideoEditorPage } from './pages/VideoEditorPage';
 import { WalletPage } from './pages/WalletPage';
 import { AdminPage } from './pages/AdminPage';
 import { SpiritualPage } from './pages/SpiritualPage';
+import { MusicPage } from './pages/MusicPage';
+import { GamesPage } from './pages/GamesPage';
+import { FoodDeliveryPage } from './pages/FoodDeliveryPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SearchPage } from './pages/SearchPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -62,6 +65,10 @@ function AppContent() {
             <Route path="/conferences" element={<ConferencesPage />} />
             <Route path="/calls" element={<Navigate to="/conferences" replace />} />
             <Route path="/podcasts" element={<PodcastsPage />} />
+            <Route path="/music" element={<MusicPage />} />
+            <Route path="/games" element={<GamesPage />} />
+            <Route path="/food" element={<FoodDeliveryPage />} />
+            <Route path="/delivery" element={<Navigate to="/food" replace />} />
             <Route path="/services" element={<ServicesPage />} />
             <Route path="/marketplace" element={<MarketplacePage />} />
             <Route path="/communities" element={<CommunitiesPage />} />

@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { 
   ShoppingBag, Users, Film, Wallet, ShieldAlert, 
-  ArrowRight, Sparkles, TrendingUp, Compass, Flower2
+  ArrowRight, Sparkles, TrendingUp, Compass, Flower2,
+  Music, Gamepad2, UtensilsCrossed
 } from 'lucide-react';
 import { currentUser } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -22,13 +23,46 @@ interface ServiceItem {
 
 const SERVICES: ServiceItem[] = [
   {
+    id: 'music',
+    title: 'Музыка и Плейлисты',
+    category: 'Аудио и Стриминг',
+    description: 'Миллионы треков, персональные рекомендации, горячие чарты, сакральные частоты 432 Гц и плейлисты фокуса.',
+    icon: Music,
+    route: '/music',
+    badge: 'Новинка',
+    colorGradient: 'linear-gradient(135deg, #EC4899, #8B5CF6)',
+    stats: '50 000+ треков'
+  },
+  {
+    id: 'games',
+    title: 'Игры и Мини-приложения',
+    category: 'Развлечения и Аркады',
+    description: 'Интерактивные мини-игры без установки: 2048 New Age, кибер-раннеры, тренировка памяти, турниры с друзьями.',
+    icon: Gamepad2,
+    route: '/games',
+    badge: 'HOT',
+    colorGradient: 'linear-gradient(135deg, #8B5CF6, #3B82F6)',
+    stats: '20+ игр онлайн'
+  },
+  {
+    id: 'food',
+    title: 'Доставка еды',
+    category: 'Доставка и Рестораны',
+    description: 'Быстрая доставка блюд из ресторанов: пицца, бургеры, суши, веганское и здоровое питание от 25 минут.',
+    icon: UtensilsCrossed,
+    route: '/food',
+    badge: '25-35 мин',
+    colorGradient: 'linear-gradient(135deg, #F59E0B, #EF4444)',
+    stats: '300+ ресторанов'
+  },
+  {
     id: 'spiritual',
     title: 'Самопознание и Духовные Практики',
     category: 'Осознанность и Здоровье',
     description: 'Медитации с частотами 432 Гц, авторские комплексы йоги, трансформирующие аффирмации, пранаяма и саундхилинг.',
     icon: Flower2,
     route: '/spiritual',
-    badge: 'Новинка',
+    badge: 'Популярно',
     colorGradient: 'linear-gradient(135deg, #10B981, #6366F1)',
     stats: '6 направлений практик'
   },
@@ -50,7 +84,7 @@ const SERVICES: ServiceItem[] = [
     description: 'Тематические группы по интересам, встречи, приватные клубы и локальные объединения.',
     icon: Users,
     route: '/communities',
-    badge: 'Новинка',
+    badge: 'Клубы',
     colorGradient: 'linear-gradient(135deg, #EC4899, #F43F5E)',
     stats: '120+ сообществ'
   },
@@ -128,7 +162,7 @@ export function ServicesPage() {
       <div className="services-meta-bar">
         <div className="meta-item">
           <TrendingUp size={18} className="meta-icon" />
-          <span><b>5</b> сервисов экосистемы</span>
+          <span><b>{SERVICES.length}</b> сервисов экосистемы</span>
         </div>
         <div className="meta-item">
           <Compass size={18} className="meta-icon" />

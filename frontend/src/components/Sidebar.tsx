@@ -5,7 +5,7 @@ import {
   User as UserIcon, Tv, ShoppingBag, Users, Film, Wallet, ShieldAlert,
   ChevronDown, ChevronRight, Layers, ExternalLink,
   Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles, GraduationCap, Lock,
-  Compass, Calendar as CalendarIcon, Bot, Brain
+  Compass, Calendar as CalendarIcon, Bot, Brain, Music, Gamepad2, UtensilsCrossed
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
@@ -17,8 +17,8 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
   const { t } = useTranslation();
-  const [servicesExpanded, setServicesExpanded] = useState(true);
-  const [spiritualExpanded, setSpiritualExpanded] = useState(true);
+  const [servicesExpanded, setServicesExpanded] = useState(false);
+  const [spiritualExpanded, setSpiritualExpanded] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   return (
@@ -75,6 +75,11 @@ export function Sidebar() {
         <NavLink to="/video" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Video className="nav-icon" size={19} />
           <span className="nav-label">{t('nav.video')}</span>
+        </NavLink>
+
+        <NavLink to="/music" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Music className="nav-icon" size={19} />
+          <span className="nav-label">Музыка</span>
         </NavLink>
 
         {isAuthenticated ? (
@@ -384,6 +389,17 @@ export function Sidebar() {
                   <span className="nav-label">Сообщества</span>
                 </NavLink>
 
+                <NavLink to="/games" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
+                  <Gamepad2 className="nav-icon service-icon-games" size={18} />
+                  <span className="nav-label">Игры</span>
+                  <span className="spiritual-sub-badge promo-badge">HOT</span>
+                </NavLink>
+
+                <NavLink to="/food" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
+                  <UtensilsCrossed className="nav-icon service-icon-food" size={18} />
+                  <span className="nav-label">Доставка еды</span>
+                </NavLink>
+
                 <NavLink to="/editor" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
                   <Film className="nav-icon service-icon-editor" size={18} />
                   <span className="nav-label">Видеостудия</span>
@@ -410,6 +426,18 @@ export function Sidebar() {
                 <div className="nav-item sub-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
                   <Users className="nav-icon service-icon-comm" size={18} />
                   <span className="nav-label">Сообщества</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <Gamepad2 className="nav-icon service-icon-games" size={18} />
+                  <span className="nav-label">Игры</span>
+                  <span className="nav-lock-badge"><Lock size={12} /></span>
+                </div>
+
+                <div className="nav-item sub-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
+                  <UtensilsCrossed className="nav-icon service-icon-food" size={18} />
+                  <span className="nav-label">Доставка еды</span>
                   <span className="nav-lock-badge"><Lock size={12} /></span>
                 </div>
 
