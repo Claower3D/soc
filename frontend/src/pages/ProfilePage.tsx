@@ -7,7 +7,11 @@ import {
   CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn, Plus, Brain, Sparkles,
   Calendar, Moon
 } from 'lucide-react';
-import { initialUsers, posts, stories, videos, podcasts, initialProducts, RELIGIONS_CATALOG, type User, type Post } from '../data/mock';
+import { 
+  initialUsers, posts, stories, videos, podcasts, initialProducts, 
+  RELIGIONS_CATALOG, type User, type Post, type Video as VideoType, 
+  type Podcast, type Product 
+} from '../data/mock';
 import { calculateZodiacProfile } from '../utils/astrology';
 import { ReligionSymbol } from '../components/ReligionSymbols';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +20,9 @@ import { PostDetailModal } from '../components/PostDetailModal';
 import { EditProfileModal } from '../components/EditProfileModal';
 import { CreatePostModal } from '../components/CreatePostModal';
 import { CreateStoryModal } from '../components/CreateStoryModal';
+import { UploadVideoModal } from '../components/UploadVideoModal';
+import { UploadPodcastModal } from '../components/UploadPodcastModal';
+import { CreateProductModal } from '../components/CreateProductModal';
 import { AuthModal } from '../components/AuthModal';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import { ConsciousnessClassModal } from '../components/ConsciousnessClassModal';
@@ -41,7 +48,13 @@ export function ProfilePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
+  const [isUploadVideoOpen, setIsUploadVideoOpen] = useState(false);
+  const [isUploadPodcastOpen, setIsUploadPodcastOpen] = useState(false);
+  const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
   const [profilePosts, setProfilePosts] = useState<Post[]>(posts);
+  const [profileVideos, setProfileVideos] = useState<VideoType[]>(videos);
+  const [profilePodcasts, setProfilePodcasts] = useState<Podcast[]>(podcasts);
+  const [profileProducts, setProfileProducts] = useState<Product[]>(initialProducts);
 
   // Normalize route param (e.g. '@claower' -> 'claower', 'me', or custom ID)
   const cleanParam = userId ? userId.replace(/^@/, '').toLowerCase() : '';
@@ -133,16 +146,19 @@ export function ProfilePage() {
   }, [profilePosts]);
 
   const userVideos = useMemo(() => {
-    return videos.filter(v => v.channel.id === user.id || (isMe && v.channel.id === 'me'));
-  }, [user.id, isMe]);
+    return profileVideos.filter(v => v.channel.id === user.id || (isMe && (v.channel.id === 'me' || v.channel.id === currentUser.id)));
+  }, [profileVideos, user.id, isMe, currentUser]);
 
   const userPodcasts = useMemo(() => {
-    return podcasts.filter(p => p.author.toLowerCase().includes(user.name.split(' ')[0].toLowerCase()));
-  }, [user.name]);
+    return profilePodcasts.filter(p => 
+      p.author.toLowerCase().includes(user.name.split(' ')[0].toLowerCase()) ||
+      (isMe && p.author.toLowerCase().includes(currentUser.name.split(' ')[0].toLowerCase()))
+    );
+  }, [profilePodcasts, user.name, isMe, currentUser]);
 
   const userProducts = useMemo(() => {
-    return initialProducts.filter(p => p.seller.id === user.id || (isMe && p.seller.id === 'me'));
-  }, [user.id, isMe]);
+    return profileProducts.filter(p => p.seller.id === user.id || (isMe && (p.seller.id === 'me' || p.seller.id === currentUser.id)));
+  }, [profileProducts, user.id, isMe, currentUser]);
 
   const handleToggleFollow = () => {
     toggleUserFollow(user.id);
@@ -494,52 +510,114 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {/* Tabs Navigation */}
+      {/* Tabs Navigation with Direct "Add" Button for the Active Category */}
       <div className="profile-tabs-wrapper">
-        <div className="profile-tabs">
-          <button
-            className={`tab-btn ${activeTab === 'posts' ? 'active' : ''}`}
-            onClick={() => setActiveTab('posts')}
-          >
-            <Grid size={17} />
-            <span>Публикации</span>
-            <span className="tab-count">{userPosts.length}</span>
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'videos' ? 'active' : ''}`}
-            onClick={() => setActiveTab('videos')}
-          >
-            <VideoIcon size={17} />
-            <span>Видео</span>
-            <span className="tab-count">{userVideos.length}</span>
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'podcasts' ? 'active' : ''}`}
-            onClick={() => setActiveTab('podcasts')}
-          >
-            <Headphones size={17} />
-            <span>Подкасты</span>
-            <span className="tab-count">{userPodcasts.length}</span>
-          </button>
-          {(activeUser.role === 'business' || userProducts.length > 0 || isMe) && (
+        <div className="profile-tabs-header-row">
+          <div className="profile-tabs">
             <button
-              className={`tab-btn ${activeTab === 'shop' ? 'active' : ''}`}
-              onClick={() => setActiveTab('shop')}
+              className={`tab-btn ${activeTab === 'posts' ? 'active' : ''}`}
+              onClick={() => setActiveTab('posts')}
             >
-              <ShoppingBag size={17} />
-              <span>Товары & Магазин</span>
-              <span className="tab-count">{userProducts.length}</span>
+              <Grid size={17} />
+              <span>Публикации</span>
+              <span className="tab-count">{userPosts.length}</span>
             </button>
-          )}
+            <button
+              className={`tab-btn ${activeTab === 'videos' ? 'active' : ''}`}
+              onClick={() => setActiveTab('videos')}
+            >
+              <VideoIcon size={17} />
+              <span>Видео</span>
+              <span className="tab-count">{userVideos.length}</span>
+            </button>
+            <button
+              className={`tab-btn ${activeTab === 'podcasts' ? 'active' : ''}`}
+              onClick={() => setActiveTab('podcasts')}
+            >
+              <Headphones size={17} />
+              <span>Подкасты</span>
+              <span className="tab-count">{userPodcasts.length}</span>
+            </button>
+            {(activeUser.role === 'business' || userProducts.length > 0 || isMe) && (
+              <button
+                className={`tab-btn ${activeTab === 'shop' ? 'active' : ''}`}
+                onClick={() => setActiveTab('shop')}
+              >
+                <ShoppingBag size={17} />
+                <span>Товары & Магазин</span>
+                <span className="tab-count">{userProducts.length}</span>
+              </button>
+            )}
+            {isMe && (
+              <button
+                className={`tab-btn ${activeTab === 'saved' ? 'active' : ''}`}
+                onClick={() => setActiveTab('saved')}
+              >
+                <Bookmark size={17} />
+                <span>Сохранённое</span>
+                <span className="tab-count">{savedPosts.length}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Dedicated Category Add Action for Own Profile */}
           {isMe && (
-            <button
-              className={`tab-btn ${activeTab === 'saved' ? 'active' : ''}`}
-              onClick={() => setActiveTab('saved')}
-            >
-              <Bookmark size={17} />
-              <span>Сохранённое</span>
-              <span className="tab-count">{savedPosts.length}</span>
-            </button>
+            <div className="profile-tab-add-action-box">
+              {activeTab === 'posts' && (
+                <button 
+                  className="btn-tab-add-content"
+                  onClick={() => setIsCreatePostOpen(true)}
+                  title="Опубликовать новую запись или фото"
+                >
+                  <Plus size={16} />
+                  <span>Добавить публикацию</span>
+                </button>
+              )}
+
+              {activeTab === 'videos' && (
+                <button 
+                  className="btn-tab-add-content"
+                  onClick={() => setIsUploadVideoOpen(true)}
+                  title="Загрузить видео на свой канал"
+                >
+                  <Plus size={16} />
+                  <span>Добавить видео</span>
+                </button>
+              )}
+
+              {activeTab === 'podcasts' && (
+                <button 
+                  className="btn-tab-add-content"
+                  onClick={() => setIsUploadPodcastOpen(true)}
+                  title="Опубликовать новый подкаст или аудиовыпуск"
+                >
+                  <Plus size={16} />
+                  <span>Добавить подкаст</span>
+                </button>
+              )}
+
+              {activeTab === 'shop' && (
+                <button 
+                  className="btn-tab-add-content"
+                  onClick={() => setIsCreateProductOpen(true)}
+                  title="Выставить новый товар на продажу"
+                >
+                  <Plus size={16} />
+                  <span>Добавить товар</span>
+                </button>
+              )}
+
+              {activeTab === 'saved' && (
+                <button 
+                  className="btn-tab-add-content btn-tab-add-secondary"
+                  onClick={() => navigate('/')}
+                  title="Перейти в ленту, чтобы найти и сохранить интересные посты"
+                >
+                  <Compass size={16} />
+                  <span>Найти в ленте</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -574,7 +652,16 @@ export function ProfilePage() {
             <div className="empty-tab-state">
               <Grid size={40} className="empty-icon" />
               <h3>Публикаций пока нет</h3>
-              <p>Пользователь еще не поделился своими фото или историями.</p>
+              <p>{isMe ? 'Поделитесь с аудиторией своими фото, мыслями или историями.' : 'Пользователь еще не поделился своими фото или историями.'}</p>
+              {isMe && (
+                <button 
+                  className="btn btn-primary" 
+                  style={{ marginTop: '1rem' }} 
+                  onClick={() => setIsCreatePostOpen(true)}
+                >
+                  <Plus size={16} /> Опубликовать первый пост
+                </button>
+              )}
             </div>
           )
         )}
@@ -623,7 +710,16 @@ export function ProfilePage() {
             <div className="empty-tab-state">
               <VideoIcon size={40} className="empty-icon" />
               <h3>Видео не найдены</h3>
-              <p>На этом канале пока нет опубликованных видеоматериалов.</p>
+              <p>{isMe ? 'Загрузите первое видео на свой канал или делитесь трансляциями.' : 'На этом канале пока нет опубликованных видеоматериалов.'}</p>
+              {isMe && (
+                <button 
+                  className="btn btn-primary" 
+                  style={{ marginTop: '1rem' }} 
+                  onClick={() => setIsUploadVideoOpen(true)}
+                >
+                  <Plus size={16} /> Загрузить видео
+                </button>
+              )}
             </div>
           )}
           </div>
@@ -648,34 +744,58 @@ export function ProfilePage() {
             <div className="empty-tab-state">
               <Headphones size={40} className="empty-icon" />
               <h3>Подкастов нет</h3>
-              <p>Пользователь пока не является автором подкастов.</p>
+              <p>{isMe ? 'Запишите или загрузите аудиовыпуск своего авторского подкаста.' : 'Пользователь пока не является автором подкастов.'}</p>
+              {isMe && (
+                <button 
+                  className="btn btn-primary" 
+                  style={{ marginTop: '1rem' }} 
+                  onClick={() => setIsUploadPodcastOpen(true)}
+                >
+                  <Plus size={16} /> Опубликовать подкаст
+                </button>
+              )}
             </div>
           )
         )}
 
         {/* SAVED TAB */}
         {activeTab === 'saved' && (
-          <div className="posts-grid">
-            {savedPosts.map(post => (
-              <div
-                key={post.id}
-                className="grid-post-item"
-                onClick={() => setSelectedPost(post)}
-              >
-                <img src={post.image} alt={post.caption} className="grid-post-img" />
-                <div className="grid-post-overlay">
-                  <div className="overlay-stat">
-                    <Heart size={18} fill="white" />
-                    <span>{post.likes}</span>
-                  </div>
-                  <div className="overlay-stat">
-                    <MessageSquare size={18} fill="white" />
-                    <span>{post.comments.length}</span>
+          savedPosts.length > 0 ? (
+            <div className="posts-grid">
+              {savedPosts.map(post => (
+                <div
+                  key={post.id}
+                  className="grid-post-item"
+                  onClick={() => setSelectedPost(post)}
+                >
+                  <img src={post.image} alt={post.caption} className="grid-post-img" />
+                  <div className="grid-post-overlay">
+                    <div className="overlay-stat">
+                      <Heart size={18} fill="white" />
+                      <span>{post.likes}</span>
+                    </div>
+                    <div className="overlay-stat">
+                      <MessageSquare size={18} fill="white" />
+                      <span>{post.comments.length}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-tab-state">
+              <Bookmark size={40} className="empty-icon" />
+              <h3>Сохранённых постов пока нет</h3>
+              <p>Сохраняйте интересные публикации из ленты с помощью иконки закладки.</p>
+              <button 
+                className="btn btn-primary" 
+                style={{ marginTop: '1rem' }} 
+                onClick={() => navigate('/')}
+              >
+                <Compass size={16} /> Перейти в ленту
+              </button>
+            </div>
+          )
         )}
 
         {/* SHOP / MARKETPLACE TAB */}
@@ -705,10 +825,20 @@ export function ProfilePage() {
             <div className="empty-tab-state">
               <ShoppingBag size={40} className="empty-icon" />
               <h3>Витрина пуста</h3>
-              <p>В магазине автора пока нет опубликованных товаров.</p>
-              <button className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => navigate('/marketplace')}>
-                Перейти в общий маркетплейс
-              </button>
+              <p>{isMe ? 'Добавьте свои товары, книги, курсы или услуги для продажи.' : 'В магазине автора пока нет опубликованных товаров.'}</p>
+              {isMe ? (
+                <button 
+                  className="btn btn-primary" 
+                  style={{ marginTop: '1rem' }} 
+                  onClick={() => setIsCreateProductOpen(true)}
+                >
+                  <Plus size={16} /> Добавить товар
+                </button>
+              ) : (
+                <button className="btn btn-primary" style={{ marginTop: '1rem' }} onClick={() => navigate('/marketplace')}>
+                  Перейти в общий маркетплейс
+                </button>
+              )}
             </div>
           )
         )}
@@ -778,6 +908,42 @@ export function ProfilePage() {
           stories.unshift(newStory);
           setIsCreateStoryOpen(false);
           alert('История успешно опубликована!');
+        }}
+      />
+
+      {/* Upload Video Modal */}
+      <UploadVideoModal
+        isOpen={isUploadVideoOpen}
+        onClose={() => setIsUploadVideoOpen(false)}
+        onUploadVideo={(newVideo) => {
+          setProfileVideos(prev => [newVideo, ...prev]);
+          videos.unshift(newVideo);
+          setIsUploadVideoOpen(false);
+          alert('Видео успешно загружено и опубликовано на вашем канале!');
+        }}
+      />
+
+      {/* Upload Podcast Modal */}
+      <UploadPodcastModal
+        isOpen={isUploadPodcastOpen}
+        onClose={() => setIsUploadPodcastOpen(false)}
+        onUploadPodcast={(newPodcast) => {
+          setProfilePodcasts(prev => [newPodcast, ...prev]);
+          podcasts.unshift(newPodcast);
+          setIsUploadPodcastOpen(false);
+          alert('Подкаст успешно опубликован!');
+        }}
+      />
+
+      {/* Create Product Modal */}
+      <CreateProductModal
+        isOpen={isCreateProductOpen}
+        onClose={() => setIsCreateProductOpen(false)}
+        onCreateProduct={(newProduct) => {
+          setProfileProducts(prev => [newProduct, ...prev]);
+          initialProducts.unshift(newProduct);
+          setIsCreateProductOpen(false);
+          alert('Товар успешно добавлен в ваш магазин!');
         }}
       />
 

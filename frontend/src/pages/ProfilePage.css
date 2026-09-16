@@ -608,10 +608,18 @@
   padding: 1.5rem 1.5rem 0 1.5rem;
 }
 
+.profile-tabs-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
 .profile-tabs {
   display: flex;
   gap: 0.5rem;
-  border-bottom: 1px solid var(--color-border);
   background: transparent;
   overflow-x: auto;
   scrollbar-width: none;
@@ -622,6 +630,46 @@
 
 .profile-tabs::-webkit-scrollbar {
   display: none;
+}
+
+.profile-tab-add-action-box {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.45rem;
+}
+
+.btn-tab-add-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.95rem;
+  background: linear-gradient(135deg, var(--color-accent), #8b5cf6);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(99, 102, 241, 0.25);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-tab-add-content:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(99, 102, 241, 0.35);
+}
+
+.btn-tab-add-content.btn-tab-add-secondary {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+}
+
+.btn-tab-add-content.btn-tab-add-secondary:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .tab-btn {
