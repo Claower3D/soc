@@ -5,6 +5,7 @@ import {
   CreditCard
 } from 'lucide-react';
 import { useCurrency } from '../context/CurrencyContext';
+import { cacheService } from '../utils/cacheService';
 import './FoodDeliveryPage.css';
 
 interface Restaurant {
@@ -181,16 +182,24 @@ export function FoodDeliveryPage() {
   const { formatPrice } = useCurrency();
   const [selectedCategory, setSelectedCategory] = useState<string>('Все');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [cart, setCart] = useState<{ [dishId: string]: number }>({});
+  const [cart, setCart] = useState<{ [dishId: string]: number }>(() => {
+    return cacheService.get<{ [dishId: string]: number }>('food_cart_cache') || {};
+  });
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
-  const [currentAddress, setCurrentAddress] = useState<string>('Москва, Пресненская наб. 12, офис 402');
+  const [currentAddress, setCurrentAddress] = useState<string>(() => {
+    return cacheService.get<string>('food_address_cache') || 'Москва, Пресненская наб. 12, офис 402';
+  });
   const [promoCode, setPromoCode] = useState<string>('');
   const [isPromoApplied, setIsPromoApplied] = useState<boolean>(false);
   const [activeOrderModal, setActiveOrderModal] = useState<boolean>(false);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
 
   const addToCart = (dishId: string) => {
-    setCart(prev => ({ ...prev, [dishId]: (prev[dishId] || 0) + 1 }));
+    setCart(prev => {
+      const updated = { ...prev, [dishId]: (prev[dishId] || 0) + 1 };
+      cacheService.set('food_cart_cache', updated, 3600 * 24 * 3, 'food');
+      return updated;
+    });
   };
 
   const removeFromCart = (dishId: string) => {
@@ -201,6 +210,7 @@ export function FoodDeliveryPage() {
       } else {
         delete updated[dishId];
       }
+      cacheService.set('food_cart_cache', updated, 3600 * 24 * 3, 'food');
       return updated;
     });
   };

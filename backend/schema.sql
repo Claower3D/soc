@@ -920,3 +920,33 @@ CREATE TABLE IF NOT EXISTS content_reports (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reports_status ON content_reports(status);
+
+-- =============================================================================
+-- 13. СИСТЕМНОЕ КЭШИРОВАНИЕ И БЫСТРОДЕЙСТВИЕ (SYSTEM CACHE & PERFORMANCE)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS system_cache (
+    key VARCHAR(255) PRIMARY KEY,
+    value JSONB NOT NULL,
+    tag VARCHAR(100) DEFAULT 'general',             -- feed, stories, market, currency, user, geo
+    ttl_seconds INT DEFAULT 3600,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    hit_count BIGINT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_cache_tag ON system_cache(tag);
+CREATE INDEX IF NOT EXISTS idx_system_cache_expires ON system_cache(expires_at);
+
+-- Синхронизация клиентского оффлайн/онлайн кэша (Offline Sync)
+CREATE TABLE IF NOT EXISTS client_cache_sync (
+    user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    cache_key VARCHAR(255) NOT NULL,
+    data JSONB NOT NULL,
+    version INT DEFAULT 1,
+    synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (user_id, cache_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cache_sync_user ON client_cache_sync(user_id);
+

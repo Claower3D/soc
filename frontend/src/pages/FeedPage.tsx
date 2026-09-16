@@ -8,13 +8,18 @@ import { CreatePostModal } from '../components/CreatePostModal';
 import { AuthModal } from '../components/AuthModal';
 import { stories, posts as mockPosts, initialUsers, type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { cacheService } from '../utils/cacheService';
 import './FeedPage.css';
 
 export function FeedPage() {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
-  const [posts, setPosts] = useState<Post[]>(mockPosts);
-  const [feedStories, setFeedStories] = useState(stories);
+  const [posts, setPosts] = useState<Post[]>(() => {
+    return cacheService.get<Post[]>('feed_posts_cache') || mockPosts;
+  });
+  const [feedStories, setFeedStories] = useState(() => {
+    return cacheService.get<typeof stories>('feed_stories_cache') || stories;
+  });
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -25,23 +30,33 @@ export function FeedPage() {
   });
 
   const handleAddStory = (newStory: typeof stories[0]) => {
-    setFeedStories(prev => [newStory, ...prev]);
+    setFeedStories(prev => {
+      const updated = [newStory, ...prev];
+      cacheService.set('feed_stories_cache', updated, 3600 * 24, 'stories');
+      return updated;
+    });
     stories.unshift(newStory);
   };
 
   const handleCreatePost = (newPost: Post) => {
-    setPosts(prev => [newPost, ...prev]);
+    setPosts(prev => {
+      const updated = [newPost, ...prev];
+      cacheService.set('feed_posts_cache', updated, 3600 * 24, 'feed');
+      return updated;
+    });
     mockPosts.unshift(newPost);
   };
 
   const handleLike = (postId: string) => {
-    setPosts(prev =>
-      prev.map(p =>
+    setPosts(prev => {
+      const updated = prev.map(p =>
         p.id === postId
           ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 }
           : p
-      )
-    );
+      );
+      cacheService.set('feed_posts_cache', updated, 3600 * 24, 'feed');
+      return updated;
+    });
   };
 
   const toggleFollow = (userId: string) => {

@@ -9,6 +9,7 @@ import { CreateProductModal } from '../components/CreateProductModal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { cacheService } from '../utils/cacheService';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './MarketplacePage.css';
 
@@ -26,53 +27,72 @@ export function MarketplacePage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { formatPrice } = useCurrency();
-  const [productsList, setProductsList] = useState<Product[]>(initialProducts);
+  const [productsList, setProductsList] = useState<Product[]>(() => {
+    return cacheService.get<Product[]>('market_products_cache') || initialProducts;
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Все товары');
   const [sortBy, setSortBy] = useState<'popular' | 'price_asc' | 'price_desc' | 'rating'>('popular');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    return cacheService.get<CartItem[]>('market_cart_cache') || [];
+  });
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
 
   const handleAddProduct = (newProd: Product) => {
-    setProductsList(prev => [newProd, ...prev]);
+    setProductsList(prev => {
+      const updated = [newProd, ...prev];
+      cacheService.set('market_products_cache', updated, 3600 * 24 * 7, 'marketplace');
+      return updated;
+    });
     initialProducts.unshift(newProd);
   };
 
-  // Cart operations
+  // Cart operations with cache
   const handleAddToCart = (product: Product, quantity = 1) => {
     setCartItems(prev => {
       const existing = prev.find(item => item.product.id === product.id);
+      let updated: CartItem[];
       if (existing) {
-        return prev.map(item =>
+        updated = prev.map(item =>
           item.product.id === product.id
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
+      } else {
+        updated = [...prev, { product, quantity }];
       }
-      return [...prev, { product, quantity }];
+      cacheService.set('market_cart_cache', updated, 3600 * 24 * 14, 'marketplace');
+      return updated;
     });
   };
 
   const handleUpdateQuantity = (productId: string, delta: number) => {
-    setCartItems(prev =>
-      prev
+    setCartItems(prev => {
+      const updated = prev
         .map(item =>
           item.product.id === productId
             ? { ...item, quantity: item.quantity + delta }
             : item
         )
-        .filter(item => item.quantity > 0)
-    );
+        .filter(item => item.quantity > 0);
+      cacheService.set('market_cart_cache', updated, 3600 * 24 * 14, 'marketplace');
+      return updated;
+    });
   };
 
   const handleRemoveFromCart = (productId: string) => {
-    setCartItems(prev => prev.filter(item => item.product.id !== productId));
+    setCartItems(prev => {
+      const updated = prev.filter(item => item.product.id !== productId);
+      cacheService.set('market_cart_cache', updated, 3600 * 24 * 14, 'marketplace');
+      return updated;
+    });
   };
 
   const handleClearCart = () => {
     setCartItems([]);
+    cacheService.remove('market_cart_cache');
   };
 
   // Filtered and sorted products

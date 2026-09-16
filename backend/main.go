@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -25,6 +26,97 @@ import (
 
 //go:embed schema.sql
 var fullSchemaSQL string
+
+// ==================== СИСТЕМА КЭШИРОВАНИЯ (CACHE PERSISTENCE) ====================
+
+type CacheItem struct {
+	Value     interface{} `json:"value"`
+	ExpiresAt time.Time   `json:"expires_at"`
+	CreatedAt time.Time   `json:"created_at"`
+	Tag       string      `json:"tag"`
+}
+
+type ServerCache struct {
+	mu     sync.RWMutex
+	items  map[string]CacheItem
+	hits   uint64
+	misses uint64
+}
+
+var globalCache = &ServerCache{
+	items: make(map[string]CacheItem),
+}
+
+func (c *ServerCache) Get(key string) (interface{}, bool) {
+	c.mu.RLock()
+	item, found := c.items[key]
+	c.mu.RUnlock()
+
+	if !found {
+		atomic.AddUint64(&c.misses, 1)
+		return nil, false
+	}
+
+	if !item.ExpiresAt.IsZero() && time.Now().After(item.ExpiresAt) {
+		c.mu.Lock()
+		delete(c.items, key)
+		c.mu.Unlock()
+		atomic.AddUint64(&c.misses, 1)
+		return nil, false
+	}
+
+	atomic.AddUint64(&c.hits, 1)
+	return item.Value, true
+}
+
+func (c *ServerCache) Set(key string, value interface{}, ttl time.Duration, tag string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	var exp time.Time
+	if ttl > 0 {
+		exp = time.Now().Add(ttl)
+	}
+
+	c.items[key] = CacheItem{
+		Value:     value,
+		ExpiresAt: exp,
+		CreatedAt: time.Now(),
+		Tag:       tag,
+	}
+}
+
+func (c *ServerCache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.items = make(map[string]CacheItem)
+}
+
+func (c *ServerCache) Stats() map[string]interface{} {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	keys := make([]string, 0, len(c.items))
+	for k := range c.items {
+		keys = append(keys, k)
+	}
+
+	hits := atomic.LoadUint64(&c.hits)
+	misses := atomic.LoadUint64(&c.misses)
+	total := hits + misses
+	hitRate := 0.0
+	if total > 0 {
+		hitRate = float64(hits) / float64(total) * 100.0
+	}
+
+	return map[string]interface{}{
+		"cached_items_count": len(c.items),
+		"keys":               keys,
+		"hits":               hits,
+		"misses":             misses,
+		"hit_rate_percent":   fmt.Sprintf("%.1f%%", hitRate),
+	}
+}
 
 // Response — стандартная обёртка для JSON-ответов API.
 type Response struct {
@@ -476,6 +568,11 @@ func main() {
 	// Geo / Location автоопределение
 	mux.HandleFunc("GET /api/geo/detect", handleGeoDetect)
 
+	// Cache Management эндпоинты
+	mux.HandleFunc("GET /api/cache/stats", handleCacheStats)
+	mux.HandleFunc("POST /api/cache/clear", handleCacheClear)
+	mux.HandleFunc("POST /api/cache/sync", handleCacheSync)
+
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
 	if distDir == "" {
@@ -702,6 +799,99 @@ func handleGeoDetect(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GET /api/cache/stats — Статистика системного кэша
+func handleCacheStats(w http.ResponseWriter, r *http.Request) {
+	stats := globalCache.Stats()
+
+	// Дополняем статистику из таблицы system_cache, если подключен PostgreSQL
+	dbMu.RLock()
+	conn := db
+	dbMu.RUnlock()
+
+	dbCacheCount := 0
+	if conn != nil {
+		var cnt int
+		if err := conn.QueryRow("SELECT COUNT(*) FROM system_cache WHERE expires_at IS NULL OR expires_at > NOW()").Scan(&cnt); err == nil {
+			dbCacheCount = cnt
+		}
+	}
+	stats["db_system_cache_count"] = dbCacheCount
+
+	writeJSON(w, http.StatusOK, Response{
+		Status: "ok",
+		Data:   stats,
+	})
+}
+
+// POST /api/cache/clear — Полная очистка серверного кэша (память + БД)
+func handleCacheClear(w http.ResponseWriter, r *http.Request) {
+	globalCache.Clear()
+
+	dbMu.RLock()
+	conn := db
+	dbMu.RUnlock()
+
+	if conn != nil {
+		_, _ = conn.Exec("DELETE FROM system_cache")
+	}
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: "Кэш сервера и базы данных успешно очищен",
+	})
+}
+
+// POST /api/cache/sync — Синхронизация клиентского оффлайн/онлайн кэша
+type CacheSyncPayload struct {
+	UserID   string      `json:"user_id"`
+	CacheKey string      `json:"cache_key"`
+	Data     interface{} `json:"data"`
+	Version  int         `json:"version"`
+}
+
+func handleCacheSync(w http.ResponseWriter, r *http.Request) {
+	var payload CacheSyncPayload
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{
+			Status:  "error",
+			Message: "Неверный формат запроса синхронизации",
+		})
+		return
+	}
+
+	if payload.CacheKey == "" {
+		writeJSON(w, http.StatusBadRequest, Response{
+			Status:  "error",
+			Message: "cache_key обязателен",
+		})
+		return
+	}
+
+	// Сохраняем в in-memory
+	memoryKey := fmt.Sprintf("sync:%s:%s", payload.UserID, payload.CacheKey)
+	globalCache.Set(memoryKey, payload.Data, 24*time.Hour, "client_sync")
+
+	// Если подключена БД, сохраняем в client_cache_sync
+	dbMu.RLock()
+	conn := db
+	dbMu.RUnlock()
+
+	if conn != nil && payload.UserID != "" {
+		dataBytes, _ := json.Marshal(payload.Data)
+		_, _ = conn.Exec(`
+			INSERT INTO client_cache_sync (user_id, cache_key, data, version, synced_at)
+			VALUES ($1, $2, $3, $4, NOW())
+			ON CONFLICT (user_id, cache_key)
+			DO UPDATE SET data = $3, version = $4, synced_at = NOW()
+		`, payload.UserID, payload.CacheKey, string(dataBytes), payload.Version)
+	}
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: "Кэш успешно синхронизирован с сервером",
+	})
+}
+
 func handleProfile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: currentUser})
 }
@@ -763,19 +953,31 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleFeed(w http.ResponseWriter, r *http.Request) {
+	if cached, ok := globalCache.Get("api:feed"); ok {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: cached})
+		return
+	}
+
 	posts := []Post{
 		{ID: "p0", User: currentUser, Image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=900&q=80", Caption: "Релиз обновленного интерфейса! 💻", Likes: 312, TimeAgo: "15 минут назад"},
 		{ID: "p1", User: mockUsers[1], Image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=80", Caption: "Утренний кофе и вдохновение ☕✨", Likes: 842, TimeAgo: "2 часа назад"},
 		{ID: "p2", User: mockUsers[4], Image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=900&q=80", Caption: "Закат в горах Кавказа 🏔️", Likes: 1450, TimeAgo: "5 часов назад"},
 	}
+	globalCache.Set("api:feed", posts, 60*time.Second, "feed")
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: posts})
 }
 
 func handleVideos(w http.ResponseWriter, r *http.Request) {
+	if cached, ok := globalCache.Get("api:videos"); ok {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: cached})
+		return
+	}
+
 	videos := []Video{
 		{ID: "v1", Title: "Как создать полнофункциональную соцсеть на React + Go", Channel: mockUsers[2], Thumbnail: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80", Views: "128K просмотров", Duration: "45:20", TimeAgo: "3 дня назад", Description: "Архитектура современного приложения"},
 		{ID: "v2", Title: "React 19 & TypeScript: современные паттерны и фичи", Channel: mockUsers[1], Thumbnail: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80", Views: "94K просмотров", Duration: "18:42", TimeAgo: "1 неделю назад", Description: "Обзор новых возможностей"},
 	}
+	globalCache.Set("api:videos", videos, 120*time.Second, "videos")
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: videos})
 }
 

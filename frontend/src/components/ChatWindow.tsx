@@ -29,13 +29,23 @@ import {
   EMOJI_CATEGORIES, 
   TELEGRAM_GIFS
 } from '../data/telegramStickers';
+import { cacheService } from '../utils/cacheService';
 
 const REACTION_EMOJIS = ['❤️', '👍', '👎', '🔥', '🥰', '👏', '😂'];
 
 export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWindowProps) {
   const navigate = useNavigate();
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState(() => {
+    return chat?.id ? (cacheService.get<string>(`chat_draft_${chat.id}`) || '') : '';
+  });
   const [messages, setMessages] = useState<Message[]>(chat?.messages || []);
+
+  useEffect(() => {
+    if (chat?.id) {
+      const draft = cacheService.get<string>(`chat_draft_${chat.id}`) || '';
+      setInputValue(draft);
+    }
+  }, [chat?.id]);
   
   // Theme state
   const [showThemeModal, setShowThemeModal] = useState(false);
@@ -134,7 +144,8 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
       }
     }
     setMessages(chat?.messages || []);
-    setInputValue('');
+    const draft = chat?.id ? (cacheService.get<string>(`chat_draft_${chat.id}`) || '') : '';
+    setInputValue(draft);
     setAttachedImage(null);
     setIsRecordingVoice(false);
     setShowAttachMenu(false);
@@ -393,6 +404,9 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
           return updated;
         });
       }, 2000);
+    }
+    if (chat?.id) {
+      cacheService.remove(`chat_draft_${chat.id}`);
     }
     setInputValue('');
     setAttachedImage(null);
@@ -2013,7 +2027,17 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                 type="text"
                 placeholder={editingMessage ? "Отредактируйте сообщение..." : "Написать сообщение..."}
                 value={inputValue}
-                onChange={e => setInputValue(e.target.value)}
+                onChange={e => {
+                  const val = e.target.value;
+                  setInputValue(val);
+                  if (chat?.id) {
+                    if (val.trim()) {
+                      cacheService.set(`chat_draft_${chat.id}`, val, 3600 * 48, 'chat_draft');
+                    } else {
+                      cacheService.remove(`chat_draft_${chat.id}`);
+                    }
+                  }
+                }}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     handleSendMessage();
