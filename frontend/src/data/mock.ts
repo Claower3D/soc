@@ -184,6 +184,14 @@ export interface Comment {
   timeAgo: string;
 }
 
+export interface VideoComment {
+  id: string;
+  user: User;
+  text: string;
+  timeAgo: string;
+  likes: number;
+}
+
 export interface Video {
   id: string;
   title: string;
@@ -195,6 +203,14 @@ export interface Video {
   timeAgo: string;
   description: string;
   likesCount?: number;
+  category?: string;
+  isKids?: boolean;
+  isMovie?: boolean;
+  rating?: number; // Рейтинг Кинопоиск/IMDb для фильмов (e.g. 8.4)
+  ageRating?: string; // 0+, 6+, 12+, 16+, 18+
+  genre?: string;
+  releaseYear?: number;
+  comments?: VideoComment[];
 }
 
 export interface ClipComment {
@@ -838,23 +854,227 @@ export const videos: Video[] = [
     title: 'Как создать полнофункциональную соцсеть на React + Go',
     channel: initialUsers[6],
     thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
     views: '128K просмотров',
     duration: '45:20',
     timeAgo: '3 дня назад',
     likesCount: 5400,
+    category: 'Разработка',
     description: 'В этом подробном видео мы разберем архитектуру современного веб-приложения: связку React 19 с Go-бэкендом, видеоконференции, чаты в реальном времени и оптимизацию светлой темы.',
+    comments: [
+      { id: 'vc1', user: initialUsers[2], text: 'Отличный разбор архитектуры! Особенно часть с WebSocket и хранилищем сессий 🔥', timeAgo: '2 дня назад', likes: 34 },
+      { id: 'vc2', user: initialUsers[4], text: 'Жду вторую часть про деплой в Kubernetes кластер!', timeAgo: '1 день назад', likes: 12 },
+      { id: 'vc3', user: initialUsers[1], text: 'Очень чисто написан код, спасибо огромное за такой качественный материал ❤️', timeAgo: '14 часов назад', likes: 8 },
+    ]
   },
   {
     id: 'v2',
     title: 'React 19 & TypeScript: современные паттерны и фичи',
     channel: initialUsers[2],
     thumbnail: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
     views: '94K просмотров',
     duration: '18:42',
     timeAgo: '1 неделю назад',
     likesCount: 4200,
+    category: 'Разработка',
     description: 'Полный обзор инноваций React: новые хуки useActionState, useOptimistic, улучшения типизации и ускорение рендеринга.',
+    comments: [
+      { id: 'vc4', user: initialUsers[6], text: 'useOptimistic сильно упростил работу с интерфейсом чатов, супер!', timeAgo: '4 дня назад', likes: 19 },
+    ]
   },
+  // ==================== РАЗДЕЛ: ФИЛЬМЫ ====================
+  {
+    id: 'm1',
+    title: 'Интерстеллар: Путешествие сквозь пространство и время',
+    channel: {
+      id: 'cinema_official',
+      name: 'New Age Cinema 🎬',
+      username: 'cinema_official',
+      avatar: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=200&q=80',
+      online: true,
+      verified: true,
+      role: 'business',
+      followersCount: 245000,
+      followingCount: 15,
+      postsCount: 420
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    views: '2.4M просмотров',
+    duration: '2:49:15',
+    timeAgo: '2 недели назад',
+    likesCount: 184000,
+    category: 'Фильмы',
+    isMovie: true,
+    rating: 8.7,
+    ageRating: '12+',
+    genre: 'Фантастика, Драма',
+    releaseYear: 2014,
+    description: 'Культовый научно-фантастический шедевр. Когда засуха и пыльные бури ставят человечество перед угрозой вымирания, группа исследователей отправляется сквозь недавно обнаруженную червоточину в поисках нового дома среди звезд.',
+    comments: [
+      { id: 'cm_f1', user: initialUsers[1], text: 'Музыка Ханса Циммера до сих пор пробирает до мурашек каждый раз 🚀✨', timeAgo: '5 дней назад', likes: 156 },
+      { id: 'cm_f2', user: initialUsers[3], text: 'Один из лучших научно-фантастических фильмов в истории кинематографа!', timeAgo: '3 дня назад', likes: 89 },
+    ]
+  },
+  {
+    id: 'm2',
+    title: 'Начало (Inception): Архитектура осознанных сновидений',
+    channel: {
+      id: 'cinema_official',
+      name: 'New Age Cinema 🎬',
+      username: 'cinema_official',
+      avatar: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=200&q=80',
+      online: true,
+      verified: true,
+      role: 'business',
+      followersCount: 245000,
+      followingCount: 15,
+      postsCount: 420
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    views: '1.9M просмотров',
+    duration: '2:28:00',
+    timeAgo: '1 месяц назад',
+    likesCount: 142000,
+    category: 'Фильмы',
+    isMovie: true,
+    rating: 8.8,
+    ageRating: '16+',
+    genre: 'Боевик, Фантастика, Триллер',
+    releaseYear: 2010,
+    description: 'Дом Кобб — непревзойденный мастер промышленного шпионажа, крадущий ценные тайны из глубин подсознания во время сна. Но теперь ему предстоит не украсть идею, а внедрить её в сознание наследника корпорации.',
+    comments: [
+      { id: 'cm_f3', user: initialUsers[5], text: 'Концовка с волчком — это вечная загадка! Лучший сюжет.', timeAgo: '1 неделю назад', likes: 94 },
+    ]
+  },
+  {
+    id: 'm3',
+    title: 'Космическая Одиссея: Горизонты будущего и квантовый разум',
+    channel: {
+      id: 'cinema_official',
+      name: 'New Age Cinema 🎬',
+      username: 'cinema_official',
+      avatar: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&w=200&q=80',
+      online: true,
+      verified: true,
+      role: 'business',
+      followersCount: 245000,
+      followingCount: 15,
+      postsCount: 420
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    views: '680K просмотров',
+    duration: '1:54:30',
+    timeAgo: '3 недели назад',
+    likesCount: 45000,
+    category: 'Фильмы',
+    isMovie: true,
+    rating: 8.3,
+    ageRating: '12+',
+    genre: 'Фантастика, Приключения',
+    releaseYear: 2023,
+    description: 'Увлекательная космическая одиссея сквозь червоточины и параллельные вселенные в поисках ответов на главные тайны мироздания.',
+    comments: [
+      { id: 'cm_f4', user: initialUsers[4], text: 'Визуальные эффекты космоса просто завораживают на большом экране!', timeAgo: '2 дня назад', likes: 23 },
+    ]
+  },
+  // ==================== РАЗДЕЛ: ДЕТЯМ И МУЛЬТИКИ (ДЕТСКИЙ РЕЖИМ) ====================
+  {
+    id: 'k1',
+    title: 'Большой Кролик Бак (Big Buck Bunny) — Весёлые лесные приключения',
+    channel: {
+      id: 'kids_channel',
+      name: 'Мультиландия 🎈',
+      username: 'kids_multiki',
+      avatar: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=200&q=80',
+      online: true,
+      verified: true,
+      role: 'creator',
+      followersCount: 512000,
+      followingCount: 10,
+      postsCount: 180
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    views: '5.8M просмотров',
+    duration: '09:56',
+    timeAgo: '1 месяц назад',
+    likesCount: 310000,
+    category: 'Мультфильмы',
+    isKids: true,
+    ageRating: '0+',
+    genre: 'Мультфильм, Сказка, Комедия',
+    releaseYear: 2024,
+    description: 'Добрый и смешной мультфильм для самых маленьких зрителей о добродушном лесном кролике и его забавных друзьях. Без возрастных ограничений!',
+    comments: [
+      { id: 'cm_k1', user: initialUsers[7], text: 'Дети смотрят с огромным восторгом уже десятый раз! Очень добрый мультик 🐰🎉', timeAgo: '3 дня назад', likes: 78 },
+    ]
+  },
+  {
+    id: 'k2',
+    title: 'Синтел и Маленький Дракончик — Сказка о дружбе и храбрости',
+    channel: {
+      id: 'kids_channel',
+      name: 'Мультиландия 🎈',
+      username: 'kids_multiki',
+      avatar: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=200&q=80',
+      online: true,
+      verified: true,
+      role: 'creator',
+      followersCount: 512000,
+      followingCount: 10,
+      postsCount: 180
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+    views: '3.2M просмотров',
+    duration: '14:48',
+    timeAgo: '2 недели назад',
+    likesCount: 195000,
+    category: 'Мультфильмы',
+    isKids: true,
+    ageRating: '6+',
+    genre: 'Анимация, Фэнтези, Сказка',
+    releaseYear: 2023,
+    description: 'Удивительная сказочная история о дружбе смелой девочки Синтел и маленького дракончика, преодолевающего все преграды на пути.',
+    comments: [
+      { id: 'cm_k2', user: initialUsers[1], text: 'Прекрасная анимация и трогательная добрая история для всей семьи ❤️', timeAgo: '1 день назад', likes: 45 },
+    ]
+  },
+  {
+    id: 'k3',
+    title: 'Приключения в Долине Бабочек: Познавательные сказки для малышей',
+    channel: {
+      id: 'kids_channel',
+      name: 'Мультиландия 🎈',
+      username: 'kids_multiki',
+      avatar: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=200&q=80',
+      online: true,
+      verified: true,
+      role: 'creator',
+      followersCount: 512000,
+      followingCount: 10,
+      postsCount: 180
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    views: '1.4M просмотров',
+    duration: '11:20',
+    timeAgo: '5 дней назад',
+    likesCount: 88000,
+    category: 'Мультфильмы',
+    isKids: true,
+    ageRating: '0+',
+    genre: 'Обучающий мультфильм',
+    releaseYear: 2024,
+    description: 'Учим цвета, числа и добрые поступки вместе с маленькими зверятами в волшебной цветущей долине.',
+    comments: [
+      { id: 'cm_k3', user: initialUsers[7], text: 'Безопасный и полезный контент для малышей, спасибо разработчикам за детский режим!', timeAgo: '4 часа назад', likes: 31 },
+    ]
+  }
 ];
 
 // ==================== КЛИПЫ (ВЕРТИКАЛЬНЫЕ ВИДЕО / REELS) ====================
