@@ -23,89 +23,14 @@ interface ChatWindowProps {
   onUpdateChat?: (chatId: string, updates: Partial<Chat>) => void;
 }
 
-const quickEmojis = ['😊', '😂', '🔥', '👍', '❤️', '🚀', '🎉', '👏', '👀', '💯', '🙌', '✨', '🧘', '🌟', '💎', '🕊️', '🤝', '🌞', '💡', '🌈'];
+import { 
+  TELEGRAM_STICKER_PACKS, 
+  STICKER_QUICK_REACTIONS, 
+  EMOJI_CATEGORIES, 
+  TELEGRAM_GIFS
+} from '../data/telegramStickers';
+
 const REACTION_EMOJIS = ['❤️', '👍', '👎', '🔥', '🥰', '👏', '😂'];
-
-interface StickerItem {
-  id: string;
-  url: string;
-  emoji?: string;
-  isFavorite?: boolean;
-}
-
-interface StickerPack {
-  id: string;
-  title: string;
-  avatar: string;
-  stickers: StickerItem[];
-}
-
-const TELEGRAM_STICKER_PACKS: StickerPack[] = [
-  {
-    id: 'pack_fav',
-    title: 'Избранные',
-    avatar: '⭐',
-    stickers: [
-      { id: 'fav_1', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80', emoji: '🧑‍🏫', isFavorite: true },
-      { id: 'fav_2', url: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=250&q=80', emoji: '❤️', isFavorite: true },
-      { id: 'fav_3', url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=250&q=80', emoji: '🔥', isFavorite: true },
-    ]
-  },
-  {
-    id: 'pack_meeseeks',
-    title: 'Mr. Meeseeks',
-    avatar: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=100&q=80',
-    stickers: [
-      { id: 'ms_1', url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=250&q=80', emoji: '😃' },
-      { id: 'ms_2', url: 'https://images.unsplash.com/photo-1563089145-599997674d42?auto=format&fit=crop&w=250&q=80', emoji: '❤️' },
-      { id: 'ms_3', url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=250&q=80', emoji: '👍' },
-      { id: 'ms_4', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=250&q=80', emoji: '😱' },
-      { id: 'ms_5', url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=250&q=80', emoji: '👋' },
-      { id: 'ms_6', url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=250&q=80', emoji: '🌧️' },
-      { id: 'ms_7', url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=250&q=80', emoji: '🤔' },
-      { id: 'ms_8', url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=250&q=80', emoji: '🎉' },
-      { id: 'ms_9', url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=250&q=80', emoji: '😡' },
-      { id: 'ms_10', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=250&q=80', emoji: '✨' },
-    ]
-  },
-  {
-    id: 'pack_pepe',
-    title: 'Pepe & Frog Mood',
-    avatar: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=100&q=80',
-    stickers: [
-      { id: 'pe_1', url: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=250&q=80', emoji: '🧘' },
-      { id: 'pe_2', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=250&q=80', emoji: '🌿' },
-      { id: 'pe_3', url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=250&q=80', emoji: '🌌' },
-      { id: 'pe_4', url: 'https://images.unsplash.com/photo-1542332213-9b5a5a3fad35?auto=format&fit=crop&w=250&q=80', emoji: '🔥' },
-    ]
-  },
-  {
-    id: 'pack_borat',
-    title: 'Classic Cinema & Memes',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80',
-    stickers: [
-      { id: 'bm_1', url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80', emoji: '👍' },
-      { id: 'bm_2', url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=250&q=80', emoji: '👌' },
-      { id: 'bm_3', url: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=250&q=80', emoji: '👏' },
-    ]
-  }
-];
-
-const STICKER_QUICK_REACTIONS = [
-  { emoji: '❤️', label: 'Любовь' },
-  { emoji: '👍', label: 'Лайк' },
-  { emoji: '👎', label: 'Дизлайк' },
-  { emoji: '🎉', label: 'Праздник' },
-  { emoji: '😀', label: 'Улыбка' },
-  { emoji: '😢', label: 'Грусть' },
-];
-
-const sampleGifs = [
-  { id: 'g1', title: 'Салют ✨', url: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=400&q=80' },
-  { id: 'g2', title: 'Огонь 🔥', url: 'https://images.unsplash.com/photo-1542332213-9b5a5a3fad35?auto=format&fit=crop&w=400&q=80' },
-  { id: 'g3', title: 'Покой 🌿', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=400&q=80' },
-  { id: 'g4', title: 'Код 💻', url: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=400&q=80' }
-];
 
 export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWindowProps) {
   const navigate = useNavigate();
@@ -136,6 +61,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
   const [stickerSearchQuery, setStickerSearchQuery] = useState('');
   const [selectedStickerPackId, setSelectedStickerPackId] = useState<string>('pack_fav');
   const [stickerReactionFilter, setStickerReactionFilter] = useState<string | null>(null);
+  const [activeEmojiCategory, setActiveEmojiCategory] = useState<string>('recent');
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [selectedRecording, setSelectedRecording] = useState<{ title: string; duration: string } | null>(null);
 
@@ -1658,29 +1584,65 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
 {/* TELEGRAM STICKERS, EMOJIS & GIF POPUP TABS (EXACT SCREENSHOT MATCH) */}
       {showMediaTabs && (
         <div className="tg-media-tabs-popover telegram-stickers-popup" onClick={e => e.stopPropagation()}>
-          {/* Top Pack Icons Carousel Dock (Screenshot: Bookmark/Favorites, Mr. Meeseeks, Pepe, Memes) */}
-          <div className="tg-sticker-top-packs-bar">
-            {TELEGRAM_STICKER_PACKS.map(pack => (
-              <button
-                key={pack.id}
-                type="button"
-                className={`tg-top-pack-item ${selectedStickerPackId === pack.id ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedStickerPackId(pack.id);
-                  setActiveMediaTab('stickers');
-                  const el = document.getElementById(`section_${pack.id}`);
-                  el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }}
-                title={pack.title}
-              >
-                {pack.id === 'pack_fav' ? (
-                  <Bookmark size={18} className="fav-pack-icon" />
-                ) : (
-                  <img src={pack.avatar} alt={pack.title} className="top-pack-thumb" />
-                )}
-              </button>
-            ))}
-          </div>
+          {/* Top Bar: Sticker packs on 'stickers', Categories on 'emoji', Tags on 'gif' */}
+          {activeMediaTab === 'stickers' && (
+            <div className="tg-sticker-top-packs-bar">
+              {TELEGRAM_STICKER_PACKS.map(pack => (
+                <button
+                  key={pack.id}
+                  type="button"
+                  className={`tg-top-pack-item ${selectedStickerPackId === pack.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setSelectedStickerPackId(pack.id);
+                    const el = document.getElementById(`section_${pack.id}`);
+                    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                  }}
+                  title={pack.title}
+                >
+                  {pack.avatar === 'bookmark' ? (
+                    <Bookmark size={18} className="fav-pack-icon" />
+                  ) : (
+                    <img src={pack.avatar} alt={pack.title} className="top-pack-thumb" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {activeMediaTab === 'emoji' && (
+            <div className="tg-emoji-top-categories-bar">
+              {EMOJI_CATEGORIES.map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  className={`tg-emoji-category-tab ${activeEmojiCategory === cat.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveEmojiCategory(cat.id);
+                    const el = document.getElementById(`emoji_cat_${cat.id}`);
+                    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                  }}
+                  title={cat.name}
+                >
+                  <span className="emoji-cat-icon">{cat.icon}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {activeMediaTab === 'gif' && (
+            <div className="tg-gif-top-tags-bar">
+              {['🔥 Огонь', '✨ Салют', '😂 Смех', '⚡ Кибер', '🌿 Дзен', '🎉 Праздник'].map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  className="tg-gif-tag-pill"
+                  onClick={() => setStickerSearchQuery(tag.split(' ')[1] || tag)}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Search bar with emoji quick filters (Screenshot: 🔍 Поиск стикеров + ❤️ 👍 👎 🎉 😀 😢) */}
           <div className="tg-sticker-search-row">
@@ -1689,7 +1651,13 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
               <input 
                 type="text"
                 className="tg-sticker-search-field"
-                placeholder="Поиск стикеров"
+                placeholder={
+                  activeMediaTab === 'stickers' 
+                    ? 'Поиск стикеров' 
+                    : activeMediaTab === 'emoji' 
+                    ? 'Поиск эмодзи' 
+                    : 'Поиск GIF'
+                }
                 value={stickerSearchQuery}
                 onChange={(e) => {
                   setStickerSearchQuery(e.target.value);
@@ -1703,22 +1671,25 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
               )}
             </div>
 
-            <div className="tg-sticker-reaction-pills">
-              {STICKER_QUICK_REACTIONS.map(rx => (
-                <button
-                  key={rx.emoji}
-                  type="button"
-                  className={`tg-reaction-filter-btn ${stickerReactionFilter === rx.emoji ? 'active' : ''}`}
-                  onClick={() => {
-                    setStickerReactionFilter(prev => prev === rx.emoji ? null : rx.emoji);
-                    setStickerSearchQuery('');
-                  }}
-                  title={rx.label}
-                >
-                  {rx.emoji}
-                </button>
-              ))}
-            </div>
+            {/* Reaction filters only on Stickers tab */}
+            {activeMediaTab === 'stickers' && (
+              <div className="tg-sticker-reaction-pills">
+                {STICKER_QUICK_REACTIONS.map(rx => (
+                  <button
+                    key={rx.emoji}
+                    type="button"
+                    className={`tg-reaction-filter-btn ${stickerReactionFilter === rx.emoji ? 'active' : ''}`}
+                    onClick={() => {
+                      setStickerReactionFilter(prev => prev === rx.emoji ? null : rx.emoji);
+                      setStickerSearchQuery('');
+                    }}
+                    title={rx.label}
+                  >
+                    {rx.emoji}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Main Media Content Area */}
@@ -1757,7 +1728,6 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                             title={`${pack.title} ${stk.emoji || ''}`}
                           >
                             <img src={stk.url} alt="Sticker" className="tg-sticker-img" />
-                            {stk.emoji && <span className="tg-sticker-emoji-pip">{stk.emoji}</span>}
                           </button>
                         ))}
                       </div>
@@ -1769,19 +1739,32 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
 
             {activeMediaTab === 'emoji' && (
               <div className="tg-emojis-pane">
-                <div className="tg-sticker-pack-title">Все эмодзи</div>
-                <div className="emoji-grid-expanded">
-                  {quickEmojis.map(emoji => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      className="emoji-large-cell"
-                      onClick={() => setInputValue(prev => prev + emoji)}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
+                {EMOJI_CATEGORIES.map(cat => {
+                  const filteredEmojis = cat.emojis.filter(e => 
+                    !stickerSearchQuery.trim() || e.includes(stickerSearchQuery.trim())
+                  );
+                  if (filteredEmojis.length === 0) return null;
+
+                  return (
+                    <div key={cat.id} id={`emoji_cat_${cat.id}`} className="emoji-cat-section">
+                      <div className="tg-sticker-pack-title emoji-cat-header-title">
+                        {cat.name}
+                      </div>
+                      <div className="emoji-grid-expanded">
+                        {filteredEmojis.map(emoji => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            className="emoji-large-cell"
+                            onClick={() => setInputValue(prev => prev + emoji)}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1789,7 +1772,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
               <div className="tg-gifs-pane">
                 <div className="tg-sticker-pack-title">Популярные GIF</div>
                 <div className="gifs-grid">
-                  {sampleGifs.map(g => (
+                  {TELEGRAM_GIFS.map(g => (
                     <button 
                       key={g.id} 
                       type="button"
@@ -1811,7 +1794,6 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
               type="button"
               className="tg-bottom-tab-icon search"
               onClick={() => {
-                setActiveMediaTab('stickers');
                 const inp = document.querySelector('.tg-sticker-search-field') as HTMLInputElement;
                 inp?.focus();
               }}
@@ -1835,7 +1817,13 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
               onClick={() => setActiveMediaTab('stickers')}
               title="Стикеры"
             >
-              <Sparkles size={20} />
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2a10 10 0 0 0-10 10c0 5.52 4.48 10 10 10a10 10 0 0 0 10-10c0-2.5-.9-4.8-2.4-6.6L12 2z"/>
+                <path d="M19.6 5.4A10 10 0 0 0 12 2v8h8c0-1.8-.7-3.4-1.8-4.6z"/>
+                <circle cx="9" cy="11" r="1.2" fill="currentColor"/>
+                <circle cx="15" cy="11" r="1.2" fill="currentColor"/>
+                <path d="M9 15c1 1.2 2 1.5 3 1.5s2-.3 3-1.5"/>
+              </svg>
             </button>
 
             <button
