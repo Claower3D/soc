@@ -5,7 +5,7 @@ import {
   Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, 
   CheckCircle2, Plus, Trash2, Heart, ChevronLeft, ChevronRight,
   GraduationCap, Megaphone, Star, Check, X,
-  Compass, Calendar as CalendarIcon, Bot, Users, LayoutGrid, ArrowRight, Brain
+  Compass, Calendar as CalendarIcon, Bot, Users, ArrowRight, Brain
 } from 'lucide-react';
 import { 
   MEDITATION_TRACKS, YOGA_ROUTINES, INITIAL_AFFIRMATIONS, 
@@ -186,6 +186,9 @@ export function SpiritualPage() {
     ? (tab as TabType) 
     : 'all';
 
+  const currentPracticeCard = SPIRITUAL_PRACTICES_CARDS.find(c => c.id === activeTab);
+  const CurrentPracticeIcon = currentPracticeCard ? currentPracticeCard.icon : Flower2;
+
   const handleTabChange = (newTab: TabType) => {
     if (newTab === 'all') {
       navigate('/spiritual');
@@ -193,6 +196,10 @@ export function SpiritualPage() {
       navigate(`/spiritual/${newTab}`);
     }
   };
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTab]);
 
   // --- MULTI-CURRENCY STATE ---
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyCode>(() => {
@@ -798,116 +805,63 @@ export function SpiritualPage() {
         </div>
       </div>
 
-      {/* Main Navigation Tabs */}
-      <div className="spiritual-tabs-bar">
-        <button 
-          className={`spiritual-tab-btn tab-btn-all ${activeTab === 'all' ? 'active' : ''}`}
-          onClick={() => handleTabChange('all')}
-        >
-          <LayoutGrid size={18} />
-          <span>Все практики</span>
-        </button>
+      {/* Sub-page Navigation Header (when on a specific practice page) */}
+      {activeTab !== 'all' && (
+        <div className="spiritual-page-header-bar">
+          <div className="page-nav-left">
+            <button 
+              type="button"
+              className="btn-back-to-catalog"
+              onClick={() => handleTabChange('all')}
+              title="Вернуться в каталог всех практик"
+            >
+              <ChevronLeft size={18} />
+              <span>Все практики</span>
+            </button>
+            <div className="page-nav-breadcrumbs">
+              <span className="crumb-home" onClick={() => handleTabChange('all')}>Каталог</span>
+              <span className="crumb-divider">/</span>
+              <span className="crumb-active">{currentPracticeCard?.title || activeTab}</span>
+            </div>
+          </div>
 
-        <button 
-          className={`spiritual-tab-btn ${activeTab === 'meditation' ? 'active' : ''}`}
-          onClick={() => handleTabChange('meditation')}
-        >
-          <Flower2 size={18} />
-          <span>Медитация</span>
-        </button>
+          <div className="page-nav-center">
+            {currentPracticeCard && (
+              <div className="current-page-badge-pill">
+                <div className="mini-page-icon" style={{ background: currentPracticeCard.gradient }}>
+                  <CurrentPracticeIcon size={16} color="#FFFFFF" />
+                </div>
+                <div className="page-title-meta">
+                  <span className="page-category-label">{currentPracticeCard.category}</span>
+                  <h2 className="page-title-heading">{currentPracticeCard.title}</h2>
+                </div>
+                {currentPracticeCard.badge && (
+                  <span className={`spiritual-practice-badge ${currentPracticeCard.badgeClass || ''}`}>
+                    {currentPracticeCard.badge}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
 
-        <button 
-          className={`spiritual-tab-btn ${activeTab === 'yoga' ? 'active' : ''}`}
-          onClick={() => handleTabChange('yoga')}
-        >
-          <Activity size={18} />
-          <span>Йога</span>
-        </button>
-
-        <button 
-          className={`spiritual-tab-btn ${activeTab === 'affirmations' ? 'active' : ''}`}
-          onClick={() => handleTabChange('affirmations')}
-        >
-          <Sunrise size={18} />
-          <span>Аффирмации</span>
-        </button>
-
-        <button 
-          className={`spiritual-tab-btn ${activeTab === 'breathing' ? 'active' : ''}`}
-          onClick={() => handleTabChange('breathing')}
-        >
-          <Wind size={18} />
-          <span>Дыхание</span>
-        </button>
-
-        <button 
-          className={`spiritual-tab-btn ${activeTab === 'sounds' ? 'active' : ''}`}
-          onClick={() => handleTabChange('sounds')}
-        >
-          <Waves size={18} />
-          <span>Звуки & Мантры</span>
-        </button>
-
-        <button 
-          className={`spiritual-tab-btn ${activeTab === 'wisdom' ? 'active' : ''}`}
-          onClick={() => handleTabChange('wisdom')}
-        >
-          <BookOpen size={18} />
-          <span>Мудрость</span>
-        </button>
-
-        <button 
-          className={`spiritual-tab-btn ${activeTab === 'tarot' ? 'active' : ''}`}
-          onClick={() => handleTabChange('tarot')}
-        >
-          <Sparkles size={18} />
-          <span>Таро & МАК</span>
-          <span className="tab-hot-badge">3D</span>
-        </button>
-
-        <button 
-          className={`spiritual-tab-btn ${activeTab === 'astrology' ? 'active' : ''}`}
-          onClick={() => handleTabChange('astrology')}
-        >
-          <Compass size={18} />
-          <span>Натальная карта</span>
-        </button>
-
-        <button 
-          className={`spiritual-tab-btn ${activeTab === 'calendar' ? 'active' : ''}`}
-          onClick={() => handleTabChange('calendar')}
-        >
-          <CalendarIcon size={18} />
-          <span>Календарь</span>
-        </button>
-
-        <button 
-          className={`spiritual-tab-btn ${activeTab === 'livezen' ? 'active' : ''}`}
-          onClick={() => handleTabChange('livezen')}
-        >
-          <Users size={18} />
-          <span>Live Zen</span>
-          <span className="tab-hot-badge live">● LIVE</span>
-        </button>
-
-        <button 
-          className={`spiritual-tab-btn tab-btn-courses ${activeTab === 'courses' ? 'active' : ''}`}
-          onClick={() => handleTabChange('courses')}
-        >
-          <GraduationCap size={18} />
-          <span>Курсы & Маркет</span>
-          <span className="tab-hot-badge">PRO</span>
-        </button>
-
-        <button 
-          className={`spiritual-tab-btn ${activeTab === 'consciousness' ? 'active' : ''}`}
-          onClick={() => handleTabChange('consciousness')}
-        >
-          <Brain size={18} />
-          <span>Класс Сознания</span>
-          <span className="tab-hot-badge" style={{ background: 'linear-gradient(135deg, #8B5CF6, #EC4899)', color: '#fff' }}>1-11</span>
-        </button>
-      </div>
+          <div className="page-nav-right">
+            <div className="quick-switch-wrapper">
+              <span className="quick-switch-label">Страница:</span>
+              <select 
+                className="practice-page-dropdown"
+                value={activeTab}
+                onChange={(e) => handleTabChange(e.target.value as TabType)}
+              >
+                {SPIRITUAL_PRACTICES_CARDS.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Karma Tree Progress Bar */}
       <div className="spiritual-karma-strip">
@@ -919,19 +873,19 @@ export function SpiritualPage() {
       </div>
 
       {/* ========================================================================= */}
-      {/* TAB 0: ВСЕ ПРАКТИКИ (КАТАЛОГ КАРТОЧЕК В СТИЛЕ СЕРВИСОВ) */}
+      {/* TAB 0: ВСЕ ПРАКТИКИ (КАТАЛОГ СТРАНИЦ КАРТОЧЕК) */}
       {/* ========================================================================= */}
       {activeTab === 'all' && (
         <div className="spiritual-tab-content">
           <div className="spiritual-catalog-header">
             <div className="spiritual-catalog-title-group">
-              <h2 className="spiritual-catalog-title">Каталог Духовных Практик</h2>
+              <h2 className="spiritual-catalog-title">Каталог страниц духовных практик</h2>
               <p className="spiritual-catalog-desc">
-                Выберите направление для персональной медитации, гармонизации сознания, работы с телом или расширения знаний.
+                Каждая карточка ведет на отдельную интерактивную страницу с собственным таймером, звуками, асанами, раскладами или курсами.
               </p>
             </div>
             <div className="spiritual-catalog-count-badge">
-              <span>{SPIRITUAL_PRACTICES_CARDS.length} направлений</span>
+              <span>{SPIRITUAL_PRACTICES_CARDS.length} отдельных страниц</span>
             </div>
           </div>
 
@@ -967,7 +921,7 @@ export function SpiritualPage() {
                   <div className="spiritual-practice-card-footer">
                     <span className="spiritual-practice-stats">{card.stats}</span>
                     <div className="spiritual-practice-action-btn">
-                      <span>Начать</span>
+                      <span>Открыть страницу</span>
                       <ArrowRight size={16} />
                     </div>
                   </div>
@@ -1774,6 +1728,20 @@ export function SpiritualPage() {
               }}
             />
           </div>
+        </div>
+      )}
+
+      {/* Bottom Back to Catalog Navigation Button (when on a practice page) */}
+      {activeTab !== 'all' && (
+        <div className="spiritual-page-bottom-nav">
+          <button 
+            type="button"
+            className="btn-bottom-back-catalog"
+            onClick={() => handleTabChange('all')}
+          >
+            <ChevronLeft size={18} />
+            <span>← Вернуться в Каталог Практик</span>
+          </button>
         </div>
       )}
 
