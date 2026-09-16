@@ -2289,9 +2289,79 @@
   margin: 0 4px;
 }
 
-/* Selected message row */
-.tg-msg-row.selected-msg .tg-bubble {
-  box-shadow: 0 0 0 2px var(--color-accent) !important;
+/* ==================== TELEGRAM SELECTION MODE (SCREENSHOT 2) ==================== */
+.tg-msg-row.selection-mode {
+  position: relative;
+  padding-left: 44px;
+  cursor: pointer;
+  transition: background 0.15s ease, padding 0.15s ease;
+  user-select: none;
+}
+
+.tg-msg-row.selection-mode .tg-msg-actions-toolbar {
+  display: none !important;
+}
+
+.tg-msg-row.selection-mode:hover {
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.tg-msg-row.selected-msg {
+  background: rgba(99, 102, 241, 0.10) !important;
+}
+
+[data-theme="dark"] .tg-msg-row.selection-mode:hover,
+.theme-dark .tg-msg-row.selection-mode:hover {
+  background: rgba(139, 92, 246, 0.08);
+}
+
+[data-theme="dark"] .tg-msg-row.selected-msg,
+.theme-dark .tg-msg-row.selected-msg {
+  background: rgba(139, 92, 246, 0.22) !important;
+}
+
+/* Checkbox Circle (Empty ring when unselected, purple check when selected) */
+.tg-msg-select-check {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  cursor: pointer;
+  border: 2px solid #cbd5e1;
+  background: #ffffff;
+  color: #ffffff;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+}
+
+.tg-msg-select-check:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-50%) scale(1.08);
+}
+
+[data-theme="dark"] .tg-msg-select-check,
+.theme-dark .tg-msg-select-check {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.tg-msg-select-check.checked {
+  border-color: var(--color-accent) !important;
+  background: var(--color-accent) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.tg-check-icon {
+  color: #ffffff;
 }
 
 /* ==================== REACTION BADGES ON MESSAGE (SCREENSHOT 5) ==================== */
@@ -2341,14 +2411,14 @@
   font-weight: 700;
 }
 
-/* ==================== TELEGRAM RIGHT-CLICK CONTEXT MENU (SCREENSHOT 4) ==================== */
+/* ==================== TELEGRAM RIGHT-CLICK CONTEXT MENU (SCREENSHOT 4: LIGHT & DARK) ==================== */
 .tg-context-menu {
   position: fixed;
-  background: #18222d;
-  color: #f1f5f9;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 14px;
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 10px 32px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.06);
   padding: 6px;
   width: 220px;
   z-index: 300;
@@ -2358,14 +2428,27 @@
   animation: fadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+[data-theme="dark"] .tg-context-menu,
+.theme-dark .tg-context-menu {
+  background: #18222d;
+  color: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7);
+}
+
 .context-reactions-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.25);
+  background: #f1f5f9;
   border-radius: 10px;
   margin-bottom: 4px;
+}
+
+[data-theme="dark"] .context-reactions-bar,
+.theme-dark .context-reactions-bar {
+  background: rgba(0, 0, 0, 0.28);
 }
 
 .context-reaction-btn {
@@ -2385,8 +2468,13 @@
 
 .context-menu-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.06);
   margin: 3px 0;
+}
+
+[data-theme="dark"] .context-menu-divider,
+.theme-dark .context-menu-divider {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .context-menu-row {
@@ -2395,7 +2483,7 @@
   gap: 12px;
   background: transparent;
   border: none;
-  color: #f1f5f9;
+  color: #1e293b;
   padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
@@ -2403,17 +2491,200 @@
   text-align: left;
   font-size: 0.88rem;
   font-weight: 500;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
+}
+
+.context-menu-row svg {
+  color: #64748b;
+  transition: color 0.15s;
 }
 
 .context-menu-row:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.context-menu-row:hover svg {
+  color: #0f172a;
+}
+
+[data-theme="dark"] .context-menu-row,
+.theme-dark .context-menu-row {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .context-menu-row svg,
+.theme-dark .context-menu-row svg {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .context-menu-row:hover,
+.theme-dark .context-menu-row:hover {
   background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .context-menu-row:hover svg,
+.theme-dark .context-menu-row:hover svg {
+  color: #ffffff;
 }
 
 .context-menu-row.danger {
-  color: #f87171;
+  color: #ef4444;
+}
+
+.context-menu-row.danger svg {
+  color: #ef4444;
 }
 
 .context-menu-row.danger:hover {
-  background: rgba(239, 68, 68, 0.15);
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.context-menu-row.danger:hover svg {
+  color: #dc2626;
+}
+
+[data-theme="dark"] .context-menu-row.danger,
+.theme-dark .context-menu-row.danger {
+  color: #f87171;
+}
+
+[data-theme="dark"] .context-menu-row.danger svg,
+.theme-dark .context-menu-row.danger svg {
+  color: #f87171;
+}
+
+[data-theme="dark"] .context-menu-row.danger:hover,
+.theme-dark .context-menu-row.danger:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .context-menu-row.danger:hover svg,
+.theme-dark .context-menu-row.danger:hover svg {
+  color: #fca5a5;
+}
+
+/* ==================== TELEGRAM SELECTION BOTTOM BAR (SCREENSHOT 2) ==================== */
+.tg-selection-bottom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 18px;
+  background: #ffffff;
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -4px 18px rgba(15, 23, 42, 0.05);
+  animation: slideUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  min-height: 56px;
+  box-sizing: border-box;
+}
+
+[data-theme="dark"] .tg-selection-bottom-bar,
+.theme-dark .tg-selection-bottom-bar {
+  background: #18222d;
+  border-top-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.4);
+}
+
+.tg-selection-action-btn {
+  background: transparent;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: var(--color-text-secondary);
+}
+
+.tg-selection-action-btn.delete {
+  color: #ef4444;
+}
+
+.tg-selection-action-btn.delete:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  transform: scale(1.06);
+}
+
+[data-theme="dark"] .tg-selection-action-btn.delete,
+.theme-dark .tg-selection-action-btn.delete {
+  color: #f87171;
+}
+
+[data-theme="dark"] .tg-selection-action-btn.delete:hover,
+.theme-dark .tg-selection-action-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.tg-selection-action-btn.forward {
+  color: var(--color-accent);
+}
+
+.tg-selection-action-btn.forward:hover {
+  background: #ede9fe;
+  color: #7c3aed;
+  transform: scale(1.06);
+}
+
+[data-theme="dark"] .tg-selection-action-btn.forward,
+.theme-dark .tg-selection-action-btn.forward {
+  color: #a78bfa;
+}
+
+[data-theme="dark"] .tg-selection-action-btn.forward:hover,
+.theme-dark .tg-selection-action-btn.forward:hover {
+  background: rgba(139, 92, 246, 0.2);
+  color: #c4b5fd;
+}
+
+.tg-selection-action-btn.close {
+  color: #64748b;
+}
+
+.tg-selection-action-btn.close:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+[data-theme="dark"] .tg-selection-action-btn.close,
+.theme-dark .tg-selection-action-btn.close {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .tg-selection-action-btn.close:hover,
+.theme-dark .tg-selection-action-btn.close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.tg-selection-counter-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tg-selection-count-text {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: 0.01em;
+}
+
+[data-theme="dark"] .tg-selection-count-text,
+.theme-dark .tg-selection-count-text {
+  color: #ffffff;
+}
+
+.tg-selection-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }

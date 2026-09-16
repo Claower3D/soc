@@ -312,6 +312,62 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
     setContextMenu({ visible: false, x: 0, y: 0, message: null });
   };
 
+  // Helper for plural text (1 сообщение, 2 сообщения, 5 сообщений)
+  const getSelectedCountText = (count: number) => {
+    const mod10 = count % 10;
+    const mod100 = count % 100;
+    if (mod100 >= 11 && mod100 <= 19) {
+      return `${count} сообщений`;
+    }
+    if (mod10 === 1) {
+      return `${count} сообщение`;
+    }
+    if (mod10 >= 2 && mod10 <= 4) {
+      return `${count} сообщения`;
+    }
+    return `${count} сообщений`;
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedMessageIds.length === 0) return;
+    const count = selectedMessageIds.length;
+    if (window.confirm(`Удалить ${getSelectedCountText(count)}?`)) {
+      const remaining = messages.filter(m => !selectedMessageIds.includes(m.id));
+      setMessages(remaining);
+      if (chat && onUpdateChat) {
+        onUpdateChat(chat.id, { messages: remaining });
+      }
+      setSelectedMessageIds([]);
+    }
+  };
+
+  const handleForwardSelected = () => {
+    if (selectedMessageIds.length === 0) return;
+    const count = selectedMessageIds.length;
+    alert(`Выбрано для пересылки: ${getSelectedCountText(count)}`);
+    setSelectedMessageIds([]);
+  };
+
+  const handleCancelSelection = () => {
+    setSelectedMessageIds([]);
+  };
+
+  // Close context menu or cancel selection on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedMessageIds.length > 0) {
+          setSelectedMessageIds([]);
+        }
+        if (contextMenu.visible) {
+          setContextMenu({ visible: false, x: 0, y: 0, message: null });
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedMessageIds.length, contextMenu.visible]);
+
   // Helper to render delivery & read ticks
   const renderMessageTicks = (msg: Message) => {
     // 1 gray tick: msg.status === 'sent' or recipient is offline
@@ -1073,9 +1129,30 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
             return (
               <div 
                 key={msg.id} 
-                className={`tg-msg-row ${isMe ? 'outgoing' : 'incoming'} ${selectedMessageIds.includes(msg.id) ? 'selected-msg' : ''}`}
+                className={`tg-msg-row ${isMe ? 'outgoing' : 'incoming'} ${selectedMessageIds.includes(msg.id) ? 'selected-msg' : ''} ${selectedMessageIds.length > 0 ? 'selection-mode' : ''}`}
                 onContextMenu={(e) => handleContextMenu(e, msg)}
+                onClick={() => {
+                  if (selectedMessageIds.length > 0) {
+                    handleSelectMessage(msg);
+                  }
+                }}
               >
+                {/* Telegram Selection Checkbox Circle (Matches Screenshot 2) */}
+                {selectedMessageIds.length > 0 && (
+                  <div 
+                    className={`tg-msg-select-check ${selectedMessageIds.includes(msg.id) ? 'checked' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectMessage(msg);
+                    }}
+                    title={selectedMessageIds.includes(msg.id) ? "Снять выбор" : "Выбрать сообщение"}
+                  >
+                    {selectedMessageIds.includes(msg.id) && (
+                      <Check size={13} strokeWidth={3.2} className="tg-check-icon" />
+                    )}
+                  </div>
+                )}
+
                 {/* Floating message actions toolbar on hover */}
                 <div className="tg-msg-wrapper">
                   <div className="tg-msg-actions-toolbar">
@@ -1582,18 +1659,58 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
         </div>
       )}
 
-      {/* Standard Telegram Bottom Input Bar */}
+      {/* Standard Telegram Bottom Input Bar OR Telegram Multi-select Action Bar */}
       <div className="tg-bottom-bar">
-        {/* Backdrop for popovers to close when clicked outside */}
-        {(showMediaTabs || showAttachMenu) && (
-          <div 
-            className="tg-popover-backdrop" 
-            onClick={() => {
-              setShowMediaTabs(false);
-              setShowAttachMenu(false);
-            }} 
-          />
-        )}
+        {selectedMessageIds.length > 0 ? (
+          /* Telegram Multi-select Action Bar (Matches Screenshot 2) */
+          <div className="tg-selection-bottom-bar">
+            <button 
+              type="button" 
+              className="tg-selection-action-btn delete"
+              onClick={handleDeleteSelected}
+              title="Удалить выбранные сообщения"
+            >
+              <Trash2 size={20} />
+            </button>
+
+            <div className="tg-selection-counter-wrapper">
+              <span className="tg-selection-count-text">
+                {getSelectedCountText(selectedMessageIds.length)}
+              </span>
+            </div>
+
+            <div className="tg-selection-right-actions">
+              <button 
+                type="button" 
+                className="tg-selection-action-btn forward"
+                onClick={handleForwardSelected}
+                title="Переслать выбранные сообщения"
+              >
+                <Forward size={20} />
+              </button>
+
+              <button
+                type="button"
+                className="tg-selection-action-btn close"
+                onClick={handleCancelSelection}
+                title="Отменить выбор (Esc)"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Backdrop for popovers to close when clicked outside */}
+            {(showMediaTabs || showAttachMenu) && (
+              <div 
+                className="tg-popover-backdrop" 
+                onClick={() => {
+                  setShowMediaTabs(false);
+                  setShowAttachMenu(false);
+                }} 
+              />
+            )}
 
 {/* TELEGRAM STICKERS, EMOJIS & GIF POPUP TABS (EXACT SCREENSHOT MATCH) */}
       {showMediaTabs && (
@@ -2102,7 +2219,9 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
             )}
           </div>
         )}
-      </div>
+        </>
+      )}
+    </div>
 
       {/* TELEGRAM VIDEO NOTE RECORDER OVERLAY MODAL */}
       {isVideoNoteRecording && (
