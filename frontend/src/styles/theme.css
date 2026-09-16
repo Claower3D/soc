@@ -25,6 +25,10 @@
   --color-accent-hover: #4F46E5;
   --color-accent-light: #EEF2FF;
   --color-accent-subtle: #E0E7FF;
+  --color-primary: var(--color-accent);
+  --color-primary-hover: var(--color-accent-hover);
+  --color-primary-light: var(--color-accent-light);
+  --color-surface: var(--color-bg-card);
   --gradient-primary: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
   --gradient-stories: linear-gradient(45deg, #F59E0B 0%, #EC4899 50%, #8B5CF6 100%);
   --gradient-glass: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.85) 100%);
@@ -99,6 +103,10 @@
   --color-accent-hover: #6366F1;
   --color-accent-light: rgba(99, 102, 241, 0.2);
   --color-accent-subtle: rgba(99, 102, 241, 0.3);
+  --color-primary: var(--color-accent);
+  --color-primary-hover: var(--color-accent-hover);
+  --color-primary-light: var(--color-accent-light);
+  --color-surface: var(--color-bg-card);
   --gradient-glass: linear-gradient(180deg, rgba(21, 29, 48, 0.95) 0%, rgba(15, 23, 42, 0.85) 100%);
 
   /* Статусы */

@@ -1,4 +1,4 @@
-﻿/* ==========================================================================
+/* ==========================================================================
    Search & Explore Page (Instagram-style Layout & Grid)
    ========================================================================== */
 
@@ -86,7 +86,7 @@
   padding: 0.55rem 1.1rem;
   border-radius: 9999px;
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-bg-card);
   color: var(--color-text-secondary);
   font-size: 0.9rem;
   font-weight: 500;
@@ -95,16 +95,16 @@
 }
 
 .search-tab-pill:hover {
-  border-color: var(--color-primary-light);
-  color: var(--color-primary);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
   background: var(--color-bg-hover);
 }
 
 .search-tab-pill.active {
-  background: var(--color-primary);
-  color: #ffffff;
-  border-color: var(--color-primary);
-  box-shadow: 0 3px 10px rgba(138, 43, 226, 0.25);
+  background: var(--color-accent) !important;
+  color: #ffffff !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
 }
 
 .tab-badge {
@@ -115,9 +115,14 @@
   font-weight: 600;
 }
 
+[data-theme="dark"] .tab-badge {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-text-secondary);
+}
+
 .search-tab-pill.active .tab-badge {
-  background: rgba(255, 255, 255, 0.25);
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
 }
 
 /* Blocks in Tab All */
@@ -247,30 +252,35 @@
   justify-content: center;
   gap: 0.35rem;
   width: 100%;
-  padding: 0.5rem;
+  padding: 0.55rem 0.75rem;
   border-radius: 10px;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  border: 1px solid var(--color-primary);
-  background: var(--color-primary);
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
   color: #ffffff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
 }
 
 .account-card-follow-btn:hover {
-  filter: brightness(1.08);
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
 }
 
 .account-card-follow-btn.following {
-  background: var(--color-surface);
+  background: var(--color-bg-secondary);
   color: var(--color-text);
   border: 1px solid var(--color-border);
+  box-shadow: none;
 }
 
 .account-card-follow-btn.following:hover {
-  border-color: #ef4444;
-  color: #ef4444;
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: var(--color-danger-light);
 }
 
 /* ==========================================================================
@@ -604,24 +614,28 @@
 }
 
 .account-row-btn.primary-follow {
-  background: var(--color-primary);
+  background: var(--color-accent);
   color: #ffffff;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--color-accent);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
 }
 
 .account-row-btn.primary-follow:hover {
-  filter: brightness(1.1);
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
 }
 
 .account-row-btn.active-following {
-  background: var(--color-surface);
+  background: var(--color-bg-secondary);
   color: var(--color-text);
   border: 1px solid var(--color-border);
 }
 
 .account-row-btn.active-following:hover {
-  border-color: #ef4444;
-  color: #ef4444;
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: var(--color-danger-light);
 }
 
 /* Video Grid Expanded in Videos Tab */
