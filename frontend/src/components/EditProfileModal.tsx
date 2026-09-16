@@ -10,6 +10,7 @@ import {
 } from '../data/mock';
 import { spiritualAudio } from '../utils/spiritualAudio';
 import { calculateZodiacProfile, type ZodiacInfo } from '../utils/astrology';
+import { ReligionSymbol } from './ReligionSymbols';
 import './EditProfileModal.css';
 
 interface EditProfileModalProps {
@@ -630,14 +631,7 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
                           spiritualAudio.playCrystalChime();
                         }}
                       >
-                        <img 
-                          src={rel.iconImg} 
-                          alt={rel.symbolTitle} 
-                          className="religion-symbol-img"
-                          onError={(e) => {
-                            (e.target as HTMLElement).style.display = 'none';
-                          }}
-                        />
+                        <ReligionSymbol id={rel.id} size={34} className="religion-symbol-vector" />
                         <div className="rel-text-meta">
                           <strong className="rel-name">{rel.name}</strong>
                           <span className="rel-symbol-title">{rel.symbolTitle}</span>

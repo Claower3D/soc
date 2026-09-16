@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { initialUsers, posts, stories, videos, podcasts, initialProducts, RELIGIONS_CATALOG, type User, type Post } from '../data/mock';
 import { calculateZodiacProfile } from '../utils/astrology';
+import { ReligionSymbol } from '../components/ReligionSymbols';
 import { useAuth } from '../context/AuthContext';
 import { FollowersModal } from '../components/FollowersModal';
 import { PostDetailModal } from '../components/PostDetailModal';
@@ -361,12 +362,8 @@ export function ProfilePage() {
                       className="meta-item meta-belief" 
                       title={isMe ? `Видимость: ${activeUser.beliefPrivacy === 'private' ? 'Только мне (Скрыто)' : activeUser.beliefPrivacy === 'followers' ? 'Только подписчикам' : 'Публично'}` : 'Мировоззрение'}
                     >
-                      {religion?.iconImg ? (
-                        <img 
-                          src={religion.iconImg} 
-                          alt={religion.name} 
-                          className="meta-belief-symbol"
-                        />
+                      {religion ? (
+                        <ReligionSymbol id={religion.id} size={20} className="meta-belief-symbol" />
                       ) : (
                         <Compass size={15} />
                       )}

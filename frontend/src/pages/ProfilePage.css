@@ -189,11 +189,13 @@
 }
 
 .meta-belief-symbol {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1px solid #F59E0B;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .meta-belief-symbol-name {
