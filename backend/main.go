@@ -622,13 +622,26 @@ func handleInitDB(w http.ResponseWriter, r *http.Request) {
 	dbStatusError = ""
 	dbMu.Unlock()
 
+	createdTables := []string{}
+	rows, err := conn.Query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name")
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var tName string
+			if err := rows.Scan(&tName); err == nil {
+				createdTables = append(createdTables, tName)
+			}
+		}
+	}
+
 	writeJSON(w, http.StatusOK, Response{
 		Status:  "ok",
-		Message: "✅ Таблицы (users, posts, messages) успешно созданы в PostgreSQL!",
+		Message: fmt.Sprintf("✅ Все таблицы базы данных (%d шт.) успешно созданы в PostgreSQL!", len(createdTables)),
 		Data: map[string]interface{}{
-			"connected": true,
-			"env":       envKey,
-			"tables":    []string{"users", "posts", "messages"},
+			"connected":    true,
+			"env":          envKey,
+			"tables":       createdTables,
+			"tables_count": len(createdTables),
 		},
 	})
 }
