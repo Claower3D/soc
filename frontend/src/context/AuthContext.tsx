@@ -51,6 +51,7 @@ interface AuthContextType {
     beliefType: string;
     beliefPrivacy: BeliefPrivacy;
     avatar?: string;
+    location?: string;
   }) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   updateProfile: (data: Partial<User>) => void;
@@ -198,6 +199,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     beliefType: string;
     beliefPrivacy: BeliefPrivacy;
     avatar?: string;
+    location?: string;
   }): Promise<{ success: boolean; message?: string }> => {
     const cleanUsername = data.username.replace(/^@/, '').trim().toLowerCase();
 
@@ -215,6 +217,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           beliefType: data.beliefType,
           beliefPrivacy: data.beliefPrivacy,
           avatar: data.avatar || '',
+          location: data.location || '',
         }),
       });
 
@@ -236,6 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ...user,
             emailOrPhone: data.emailOrPhone.trim(),
             password: data.password,
+            location: data.location || user.location,
             createdAt: new Date().toISOString(),
           } as RegisteredAccount,
           ...prev.filter((a) => a && a.id !== user.id),
@@ -276,6 +280,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatar,
       coverImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
       bio: 'Новый участник экосистемы New Age ✨',
+      location: data.location || 'Россия',
       role: data.role,
       beliefType: data.beliefType,
       beliefPrivacy: data.beliefPrivacy,

@@ -220,6 +220,31 @@
   color: var(--color-text);
 }
 
+.post-auto-loc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.post-auto-loc-btn:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-accent);
+}
+
+.post-auto-loc-btn:disabled {
+  opacity: 0.6;
+}
+
 /* Footer */
 .create-post-footer {
   display: flex;

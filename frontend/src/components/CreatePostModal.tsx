@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
-import { X, Image as ImageIcon, MapPin, Sparkles } from 'lucide-react';
+import { X, Image as ImageIcon, MapPin, Sparkles, Compass } from 'lucide-react';
 import { type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { detectUserCityAndCountry } from '../utils/countryDetect';
 import './CreatePostModal.css';
 
 interface CreatePostModalProps {
@@ -21,6 +22,7 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
   const { currentUser } = useAuth();
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(sampleImages[0]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -141,11 +143,31 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
             <MapPin size={18} className="loc-icon" />
             <input
               type="text"
-              placeholder="Укажите место (город, заведение)..."
+              placeholder="Укажите место (город, страна)..."
               value={location}
               onChange={e => setLocation(e.target.value)}
               className="location-input"
             />
+            <button
+              type="button"
+              className="post-auto-loc-btn"
+              disabled={isDetectingLocation}
+              onClick={async () => {
+                setIsDetectingLocation(true);
+                try {
+                  const res = await detectUserCityAndCountry();
+                  if (res && res.fullLocation) {
+                    setLocation(res.fullLocation);
+                  }
+                } finally {
+                  setIsDetectingLocation(false);
+                }
+              }}
+              title="Определить город и страну автоматически"
+            >
+              <Compass size={13} className={isDetectingLocation ? 'spin-anim' : ''} />
+              <span>{isDetectingLocation ? '...' : 'Где я?'}</span>
+            </button>
           </div>
 
           {/* Footer Submit */}

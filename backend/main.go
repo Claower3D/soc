@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
+	_ "embed"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -21,6 +22,9 @@ import (
 
 	_ "github.com/lib/pq"
 )
+
+//go:embed schema.sql
+var fullSchemaSQL string
 
 // Response — стандартная обёртка для JSON-ответов API.
 type Response struct {
@@ -45,6 +49,7 @@ type User struct {
 	Username       string `json:"username"`
 	Avatar         string `json:"avatar"`
 	Bio            string `json:"bio,omitempty"`
+	Location       string `json:"location,omitempty"`
 	Online         bool   `json:"online"`
 	Role           string `json:"role,omitempty"`
 	BeliefType     string `json:"beliefType,omitempty"`
@@ -178,64 +183,12 @@ func getDatabaseURL() (string, string) {
 	return "", ""
 }
 
-// createTables создает все необходимые таблицы и индексы в PostgreSQL
+// createTables создает полную схему базы данных (все таблицы, индексы и связи) из embedded schema.sql
 func createTables(dbConn *sql.DB) error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS users (
-		id VARCHAR(64) PRIMARY KEY,
-		name VARCHAR(255) NOT NULL,
-		username VARCHAR(100) UNIQUE NOT NULL,
-		email_or_phone VARCHAR(255) UNIQUE NOT NULL,
-		password_hash VARCHAR(255) NOT NULL,
-		salt VARCHAR(64) NOT NULL,
-		avatar TEXT,
-		cover_image TEXT DEFAULT '',
-		bio TEXT DEFAULT '',
-		website TEXT DEFAULT '',
-		location TEXT DEFAULT '',
-		birth_date VARCHAR(50) DEFAULT '',
-		zodiac_sign VARCHAR(50) DEFAULT '',
-		role VARCHAR(50) DEFAULT 'user',
-		belief_type VARCHAR(100) DEFAULT '',
-		belief_privacy VARCHAR(50) DEFAULT 'public',
-		verified BOOLEAN DEFAULT FALSE,
-		followers_count INT DEFAULT 0,
-		following_count INT DEFAULT 0,
-		critics_count INT DEFAULT 0,
-		posts_count INT DEFAULT 0,
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-	);
-
-	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-	CREATE INDEX IF NOT EXISTS idx_users_email_or_phone ON users(email_or_phone);
-
-	ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date VARCHAR(50) DEFAULT '';
-	ALTER TABLE users ADD COLUMN IF NOT EXISTS zodiac_sign VARCHAR(50) DEFAULT '';
-	ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_image TEXT DEFAULT '';
-	ALTER TABLE users ADD COLUMN IF NOT EXISTS website TEXT DEFAULT '';
-	ALTER TABLE users ADD COLUMN IF NOT EXISTS location TEXT DEFAULT '';
-
-	CREATE TABLE IF NOT EXISTS posts (
-		id VARCHAR(64) PRIMARY KEY,
-		user_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
-		image TEXT,
-		caption TEXT,
-		likes INT DEFAULT 0,
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-	);
-	CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
-
-	CREATE TABLE IF NOT EXISTS messages (
-		id VARCHAR(64) PRIMARY KEY,
-		chat_id VARCHAR(64) NOT NULL,
-		sender_id VARCHAR(64) NOT NULL,
-		text TEXT NOT NULL,
-		is_read BOOLEAN DEFAULT FALSE,
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-	);
-	CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
-	`
-	_, err := dbConn.Exec(schema)
+	if strings.TrimSpace(fullSchemaSQL) == "" {
+		return errors.New("embedded fullSchemaSQL пуст")
+	}
+	_, err := dbConn.Exec(fullSchemaSQL)
 	return err
 }
 
@@ -520,6 +473,9 @@ func main() {
 	mux.HandleFunc("POST /api/admin/init-db", handleInitDB)
 	mux.HandleFunc("GET /api/admin/init-db", handleInitDB)
 
+	// Geo / Location автоопределение
+	mux.HandleFunc("GET /api/geo/detect", handleGeoDetect)
+
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
 	if distDir == "" {
@@ -673,6 +629,62 @@ func handleInitDB(w http.ResponseWriter, r *http.Request) {
 			"connected": true,
 			"env":       envKey,
 			"tables":    []string{"users", "posts", "messages"},
+		},
+	})
+}
+
+// GET /api/geo/detect — Автоопределение страны по заголовкам Cloudflare / прокси / IP
+func handleGeoDetect(w http.ResponseWriter, r *http.Request) {
+	country := strings.ToUpper(strings.TrimSpace(r.Header.Get("CF-IPCountry")))
+	if country == "" {
+		country = strings.ToUpper(strings.TrimSpace(r.Header.Get("X-Country-Code")))
+	}
+	if country == "" {
+		country = "RU"
+	}
+
+	countryName := "Россия"
+	dialCode := "+7"
+
+	switch country {
+	case "RU":
+		countryName = "Россия"; dialCode = "+7"
+	case "BY":
+		countryName = "Беларусь"; dialCode = "+375"
+	case "KZ":
+		countryName = "Казахстан"; dialCode = "+7"
+	case "UZ":
+		countryName = "Узбекистан"; dialCode = "+998"
+	case "KG":
+		countryName = "Кыргызстан"; dialCode = "+996"
+	case "TJ":
+		countryName = "Таджикистан"; dialCode = "+992"
+	case "AM":
+		countryName = "Армения"; dialCode = "+374"
+	case "AZ":
+		countryName = "Азербайджан"; dialCode = "+994"
+	case "GE":
+		countryName = "Грузия"; dialCode = "+995"
+	case "MD":
+		countryName = "Молдова"; dialCode = "+373"
+	case "UA":
+		countryName = "Украина"; dialCode = "+380"
+	case "TR":
+		countryName = "Турция"; dialCode = "+90"
+	case "AE":
+		countryName = "ОАЭ"; dialCode = "+971"
+	case "US":
+		countryName = "США"; dialCode = "+1"
+	case "DE":
+		countryName = "Германия"; dialCode = "+49"
+	}
+
+	writeJSON(w, http.StatusOK, Response{
+		Status: "ok",
+		Data: map[string]string{
+			"country":     country,
+			"countryName": countryName,
+			"dialCode":    dialCode,
 		},
 	})
 }
@@ -915,6 +927,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		BeliefType    string `json:"beliefType"`
 		BeliefPrivacy string `json:"beliefPrivacy"`
 		Avatar        string `json:"avatar"`
+		Location      string `json:"location"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Некорректные данные запроса"})
@@ -989,11 +1002,17 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	salt := generateSalt(16)
 	hash := hashPassword(req.Password, salt)
 
+	loc := strings.TrimSpace(req.Location)
+	if loc == "" {
+		loc = "Россия"
+	}
+
 	newUser := User{
 		ID:             newID,
 		Name:           strings.TrimSpace(req.Name),
 		Username:       cleanUsername,
 		Avatar:         avatar,
+		Location:       loc,
 		Online:         true,
 		Role:           role,
 		BeliefType:     req.BeliefType,
@@ -1007,14 +1026,14 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	// Сохранение в PostgreSQL, если БД подключена
 	if db != nil {
 		insertQuery := `
-		INSERT INTO users (id, name, username, email_or_phone, password_hash, salt, avatar, role, belief_type, belief_privacy, followers_count, following_count, critics_count, posts_count, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		INSERT INTO users (id, name, username, email_or_phone, password_hash, salt, avatar, location, role, belief_type, belief_privacy, followers_count, following_count, critics_count, posts_count, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		`
-		_, err := db.Exec(insertQuery, newID, newUser.Name, cleanUsername, cleanEmailOrPhone, hash, salt, avatar, role, req.BeliefType, req.BeliefPrivacy, 1, 0, 0, 0, time.Now())
+		_, err := db.Exec(insertQuery, newID, newUser.Name, cleanUsername, cleanEmailOrPhone, hash, salt, avatar, loc, role, req.BeliefType, req.BeliefPrivacy, 1, 0, 0, 0, time.Now())
 		if err != nil {
 			log.Printf("⚠️ Ошибка сохранения пользователя в Postgres: %v", err)
 		} else {
-			log.Printf("💾 Пользователь %s (@%s) успешно сохранён в PostgreSQL!", newUser.Name, cleanUsername)
+			log.Printf("💾 Пользователь %s (@%s, %s) успешно сохранён в PostgreSQL!", newUser.Name, cleanUsername, loc)
 		}
 	}
 

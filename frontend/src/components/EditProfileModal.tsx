@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { 
   X, Camera, MapPin, Globe, Sparkles, Shield, ShoppingBag, 
   Video, User as UserIcon, Check, Image as ImageIcon,
-  Flame, Award, Eye, Calendar, Moon, Sun
+  Flame, Award, Eye, Calendar, Moon, Sun, Compass
 } from 'lucide-react';
 import { 
   currentUser, type User, type UserRole, type BeliefPrivacy, 
@@ -10,6 +10,7 @@ import {
 } from '../data/mock';
 import { spiritualAudio } from '../utils/spiritualAudio';
 import { calculateZodiacProfile, type ZodiacInfo } from '../utils/astrology';
+import { detectUserCityAndCountry } from '../utils/countryDetect';
 import { ReligionSymbol } from './ReligionSymbols';
 import './EditProfileModal.css';
 
@@ -81,6 +82,7 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
   const [role, setRole] = useState<UserRole>(currentUser.role || 'creator');
   const [beliefType, setBeliefType] = useState<string>(currentUser.beliefType || 'Христианство');
   const [beliefPrivacy, setBeliefPrivacy] = useState<BeliefPrivacy>(currentUser.beliefPrivacy || 'public');
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   // Личные данные: Дата рождения, Знак зодиака, Пол
   const [birthDate, setBirthDate] = useState(currentUser.birthDate || '1995-04-12');
@@ -309,7 +311,29 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
               {/* Location & Website */}
               <div className="form-two-cols">
                 <div className="edit-field-group">
-                  <label className="edit-field-label">Город / Страна</label>
+                  <div className="edit-field-header-flex">
+                    <label className="edit-field-label">Город / Страна</label>
+                    <button
+                      type="button"
+                      className="auto-detect-location-btn"
+                      disabled={isDetectingLocation}
+                      onClick={async () => {
+                        setIsDetectingLocation(true);
+                        try {
+                          const res = await detectUserCityAndCountry();
+                          if (res && res.fullLocation) {
+                            setLocation(res.fullLocation);
+                          }
+                        } finally {
+                          setIsDetectingLocation(false);
+                        }
+                      }}
+                      title="Определить город и страну автоматически"
+                    >
+                      <Compass size={12} className={isDetectingLocation ? 'spin-anim' : ''} />
+                      {isDetectingLocation ? 'Определяем...' : 'Автоопределить'}
+                    </button>
+                  </div>
                   <div className="input-with-icon-left">
                     <MapPin size={16} className="input-icon-left" />
                     <input

@@ -454,6 +454,23 @@
   color: #334155;
 }
 
+.auth-field-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.auth-detected-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #10B981;
+  background: rgba(16, 185, 129, 0.08);
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
 .auth-input-wrapper {
   position: relative;
   display: flex;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { 
-  X, Mail, Lock, Phone, User as UserIcon, Shield, CheckCircle2, 
+  X, Mail, Lock, User as UserIcon, Shield, CheckCircle2, 
   ShoppingBag, Video, ArrowRight, Check, Compass, Info, AlertCircle, Sparkles, LogIn, UserPlus, QrCode, Smartphone
 } from 'lucide-react';
 import { RELIGIONS_CATALOG, type UserRole, type BeliefPrivacy } from '../data/mock';
@@ -8,6 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { LegalModal } from './LegalModal';
 import { SacredQrLogo } from './SacredQrLogo';
+import { CountryPhoneInput } from './CountryPhoneInput';
+import { type CountryInfo } from '../utils/countryDetect';
 import logoImg from '../assets/logo.png';
 import './AuthModal.css';
 
@@ -33,6 +35,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
+  const [detectedCountry, setDetectedCountry] = useState<CountryInfo | null>(null);
   const [selectedRole, setSelectedRole] = useState<UserRole>('user');
   const [selectedBeliefId, setSelectedBeliefId] = useState<string>('christianity');
   const [beliefPrivacy, setBeliefPrivacy] = useState<BeliefPrivacy>('public');
@@ -101,6 +104,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         role: selectedRole,
         beliefType: selectedBeliefId === 'none' ? 'Не указывать / Личное' : selectedReligion.name,
         beliefPrivacy,
+        location: detectedCountry ? detectedCountry.nameRu : 'Россия',
       });
 
       if (!res.success) {
@@ -273,17 +277,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     {mode === 'login' && (
                       <>
                         <div className="auth-field">
-                          <label>{t('auth.modal.contact_label')}</label>
-                          <div className="auth-input-wrapper">
-                            <Mail size={17} className="auth-input-icon" />
-                            <input 
-                              type="text" 
-                              placeholder="+7 (___) ___-__-__ или email" 
-                              value={emailOrPhone}
-                              onChange={e => setEmailOrPhone(e.target.value)}
-                              required 
-                            />
+                          <div className="auth-field-header-row">
+                            <label>{t('auth.modal.contact_label')}</label>
+                            {detectedCountry && (
+                              <span className="auth-detected-badge" title="Страна определена автоматически">
+                                📍 {detectedCountry.nameRu}
+                              </span>
+                            )}
                           </div>
+                          <CountryPhoneInput
+                            value={emailOrPhone}
+                            onChange={(val) => setEmailOrPhone(val)}
+                            onCountryDetected={(c) => setDetectedCountry(c)}
+                            placeholder="+7 (___) ___-__-__ или email"
+                            required
+                          />
                         </div>
 
                         <div className="auth-field">
@@ -293,7 +301,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             <input 
                               type="password" 
                               placeholder="••••••••" 
-                              value={password}
+                              value={password} 
                               onChange={e => setPassword(e.target.value)}
                             />
                           </div>
@@ -348,17 +356,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         </div>
 
                         <div className="auth-field">
-                          <label>{t('auth.modal.contact_label')}</label>
-                          <div className="auth-input-wrapper">
-                            <Phone size={17} className="auth-input-icon" />
-                            <input 
-                              type="text" 
-                              placeholder={t('auth.modal.contact_placeholder')}
-                              value={emailOrPhone}
-                              onChange={e => setEmailOrPhone(e.target.value)}
-                              required 
-                            />
+                          <div className="auth-field-header-row">
+                            <label>{t('auth.modal.contact_label')}</label>
+                            {detectedCountry && (
+                              <span className="auth-detected-badge" title="Страна определена автоматически">
+                                📍 {detectedCountry.nameRu}
+                              </span>
+                            )}
                           </div>
+                          <CountryPhoneInput
+                            value={emailOrPhone}
+                            onChange={(val) => setEmailOrPhone(val)}
+                            onCountryDetected={(c) => setDetectedCountry(c)}
+                            placeholder={t('auth.modal.contact_placeholder')}
+                            required
+                          />
                         </div>
 
                         <div className="auth-field">
