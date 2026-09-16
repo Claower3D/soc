@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -32,6 +33,9 @@ type Response struct {
 type HealthCheck struct {
 	Uptime    string `json:"uptime"`
 	Timestamp string `json:"timestamp"`
+	Database  string `json:"database"`
+	DBEnv     string `json:"dbEnv,omitempty"`
+	DBError   string `json:"dbError,omitempty"`
 }
 
 // User — пользователь платформы New Age.
@@ -121,36 +125,62 @@ var jwtSecretKey = func() []byte {
 	return []byte(k)
 }()
 
-// Глобальное подключение к PostgreSQL (если задана DATABASE_URL)
-var db *sql.DB
+// Глобальное подключение к PostgreSQL и переменные состояния
+var (
+	db            *sql.DB
+	dbMu          sync.RWMutex
+	dbStatus      = "initializing"
+	dbStatusError = ""
+	dbEnvKeyUsed  = ""
+)
 
-func initDB() {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		log.Println("ℹ️ Переменная DATABASE_URL не задана. Работа в in-memory режиме.")
-		return
+// getDatabaseURL ищет строку подключения к PostgreSQL в стандартных переменных Railway, Render и Heroku
+func getDatabaseURL() (string, string) {
+	keys := []string{
+		"DATABASE_URL",
+		"DATABASE_PRIVATE_URL",
+		"DATABASE_PUBLIC_URL",
+		"POSTGRES_URL",
+		"POSTGRESQL_URL",
+		"RAILWAY_DATABASE_URL",
 	}
 
-	var err error
-	db, err = sql.Open("postgres", dbURL)
-	if err != nil {
-		log.Printf("⚠️ Ошибка открытия соединения с PostgreSQL: %v", err)
-		return
+	for _, k := range keys {
+		if val := strings.TrimSpace(os.Getenv(k)); val != "" {
+			return val, k
+		}
 	}
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
-
-	if err := db.Ping(); err != nil {
-		log.Printf("⚠️ Не удалось связаться с PostgreSQL (%v). Используется in-memory хранилище.", err)
-		return
+	// Раздельные переменные PGHOST, PGUSER, PGPORT, PGPASSWORD, PGDATABASE
+	host := strings.TrimSpace(os.Getenv("PGHOST"))
+	if host != "" {
+		port := strings.TrimSpace(os.Getenv("PGPORT"))
+		if port == "" {
+			port = "5432"
+		}
+		user := strings.TrimSpace(os.Getenv("PGUSER"))
+		if user == "" {
+			user = "postgres"
+		}
+		pass := strings.TrimSpace(os.Getenv("PGPASSWORD"))
+		dbname := strings.TrimSpace(os.Getenv("PGDATABASE"))
+		if dbname == "" {
+			dbname = "railway"
+		}
+		sslMode := strings.TrimSpace(os.Getenv("PGSSLMODE"))
+		if sslMode == "" {
+			sslMode = "disable"
+		}
+		url := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", user, pass, host, port, dbname, sslMode)
+		return url, "PGHOST"
 	}
 
-	log.Println("✅ Успешное подключение к PostgreSQL на Railway!")
+	return "", ""
+}
 
-	// Создание таблицы пользователей при первом запуске
-	createTableQuery := `
+// createTables создает все необходимые таблицы и индексы в PostgreSQL
+func createTables(dbConn *sql.DB) error {
+	schema := `
 	CREATE TABLE IF NOT EXISTS users (
 		id VARCHAR(64) PRIMARY KEY,
 		name VARCHAR(255) NOT NULL,
@@ -159,10 +189,12 @@ func initDB() {
 		password_hash VARCHAR(255) NOT NULL,
 		salt VARCHAR(64) NOT NULL,
 		avatar TEXT,
-		cover_image TEXT,
-		bio TEXT,
-		website TEXT,
-		location TEXT,
+		cover_image TEXT DEFAULT '',
+		bio TEXT DEFAULT '',
+		website TEXT DEFAULT '',
+		location TEXT DEFAULT '',
+		birth_date VARCHAR(50) DEFAULT '',
+		zodiac_sign VARCHAR(50) DEFAULT '',
 		role VARCHAR(50) DEFAULT 'user',
 		belief_type VARCHAR(100) DEFAULT '',
 		belief_privacy VARCHAR(50) DEFAULT 'public',
@@ -173,14 +205,129 @@ func initDB() {
 		posts_count INT DEFAULT 0,
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 	);
+
 	CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 	CREATE INDEX IF NOT EXISTS idx_users_email_or_phone ON users(email_or_phone);
+
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date VARCHAR(50) DEFAULT '';
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS zodiac_sign VARCHAR(50) DEFAULT '';
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_image TEXT DEFAULT '';
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS website TEXT DEFAULT '';
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS location TEXT DEFAULT '';
+
+	CREATE TABLE IF NOT EXISTS posts (
+		id VARCHAR(64) PRIMARY KEY,
+		user_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
+		image TEXT,
+		caption TEXT,
+		likes INT DEFAULT 0,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
+
+	CREATE TABLE IF NOT EXISTS messages (
+		id VARCHAR(64) PRIMARY KEY,
+		chat_id VARCHAR(64) NOT NULL,
+		sender_id VARCHAR(64) NOT NULL,
+		text TEXT NOT NULL,
+		is_read BOOLEAN DEFAULT FALSE,
+		created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
 	`
-	if _, err := db.Exec(createTableQuery); err != nil {
-		log.Printf("⚠️ Ошибка создания таблицы users: %v", err)
-	} else {
-		log.Println("✅ Схема базы данных users проверена и готова к работе.")
+	_, err := dbConn.Exec(schema)
+	return err
+}
+
+func connectAndMigrate(dbURL string) (*sql.DB, error) {
+	conn, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		return nil, err
 	}
+	conn.SetMaxOpenConns(25)
+	conn.SetMaxIdleConns(5)
+	conn.SetConnMaxLifetime(5 * time.Minute)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+
+	if err := conn.PingContext(ctx); err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	if err := createTables(conn); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("ошибка создания таблиц в БД: %w", err)
+	}
+
+	return conn, nil
+}
+
+func initDB() {
+	dbURL, envKey := getDatabaseURL()
+	if dbURL == "" {
+		dbMu.Lock()
+		dbStatus = "in_memory (no database variable)"
+		dbMu.Unlock()
+		log.Println("ℹ️ Переменная базы данных (DATABASE_URL/POSTGRES_URL/PGHOST) не обнаружена.")
+		log.Println("👉 ВАЖНО: В панели Railway свяжите сервис PostgreSQL с сервисом приложения через Reference Variable DATABASE_URL.")
+		log.Println("ℹ️ Сервер продолжает работу в in-memory режиме.")
+		return
+	}
+
+	log.Printf("🔌 Найдена конфигурация БД из переменной '%s'. Попытка подключения...", envKey)
+
+	var lastErr error
+	for attempt := 1; attempt <= 5; attempt++ {
+		conn, err := connectAndMigrate(dbURL)
+		if err == nil {
+			dbMu.Lock()
+			db = conn
+			dbStatus = "connected"
+			dbEnvKeyUsed = envKey
+			dbStatusError = ""
+			dbMu.Unlock()
+			log.Printf("✅ Успешное подключение к PostgreSQL на Railway (из переменной %s)!", envKey)
+			log.Println("✅ Схема базы данных (таблицы users, posts, messages) проверена и готова к работе!")
+			return
+		}
+		lastErr = err
+		log.Printf("⏳ Попытка подключения к Postgres %d/5 не удалась (%v). Повтор через 2с...", attempt, err)
+		time.Sleep(2 * time.Second)
+	}
+
+	dbMu.Lock()
+	dbStatus = "connecting_retry"
+	dbStatusError = lastErr.Error()
+	dbMu.Unlock()
+	log.Printf("⚠️ Первые попытки подключения не удались (%v). Запускаем фоновый реконнект...", lastErr)
+
+	go func() {
+		for i := 1; i <= 30; i++ {
+			time.Sleep(5 * time.Second)
+			currentURL, currentKey := getDatabaseURL()
+			if currentURL == "" {
+				continue
+			}
+			conn, err := connectAndMigrate(currentURL)
+			if err == nil {
+				dbMu.Lock()
+				db = conn
+				dbStatus = "connected"
+				dbEnvKeyUsed = currentKey
+				dbStatusError = ""
+				dbMu.Unlock()
+				log.Printf("✅ [Фоновое подключение] Успешное подключение к PostgreSQL (%s)!", currentKey)
+				log.Println("✅ [Фоновое подключение] Таблицы users, posts, messages успешно созданы!")
+				return
+			}
+		}
+		dbMu.Lock()
+		dbStatus = "failed"
+		dbMu.Unlock()
+		log.Println("❌ Не удалось подключиться к PostgreSQL после серии фоновых попыток. Используется in-memory режим.")
+	}()
 }
 
 // Хранилище аккаунтов (In-memory + fallback)
@@ -368,6 +515,11 @@ func main() {
 	mux.HandleFunc("GET /api/auth/me", handleAuthMe)
 	mux.HandleFunc("GET /api/auth/check-username", handleCheckUsername)
 
+	// DB Admin эндпоинты
+	mux.HandleFunc("GET /api/admin/db-status", handleDBStatus)
+	mux.HandleFunc("POST /api/admin/init-db", handleInitDB)
+	mux.HandleFunc("GET /api/admin/init-db", handleInitDB)
+
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
 	if distDir == "" {
@@ -425,11 +577,102 @@ func corsMiddleware(next http.Handler) http.Handler {
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
+	dbMu.RLock()
+	st := dbStatus
+	envKey := dbEnvKeyUsed
+	errStr := dbStatusError
+	dbMu.RUnlock()
+
 	writeJSON(w, http.StatusOK, Response{
 		Status: "ok",
 		Data: HealthCheck{
 			Uptime:    time.Since(startTime).String(),
 			Timestamp: time.Now().Format(time.RFC3339),
+			Database:  st,
+			DBEnv:     envKey,
+			DBError:   errStr,
+		},
+	})
+}
+
+func handleDBStatus(w http.ResponseWriter, r *http.Request) {
+	dbMu.RLock()
+	isConnected := db != nil
+	st := dbStatus
+	envKey := dbEnvKeyUsed
+	errStr := dbStatusError
+	dbMu.RUnlock()
+
+	tables := []string{}
+	if isConnected {
+		rows, err := db.Query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name")
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var tName string
+				if err := rows.Scan(&tName); err == nil {
+					tables = append(tables, tName)
+				}
+			}
+		}
+	}
+
+	_, detectedKey := getDatabaseURL()
+
+	writeJSON(w, http.StatusOK, Response{
+		Status: "ok",
+		Data: map[string]interface{}{
+			"connected":    isConnected,
+			"status":       st,
+			"detected_env": detectedKey,
+			"active_env":   envKey,
+			"tables":       tables,
+			"tables_count": len(tables),
+			"error":        errStr,
+			"railway_hint": "Для привязки базы в Railway: Сервис бэкенда -> Variables -> Add Variable -> Add Reference -> Postgres -> DATABASE_URL",
+		},
+	})
+}
+
+func handleInitDB(w http.ResponseWriter, r *http.Request) {
+	dbURL, envKey := getDatabaseURL()
+	if dbURL == "" {
+		writeJSON(w, http.StatusBadRequest, Response{
+			Status:  "error",
+			Message: "Не найдена переменная окружения DATABASE_URL или POSTGRES_URL в сервисе Railway.",
+			Data: map[string]string{
+				"instruction": "Перейдите в веб-сервис на Railway -> Variables -> Add Variable -> Add Reference -> выберите Postgres -> DATABASE_URL",
+			},
+		})
+		return
+	}
+
+	conn, err := connectAndMigrate(dbURL)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, Response{
+			Status:  "error",
+			Message: fmt.Sprintf("Ошибка создания таблиц в PostgreSQL: %v", err),
+		})
+		return
+	}
+
+	dbMu.Lock()
+	if db != nil {
+		db.Close()
+	}
+	db = conn
+	dbStatus = "connected"
+	dbEnvKeyUsed = envKey
+	dbStatusError = ""
+	dbMu.Unlock()
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: "✅ Таблицы (users, posts, messages) успешно созданы в PostgreSQL!",
+		Data: map[string]interface{}{
+			"connected": true,
+			"env":       envKey,
+			"tables":    []string{"users", "posts", "messages"},
 		},
 	})
 }
