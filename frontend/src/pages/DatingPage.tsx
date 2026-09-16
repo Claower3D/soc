@@ -4,7 +4,7 @@ import {
   Heart, Sparkles, Search, MapPin, 
   MessageCircle, ShieldCheck, Edit3, 
   ChevronRight, ArrowRight, Users,
-  Check, RotateCcw, Filter, SlidersHorizontal, X,
+  Check, RotateCcw, Filter, X,
   Navigation, Globe
 } from 'lucide-react';
 import { 
@@ -380,46 +380,6 @@ export const DatingPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Goal Filter Pills (Любовь, Друзья, Односознавцы, Семья, Творчество...) & Filter Button */}
-      <div className="dating-goals-filter-bar-wrap">
-        <div className="dating-goals-filter-bar">
-          <button 
-            className={`goal-filter-pill ${selectedGoalFilter === 'all' ? 'active' : ''}`}
-            onClick={() => {
-              setSelectedGoalFilter('all');
-              setCurrentSwipeIndex(0);
-            }}
-          >
-            <span>✨ Все цели</span>
-          </button>
-          {DATING_GOALS.map(goal => (
-            <button 
-              key={goal.id}
-              className={`goal-filter-pill ${selectedGoalFilter === goal.id ? 'active' : ''}`}
-              onClick={() => {
-                setSelectedGoalFilter(goal.id);
-                setCurrentSwipeIndex(0);
-              }}
-            >
-              <span>{goal.icon} {goal.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Prominent Filter Toggle Button */}
-        <button 
-          className={`btn-toggle-filters ${isFiltersOpen || activeFiltersCount > 0 ? 'active' : ''}`}
-          onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-          title="Открыть расширенные фильтры"
-        >
-          <SlidersHorizontal size={16} />
-          <span>Фильтры</span>
-          {activeFiltersCount > 0 && (
-            <span className="filter-count-badge">{activeFiltersCount}</span>
-          )}
-        </button>
-      </div>
-
       {/* Collapsible / Expandable Advanced Filter Panel */}
       {isFiltersOpen && (
         <div className="dating-expanded-filter-panel">
@@ -440,6 +400,26 @@ export const DatingPage: React.FC = () => {
           </div>
 
           <div className="filter-panel-grid">
+            {/* Цель знакомства */}
+            <div className="filter-field-group">
+              <label className="filter-label">Цель знакомства:</label>
+              <select 
+                value={selectedGoalFilter} 
+                onChange={e => {
+                  setSelectedGoalFilter(e.target.value);
+                  setCurrentSwipeIndex(0);
+                }}
+                className="filter-panel-select"
+              >
+                <option value="all">✨ Все цели</option>
+                {DATING_GOALS.map(goal => (
+                  <option key={goal.id} value={goal.id}>
+                    {goal.icon} {goal.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Пол */}
             <div className="filter-field-group">
               <label className="filter-label">Кого вы ищете:</label>
