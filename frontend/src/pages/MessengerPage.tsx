@@ -93,6 +93,8 @@ export function MessengerPage() {
           onBack={() => setActiveChatId(null)} 
           onDeleteChat={handleDeleteChat}
           onUpdateChat={handleUpdateChat}
+          availableChats={chatList}
+          onSelectChat={handleSelectChat}
         />
       </div>
     </div>

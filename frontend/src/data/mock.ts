@@ -286,6 +286,7 @@ export interface Message {
   text?: string;
   fromMe: boolean;
   time: string;
+  forwardedFrom?: string;
   mediaUrl?: string;
   mediaType?: 'image' | 'voice' | 'file' | 'video_note' | 'poll' | 'event' | 'product' | 'contact' | 'sticker' | 'gif' | 'audio' | 'document';
   voiceDuration?: string;

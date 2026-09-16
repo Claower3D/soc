@@ -12,7 +12,7 @@ import {
 import { 
   type Chat, type Message, type PollData, type EventData, 
   type ProductData, type ContactData, type ChatTheme, CHAT_THEMES, 
-  initialUsers, initialProducts 
+  initialUsers, initialProducts, chats as defaultChats 
 } from '../data/mock';
 import './ChatWindow.css';
 
@@ -21,6 +21,8 @@ interface ChatWindowProps {
   onBack: () => void;
   onDeleteChat?: (chatId: string) => void;
   onUpdateChat?: (chatId: string, updates: Partial<Chat>) => void;
+  availableChats?: Chat[];
+  onSelectChat?: (id: string) => void;
 }
 
 import { 
@@ -33,7 +35,7 @@ import { cacheService } from '../utils/cacheService';
 
 const REACTION_EMOJIS = ['❤️', '👍', '👎', '🔥', '🥰', '👏', '😂'];
 
-export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWindowProps) {
+export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, availableChats, onSelectChat }: ChatWindowProps) {
   const navigate = useNavigate();
   const [inputValue, setInputValue] = useState(() => {
     return chat?.id ? (cacheService.get<string>(`chat_draft_${chat.id}`) || '') : '';
@@ -115,6 +117,14 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
 
   // Selected messages mode
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
+
+  // Forward Message Modal State (Telegram Forward Dialog)
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [messagesToForward, setMessagesToForward] = useState<Message[]>([]);
+  const [forwardSearchQuery, setForwardSearchQuery] = useState('');
+  const [selectedTargetChatId, setSelectedTargetChatId] = useState<string | null>(null);
+  const [forwardComment, setForwardComment] = useState('');
+  const [forwardToastMessage, setForwardToastMessage] = useState<string | null>(null);
 
   // Close context menu on any outside click
   useEffect(() => {
@@ -300,9 +310,13 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
     setContextMenu({ visible: false, x: 0, y: 0, message: null });
   };
 
-  // Forward simulated
+  // Forward single message (Opens Telegram Forward Modal)
   const handleForwardMessage = (msg: Message) => {
-    alert(`Сообщение «${(msg.text || 'Медиа').slice(0, 30)}...» скопировано для пересылки!`);
+    setMessagesToForward([msg]);
+    setSelectedTargetChatId(null);
+    setForwardComment('');
+    setForwardSearchQuery('');
+    setShowForwardModal(true);
     setContextMenu({ visible: false, x: 0, y: 0, message: null });
   };
 
@@ -341,11 +355,86 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
     }
   };
 
+  // Forward selected messages (Opens Telegram Forward Modal)
   const handleForwardSelected = () => {
     if (selectedMessageIds.length === 0) return;
-    const count = selectedMessageIds.length;
-    alert(`Выбрано для пересылки: ${getSelectedCountText(count)}`);
+    const toForward = messages.filter(m => selectedMessageIds.includes(m.id));
+    setMessagesToForward(toForward);
+    setSelectedTargetChatId(null);
+    setForwardComment('');
+    setForwardSearchQuery('');
+    setShowForwardModal(true);
+  };
+
+  // Execute Telegram message forwarding
+  const handleConfirmForward = () => {
+    if (!selectedTargetChatId || messagesToForward.length === 0) return;
+
+    const targetList = availableChats || defaultChats;
+    const targetChat = targetList.find(c => c.id === selectedTargetChatId);
+    if (!targetChat) return;
+
+    const senderName = chat?.user.name || (chat?.isGroup ? chat.groupTitle : 'Пользователь');
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Build new forwarded messages with forwardedFrom label
+    const newForwardedMsgs: Message[] = messagesToForward.map((origMsg, idx) => ({
+      ...origMsg,
+      id: `fwd_${Date.now()}_${idx}`,
+      fromMe: true,
+      time: nowTime,
+      forwardedFrom: origMsg.forwardedFrom || (origMsg.fromMe ? 'Вы' : senderName),
+      status: 'sent' as const,
+      reactions: []
+    }));
+
+    // If there's an additional comment entered by user
+    if (forwardComment.trim()) {
+      newForwardedMsgs.push({
+        id: `fwd_cmt_${Date.now()}`,
+        text: forwardComment.trim(),
+        fromMe: true,
+        time: nowTime,
+        status: 'sent' as const
+      });
+    }
+
+    const countText = getSelectedCountText(messagesToForward.length);
+    const targetChatName = targetChat.groupTitle || targetChat.user.name;
+
+    // If forwarded to the current active chat
+    if (chat && targetChat.id === chat.id) {
+      setMessages(prev => [...prev, ...newForwardedMsgs]);
+      if (onUpdateChat) {
+        onUpdateChat(chat.id, {
+          messages: [...messages, ...newForwardedMsgs]
+        });
+      }
+    } else {
+      // Forwarded to another chat
+      if (onUpdateChat) {
+        onUpdateChat(targetChat.id, {
+          messages: [...targetChat.messages, ...newForwardedMsgs],
+          unread: (targetChat.unread || 0) + 1
+        });
+      }
+      // Switch to the target chat so user sees their forwarded message
+      if (onSelectChat) {
+        onSelectChat(targetChat.id);
+      }
+    }
+
+    // Show temporary toast notification
+    setForwardToastMessage(`${countText} переслано в «${targetChatName}»`);
+    setTimeout(() => {
+      setForwardToastMessage(null);
+    }, 3500);
+
+    setShowForwardModal(false);
     setSelectedMessageIds([]);
+    setMessagesToForward([]);
+    setForwardComment('');
+    setSelectedTargetChatId(null);
   };
 
   const handleCancelSelection = () => {
@@ -1402,6 +1491,14 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
                           : (currentTheme.bubbleThemColor || undefined),
                       }}
                     >
+                      {/* Telegram Forwarded Header */}
+                      {msg.forwardedFrom && (
+                        <div className="tg-forwarded-bubble-header">
+                          <Forward size={12} className="tg-forward-header-icon" />
+                          <span>Переслано от <strong>{msg.forwardedFrom}</strong></span>
+                        </div>
+                      )}
+
                       {/* Conference Recording Card */}
                       {isRec && msg.conferenceRecording && (
                         <div className="tg-rec-card">
@@ -2592,6 +2689,151 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TELEGRAM FORWARD MODAL (EXACT TELEGRAM STYLE) */}
+      {showForwardModal && (
+        <div className="tg-modal-overlay" onClick={() => setShowForwardModal(false)}>
+          <div className="tg-forward-modal-card" onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="tg-forward-modal-head">
+              <div>
+                <h3 className="tg-forward-title">Переслать сообщение</h3>
+                <span className="tg-forward-subtitle">
+                  {getSelectedCountText(messagesToForward.length)}
+                </span>
+              </div>
+              <button 
+                type="button" 
+                className="tg-forward-close-btn"
+                onClick={() => setShowForwardModal(false)}
+                title="Закрыть"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Preview of messages being forwarded */}
+            <div className="tg-forward-preview-strip">
+              <Forward size={14} className="preview-fwd-icon" />
+              <div className="preview-text-box">
+                <span className="preview-sender">
+                  {chat?.user.name || 'Диалог'}:
+                </span>
+                <span className="preview-snippet">
+                  {messagesToForward.map(m => m.text || (m.mediaType === 'image' ? 'Фотография' : m.mediaType === 'voice' ? 'Голосовое сообщение' : 'Медиа')).join(' • ').slice(0, 65)}
+                  {messagesToForward.map(m => m.text || '').join('').length > 65 ? '...' : ''}
+                </span>
+              </div>
+            </div>
+
+            {/* Search chats field */}
+            <div className="tg-forward-search-box">
+              <Search size={16} className="forward-search-icon" />
+              <input
+                type="text"
+                placeholder="Поиск чатов и контактов..."
+                value={forwardSearchQuery}
+                onChange={e => setForwardSearchQuery(e.target.value)}
+                autoFocus
+              />
+              {forwardSearchQuery && (
+                <button 
+                  type="button" 
+                  className="search-clear-btn"
+                  onClick={() => setForwardSearchQuery('')}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Chats and Contacts list */}
+            <div className="tg-forward-chats-list">
+              {((availableChats || defaultChats).filter(c => 
+                c.user.name.toLowerCase().includes(forwardSearchQuery.toLowerCase()) ||
+                (c.groupTitle && c.groupTitle.toLowerCase().includes(forwardSearchQuery.toLowerCase())) ||
+                c.user.username.toLowerCase().includes(forwardSearchQuery.toLowerCase())
+              )).map(c => {
+                const isSelected = selectedTargetChatId === c.id;
+                const chatDisplayName = c.groupTitle || c.user.name;
+                return (
+                  <div
+                    key={c.id}
+                    className={`tg-forward-chat-item ${isSelected ? 'selected' : ''}`}
+                    onClick={() => setSelectedTargetChatId(c.id)}
+                  >
+                    <div className="forward-chat-avatar-wrap">
+                      <img src={c.user.avatar} alt={chatDisplayName} className="forward-chat-avatar" />
+                      {c.user.online && <span className="forward-online-dot" />}
+                    </div>
+
+                    <div className="forward-chat-info">
+                      <div className="forward-chat-name-row">
+                        <span className="forward-chat-name">{chatDisplayName}</span>
+                        {c.isGroup && <span className="forward-group-tag">Группа</span>}
+                      </div>
+                      <span className="forward-chat-meta">
+                        {c.user.online ? 'в сети' : `@${c.user.username}`}
+                      </span>
+                    </div>
+
+                    <div className={`forward-radio-circle ${isSelected ? 'checked' : ''}`}>
+                      {isSelected && <Check size={13} strokeWidth={3} />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Optional Comment Input */}
+            <div className="tg-forward-comment-row">
+              <input
+                type="text"
+                placeholder="Добавить комментарий к пересылке..."
+                value={forwardComment}
+                onChange={e => setForwardComment(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && selectedTargetChatId) {
+                    handleConfirmForward();
+                  }
+                }}
+              />
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="tg-forward-modal-foot">
+              <button
+                type="button"
+                className="btn-forward-cancel"
+                onClick={() => setShowForwardModal(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="btn-forward-submit"
+                disabled={!selectedTargetChatId}
+                onClick={handleConfirmForward}
+              >
+                <Forward size={16} />
+                <span>
+                  {selectedTargetChatId 
+                    ? `Отправить в ${(availableChats || defaultChats).find(c => c.id === selectedTargetChatId)?.user.name || 'чат'}` 
+                    : 'Выберите чат для отправки'}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Temporary Toast for Forward success */}
+      {forwardToastMessage && (
+        <div className="tg-forward-toast-banner">
+          <Check size={16} className="toast-icon" />
+          <span>{forwardToastMessage}</span>
         </div>
       )}
     </div>
