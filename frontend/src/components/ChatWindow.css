@@ -1072,90 +1072,297 @@
   }
 }
 
-/* ==================== STICKERS, EMOJIS & GIF POPUP TABS ==================== */
-.tg-media-tabs-popover {
+/* ==================== TELEGRAM STICKERS, EMOJIS & GIF POPUP TABS (EXACT MATCH) ==================== */
+.telegram-stickers-popup {
   position: absolute;
-  bottom: calc(100% + 10px);
-  right: 1.25rem;
-  width: 340px;
-  max-width: calc(100vw - 2.5rem);
-  background: #18222d;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
-  z-index: 120;
+  bottom: calc(100% + 8px);
+  right: 1rem;
+  width: 390px;
+  max-width: calc(100vw - 2rem);
+  height: 480px;
+  max-height: 70vh;
+  background: #212121;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  z-index: 130;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: fadeIn 0.15s ease;
+  animation: fadeInScale 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.media-tabs-header {
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 1. Top Pack Icons Carousel (Screenshot: Bookmark, Avatar 1, Avatar 2...) */
+.tg-sticker-top-packs-bar {
   display: flex;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.2);
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 8px;
+  background: #212121;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  scrollbar-width: none;
+  flex-shrink: 0;
 }
 
-.media-tab-btn {
-  flex: 1;
-  padding: 10px 0;
+.tg-sticker-top-packs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.tg-top-pack-item {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: transparent;
-  border: none;
-  color: #94a3b8;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  border: 1px solid transparent;
+  color: #a1a1aa;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
 }
 
-.media-tab-btn.active {
-  color: #a855f7;
-  border-bottom: 2px solid #a855f7;
-  background: rgba(168, 85, 247, 0.08);
+.tg-top-pack-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
-.media-tabs-body {
-  height: 250px;
+.tg-top-pack-item.active {
+  background: rgba(168, 85, 247, 0.18);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #c084fc;
+}
+
+.fav-pack-icon {
+  color: #a1a1aa;
+}
+
+.tg-top-pack-item.active .fav-pack-icon {
+  color: #c084fc;
+}
+
+.top-pack-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+/* 2. Search & Reaction Filters Row (Screenshot: 🔍 Поиск стикеров + ❤️ 👍 👎 🎉 😀 😢) */
+.tg-sticker-search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #212121;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  flex-shrink: 0;
+}
+
+.tg-sticker-search-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #2b2b2b;
+  border-radius: 12px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.tg-sticker-search-input-wrap:focus-within {
+  border-color: #52525b;
+}
+
+.search-icon-muted {
+  color: #71717a;
+  flex-shrink: 0;
+}
+
+.tg-sticker-search-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: #ffffff;
+  padding: 0;
+}
+
+.tg-sticker-search-field::placeholder {
+  color: #71717a;
+}
+
+.clear-search-btn {
+  background: none;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.tg-sticker-reaction-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tg-reaction-filter-btn {
+  background: transparent;
+  border: none;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 3px 5px;
+  border-radius: 8px;
+  transition: transform 0.12s, background 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tg-reaction-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(1.15);
+}
+
+.tg-reaction-filter-btn.active {
+  background: rgba(255, 255, 255, 0.16);
+  transform: scale(1.2);
+}
+
+/* 3. Main Content Scroll Area */
+.tg-stickers-content-scroll {
+  flex: 1;
   overflow-y: auto;
-  padding: 10px;
+  padding: 10px 14px;
+  background: #212121;
 }
 
-/* Stickers grid */
-.stickers-grid {
+.tg-stickers-content-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.tg-stickers-content-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.tg-sticker-sections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tg-sticker-pack-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tg-sticker-pack-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #a1a1aa;
+  text-align: center;
+  padding: 2px 0 4px;
+  letter-spacing: 0.2px;
+}
+
+.tg-stickers-grid-cells {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
 }
 
-.sticker-cell-btn {
+.tg-sticker-single-item {
   background: transparent;
   border: none;
   cursor: pointer;
   padding: 6px;
-  border-radius: 10px;
-  transition: transform 0.2s, background 0.2s;
+  border-radius: 12px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  position: relative;
+  transition: transform 0.15s ease, background 0.15s ease;
 }
 
-.sticker-cell-btn:hover {
-  transform: scale(1.1);
+.tg-sticker-single-item:hover {
+  transform: scale(1.12);
   background: rgba(255, 255, 255, 0.06);
 }
 
-.sticker-cell-img {
-  width: 72px;
-  height: 72px;
+.tg-sticker-img {
+  width: 68px;
+  height: 68px;
   object-fit: contain;
 }
 
-/* GIF grid */
+.tg-sticker-emoji-pip {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 10px;
+  opacity: 0.8;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+}
+
+/* Emojis Pane */
+.tg-emojis-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.emoji-grid-expanded {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+.emoji-large-cell {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.emoji-large-cell:hover {
+  transform: scale(1.25);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* GIF Pane */
+.tg-gifs-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .gifs-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1171,7 +1378,7 @@
   position: relative;
   aspect-ratio: 4 / 3;
   padding: 0;
-  transition: transform 0.2s;
+  transition: transform 0.15s;
 }
 
 .gif-cell-btn:hover {
@@ -1193,6 +1400,50 @@
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+/* 4. Bottom Telegram Navigation Bar (🔍, 😊, 🐱/✨, 🎬 GIF) */
+.tg-sticker-bottom-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 8px 12px;
+  background: #181818;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.tg-bottom-tab-icon {
+  background: transparent;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.tg-bottom-tab-icon:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tg-bottom-tab-icon.active {
+  color: #c084fc;
+  background: rgba(168, 85, 247, 0.14);
+}
+
+.gif-text-icon {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  border: 1.5px solid currentColor;
+  border-radius: 5px;
+  padding: 1px 4px;
+  line-height: 1;
 }
 
 /* ==================== STYLED ATTACH MENU (EXACT SCREENSHOT MATCH) ==================== */

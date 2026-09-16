@@ -7,7 +7,7 @@ import {
   CheckCheck, X, Trash2, Edit2, Reply, Copy, Check, MoreVertical,
   Camera, FileText, Headphones, UserCheck, BarChart2, Calendar, 
   Sparkles, ShoppingBag, Zap, VolumeX, Palette, Archive, ArchiveRestore, Lock, Unlock,
-  Pin, Languages, Forward, CheckSquare
+  Pin, Languages, Forward, CheckSquare, Search, Bookmark
 } from 'lucide-react';
 import { 
   type Chat, type Message, type PollData, type EventData, 
@@ -26,13 +26,78 @@ interface ChatWindowProps {
 const quickEmojis = ['😊', '😂', '🔥', '👍', '❤️', '🚀', '🎉', '👏', '👀', '💯', '🙌', '✨', '🧘', '🌟', '💎', '🕊️', '🤝', '🌞', '💡', '🌈'];
 const REACTION_EMOJIS = ['❤️', '👍', '👎', '🔥', '🥰', '👏', '😂'];
 
-const stickerPacks = [
-  { id: 'stk_1', title: 'Осознанность', url: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=250&q=80' },
-  { id: 'stk_2', title: 'Сердце', url: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=250&q=80' },
-  { id: 'stk_3', title: 'Медитация', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=250&q=80' },
-  { id: 'stk_4', title: 'Энергия', url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=250&q=80' },
-  { id: 'stk_5', title: 'Океан', url: 'https://images.unsplash.com/photo-1507525428033-b723cf961d3e?auto=format&fit=crop&w=250&q=80' },
-  { id: 'stk_6', title: 'Космос', url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=250&q=80' }
+interface StickerItem {
+  id: string;
+  url: string;
+  emoji?: string;
+  isFavorite?: boolean;
+}
+
+interface StickerPack {
+  id: string;
+  title: string;
+  avatar: string;
+  stickers: StickerItem[];
+}
+
+const TELEGRAM_STICKER_PACKS: StickerPack[] = [
+  {
+    id: 'pack_fav',
+    title: 'Избранные',
+    avatar: '⭐',
+    stickers: [
+      { id: 'fav_1', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80', emoji: '🧑‍🏫', isFavorite: true },
+      { id: 'fav_2', url: 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=250&q=80', emoji: '❤️', isFavorite: true },
+      { id: 'fav_3', url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=250&q=80', emoji: '🔥', isFavorite: true },
+    ]
+  },
+  {
+    id: 'pack_meeseeks',
+    title: 'Mr. Meeseeks',
+    avatar: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=100&q=80',
+    stickers: [
+      { id: 'ms_1', url: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=250&q=80', emoji: '😃' },
+      { id: 'ms_2', url: 'https://images.unsplash.com/photo-1563089145-599997674d42?auto=format&fit=crop&w=250&q=80', emoji: '❤️' },
+      { id: 'ms_3', url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=250&q=80', emoji: '👍' },
+      { id: 'ms_4', url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=250&q=80', emoji: '😱' },
+      { id: 'ms_5', url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=250&q=80', emoji: '👋' },
+      { id: 'ms_6', url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=250&q=80', emoji: '🌧️' },
+      { id: 'ms_7', url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=250&q=80', emoji: '🤔' },
+      { id: 'ms_8', url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=250&q=80', emoji: '🎉' },
+      { id: 'ms_9', url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=250&q=80', emoji: '😡' },
+      { id: 'ms_10', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=250&q=80', emoji: '✨' },
+    ]
+  },
+  {
+    id: 'pack_pepe',
+    title: 'Pepe & Frog Mood',
+    avatar: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=100&q=80',
+    stickers: [
+      { id: 'pe_1', url: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=250&q=80', emoji: '🧘' },
+      { id: 'pe_2', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=250&q=80', emoji: '🌿' },
+      { id: 'pe_3', url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=250&q=80', emoji: '🌌' },
+      { id: 'pe_4', url: 'https://images.unsplash.com/photo-1542332213-9b5a5a3fad35?auto=format&fit=crop&w=250&q=80', emoji: '🔥' },
+    ]
+  },
+  {
+    id: 'pack_borat',
+    title: 'Classic Cinema & Memes',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=100&q=80',
+    stickers: [
+      { id: 'bm_1', url: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80', emoji: '👍' },
+      { id: 'bm_2', url: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=250&q=80', emoji: '👌' },
+      { id: 'bm_3', url: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=250&q=80', emoji: '👏' },
+    ]
+  }
+];
+
+const STICKER_QUICK_REACTIONS = [
+  { emoji: '❤️', label: 'Любовь' },
+  { emoji: '👍', label: 'Лайк' },
+  { emoji: '👎', label: 'Дизлайк' },
+  { emoji: '🎉', label: 'Праздник' },
+  { emoji: '😀', label: 'Улыбка' },
+  { emoji: '😢', label: 'Грусть' },
 ];
 
 const sampleGifs = [
@@ -67,7 +132,10 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
   // Popups & Attachments
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showMediaTabs, setShowMediaTabs] = useState(false);
-  const [activeMediaTab, setActiveMediaTab] = useState<'emoji' | 'stickers' | 'gif'>('emoji');
+  const [activeMediaTab, setActiveMediaTab] = useState<'search' | 'emoji' | 'stickers' | 'gif'>('stickers');
+  const [stickerSearchQuery, setStickerSearchQuery] = useState('');
+  const [selectedStickerPackId, setSelectedStickerPackId] = useState<string>('pack_fav');
+  const [stickerReactionFilter, setStickerReactionFilter] = useState<string | null>(null);
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [selectedRecording, setSelectedRecording] = useState<{ title: string; duration: string } | null>(null);
 
@@ -1587,76 +1655,197 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWin
           />
         )}
 
-{/* STICKERS, EMOJIS & GIF POPUP TABS */}
+{/* TELEGRAM STICKERS, EMOJIS & GIF POPUP TABS (EXACT SCREENSHOT MATCH) */}
       {showMediaTabs && (
-        <div className="tg-media-tabs-popover">
-          <div className="media-tabs-header">
-            <button 
-              className={`media-tab-btn ${activeMediaTab === 'emoji' ? 'active' : ''}`}
-              onClick={() => setActiveMediaTab('emoji')}
-            >
-              <Smile size={16} /> Эмодзи
-            </button>
-            <button 
-              className={`media-tab-btn ${activeMediaTab === 'stickers' ? 'active' : ''}`}
-              onClick={() => setActiveMediaTab('stickers')}
-            >
-              <Sparkles size={16} /> Стикеры
-            </button>
-            <button 
-              className={`media-tab-btn ${activeMediaTab === 'gif' ? 'active' : ''}`}
-              onClick={() => setActiveMediaTab('gif')}
-            >
-              <Zap size={16} /> GIF
-            </button>
+        <div className="tg-media-tabs-popover telegram-stickers-popup" onClick={e => e.stopPropagation()}>
+          {/* Top Pack Icons Carousel Dock (Screenshot: Bookmark/Favorites, Mr. Meeseeks, Pepe, Memes) */}
+          <div className="tg-sticker-top-packs-bar">
+            {TELEGRAM_STICKER_PACKS.map(pack => (
+              <button
+                key={pack.id}
+                type="button"
+                className={`tg-top-pack-item ${selectedStickerPackId === pack.id ? 'active' : ''}`}
+                onClick={() => {
+                  setSelectedStickerPackId(pack.id);
+                  setActiveMediaTab('stickers');
+                  const el = document.getElementById(`section_${pack.id}`);
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }}
+                title={pack.title}
+              >
+                {pack.id === 'pack_fav' ? (
+                  <Bookmark size={18} className="fav-pack-icon" />
+                ) : (
+                  <img src={pack.avatar} alt={pack.title} className="top-pack-thumb" />
+                )}
+              </button>
+            ))}
           </div>
 
-          <div className="media-tabs-body">
-            {activeMediaTab === 'emoji' && (
-              <div className="emoji-grid">
-                {quickEmojis.map(emoji => (
-                  <button
-                    key={emoji}
-                    className="emoji-cell"
-                    onClick={() => {
-                      setInputValue(prev => prev + emoji);
-                    }}
-                  >
-                    {emoji}
-                  </button>
-                ))}
+          {/* Search bar with emoji quick filters (Screenshot: 🔍 Поиск стикеров + ❤️ 👍 👎 🎉 😀 😢) */}
+          <div className="tg-sticker-search-row">
+            <div className="tg-sticker-search-input-wrap">
+              <Search size={15} className="search-icon-muted" />
+              <input 
+                type="text"
+                className="tg-sticker-search-field"
+                placeholder="Поиск стикеров"
+                value={stickerSearchQuery}
+                onChange={(e) => {
+                  setStickerSearchQuery(e.target.value);
+                  if (stickerReactionFilter) setStickerReactionFilter(null);
+                }}
+              />
+              {stickerSearchQuery && (
+                <button type="button" className="clear-search-btn" onClick={() => setStickerSearchQuery('')}>
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            <div className="tg-sticker-reaction-pills">
+              {STICKER_QUICK_REACTIONS.map(rx => (
+                <button
+                  key={rx.emoji}
+                  type="button"
+                  className={`tg-reaction-filter-btn ${stickerReactionFilter === rx.emoji ? 'active' : ''}`}
+                  onClick={() => {
+                    setStickerReactionFilter(prev => prev === rx.emoji ? null : rx.emoji);
+                    setStickerSearchQuery('');
+                  }}
+                  title={rx.label}
+                >
+                  {rx.emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Main Media Content Area */}
+          <div className="tg-stickers-content-scroll">
+            {activeMediaTab === 'stickers' && (
+              <div className="tg-sticker-sections-list">
+                {TELEGRAM_STICKER_PACKS.map(pack => {
+                  let filteredStickers = pack.stickers;
+                  if (stickerReactionFilter) {
+                    filteredStickers = filteredStickers.filter(s => s.emoji === stickerReactionFilter);
+                  }
+                  if (stickerSearchQuery.trim()) {
+                    const q = stickerSearchQuery.toLowerCase();
+                    filteredStickers = filteredStickers.filter(s => 
+                      pack.title.toLowerCase().includes(q) || (s.emoji && s.emoji.includes(q))
+                    );
+                  }
+
+                  if (filteredStickers.length === 0 && (stickerReactionFilter || stickerSearchQuery)) {
+                    return null;
+                  }
+
+                  return (
+                    <div key={pack.id} id={`section_${pack.id}`} className="tg-sticker-pack-section">
+                      <div className="tg-sticker-pack-title">
+                        {pack.title}
+                      </div>
+
+                      <div className="tg-stickers-grid-cells">
+                        {filteredStickers.map(stk => (
+                          <button
+                            key={stk.id}
+                            type="button"
+                            className="tg-sticker-single-item"
+                            onClick={() => handleSendSticker(stk.url)}
+                            title={`${pack.title} ${stk.emoji || ''}`}
+                          >
+                            <img src={stk.url} alt="Sticker" className="tg-sticker-img" />
+                            {stk.emoji && <span className="tg-sticker-emoji-pip">{stk.emoji}</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
-            {activeMediaTab === 'stickers' && (
-              <div className="stickers-grid">
-                {stickerPacks.map(stk => (
-                  <button 
-                    key={stk.id} 
-                    className="sticker-cell-btn"
-                    onClick={() => handleSendSticker(stk.url)}
-                    title={stk.title}
-                  >
-                    <img src={stk.url} alt={stk.title} className="sticker-cell-img" />
-                  </button>
-                ))}
+            {activeMediaTab === 'emoji' && (
+              <div className="tg-emojis-pane">
+                <div className="tg-sticker-pack-title">Все эмодзи</div>
+                <div className="emoji-grid-expanded">
+                  {quickEmojis.map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className="emoji-large-cell"
+                      onClick={() => setInputValue(prev => prev + emoji)}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
             {activeMediaTab === 'gif' && (
-              <div className="gifs-grid">
-                {sampleGifs.map(g => (
-                  <button 
-                    key={g.id} 
-                    className="gif-cell-btn"
-                    onClick={() => handleSendGif(g.url)}
-                  >
-                    <img src={g.url} alt={g.title} className="gif-cell-img" />
-                    <span className="gif-title-tag">{g.title}</span>
-                  </button>
-                ))}
+              <div className="tg-gifs-pane">
+                <div className="tg-sticker-pack-title">Популярные GIF</div>
+                <div className="gifs-grid">
+                  {sampleGifs.map(g => (
+                    <button 
+                      key={g.id} 
+                      type="button"
+                      className="gif-cell-btn"
+                      onClick={() => handleSendGif(g.url)}
+                    >
+                      <img src={g.url} alt={g.title} className="gif-cell-img" />
+                      <span className="gif-title-tag">{g.title}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
+          </div>
+
+          {/* Bottom Telegram Navigation Bar (🔍 Search, 😊 Emoji, 🐱 Stickers, 🎬 GIF) */}
+          <div className="tg-sticker-bottom-nav">
+            <button
+              type="button"
+              className="tg-bottom-tab-icon search"
+              onClick={() => {
+                setActiveMediaTab('stickers');
+                const inp = document.querySelector('.tg-sticker-search-field') as HTMLInputElement;
+                inp?.focus();
+              }}
+              title="Поиск"
+            >
+              <Search size={19} />
+            </button>
+
+            <button
+              type="button"
+              className={`tg-bottom-tab-icon ${activeMediaTab === 'emoji' ? 'active' : ''}`}
+              onClick={() => setActiveMediaTab('emoji')}
+              title="Эмодзи"
+            >
+              <Smile size={20} />
+            </button>
+
+            <button
+              type="button"
+              className={`tg-bottom-tab-icon ${activeMediaTab === 'stickers' ? 'active' : ''}`}
+              onClick={() => setActiveMediaTab('stickers')}
+              title="Стикеры"
+            >
+              <Sparkles size={20} />
+            </button>
+
+            <button
+              type="button"
+              className={`tg-bottom-tab-icon ${activeMediaTab === 'gif' ? 'active' : ''}`}
+              onClick={() => setActiveMediaTab('gif')}
+              title="GIF"
+            >
+              <span className="gif-text-icon">GIF</span>
+            </button>
           </div>
         </div>
       )}
