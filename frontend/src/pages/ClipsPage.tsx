@@ -2,12 +2,15 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, 
-  Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send, Smile
+  Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send, Smile,
+  Radio, Users, Sparkles, Flame
 } from 'lucide-react';
 import { initialClips } from '../data/mock';
 import type { Clip, ClipComment } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import './ClipsPage.css';
+
+type ClipTab = 'all' | 'live' | 'trending';
 
 export function ClipsPage() {
   const { currentUser, isAuthenticated, openAuthModal } = useAuth();
@@ -15,7 +18,11 @@ export function ClipsPage() {
     const saved = localStorage.getItem('newage_clips_state');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Ensure new live clips from mock are always present
+        const ids = new Set(parsed.map((c: Clip) => c.id));
+        const missing = initialClips.filter(c => !ids.has(c.id));
+        return [...missing, ...parsed];
       } catch (e) {
         console.error('Failed to parse saved clips', e);
       }
@@ -23,6 +30,7 @@ export function ClipsPage() {
     return initialClips;
   });
 
+  const [activeTab, setActiveTab] = useState<ClipTab>('all');
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -244,8 +252,43 @@ export function ClipsPage() {
     return num.toString();
   };
 
+  const displayedClips = clips.filter(c => {
+    if (activeTab === 'live') return c.isLive;
+    if (activeTab === 'trending') return c.likesCount > 10000;
+    return true;
+  });
+
   return (
     <div className="clips-page-container">
+      {/* Category Tab Selector (Все / LIVE 🔴 / Тренды) */}
+      <div className="clips-category-nav-bar">
+        <button 
+          type="button" 
+          className={`clips-cat-tab ${activeTab === 'all' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('all'); setActiveIndex(0); scrollToClip(0); }}
+        >
+          <Sparkles size={14} />
+          <span>Все клипы</span>
+        </button>
+        <button 
+          type="button" 
+          className={`clips-cat-tab live-tab ${activeTab === 'live' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('live'); setActiveIndex(0); scrollToClip(0); }}
+        >
+          <Radio size={14} className="clip-live-pulse-icon" />
+          <span>Прямой эфир • LIVE</span>
+          <span className="clips-live-dot" />
+        </button>
+        <button 
+          type="button" 
+          className={`clips-cat-tab ${activeTab === 'trending' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('trending'); setActiveIndex(0); scrollToClip(0); }}
+        >
+          <Flame size={14} />
+          <span>В тренде</span>
+        </button>
+      </div>
+
       <div className="clips-feed-wrapper">
         <div className="clip-nav-arrows">
           <button 
@@ -261,7 +304,7 @@ export function ClipsPage() {
             type="button"
             className="clip-arrow-btn" 
             onClick={() => scrollToClip(activeIndex + 1)}
-            disabled={activeIndex === clips.length - 1}
+            disabled={activeIndex === displayedClips.length - 1}
             title="Следующий клип"
           >
             <ChevronDown size={22} />
@@ -269,7 +312,7 @@ export function ClipsPage() {
         </div>
 
         <div className="clips-feed" ref={feedRef} onScroll={handleScroll}>
-          {clips.map((clip, index) => {
+          {displayedClips.map((clip, index) => {
             const isCurrent = index === activeIndex;
             const isFollowed = followedAuthors[clip.user.id];
             const isCaptionExpanded = expandedCaptions[clip.id];
@@ -280,10 +323,22 @@ export function ClipsPage() {
                 <div className="clip-video-wrapper">
                   {/* Top Floating Badge */}
                   <div className="clip-top-bar">
-                    <div className="clip-brand-tag">
-                      <span className="clip-brand-dot" />
-                      <span>Reels • New Age</span>
-                    </div>
+                    {clip.isLive ? (
+                      <div className="clip-live-brand-tag">
+                        <span className="clip-live-flashing-dot" />
+                        <span className="clip-live-text">В ЭФИРЕ • LIVE</span>
+                        {clip.viewersCount && (
+                          <span className="clip-live-viewers">
+                            <Users size={12} /> {clip.viewersCount.toLocaleString('ru-RU')}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="clip-brand-tag">
+                        <span className="clip-brand-dot" />
+                        <span>Reels • New Age</span>
+                      </div>
+                    )}
                     <Link to="/editor" className="clip-create-btn" title="Снять свой ролик">
                       <Plus size={15} />
                       <span>Создать</span>

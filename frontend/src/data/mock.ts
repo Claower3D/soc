@@ -278,6 +278,8 @@ export interface Clip {
   audioTrackArt?: string;
   overlayTitle?: string;
   isHorizontal?: boolean;
+  isLive?: boolean;
+  viewersCount?: number;
 }
 
 export interface PollOption {
@@ -1336,6 +1338,55 @@ export const videos: Video[] = [
 // ==================== КЛИПЫ (ВЕРТИКАЛЬНЫЕ ВИДЕО / REELS) ====================
 
 export const initialClips: Clip[] = [
+  {
+    id: 'clip_live_meditation',
+    user: initialUsers[3], // Екатерина Смирнова
+    poster: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    caption: 'ПРЯМОЙ ЭФИР: Вечерняя медитация тишины и снятия стресса 🕯️ Подключайтесь в круг спокойствия! Задавайте вопросы в прямой эфир.',
+    musicTitle: 'Прямой эфир • Живой звук',
+    musicAuthor: 'Екатерина Смирнова',
+    audioTrackArt: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=100&q=80',
+    isLive: true,
+    viewersCount: 4280,
+    likesCount: 18450,
+    commentsCount: 924,
+    sharesCount: 1820,
+    viewsCount: 65400,
+    isLiked: true,
+    isSaved: false,
+    tags: ['live', 'медитация', 'прямойэфир', 'осознанность'],
+    timeAgo: 'В эфире',
+    comments: [
+      { id: 'c_l1', user: initialUsers[1], text: 'Какой тёплый голос! Очень помогает настроиться на сон ❤️', timeAgo: '1 мин назад', likes: 12 },
+      { id: 'c_l2', user: initialUsers[2], text: 'Привет из Москвы! Дышим вместе 🙏', timeAgo: 'только что', likes: 5 },
+      { id: 'c_l3', user: initialUsers[5], text: 'Энергетика через экран чувствуется!', timeAgo: 'только что', likes: 8 },
+    ]
+  },
+  {
+    id: 'clip_live_gaming',
+    user: initialUsers[4], // Дмитрий Козлов
+    poster: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    caption: 'LIVE СТРИМ: Турнирный финал по киберспорту 🏆 Обсуждаем тактики и общаемся со зрителями! Жмите сердечки!',
+    musicTitle: 'Cyber Arena Live Sound',
+    musicAuthor: 'Dmitry Tech',
+    audioTrackArt: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=100&q=80',
+    isLive: true,
+    viewersCount: 8910,
+    likesCount: 34100,
+    commentsCount: 1450,
+    sharesCount: 3900,
+    viewsCount: 120400,
+    isLiked: false,
+    isSaved: false,
+    tags: ['live', 'киберспорт', 'стрим', 'игры'],
+    timeAgo: 'В эфире',
+    comments: [
+      { id: 'c_l4', user: initialUsers[6], text: 'Вот это камбэк в третьем раунде! 🔥', timeAgo: '2 мин назад', likes: 19 },
+      { id: 'c_l5', user: initialUsers[7], text: 'Топим за победу!', timeAgo: '1 мин назад', likes: 7 },
+    ]
+  },
   {
     id: 'clip_soulhelp',
     user: {

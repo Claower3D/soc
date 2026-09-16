@@ -4,10 +4,82 @@
   height: calc(100vh - 64px);
   background: #000000;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   overflow: hidden;
   user-select: none;
+}
+
+/* Category Navigation Bar (Top Center) */
+.clips-category-nav-bar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(18, 18, 18, 0.75);
+  backdrop-filter: blur(16px);
+  padding: 4px 6px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  z-index: 40;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.clips-cat-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.clips-cat-tab:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.clips-cat-tab.active {
+  background: var(--color-accent);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+}
+
+.clips-cat-tab.live-tab.active {
+  background: #ef4444;
+  box-shadow: 0 2px 12px rgba(239, 68, 68, 0.4);
+}
+
+.clips-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulseLiveDot 1.2s infinite ease-in-out;
+}
+
+.clips-cat-tab.live-tab.active .clips-live-dot {
+  background: #ffffff;
+}
+
+@keyframes pulseLiveDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.4); }
+}
+
+.clip-live-pulse-icon {
+  animation: pulse-badge 1.5s infinite ease-in-out;
 }
 
 /* Feed Wrapper */
@@ -102,6 +174,42 @@
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.3px;
+}
+
+/* LIVE Streaming Brand Tag */
+.clip-live-brand-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  background: rgba(239, 68, 68, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.5);
+}
+
+.clip-live-flashing-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffffff;
+  animation: pulseLiveDot 1s infinite ease-in-out;
+}
+
+.clip-live-viewers {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 7px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .clip-brand-dot {
