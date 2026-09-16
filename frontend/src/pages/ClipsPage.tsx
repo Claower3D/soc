@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, 
-  Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send
+  Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send, Smile
 } from 'lucide-react';
 import { initialClips } from '../data/mock';
 import type { Clip, ClipComment } from '../data/mock';
@@ -484,16 +484,18 @@ export function ClipsPage() {
         <div className="clip-comments-drawer-overlay" onClick={() => setCommentsDrawerOpen(false)}>
           <div className="clip-comments-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="clip-comments-header">
-              <span className="clip-comments-title">
-                Комментарии ({activeClipForComments.comments?.length || 0})
-              </span>
               <button 
                 type="button"
                 className="clip-comments-close" 
                 onClick={() => setCommentsDrawerOpen(false)}
+                title="Закрыть комментарии"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
+              <span className="clip-comments-title">
+                Комментарии
+              </span>
+              <div style={{ width: 24 }} />
             </div>
 
             <div className="clip-comments-list">
@@ -506,20 +508,36 @@ export function ClipsPage() {
                       className="clip-comment-avatar" 
                     />
                     <div className="clip-comment-body">
-                      <span className="clip-comment-author">{c.user.name}</span>
+                      <div className="clip-comment-line">
+                        <span className="clip-comment-author">{c.user.username || c.user.name}</span>
+                        <span className="clip-comment-time">{c.timeAgo}</span>
+                      </div>
                       <p className="clip-comment-text">{c.text}</p>
-                      <div className="clip-comment-footer">
-                        <span>{c.timeAgo}</span>
-                        <button 
-                          type="button"
-                          className="clip-comment-like-btn"
-                          onClick={() => handleLikeComment(c.id)}
-                        >
-                          <Heart size={11} />
-                          <span>{c.likes || 0}</span>
+                      
+                      <div className="clip-comment-subactions">
+                        <button type="button" className="comment-subaction-link" onClick={() => setNewCommentText(`@${c.user.username || c.user.name} `)}>
+                          Ответить
+                        </button>
+                        <button type="button" className="comment-subaction-link">
+                          Показать перевод
                         </button>
                       </div>
+
+                      <div className="comment-replies-row">
+                        <span className="comment-replies-line" />
+                        <span className="comment-replies-text">Смотреть все ответы (1)</span>
+                      </div>
                     </div>
+
+                    <button 
+                      type="button"
+                      className="clip-comment-like-btn"
+                      onClick={() => handleLikeComment(c.id)}
+                      title="Нравится"
+                    >
+                      <Heart size={14} fill={(c.likes || 0) > 0 ? '#ef4444' : 'none'} color={(c.likes || 0) > 0 ? '#ef4444' : '#8e8e8e'} />
+                      {(c.likes || 0) > 0 && <span className="comment-like-count">{c.likes}</span>}
+                    </button>
                   </div>
                 ))
               ) : (
@@ -530,22 +548,39 @@ export function ClipsPage() {
             </div>
 
             <form className="clip-comment-input-form" onSubmit={handleAddComment}>
-              <input 
-                type="text" 
-                className="clip-comment-input"
-                placeholder={isAuthenticated ? 'Оставить комментарий...' : 'Войдите, чтобы комментировать'}
-                value={newCommentText}
-                onChange={(e) => setNewCommentText(e.target.value)}
-                disabled={!isAuthenticated}
+              <img 
+                src={currentUser.avatar} 
+                alt={currentUser.name} 
+                className="clip-comment-my-avatar"
               />
-              <button 
-                type="submit" 
-                className="clip-comment-send-btn"
-                disabled={!isAuthenticated || !newCommentText.trim()}
-                title="Отправить комментарий"
-              >
-                <Send size={15} />
-              </button>
+              <div className="clip-comment-input-wrap">
+                <input 
+                  type="text" 
+                  className="clip-comment-input"
+                  placeholder={isAuthenticated ? 'Добавьте комментарий...' : 'Войдите, чтобы комментировать'}
+                  value={newCommentText}
+                  onChange={(e) => setNewCommentText(e.target.value)}
+                  disabled={!isAuthenticated}
+                />
+                <button 
+                  type="button" 
+                  className="clip-comment-emoji-btn"
+                  title="Эмодзи"
+                  onClick={() => setNewCommentText(prev => prev + '❤️')}
+                >
+                  <Smile size={18} />
+                </button>
+              </div>
+              {newCommentText.trim() && (
+                <button 
+                  type="submit" 
+                  className="clip-comment-send-btn"
+                  disabled={!isAuthenticated || !newCommentText.trim()}
+                  title="Опубликовать"
+                >
+                  <Send size={15} />
+                </button>
+              )}
             </form>
           </div>
         </div>

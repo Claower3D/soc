@@ -524,30 +524,44 @@
   cursor: not-allowed;
 }
 
-/* Comments Modal / Drawer */
+/* Comments Modal / Drawer (Instagram Desktop Floating Panel - Screenshot 1) */
 .clip-comments-drawer-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 40;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 50;
   display: flex;
-  flex-direction: column;
   justify-content: flex-end;
+  align-items: center;
+  padding-right: 24px;
   animation: fadeIn 0.2s ease;
 }
 
 .clip-comments-drawer {
-  background: #111827;
-  border-top-left-radius: 20px;
-  border-top-right-radius: 20px;
-  height: 65%;
-  max-height: 520px;
+  background: #18181b;
+  border-radius: 16px;
+  width: 375px;
+  max-width: 90vw;
+  height: calc(100vh - 120px);
+  max-height: 640px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.7);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  animation: popInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 @keyframes slideUp {
@@ -569,29 +583,32 @@
 }
 
 .clip-comments-header {
-  padding: 14px 18px;
+  padding: 14px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
 }
 
 .clip-comments-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
-  color: #fff;
+  color: #ffffff;
+  letter-spacing: 0.2px;
 }
 
 .clip-comments-close {
   background: none;
   border: none;
-  color: #94a3b8;
+  color: #a1a1aa;
   cursor: pointer;
   padding: 4px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.15s ease;
 }
 
 .clip-comments-close:hover {
@@ -602,21 +619,31 @@
 .clip-comments-list {
   flex: 1;
   overflow-y: auto;
-  padding: 14px 18px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
+}
+
+.clip-comments-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.clip-comments-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
 }
 
 .clip-comment-item {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: flex-start;
+  position: relative;
 }
 
 .clip-comment-avatar {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
@@ -626,96 +653,199 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  min-width: 0;
+}
+
+.clip-comment-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
 }
 
 .clip-comment-author {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  color: #e2e8f0;
+  color: #f4f4f5;
+  cursor: pointer;
+}
+
+.clip-comment-author:hover {
+  text-decoration: underline;
+}
+
+.clip-comment-time {
+  font-size: 12px;
+  color: #71717a;
 }
 
 .clip-comment-text {
   font-size: 13px;
-  color: #cbd5e1;
-  line-height: 1.35;
+  color: #e4e4e7;
+  line-height: 1.4;
   word-break: break-word;
 }
 
-.clip-comment-footer {
+.clip-comment-subactions {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 11px;
-  color: #64748b;
-  margin-top: 3px;
+  margin-top: 2px;
+}
+
+.comment-subaction-link {
+  background: none;
+  border: none;
+  color: #71717a;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.comment-subaction-link:hover {
+  color: #d4d4d8;
+}
+
+.comment-replies-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+  cursor: pointer;
+}
+
+.comment-replies-line {
+  width: 24px;
+  height: 1px;
+  background: #3f3f46;
+}
+
+.comment-replies-text {
+  font-size: 12px;
+  color: #71717a;
+  font-weight: 600;
+}
+
+.comment-replies-row:hover .comment-replies-text {
+  color: #a1a1aa;
 }
 
 .clip-comment-like-btn {
   background: none;
   border: none;
-  color: #64748b;
+  color: #71717a;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 0;
-  font-size: 11px;
+  gap: 2px;
+  padding: 4px;
+  margin-top: 2px;
+  transition: transform 0.15s;
 }
 
 .clip-comment-like-btn:hover {
-  color: #ef4444;
+  transform: scale(1.15);
+}
+
+.comment-like-count {
+  font-size: 10px;
+  color: #71717a;
 }
 
 .clip-comments-empty {
   text-align: center;
-  color: #64748b;
+  color: #71717a;
   font-size: 13px;
   margin: auto;
 }
 
+/* Bottom Comment Input Form (Screenshot 1: avatar + pill input with emoji inside) */
 .clip-comment-input-form {
   padding: 12px 16px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: #0d121f;
+  background: #18181b;
+  flex-shrink: 0;
+}
+
+.clip-comment-my-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.clip-comment-input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #27272a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 2px 8px 2px 14px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.clip-comment-input-wrap:focus-within {
+  border-color: #52525b;
+  background: #27272a;
 }
 
 .clip-comment-input {
   flex: 1;
-  background: #1e293b;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  outline: none;
   font-size: 13px;
   color: #fff;
-  outline: none;
-  transition: border-color 0.2s;
+  padding: 6px 0;
 }
 
-.clip-comment-input:focus {
-  border-color: #a855f7;
+.clip-comment-input::placeholder {
+  color: #71717a;
+}
+
+.clip-comment-emoji-btn {
+  background: none;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+.clip-comment-emoji-btn:hover {
+  color: #f4f4f5;
 }
 
 .clip-comment-send-btn {
-  background: #7c3aed;
+  background: #8b5cf6;
   border: none;
   color: #fff;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  flex-shrink: 0;
+  transition: all 0.15s;
 }
 
 .clip-comment-send-btn:hover:not(:disabled) {
-  background: #9333ea;
-  transform: scale(1.05);
+  background: #7c3aed;
+  transform: scale(1.06);
 }
 
 .clip-comment-send-btn:disabled {
@@ -755,5 +885,21 @@
   .clip-bottom-info {
     right: 64px;
     padding-bottom: 16px;
+  }
+
+  /* Bottom sheet on mobile devices */
+  .clip-comments-drawer-overlay {
+    justify-content: flex-end;
+    align-items: flex-end;
+    padding-right: 0;
+  }
+
+  .clip-comments-drawer {
+    width: 100%;
+    max-width: 100%;
+    height: 70%;
+    max-height: 540px;
+    border-radius: 20px 20px 0 0;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 }
