@@ -3,7 +3,7 @@ import {
   Heart, Sparkles, Search, MapPin, 
   MessageCircle, ShieldCheck, Edit3, 
   ChevronRight, ArrowRight, Users,
-  Check, RotateCcw
+  Check, RotateCcw, Filter, SlidersHorizontal, X
 } from 'lucide-react';
 import { 
   INITIAL_DATING_PROFILES, 
@@ -61,6 +61,31 @@ export const DatingPage: React.FC = () => {
   const [selectedCity, setSelectedCity] = useState('all');
   const [genderFilter, setGenderFilter] = useState<'all' | 'male' | 'female'>('all');
   const [consciousnessFilter, setConsciousnessFilter] = useState<string>('all');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [minAgeFilter, setMinAgeFilter] = useState<number>(18);
+  const [maxAgeFilter, setMaxAgeFilter] = useState<number>(80);
+
+  // Подсчёт активных фильтров (кроме строки поиска)
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (selectedGoalFilter !== 'all') count++;
+    if (genderFilter !== 'all') count++;
+    if (selectedCity !== 'all') count++;
+    if (consciousnessFilter !== 'all') count++;
+    if (minAgeFilter > 18 || maxAgeFilter < 80) count++;
+    return count;
+  }, [selectedGoalFilter, genderFilter, selectedCity, consciousnessFilter, minAgeFilter, maxAgeFilter]);
+
+  const handleResetFilters = () => {
+    setSelectedGoalFilter('all');
+    setGenderFilter('all');
+    setSelectedCity('all');
+    setConsciousnessFilter('all');
+    setMinAgeFilter(18);
+    setMaxAgeFilter(80);
+    setSearchQuery('');
+    setCurrentSwipeIndex(0);
+  };
 
   // Модальные окна
   const [inspectedProfile, setInspectedProfile] = useState<DatingProfile | null>(null);
@@ -98,6 +123,11 @@ export const DatingPage: React.FC = () => {
         if (profile.consciousnessLevel !== Number(consciousnessFilter)) return false;
       }
 
+      // Фильтр по возрасту
+      if (profile.age < minAgeFilter || profile.age > maxAgeFilter) {
+        return false;
+      }
+
       // Поисковый запрос по имени, городу, увлечениям
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -110,7 +140,7 @@ export const DatingPage: React.FC = () => {
 
       return true;
     });
-  }, [profiles, myProfile, selectedGoalFilter, genderFilter, selectedCity, consciousnessFilter, searchQuery]);
+  }, [profiles, myProfile, selectedGoalFilter, genderFilter, selectedCity, consciousnessFilter, minAgeFilter, maxAgeFilter, searchQuery]);
 
   // Карточки для ленты свайпа
   const activeSwipeCard = filteredProfiles[currentSwipeIndex] || null;
@@ -233,32 +263,164 @@ export const DatingPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Goal Filter Pills (Любовь, Друзья, Односознавцы, Семья, Творчество...) */}
-      <div className="dating-goals-filter-bar">
-        <button 
-          className={`goal-filter-pill ${selectedGoalFilter === 'all' ? 'active' : ''}`}
-          onClick={() => {
-            setSelectedGoalFilter('all');
-            setCurrentSwipeIndex(0);
-          }}
-        >
-          <span>✨ Все цели</span>
-        </button>
-        {DATING_GOALS.map(goal => (
+      {/* Goal Filter Pills (Любовь, Друзья, Односознавцы, Семья, Творчество...) & Filter Button */}
+      <div className="dating-goals-filter-bar-wrap">
+        <div className="dating-goals-filter-bar">
           <button 
-            key={goal.id}
-            className={`goal-filter-pill ${selectedGoalFilter === goal.id ? 'active' : ''}`}
+            className={`goal-filter-pill ${selectedGoalFilter === 'all' ? 'active' : ''}`}
             onClick={() => {
-              setSelectedGoalFilter(goal.id);
+              setSelectedGoalFilter('all');
               setCurrentSwipeIndex(0);
             }}
           >
-            <span>{goal.icon} {goal.label}</span>
+            <span>✨ Все цели</span>
           </button>
-        ))}
+          {DATING_GOALS.map(goal => (
+            <button 
+              key={goal.id}
+              className={`goal-filter-pill ${selectedGoalFilter === goal.id ? 'active' : ''}`}
+              onClick={() => {
+                setSelectedGoalFilter(goal.id);
+                setCurrentSwipeIndex(0);
+              }}
+            >
+              <span>{goal.icon} {goal.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Prominent Filter Toggle Button */}
+        <button 
+          className={`btn-toggle-filters ${isFiltersOpen || activeFiltersCount > 0 ? 'active' : ''}`}
+          onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+          title="Открыть расширенные фильтры"
+        >
+          <SlidersHorizontal size={16} />
+          <span>Фильтры</span>
+          {activeFiltersCount > 0 && (
+            <span className="filter-count-badge">{activeFiltersCount}</span>
+          )}
+        </button>
       </div>
 
-      {/* Secondary Search and Dropdown Filters */}
+      {/* Collapsible / Expandable Advanced Filter Panel */}
+      {isFiltersOpen && (
+        <div className="dating-expanded-filter-panel">
+          <div className="filter-panel-header">
+            <div className="filter-panel-title">
+              <Filter size={16} />
+              <span>Параметры поиска и фильтрации</span>
+            </div>
+            {activeFiltersCount > 0 && (
+              <button 
+                className="btn-reset-filters"
+                onClick={handleResetFilters}
+              >
+                <RotateCcw size={14} />
+                <span>Сбросить ({activeFiltersCount})</span>
+              </button>
+            )}
+          </div>
+
+          <div className="filter-panel-grid">
+            {/* Пол */}
+            <div className="filter-field-group">
+              <label className="filter-label">Кого вы ищете:</label>
+              <div className="filter-segmented-control">
+                <button 
+                  className={`segmented-btn ${genderFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => { setGenderFilter('all'); setCurrentSwipeIndex(0); }}
+                >
+                  Всех
+                </button>
+                <button 
+                  className={`segmented-btn ${genderFilter === 'female' ? 'active' : ''}`}
+                  onClick={() => { setGenderFilter('female'); setCurrentSwipeIndex(0); }}
+                >
+                  Девушек
+                </button>
+                <button 
+                  className={`segmented-btn ${genderFilter === 'male' ? 'active' : ''}`}
+                  onClick={() => { setGenderFilter('male'); setCurrentSwipeIndex(0); }}
+                >
+                  Парней
+                </button>
+              </div>
+            </div>
+
+            {/* Возраст */}
+            <div className="filter-field-group">
+              <label className="filter-label">Возраст: от {minAgeFilter} до {maxAgeFilter} лет</label>
+              <div className="filter-age-inputs">
+                <input 
+                  type="range" 
+                  min="18" 
+                  max="65" 
+                  value={minAgeFilter} 
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    if (val <= maxAgeFilter) setMinAgeFilter(val);
+                    setCurrentSwipeIndex(0);
+                  }}
+                  className="filter-range-slider"
+                  title="Минимальный возраст"
+                />
+                <input 
+                  type="range" 
+                  min="20" 
+                  max="80" 
+                  value={maxAgeFilter} 
+                  onChange={e => {
+                    const val = Number(e.target.value);
+                    if (val >= minAgeFilter) setMaxAgeFilter(val);
+                    setCurrentSwipeIndex(0);
+                  }}
+                  className="filter-range-slider"
+                  title="Максимальный возраст"
+                />
+              </div>
+            </div>
+
+            {/* Город */}
+            <div className="filter-field-group">
+              <label className="filter-label">Локация / Город:</label>
+              <select 
+                value={selectedCity} 
+                onChange={e => {
+                  setSelectedCity(e.target.value);
+                  setCurrentSwipeIndex(0);
+                }}
+                className="filter-panel-select"
+              >
+                <option value="all">🌍 Все города и страны</option>
+                {uniqueCities.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Класс сознания */}
+            <div className="filter-field-group">
+              <label className="filter-label">Класс сознания (1–11):</label>
+              <select 
+                value={consciousnessFilter} 
+                onChange={e => {
+                  setConsciousnessFilter(e.target.value);
+                  setCurrentSwipeIndex(0);
+                }}
+                className="filter-panel-select"
+              >
+                <option value="all">✨ Любой класс сознания</option>
+                {[1,2,3,4,5,6,7,8,9,10,11].map(lvl => (
+                  <option key={lvl} value={String(lvl)}>Класс {lvl} {lvl >= 7 ? '★ Высоковибрационный' : ''}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Secondary Search and Quick Dropdowns */}
       <div className="dating-filters-bar">
         <div className="dating-search-box">
           <Search size={16} className="search-icon" />
@@ -269,12 +431,28 @@ export const DatingPage: React.FC = () => {
               setSearchQuery(e.target.value);
               setCurrentSwipeIndex(0);
             }}
-            placeholder="Поиск по имени, городу, интересам..."
+            placeholder="Поиск по имени, городу, увлечениям..."
             className="dating-search-input"
           />
+          {searchQuery && (
+            <button className="search-clear-btn" onClick={() => setSearchQuery('')}>
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         <div className="filter-selects-row">
+          <button 
+            className={`quick-filter-toggle-btn ${isFiltersOpen ? 'open' : ''}`}
+            onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+          >
+            <Filter size={15} />
+            <span>{isFiltersOpen ? 'Скрыть параметры' : 'Параметры фильтра'}</span>
+            {activeFiltersCount > 0 && (
+              <span className="quick-filter-badge">{activeFiltersCount}</span>
+            )}
+          </button>
+
           <select 
             value={genderFilter} 
             onChange={e => {
@@ -299,20 +477,6 @@ export const DatingPage: React.FC = () => {
             <option value="all">Все города</option>
             {uniqueCities.map(c => (
               <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-
-          <select 
-            value={consciousnessFilter} 
-            onChange={e => {
-              setConsciousnessFilter(e.target.value);
-              setCurrentSwipeIndex(0);
-            }}
-            className="filter-dropdown"
-          >
-            <option value="all">Любой класс сознания</option>
-            {[1,2,3,4,5,6,7,8,9,10,11].map(lvl => (
-              <option key={lvl} value={String(lvl)}>Класс {lvl}</option>
             ))}
           </select>
         </div>
