@@ -21,6 +21,7 @@ import { SpiritualPage } from './pages/SpiritualPage';
 import { MusicPage } from './pages/MusicPage';
 import { GamesPage } from './pages/GamesPage';
 import { FoodDeliveryPage } from './pages/FoodDeliveryPage';
+import { DatingPage } from './pages/DatingPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SearchPage } from './pages/SearchPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -70,6 +71,7 @@ function AppContent() {
             <Route path="/games" element={<GamesPage />} />
             <Route path="/food" element={<FoodDeliveryPage />} />
             <Route path="/delivery" element={<Navigate to="/food" replace />} />
+            <Route path="/dating" element={<DatingPage />} />
             <Route path="/services" element={<ServicesPage />} />
             <Route path="/marketplace" element={<MarketplacePage />} />
             <Route path="/communities" element={<CommunitiesPage />} />

@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   ShoppingBag, Users, Film, Wallet, ShieldAlert, 
   ArrowRight, Sparkles, TrendingUp, Compass, Flower2,
-  Music, Gamepad2, UtensilsCrossed
+  Music, Gamepad2, UtensilsCrossed, HeartHandshake
 } from 'lucide-react';
 import { currentUser } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -22,6 +22,17 @@ interface ServiceItem {
 }
 
 const SERVICES: ServiceItem[] = [
+  {
+    id: 'dating',
+    title: 'Знакомства & Резонанс',
+    category: 'Любовь, Друзья, Единомышленники',
+    description: 'Поиск партнёра, друзей и односознавцев (1-11 класс сознания). Полные анкеты: цели, увлечения, достижения, фото и резонанс душ.',
+    icon: HeartHandshake,
+    route: '/dating',
+    badge: 'NEW AGE',
+    colorGradient: 'linear-gradient(135deg, #EC4899, #8B5CF6)',
+    stats: '15 000+ анкет'
+  },
   {
     id: 'music',
     title: 'Музыка и Плейлисты',

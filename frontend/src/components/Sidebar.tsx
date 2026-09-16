@@ -5,7 +5,7 @@ import {
   User as UserIcon, Tv, ShoppingBag, Users, Film, Wallet, ShieldAlert,
   ChevronDown, ChevronRight, Layers, ExternalLink,
   Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles, GraduationCap, Lock,
-  Compass, Calendar as CalendarIcon, Bot, Brain, Music, Gamepad2, UtensilsCrossed
+  Compass, Calendar as CalendarIcon, Bot, Brain, Music, Gamepad2, UtensilsCrossed, HeartHandshake
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
@@ -80,6 +80,20 @@ export function Sidebar() {
         <NavLink to="/music" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
           <Music className="nav-icon" size={19} />
           <span className="nav-label">Музыка</span>
+        </NavLink>
+
+        <NavLink to="/dating" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <HeartHandshake className="nav-icon" size={19} style={{ color: '#ec4899' }} />
+          <span className="nav-label">Знакомства</span>
+          <span className="nav-badge-hot" style={{
+            fontSize: '10px',
+            background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
+            color: '#fff',
+            padding: '1px 6px',
+            borderRadius: '10px',
+            fontWeight: 700,
+            marginLeft: 'auto'
+          }}>NEW</span>
         </NavLink>
 
         {isAuthenticated ? (
