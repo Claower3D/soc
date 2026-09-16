@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { type Product } from '../data/mock';
 import { useNavigate } from 'react-router-dom';
+import { useCurrency } from '../context/CurrencyContext';
 import './ProductDetailModal.css';
 
 interface ProductDetailModalProps {
@@ -21,6 +22,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onAddToCart
 }) => {
   const navigate = useNavigate();
+  const { formatPrice } = useCurrency();
   const [selectedImgIndex, setSelectedImgIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [isAdded, setIsAdded] = useState(false);
@@ -99,9 +101,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             <div className="product-price-box">
               <div className="price-values">
-                <span className="main-price">{product.price.toLocaleString('ru-RU')} ₽</span>
+                <span className="main-price">{formatPrice(product.price)}</span>
                 {product.oldPrice && (
-                  <span className="striked-price">{product.oldPrice.toLocaleString('ru-RU')} ₽</span>
+                  <span className="striked-price">{formatPrice(product.oldPrice)}</span>
                 )}
               </div>
               {product.oldPrice && (
@@ -165,7 +167,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 onClick={handleAddToCart}
               >
                 <ShoppingBag size={18} />
-                {isAdded ? 'Добавлено!' : `В корзину • ${(product.price * quantity).toLocaleString('ru-RU')} ₽`}
+                {isAdded ? 'Добавлено!' : `В корзину • ${formatPrice(product.price * quantity)}`}
               </button>
 
               <button 

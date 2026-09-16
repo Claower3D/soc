@@ -4,6 +4,7 @@ import {
   X, Plus, Minus, ArrowRight, Check, Bike, Sparkles, Phone,
   CreditCard
 } from 'lucide-react';
+import { useCurrency } from '../context/CurrencyContext';
 import './FoodDeliveryPage.css';
 
 interface Restaurant {
@@ -177,6 +178,7 @@ const DISHES: Dish[] = [
 const CATEGORIES = ['Все', 'Пицца', 'Бургеры', 'Суши', 'Здоровая еда'];
 
 export function FoodDeliveryPage() {
+  const { formatPrice } = useCurrency();
   const [selectedCategory, setSelectedCategory] = useState<string>('Все');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [cart, setCart] = useState<{ [dishId: string]: number }>({});
@@ -335,7 +337,7 @@ export function FoodDeliveryPage() {
                   <h3 className="restaurant-name">{rest.name}</h3>
                   <div className="restaurant-meta-row">
                     <span>{rest.cuisine}</span>
-                    <span className="free-delivery-badge">От {rest.freeDeliveryThreshold} ₽ бесплатно</span>
+                    <span className="free-delivery-badge">От {formatPrice(rest.freeDeliveryThreshold)} бесплатно</span>
                   </div>
                 </div>
               </div>
@@ -362,7 +364,7 @@ export function FoodDeliveryPage() {
                     <p className="dish-desc">{dish.description}</p>
 
                     <div className="dish-footer">
-                      <span className="dish-price">{dish.price} ₽</span>
+                      <span className="dish-price">{formatPrice(dish.price)}</span>
                       
                       {qty === 0 ? (
                         <button className="dish-add-btn" onClick={() => addToCart(dish.id)}>
@@ -390,7 +392,7 @@ export function FoodDeliveryPage() {
         <div className="floating-cart-pill" onClick={() => setIsCartOpen(true)}>
           <div className="cart-pill-count">{totalCartCount}</div>
           <ShoppingBag size={20} />
-          <span className="cart-pill-price">{finalTotal} ₽</span>
+          <span className="cart-pill-price">{formatPrice(finalTotal)}</span>
           <ArrowRight size={18} />
         </div>
       )}
@@ -416,7 +418,7 @@ export function FoodDeliveryPage() {
                       <img src={dish.imageUrl} alt={dish.name} className="cart-item-thumb" />
                       <div>
                         <h4 className="cart-item-title">{dish.name}</h4>
-                        <span className="cart-item-price">{dish.price * count} ₽</span>
+                        <span className="cart-item-price">{formatPrice(dish.price * count)}</span>
                       </div>
                     </div>
 
@@ -483,26 +485,26 @@ export function FoodDeliveryPage() {
             <div className="cart-drawer-footer">
               <div className="cart-summary-line">
                 <span>Сумма блюд:</span>
-                <span>{rawSubtotal} ₽</span>
+                <span>{formatPrice(rawSubtotal)}</span>
               </div>
               {isPromoApplied && (
                 <div className="cart-summary-line" style={{ color: '#10b981' }}>
                   <span>Скидка промокод (20%):</span>
-                  <span>-{discount} ₽</span>
+                  <span>-{formatPrice(discount)}</span>
                 </div>
               )}
               <div className="cart-summary-line">
                 <span>Доставка:</span>
-                <span>{deliveryCost === 0 ? 'Бесплатно' : `${deliveryCost} ₽`}</span>
+                <span>{deliveryCost === 0 ? 'Бесплатно' : formatPrice(deliveryCost)}</span>
               </div>
               <div className="cart-summary-line total">
                 <span>Итого к оплате:</span>
-                <span>{finalTotal} ₽</span>
+                <span>{formatPrice(finalTotal)}</span>
               </div>
 
               <button className="btn-checkout-order" onClick={handleCreateOrder}>
                 <CreditCard size={18} />
-                <span>Оплатить {finalTotal} ₽</span>
+                <span>Оплатить {formatPrice(finalTotal)}</span>
               </button>
             </div>
           </div>

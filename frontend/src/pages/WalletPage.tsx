@@ -22,11 +22,13 @@ import {
   type WalletTransaction
 } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './WalletPage.css';
 
 export const WalletPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
+  const { formatPrice, currencyConfig, currency } = useCurrency();
   const [balance, setBalance] = useState(14850);
   const [transactions, setTransactions] = useState<WalletTransaction[]>(initialTransactions);
 
@@ -94,7 +96,7 @@ export const WalletPage: React.FC = () => {
     };
     setTransactions([newTx, ...transactions]);
     setIsDonateOpen(false);
-    alert(`Вы успешно отправили ${val} ₽ автору ${donateAuthor}!`);
+    alert(`Вы успешно отправили ${formatPrice(val)} автору ${donateAuthor}!`);
   };
 
   const handleSubscribeTier = (tierTitle: string, price: number) => {
@@ -152,8 +154,12 @@ export const WalletPage: React.FC = () => {
           <div className="balance-value-block">
             <span className="balance-label">Доступный баланс</span>
             <div className="balance-sum">
-              <h1>{balance.toLocaleString()} ₽</h1>
-              <span className="currency-sub">≈ ${(balance / 92).toFixed(0)} USD</span>
+              <h1>{formatPrice(balance)}</h1>
+              {currency !== 'RUB' ? (
+                <span className="currency-sub">≈ {balance.toLocaleString()} ₽</span>
+              ) : (
+                <span className="currency-sub">≈ ${(balance / 92).toFixed(0)} USD</span>
+              )}
             </div>
           </div>
 
@@ -202,7 +208,7 @@ export const WalletPage: React.FC = () => {
 
           <div className="premium-footer-row">
             <div className="price-tag">
-              <strong>399 ₽</strong>
+              <strong>{formatPrice(399)}</strong>
               <span>/ месяц</span>
             </div>
             <button
@@ -210,7 +216,7 @@ export const WalletPage: React.FC = () => {
               onClick={handleBuyPremium}
               disabled={hasPremium}
             >
-              {hasPremium ? 'Подписка подключена' : 'Оформить за 399 ₽'}
+              {hasPremium ? 'Подписка подключена' : `Оформить за ${formatPrice(399)}`}
             </button>
           </div>
         </div>
@@ -234,7 +240,7 @@ export const WalletPage: React.FC = () => {
               <div className="tier-top">
                 <h4>{tier.title}</h4>
                 <div className="tier-price">
-                  <strong>{tier.price} ₽</strong>
+                  <strong>{formatPrice(tier.price)}</strong>
                   <span>/ месяц</span>
                 </div>
               </div>
@@ -376,7 +382,7 @@ export const WalletPage: React.FC = () => {
 
                   <div className="tx-amount-col">
                     <span className={`amount-text ${isPositive ? 'green' : 'gray'}`}>
-                      {isPositive ? `+${tx.amount.toLocaleString()}` : `${tx.amount.toLocaleString()}`} ₽
+                      {isPositive ? `+${formatPrice(tx.amount)}` : `-${formatPrice(Math.abs(tx.amount))}`}
                     </span>
                     <span className="tx-status-badge completed">
                       <ShieldCheck size={11} /> Успешно
@@ -398,7 +404,7 @@ export const WalletPage: React.FC = () => {
 
             <form onSubmit={handleDepositSubmit} className="modal-form">
               <div className="form-group">
-                <label>Сумма пополнения (₽)</label>
+                <label>Сумма пополнения ({currencyConfig.symbol})</label>
                 <div className="deposit-preset-row">
                   {['500', '1000', '2500', '5000'].map((preset) => (
                     <button
@@ -407,7 +413,7 @@ export const WalletPage: React.FC = () => {
                       className={`preset-btn ${depositAmount === preset ? 'active' : ''}`}
                       onClick={() => setDepositAmount(preset)}
                     >
-                      {preset} ₽
+                      {formatPrice(Number(preset))}
                     </button>
                   ))}
                 </div>

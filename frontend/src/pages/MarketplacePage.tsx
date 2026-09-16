@@ -8,6 +8,7 @@ import { CartDrawer } from '../components/CartDrawer';
 import { CreateProductModal } from '../components/CreateProductModal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './MarketplacePage.css';
 
@@ -24,6 +25,7 @@ const CATEGORIES = [
 export function MarketplacePage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { formatPrice } = useCurrency();
   const [productsList, setProductsList] = useState<Product[]>(initialProducts);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Все товары');
@@ -226,9 +228,9 @@ export function MarketplacePage() {
 
                 <div className="market-price-row">
                   <div className="market-price-values">
-                    <span className="market-main-price">{product.price.toLocaleString('ru-RU')} ₽</span>
+                    <span className="market-main-price">{formatPrice(product.price)}</span>
                     {product.oldPrice && (
-                      <span className="market-old-price">{product.oldPrice.toLocaleString('ru-RU')} ₽</span>
+                      <span className="market-old-price">{formatPrice(product.oldPrice)}</span>
                     )}
                   </div>
                   <button 

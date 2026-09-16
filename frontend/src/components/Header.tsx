@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Video, Headphones,
   Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
-  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Bot, Globe
+  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Bot, Globe, ChevronDown
 } from 'lucide-react';
 import { initialUsers } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useTranslation } from '../context/LanguageContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { AuthModal } from './AuthModal';
 import './Header.css';
 
@@ -18,13 +19,16 @@ export function Header() {
   const { theme, toggleTheme } = useTheme();
   const { preferences, updatePreferences, triggerTestPush, requestDesktopPermission, browserPermission } = useNotifications();
   const { currentLang, setLanguage, languages, t } = useTranslation();
+  const { currency, currencyConfig, setCurrency, allCurrencies, detectedFromCountry } = useCurrency();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
+  const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
   const [notifTab, setNotifTab] = useState<'alerts' | 'push_settings'>('alerts');
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const createRef = useRef<HTMLDivElement>(null);
   const langRef = useRef<HTMLDivElement>(null);
+  const currencyRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -34,6 +38,9 @@ export function Header() {
       }
       if (langRef.current && !langRef.current.contains(event.target as Node)) {
         setLangDropdownOpen(false);
+      }
+      if (currencyRef.current && !currencyRef.current.contains(event.target as Node)) {
+        setCurrencyDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -253,6 +260,49 @@ export function Header() {
                     <span className="lang-item-name">{lang.nativeName}</span>
                     <span className="lang-item-code">{lang.code.toUpperCase()}</span>
                     {currentLang === lang.code && <Check size={14} className="lang-check-icon" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Currency Selector (Автоопределение по стране + ручной выбор) */}
+        <div className="header-currency-wrapper" ref={currencyRef}>
+          <button
+            className={`header-currency-btn ${currencyDropdownOpen ? 'active' : ''}`}
+            onClick={() => setCurrencyDropdownOpen(!currencyDropdownOpen)}
+            title={`Валюта: ${currencyConfig.name} (${currencyConfig.symbol})`}
+          >
+            <span className="header-curr-flag">{currencyConfig.flag}</span>
+            <span className="header-curr-symbol">{currencyConfig.symbol}</span>
+            <ChevronDown size={12} className={`header-curr-chevron ${currencyDropdownOpen ? 'open' : ''}`} />
+          </button>
+
+          {currencyDropdownOpen && (
+            <div className="currency-popover">
+              <div className="currency-popover-header">
+                <span>Валюта отображения</span>
+                {detectedFromCountry && (
+                  <span className="currency-detected-note" title="Определено по стране">
+                    📍 {detectedFromCountry}
+                  </span>
+                )}
+              </div>
+              <div className="currency-options-list">
+                {allCurrencies.map((c) => (
+                  <button
+                    key={c.code}
+                    className={`currency-option-item ${currency === c.code ? 'selected' : ''}`}
+                    onClick={() => {
+                      setCurrency(c.code);
+                      setCurrencyDropdownOpen(false);
+                    }}
+                  >
+                    <span className="curr-item-flag">{c.flag}</span>
+                    <span className="curr-item-name">{c.name}</span>
+                    <span className="curr-item-symbol">{c.symbol}</span>
+                    {currency === c.code && <Check size={14} className="curr-check-icon" />}
                   </button>
                 ))}
               </div>

@@ -27,6 +27,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { CurrencyProvider } from './context/CurrencyContext';
 import { AuthModal } from './components/AuthModal';
 import './styles/theme.css';
 import './App.css';
@@ -100,13 +101,15 @@ function App() {
   return (
     <BrowserRouter>
       <LanguageProvider>
-        <ThemeProvider>
-          <NotificationProvider>
-            <AuthProvider>
-              <AppContent />
-            </AuthProvider>
-          </NotificationProvider>
-        </ThemeProvider>
+        <CurrencyProvider>
+          <ThemeProvider>
+            <NotificationProvider>
+              <AuthProvider>
+                <AppContent />
+              </AuthProvider>
+            </NotificationProvider>
+          </ThemeProvider>
+        </CurrencyProvider>
       </LanguageProvider>
     </BrowserRouter>
   );

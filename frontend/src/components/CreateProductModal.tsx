@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, ShoppingBag, Image as ImageIcon, Sparkles, Tag, Layers, DollarSign, Percent, Info, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { type Product } from '../data/mock';
 import './CreateProductModal.css';
 
@@ -30,6 +31,7 @@ const SAMPLE_PRODUCT_IMAGES = [
 
 export function CreateProductModal({ isOpen, onClose, onCreateProduct }: CreateProductModalProps) {
   const { currentUser } = useAuth();
+  const { currencyConfig } = useCurrency();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -167,7 +169,7 @@ export function CreateProductModal({ isOpen, onClose, onCreateProduct }: CreateP
               <div className="product-prices-row">
                 <div className="product-field-group">
                   <label className="product-field-label">
-                    <DollarSign size={14} /> Цена (₽) *
+                    <DollarSign size={14} /> Цена ({currencyConfig.symbol}) *
                   </label>
                   <input
                     type="number"
@@ -180,7 +182,7 @@ export function CreateProductModal({ isOpen, onClose, onCreateProduct }: CreateP
                   />
                 </div>
                 <div className="product-field-group">
-                  <label className="product-field-label">Старая цена (₽)</label>
+                  <label className="product-field-label">Старая цена ({currencyConfig.symbol})</label>
                   <input
                     type="number"
                     placeholder="4200"
@@ -209,26 +211,26 @@ export function CreateProductModal({ isOpen, onClose, onCreateProduct }: CreateP
                         <span className="fee-subtitle">Удерживается при успешной сделке</span>
                       </div>
                       <span className="fee-amount">
-                        {numericPrice > 0 ? `-${commissionAmount.toLocaleString('ru-RU')} ₽` : '0 ₽'}
+                        {numericPrice > 0 ? `-${commissionAmount.toLocaleString('ru-RU')} ${currencyConfig.symbol}` : `0 ${currencyConfig.symbol}`}
                       </span>
                     </div>
 
                     <div className="fee-details-list">
                       <div className="fee-row">
                         <span className="fee-row-label">Стоимость товара для покупателя:</span>
-                        <span className="fee-row-val">{numericPrice.toLocaleString('ru-RU')} ₽</span>
+                        <span className="fee-row-val">{numericPrice.toLocaleString('ru-RU')} {currencyConfig.symbol}</span>
                       </div>
                       <div className="fee-row fee-deduction">
                         <span className="fee-row-label">
                           <Info size={13} /> Комиссия маркетплейса (3%):
                         </span>
-                        <span className="fee-row-val">-{commissionAmount.toLocaleString('ru-RU')} ₽</span>
+                        <span className="fee-row-val">-{commissionAmount.toLocaleString('ru-RU')} {currencyConfig.symbol}</span>
                       </div>
                       <div className="fee-row fee-payout-row">
                         <span className="fee-row-label">
                           <ShieldCheck size={14} className="fee-payout-icon" /> Вы получите на счет:
                         </span>
-                        <strong className="fee-payout-val">{sellerReceives.toLocaleString('ru-RU')} ₽</strong>
+                        <strong className="fee-payout-val">{sellerReceives.toLocaleString('ru-RU')} {currencyConfig.symbol}</strong>
                       </div>
                     </div>
                   </div>

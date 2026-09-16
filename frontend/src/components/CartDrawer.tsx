@@ -4,6 +4,7 @@ import {
   CreditCard, Wallet, MapPin 
 } from 'lucide-react';
 import { type CartItem } from '../data/mock';
+import { useCurrency } from '../context/CurrencyContext';
 import './CartDrawer.css';
 
 interface CartDrawerProps {
@@ -23,6 +24,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onRemoveItem,
   onClearCart
 }) => {
+  const { formatPrice } = useCurrency();
   const [address, setAddress] = useState('Санкт-Петербург, Невский проспект, д. 45, кв. 12');
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'card'>('wallet');
   const [orderPlaced, setOrderPlaced] = useState(false);
@@ -58,7 +60,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           <div className="order-success-state">
             <CheckCircle2 size={64} className="order-success-icon" />
             <h3>Заказ успешно оформлен!</h3>
-            <p>Сумма: <strong>{totalAmount.toLocaleString('ru-RU')} ₽</strong></p>
+            <p>Сумма: <strong>{formatPrice(totalAmount)}</strong></p>
             <p className="order-address-hint">Доставка по адресу: {address}</p>
             <span className="order-status-pill">Оплачено через {paymentMethod === 'wallet' ? 'Кошелёк New Age' : 'Карту'}</span>
           </div>
@@ -81,7 +83,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <div className="cart-item-info">
                     <h4>{item.product.title}</h4>
                     <span className="cart-seller-name">Продавец: {item.product.seller.name}</span>
-                    <span className="cart-item-price">{(item.product.price * item.quantity).toLocaleString('ru-RU')} ₽</span>
+                    <span className="cart-item-price">{formatPrice(item.product.price * item.quantity)}</span>
                   </div>
 
                   <div className="cart-item-actions">
@@ -138,7 +140,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               <div className="cart-summary-box">
                 <div className="summary-row">
                   <span>Товары ({items.reduce((c, i) => c + i.quantity, 0)} шт.)</span>
-                  <span>{totalAmount.toLocaleString('ru-RU')} ₽</span>
+                  <span>{formatPrice(totalAmount)}</span>
                 </div>
                 <div className="summary-row">
                   <span>Доставка New Age</span>
@@ -146,7 +148,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
                 <div className="summary-total-row">
                   <strong>Итого к оплате</strong>
-                  <strong>{totalAmount.toLocaleString('ru-RU')} ₽</strong>
+                  <strong>{formatPrice(totalAmount)}</strong>
                 </div>
               </div>
 

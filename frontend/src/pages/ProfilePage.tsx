@@ -19,6 +19,7 @@ import { CreateStoryModal } from '../components/CreateStoryModal';
 import { AuthModal } from '../components/AuthModal';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import { ConsciousnessClassModal } from '../components/ConsciousnessClassModal';
+import { useCurrency } from '../context/CurrencyContext';
 import { 
   getStoredFollowingIds, 
   isUserFollowed, 
@@ -36,6 +37,7 @@ export function ProfilePage() {
   const { userId } = useParams();
   const navigate = useNavigate();
   const { currentUser, isAuthenticated, logout, updateProfile, allAccounts } = useAuth();
+  const { formatPrice } = useCurrency();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
@@ -689,8 +691,8 @@ export function ProfilePage() {
                   <div className="profile-product-details">
                     <h4>{product.title}</h4>
                     <div className="product-price-row">
-                      <span className="current-price">{product.price.toLocaleString('ru-RU')} ₽</span>
-                      {product.oldPrice && <span className="old-price">{product.oldPrice.toLocaleString('ru-RU')} ₽</span>}
+                      <span className="current-price">{formatPrice(product.price)}</span>
+                      {product.oldPrice && <span className="old-price">{formatPrice(product.oldPrice)}</span>}
                     </div>
                     <button className="btn-product-buy" onClick={(e) => { e.stopPropagation(); navigate('/marketplace'); }}>
                       Купить на маркетплейсе

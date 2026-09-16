@@ -3,6 +3,7 @@ import {
   Clock, Video, Star, CheckCircle, 
   CreditCard, Sparkles, X 
 } from 'lucide-react';
+import { useCurrency } from '../context/CurrencyContext';
 import './MasterBookingModal.css';
 
 interface MasterBookingModalProps {
@@ -66,6 +67,7 @@ export const MasterBookingModal: React.FC<MasterBookingModalProps> = ({
   preselectedMasterType,
   onConferenceCreated
 }) => {
+  const { formatPrice } = useCurrency();
   const [selectedMaster, setSelectedMaster] = useState<Master>(MASTERS[0]);
   const [selectedSlot, setSelectedSlot] = useState<string>(MASTERS[0].slots[0]);
   const [sessionTheme, setSessionTheme] = useState('');
@@ -145,7 +147,7 @@ export const MasterBookingModal: React.FC<MasterBookingModalProps> = ({
                         <span>{m.rating} ({m.reviewsCount} отзывов)</span>
                       </div>
                     </div>
-                    <div className="master-card-price">{m.priceRub} ₽</div>
+                    <div className="master-card-price">{formatPrice(m.priceRub)}</div>
                   </div>
                 ))}
               </div>
@@ -185,7 +187,7 @@ export const MasterBookingModal: React.FC<MasterBookingModalProps> = ({
             <div className="booking-summary-box">
               <div className="booking-summary-row">
                 <span>Стоимость 50-мин консультации:</span>
-                <strong>{selectedMaster.priceRub} ₽</strong>
+                <strong>{formatPrice(selectedMaster.priceRub)}</strong>
               </div>
               <div className="booking-summary-row sub-row">
                 <span>Способ оплаты:</span>
@@ -199,7 +201,7 @@ export const MasterBookingModal: React.FC<MasterBookingModalProps> = ({
             <div className="booking-footer">
               <button className="booking-pay-btn" onClick={handleBook}>
                 <Video size={16} />
-                <span>Оплатить и создать видеокомнату ({selectedMaster.priceRub} ₽)</span>
+                <span>Оплатить и создать видеокомнату ({formatPrice(selectedMaster.priceRub)})</span>
               </button>
             </div>
           </div>
