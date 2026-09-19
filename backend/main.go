@@ -13,9 +13,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	mathrand "math/rand"
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -46,6 +48,16 @@ type ServerCache struct {
 var globalCache = &ServerCache{
 	items: make(map[string]CacheItem),
 }
+
+// SMS-коды в памяти (фолбэк если нет БД)
+type smsCodeEntry struct {
+	Code      string
+	Phone     string
+	ExpiresAt time.Time
+	SentAt    time.Time
+	Attempts  int
+}
+var smsCodesStore sync.Map
 
 func (c *ServerCache) Get(key string) (interface{}, bool) {
 	c.mu.RLock()
@@ -143,6 +155,7 @@ type User struct {
 	Bio            string `json:"bio,omitempty"`
 	Location       string `json:"location,omitempty"`
 	Online         bool   `json:"online"`
+	IsFollowed     bool   `json:"isFollowed,omitempty"`
 	Role           string `json:"role,omitempty"`
 	BeliefType     string `json:"beliefType,omitempty"`
 	BeliefPrivacy  string `json:"beliefPrivacy,omitempty"`
@@ -559,6 +572,26 @@ func main() {
 	mux.HandleFunc("POST /api/auth/login", handleLogin)
 	mux.HandleFunc("GET /api/auth/me", handleAuthMe)
 	mux.HandleFunc("GET /api/auth/check-username", handleCheckUsername)
+
+	// SMS авторизация
+	mux.HandleFunc("POST /api/auth/send-code", handleSendCode)
+	mux.HandleFunc("POST /api/auth/verify-code", handleVerifyCode)
+
+	// Подписки и профили
+	mux.HandleFunc("POST /api/users/{id}/follow", handleFollow)
+	mux.HandleFunc("DELETE /api/users/{id}/follow", handleUnfollow)
+	mux.HandleFunc("GET /api/users/{id}/followers", handleFollowers)
+	mux.HandleFunc("GET /api/users/{id}/following", handleFollowing)
+	mux.HandleFunc("GET /api/users/{id}/profile", handleUserProfile)
+	mux.HandleFunc("PUT /api/profile", handleUpdateProfile)
+
+	// Посты CRUD
+	mux.HandleFunc("POST /api/posts", handleCreatePost)
+	mux.HandleFunc("POST /api/posts/{id}/like", handleLikePost)
+	mux.HandleFunc("DELETE /api/posts/{id}/like", handleUnlikePost)
+	mux.HandleFunc("POST /api/posts/{id}/comments", handleAddComment)
+	mux.HandleFunc("GET /api/posts/{id}/comments", handleGetComments)
+	mux.HandleFunc("DELETE /api/posts/{id}", handleDeletePost)
 
 	// DB Admin эндпоинты
 	mux.HandleFunc("GET /api/admin/db-status", handleDBStatus)
@@ -1424,6 +1457,544 @@ func handleAuthMe(w http.ResponseWriter, r *http.Request) {
 			"claims": claims,
 		},
 	})
+}
+
+// POST /api/auth/send-code — Отправка SMS-кода (пока мок — код возвращается в ответе для тестирования)
+func handleSendCode(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
+		return
+	}
+	if !strings.HasPrefix(req.Phone, "+") || len(req.Phone) < 10 {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Некорректный номер телефона"})
+		return
+	}
+
+	if val, ok := smsCodesStore.Load(req.Phone); ok {
+		entry := val.(smsCodeEntry)
+		if time.Since(entry.SentAt) < 60*time.Second {
+			writeJSON(w, http.StatusTooManyRequests, Response{Status: "error", Message: "Код уже был отправлен недавно"})
+			return
+		}
+	}
+
+	code := strconv.Itoa(mathrand.Intn(9000) + 1000)
+	expiresIn := 300
+
+	if db != nil {
+		_, err := db.Exec(`
+			INSERT INTO sms_verifications (phone_number, code, purpose, expires_at, attempts, is_used)
+			VALUES ($1, $2, 'login', NOW() + interval '5 minutes', 0, false)
+		`, req.Phone, code)
+		if err != nil {
+			log.Printf("Ошибка сохранения SMS-кода в БД: %v", err)
+		}
+	}
+
+	smsCodesStore.Store(req.Phone, smsCodeEntry{
+		Code:      code,
+		Phone:     req.Phone,
+		ExpiresAt: time.Now().Add(5 * time.Minute),
+		SentAt:    time.Now(),
+		Attempts:  0,
+	})
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: "Код отправлен",
+		Data: map[string]interface{}{
+			"code":       code,
+			"expires_in": expiresIn,
+		},
+	})
+}
+
+// POST /api/auth/verify-code — Проверка SMS-кода
+func handleVerifyCode(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
+		return
+	}
+
+	valid := false
+	if db != nil {
+		var expiresAt time.Time
+		var attempts int
+		err := db.QueryRow(`
+			SELECT expires_at, attempts FROM sms_verifications 
+			WHERE phone_number = $1 AND code = $2 AND is_used = false AND purpose = 'login'
+			ORDER BY created_at DESC LIMIT 1
+		`, req.Phone, req.Code).Scan(&expiresAt, &attempts)
+		if err == nil && time.Now().Before(expiresAt) {
+			valid = true
+			db.Exec("UPDATE sms_verifications SET is_used = true WHERE phone_number = $1 AND code = $2", req.Phone, req.Code)
+		} else if err == nil {
+			db.Exec("UPDATE sms_verifications SET attempts = attempts + 1 WHERE phone_number = $1 AND code = $2", req.Phone, req.Code)
+		}
+	}
+
+	if !valid {
+		if val, ok := smsCodesStore.Load(req.Phone); ok {
+			entry := val.(smsCodeEntry)
+			if entry.Code == req.Code && time.Now().Before(entry.ExpiresAt) {
+				valid = true
+				smsCodesStore.Delete(req.Phone)
+			} else {
+				entry.Attempts++
+				smsCodesStore.Store(req.Phone, entry)
+			}
+		}
+	}
+
+	if !valid {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный или просроченный код"})
+		return
+	}
+
+	isNewUser := false
+	var user User
+	var err error
+
+	if db != nil {
+		err = db.QueryRow(`
+			SELECT id, name, username, avatar, bio, location, verified 
+			FROM users WHERE phone = $1
+		`, req.Phone).Scan(&user.ID, &user.Name, &user.Username, &user.Avatar, &user.Bio, &user.Location, &user.Verified)
+		if err == sql.ErrNoRows {
+			isNewUser = true
+			user.ID = "u_" + time.Now().Format("20060102150405")
+			user.Username = "user_" + strconv.FormatInt(time.Now().UnixNano(), 10)[:8]
+			user.Name = "Пользователь"
+			_, err = db.Exec(`
+				INSERT INTO users (id, phone, username, name, created_at)
+				VALUES ($1, $2, $3, $4, NOW())
+			`, user.ID, req.Phone, user.Username, user.Name)
+		}
+	} else {
+		store.mu.Lock()
+		found := false
+		for _, acc := range store.accounts {
+			if acc.EmailOrPhone == req.Phone {
+				user = acc.User
+				found = true
+				break
+			}
+		}
+		if !found {
+			isNewUser = true
+			user.ID = "u_" + time.Now().Format("20060102150405")
+			user.Username = "user_" + strconv.FormatInt(time.Now().UnixNano(), 10)[:8]
+			user.Name = "Пользователь"
+			
+			salt := generateSalt(16)
+			hash := hashPassword("nopassword", salt)
+			store.accounts[user.ID] = AccountStoreEntry{
+				User:         user,
+				EmailOrPhone: req.Phone,
+				PasswordHash: hash,
+				Salt:         salt,
+				CreatedAt:    time.Now(),
+			}
+		}
+		store.mu.Unlock()
+	}
+
+	token, _ := generateJWT(user, req.Phone)
+
+	writeJSON(w, http.StatusOK, Response{
+		Status: "ok",
+		Data: map[string]interface{}{
+			"token":     token,
+			"user":      user,
+			"isNewUser": isNewUser,
+		},
+	})
+}
+
+// POST /api/users/{id}/follow
+func handleFollow(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	targetID := r.PathValue("id")
+	if claims.UserID == targetID {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Нельзя подписаться на самого себя"})
+		return
+	}
+
+	if db != nil {
+		_, err := db.Exec(`
+			INSERT INTO user_relationships (follower_id, following_id, relationship_type)
+			VALUES ($1, $2, 'follow') ON CONFLICT DO NOTHING
+		`, claims.UserID, targetID)
+		if err == nil {
+			db.Exec("UPDATE users SET followers_count = followers_count + 1 WHERE id = $1", targetID)
+			db.Exec("UPDATE users SET following_count = following_count + 1 WHERE id = $1", claims.UserID)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Вы подписались"})
+}
+
+// DELETE /api/users/{id}/follow
+func handleUnfollow(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	targetID := r.PathValue("id")
+
+	if db != nil {
+		res, err := db.Exec(`
+			DELETE FROM user_relationships 
+			WHERE follower_id = $1 AND following_id = $2 AND relationship_type = 'follow'
+		`, claims.UserID, targetID)
+		if err == nil {
+			affected, _ := res.RowsAffected()
+			if affected > 0 {
+				db.Exec("UPDATE users SET followers_count = followers_count - 1 WHERE id = $1", targetID)
+				db.Exec("UPDATE users SET following_count = following_count - 1 WHERE id = $1", claims.UserID)
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Вы отписались"})
+}
+
+// GET /api/users/{id}/followers
+func handleFollowers(w http.ResponseWriter, r *http.Request) {
+	targetID := r.PathValue("id")
+	var users []User
+	
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT id, username, name, avatar, bio, location, verified 
+			FROM users 
+			WHERE id IN (
+				SELECT follower_id FROM user_relationships 
+				WHERE following_id = $1 AND relationship_type = 'follow'
+			)
+		`, targetID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var u User
+				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.Verified)
+				users = append(users, u)
+			}
+		}
+	}
+	
+	if users == nil {
+		users = []User{}
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"users": users}})
+}
+
+// GET /api/users/{id}/following
+func handleFollowing(w http.ResponseWriter, r *http.Request) {
+	targetID := r.PathValue("id")
+	var users []User
+	
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT id, username, name, avatar, bio, location, verified 
+			FROM users 
+			WHERE id IN (
+				SELECT following_id FROM user_relationships 
+				WHERE follower_id = $1 AND relationship_type = 'follow'
+			)
+		`, targetID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var u User
+				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.Verified)
+				users = append(users, u)
+			}
+		}
+	}
+	
+	if users == nil {
+		users = []User{}
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"users": users}})
+}
+
+// GET /api/users/{id}/profile
+func handleUserProfile(w http.ResponseWriter, r *http.Request) {
+	targetID := r.PathValue("id")
+	var user User
+	
+	token := extractBearerToken(r)
+	claims, _ := parseAndValidateJWT(token)
+
+	if db != nil {
+		err := db.QueryRow(`
+			SELECT id, username, name, avatar, bio, location, followers_count, following_count, posts_count, verified 
+			FROM users WHERE id = $1
+		`, targetID).Scan(&user.ID, &user.Username, &user.Name, &user.Avatar, &user.Bio, &user.Location, &user.FollowersCount, &user.FollowingCount, &user.PostsCount, &user.Verified)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден"})
+			return
+		}
+		
+		if claims != nil {
+			var count int
+			db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND following_id = $2 AND relationship_type = 'follow'", claims.UserID, targetID).Scan(&count)
+			user.IsFollowed = count > 0
+		}
+	} else {
+		store.mu.RLock()
+		acc, ok := store.accounts[targetID]
+		store.mu.RUnlock()
+		if !ok {
+			writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден"})
+			return
+		}
+		user = acc.User
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"user": user}})
+}
+
+// PUT /api/profile
+func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	var req struct {
+		Name          string `json:"name"`
+		Bio           string `json:"bio"`
+		Avatar        string `json:"avatar"`
+		Location      string `json:"location"`
+		BeliefType    string `json:"belief_type"`
+		BeliefPrivacy string `json:"belief_privacy"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
+		return
+	}
+
+	if db != nil {
+		_, err := db.Exec(`
+			UPDATE users SET name = $1, bio = $2, avatar = $3, location = $4, belief_type = $5, belief_privacy = $6
+			WHERE id = $7
+		`, req.Name, req.Bio, req.Avatar, req.Location, req.BeliefType, req.BeliefPrivacy, claims.UserID)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, Response{Status: "error", Message: "Ошибка обновления профиля"})
+			return
+		}
+	} else {
+		store.mu.Lock()
+		acc, ok := store.accounts[claims.UserID]
+		if ok {
+			if req.Name != "" { acc.User.Name = req.Name }
+			if req.Bio != "" { acc.User.Bio = req.Bio }
+			if req.Avatar != "" { acc.User.Avatar = req.Avatar }
+			if req.Location != "" { acc.User.Location = req.Location }
+			if req.BeliefType != "" { acc.User.BeliefType = req.BeliefType }
+			if req.BeliefPrivacy != "" { acc.User.BeliefPrivacy = req.BeliefPrivacy }
+			store.accounts[claims.UserID] = acc
+		}
+		store.mu.Unlock()
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Профиль обновлен"})
+}
+
+// POST /api/posts
+func handleCreatePost(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	var req struct {
+		Caption  string `json:"caption"`
+		Image    string `json:"image"`
+		Location string `json:"location"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
+		return
+	}
+
+	postID := "p_" + strconv.FormatInt(time.Now().UnixNano(), 10)
+
+	if db != nil {
+		_, err := db.Exec(`
+			INSERT INTO posts (id, user_id, content, type, location)
+			VALUES ($1, $2, $3, 'post', $4)
+		`, postID, claims.UserID, req.Caption, req.Location)
+		if err == nil && req.Image != "" {
+			db.Exec(`
+				INSERT INTO post_media (post_id, url, type, order_index)
+				VALUES ($1, $2, 'image', 0)
+			`, postID, req.Image)
+		}
+		db.Exec("UPDATE users SET posts_count = posts_count + 1 WHERE id = $1", claims.UserID)
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"id": postID}})
+}
+
+// POST /api/posts/{id}/like
+func handleLikePost(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	postID := r.PathValue("id")
+	if db != nil {
+		_, err := db.Exec(`
+			INSERT INTO post_likes (post_id, user_id)
+			VALUES ($1, $2) ON CONFLICT DO NOTHING
+		`, postID, claims.UserID)
+		if err == nil {
+			db.Exec("UPDATE posts SET likes_count = likes_count + 1 WHERE id = $1", postID)
+		}
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok"})
+}
+
+// DELETE /api/posts/{id}/like
+func handleUnlikePost(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	postID := r.PathValue("id")
+	if db != nil {
+		res, err := db.Exec(`
+			DELETE FROM post_likes WHERE post_id = $1 AND user_id = $2
+		`, postID, claims.UserID)
+		if err == nil {
+			affected, _ := res.RowsAffected()
+			if affected > 0 {
+				db.Exec("UPDATE posts SET likes_count = likes_count - 1 WHERE id = $1", postID)
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok"})
+}
+
+// POST /api/posts/{id}/comments
+func handleAddComment(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	postID := r.PathValue("id")
+	var req struct {
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
+		return
+	}
+
+	if db != nil {
+		db.Exec(`
+			INSERT INTO post_comments (post_id, user_id, content)
+			VALUES ($1, $2, $3)
+		`, postID, claims.UserID, req.Text)
+		db.Exec("UPDATE posts SET comments_count = comments_count + 1 WHERE id = $1", postID)
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok"})
+}
+
+// GET /api/posts/{id}/comments
+func handleGetComments(w http.ResponseWriter, r *http.Request) {
+	postID := r.PathValue("id")
+	var comments []map[string]interface{}
+
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT c.id, c.content, c.created_at, u.id, u.username, u.avatar 
+			FROM post_comments c
+			JOIN users u ON c.user_id = u.id
+			WHERE c.post_id = $1
+			ORDER BY c.created_at DESC
+		`, postID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var id, content, uid, username, avatar string
+				var createdAt time.Time
+				rows.Scan(&id, &content, &createdAt, &uid, &username, &avatar)
+				comments = append(comments, map[string]interface{}{
+					"id": id,
+					"content": content,
+					"created_at": createdAt,
+					"user": map[string]string{
+						"id": uid,
+						"username": username,
+						"avatar": avatar,
+					},
+				})
+			}
+		}
+	}
+	if comments == nil {
+		comments = []map[string]interface{}{}
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"comments": comments}})
+}
+
+// DELETE /api/posts/{id}
+func handleDeletePost(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	postID := r.PathValue("id")
+	if db != nil {
+		var authorID string
+		err := db.QueryRow("SELECT user_id FROM posts WHERE id = $1", postID).Scan(&authorID)
+		if err == nil && (authorID == claims.UserID || claims.Role == "admin") {
+			db.Exec("DELETE FROM posts WHERE id = $1", postID)
+			db.Exec("UPDATE users SET posts_count = posts_count - 1 WHERE id = $1", authorID)
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Пост удален"})
+			return
+		}
+	}
+	writeJSON(w, http.StatusForbidden, Response{Status: "error", Message: "Нет прав для удаления"})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
