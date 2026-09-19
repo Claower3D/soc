@@ -472,8 +472,8 @@ export function Header() {
             >
               <img src={currentUser.avatar} alt={currentUser.name} className="header-avatar" />
               <div className="header-profile-text">
-                <span className="header-user-name">{currentUser.name.split(' ')[0]}</span>
-                <span className="header-user-handle">@{currentUser.username}</span>
+                <span className="header-user-name">{typeof currentUser.name === 'string' ? currentUser.name.split(' ')[0] : ''}</span>
+                <span className="header-user-handle">@{String(currentUser.username || '')}</span>
               </div>
             </button>
           </>

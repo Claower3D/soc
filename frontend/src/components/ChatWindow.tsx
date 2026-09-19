@@ -400,7 +400,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
     }
 
     const countText = getSelectedCountText(messagesToForward.length);
-    const targetChatName = targetChat.groupTitle || targetChat.user.name;
+    const targetChatName = String(targetChat.groupTitle || targetChat.user?.name || 'Чат');
 
     // If forwarded to the current active chat
     if (chat && targetChat.id === chat.id) {
@@ -466,7 +466,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
     if (!status) {
       if (chat?.isGroup || chat?.id === 'ai_guru_bot') {
         status = 'read';
-      } else if (chat && !chat.user.online) {
+      } else if (chat && !chat.user?.online) {
         status = 'sent';
       } else {
         status = 'read';
@@ -515,7 +515,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
       ? `💬 [В ответ]: ${replyingToMessage.text ? replyingToMessage.text.slice(0, 30) + '...' : 'вложение'}\n`
       : '';
 
-    const isRecipientOnline = chat ? (chat.isGroup || chat.id === 'ai_guru_bot' || chat.id === 'chat_ai_oracle' || chat.user.online) : false;
+    const isRecipientOnline = chat ? (chat.isGroup || chat.id === 'ai_guru_bot' || chat.id === 'chat_ai_oracle' || chat.user?.online) : false;
     const initialStatus: 'sent' | 'delivered' = isRecipientOnline ? 'delivered' : 'sent';
 
     const newMsg: Message = {
@@ -1032,7 +1032,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
     if (chat.isGroup) {
       navigate('/conferences');
     } else {
-      navigate(`/profile/${chat.user.id === 'me' ? 'me' : chat.user.id}`);
+      navigate(`/profile/${chat.user?.id === 'me' ? 'me' : chat.user?.id || 'me'}`);
     }
   };
 
@@ -1063,16 +1063,16 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
           <div className="tg-user-box" onClick={handleHeaderClick}>
             <div className="tg-avatar-wrap">
               <img 
-                src={chat.groupAvatar || chat.user.avatar} 
-                alt={chat.groupTitle || chat.user.name} 
+                src={chat.groupAvatar || chat.user?.avatar || ''} 
+                alt={String(chat.groupTitle || chat.user?.name || 'Чат')} 
                 className="tg-header-avatar" 
               />
-              {!chat.isGroup && chat.user.online && <span className="tg-online-pip" />}
+              {!chat.isGroup && chat.user?.online && <span className="tg-online-pip" />}
             </div>
             <div className="tg-user-titles">
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className="tg-header-name">{chat.groupTitle || chat.user.name}</span>
-                {chat.id === 'ai_guru_bot' && (
+                <span className="tg-header-name">{String(chat.groupTitle || chat.user?.name || 'Чат')}</span>
+                {(chat.id === 'ai_guru_bot' || chat.id === 'chat_ai_oracle') && (
                   <span style={{ 
                     fontSize: 10, 
                     fontWeight: 700, 
@@ -1088,9 +1088,9 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
               <span className="tg-header-status">
                 {chat.isGroup ? (
                   `${chat.membersCount || 6} участников · группа`
-                ) : chat.id === 'ai_guru_bot' ? (
+                ) : chat.id === 'ai_guru_bot' || chat.id === 'chat_ai_oracle' ? (
                   <span style={{ color: '#a855f7', fontWeight: 600 }}>Нейросетевой наставник (всегда в сети)</span>
-                ) : chat.user.online ? (
+                ) : chat.user?.online ? (
                   <span className="online-text">в сети</span>
                 ) : (
                   'был(а) недавно'
@@ -1112,7 +1112,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
           {!chat.isGroup && chat.id !== 'ai_guru_bot' && (
             <button 
               className="tg-header-btn" 
-              onClick={() => navigate(`/profile/${chat.user.id}`)}
+              onClick={() => navigate(`/profile/${chat.user?.id || 'me'}`)}
               title="Профиль"
             >
               <UserIcon size={19} />
@@ -1221,7 +1221,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
             <div className="pinned-text-wrap">
               <span className="pinned-label">Закрепленное сообщение</span>
               <span className="pinned-preview">
-                {messages.find(m => m.isPinned)?.text || 'Вложение'}
+                {(() => { const p = messages.find(m => m.isPinned); return typeof p?.text === 'string' ? p.text : 'Вложение'; })()}
               </span>
             </div>
           </div>
@@ -1370,7 +1370,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                         </div>
                       )}
                       <div className="video-note-mute-status">
-                        {playingVideoNoteId === msg.id ? 'Звук вкл' : 'Без звука'} · {msg.time}
+                        {playingVideoNoteId === msg.id ? 'Звук вкл' : 'Без звука'} · {typeof msg.time === 'string' ? msg.time : ''}
                       </div>
                     </div>
                   )}
@@ -1439,10 +1439,10 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                     <div className={`tg-bubble ${isMe ? 'bubble-me' : 'bubble-them'}`}>
                       <div className="tg-event-card">
                         <span className="event-badge"><Calendar size={13} /> Мероприятие</span>
-                        <div className="event-title">{msg.eventData.title}</div>
+                        <div className="event-title">{String(msg.eventData.title || '')}</div>
                         <div className="event-meta-info">
-                          <span>📅 {msg.eventData.date} в {msg.eventData.time}</span>
-                          <span>📍 {msg.eventData.location}</span>
+                          <span>📅 {String(msg.eventData.date || '')} в {String(msg.eventData.time || '')}</span>
+                          <span>📍 {String(msg.eventData.location || '')}</span>
                           <span>👥 Участников: {msg.eventData.participantsCount}</span>
                         </div>
                         <button 
@@ -1555,8 +1555,8 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                           <div className="tg-rec-header">
                             <VideoIcon size={20} className="tg-rec-icon" />
                             <div className="tg-rec-meta">
-                              <span className="tg-rec-title">{msg.conferenceRecording.title}</span>
-                              <span className="tg-rec-date">{msg.conferenceRecording.date} · {msg.conferenceRecording.duration}</span>
+                              <span className="tg-rec-title">{String(msg.conferenceRecording.title || '')}</span>
+                              <span className="tg-rec-date">{String(msg.conferenceRecording.date || '')} · {String(msg.conferenceRecording.duration || '')}</span>
                             </div>
                           </div>
                           <button 
@@ -2583,7 +2583,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                 checked={deleteForEveryone}
                 onChange={e => setDeleteForEveryone(e.target.checked)}
               />
-              <span>Удалить также для {chat.isGroup ? 'всех участников' : chat.user.name}</span>
+              <span>Удалить также для {chat.isGroup ? 'всех участников' : String(chat.user?.name || 'собеседника')}</span>
             </label>
 
             <div className="delete-modal-buttons">
@@ -2684,7 +2684,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
 
             <div className="theme-modal-body">
               <p className="theme-modal-desc">
-                Выберите индивидуальную цветовую палитру и фон для чата с <strong>«{chat.groupTitle || chat.user.name}»</strong>:
+                Выберите индивидуальную цветовую палитру и фон для чата с <strong>«{String(chat.groupTitle || chat.user?.name || 'Чат')}»</strong>:
               </p>
 
               <div className="themes-grid-picker">
@@ -2769,7 +2769,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
               <Forward size={14} className="preview-fwd-icon" />
               <div className="preview-text-box">
                 <span className="preview-sender">
-                  {chat?.user.name || 'Диалог'}:
+                  {String(chat?.user?.name || 'Диалог')}:
                 </span>
                 <span className="preview-snippet">
                   {messagesToForward.map(m => m.text || (m.mediaType === 'image' ? 'Фотография' : m.mediaType === 'voice' ? 'Голосовое сообщение' : 'Медиа')).join(' • ').slice(0, 65)}
@@ -2801,13 +2801,15 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
 
             {/* Chats and Contacts list */}
             <div className="tg-forward-chats-list">
-              {((availableChats || defaultChats).filter(c => 
-                c.user.name.toLowerCase().includes(forwardSearchQuery.toLowerCase()) ||
-                (c.groupTitle && c.groupTitle.toLowerCase().includes(forwardSearchQuery.toLowerCase())) ||
-                c.user.username.toLowerCase().includes(forwardSearchQuery.toLowerCase())
-              )).map(c => {
+              {((availableChats || defaultChats).filter(c => {
+                const name = String(c.user?.name || '');
+                const group = String(c.groupTitle || '');
+                const uname = String(c.user?.username || '');
+                const q = forwardSearchQuery.toLowerCase();
+                return name.toLowerCase().includes(q) || group.toLowerCase().includes(q) || uname.toLowerCase().includes(q);
+              })).map(c => {
                 const isSelected = selectedTargetChatId === c.id;
-                const chatDisplayName = c.groupTitle || c.user.name;
+                const chatDisplayName = String(c.groupTitle || c.user?.name || 'Чат');
                 return (
                   <div
                     key={c.id}
@@ -2825,7 +2827,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                         {c.isGroup && <span className="forward-group-tag">Группа</span>}
                       </div>
                       <span className="forward-chat-meta">
-                        {c.user.online ? 'в сети' : `@${c.user.username}`}
+                        {c.user?.online ? 'в сети' : `@${c.user?.username || ''}`}
                       </span>
                     </div>
 
@@ -2870,7 +2872,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                 <Forward size={16} />
                 <span>
                   {selectedTargetChatId 
-                    ? `Отправить в ${(availableChats || defaultChats).find(c => c.id === selectedTargetChatId)?.user.name || 'чат'}` 
+                    ? `Отправить в ${String((availableChats || defaultChats).find(c => c.id === selectedTargetChatId)?.user?.name || 'чат')}` 
                     : 'Выберите чат для отправки'}
                 </span>
               </button>

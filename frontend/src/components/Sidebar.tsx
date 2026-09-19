@@ -528,8 +528,8 @@ export function Sidebar() {
               <span className="footer-online-dot" />
             </div>
             <div className="footer-user-info">
-              <span className="footer-user-name">{currentUser.name}</span>
-              <span className="footer-user-handle">@{currentUser.username}</span>
+              <span className="footer-user-name">{String(currentUser.name || '')}</span>
+              <span className="footer-user-handle">@{String(currentUser.username || '')}</span>
             </div>
           </div>
         ) : (

@@ -829,7 +829,7 @@ export function ChatList({
 
             <form onSubmit={handleSaveChatLock} className="group-modal-form">
               <p style={{ fontSize: '0.84rem', color: 'var(--color-text-secondary)', margin: 0 }}>
-                Чат <strong>«{chatToSetLock.groupTitle || chatToSetLock.user.name}»</strong> будет скрыт из общего списка и перемещен во вкладку «Закрытые 🔒».
+                Чат <strong>«{String(chatToSetLock.groupTitle || chatToSetLock.user?.name || 'Чат')}»</strong> будет скрыт из общего списка и перемещен во вкладку «Закрытые 🔒».
               </p>
 
               <div className="group-form-group">

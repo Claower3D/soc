@@ -61,7 +61,13 @@ export function MessengerPage() {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            userChats = parsed;
+            // Нормализуем — фильтруем битые данные
+            userChats = parsed.filter((c: any) => c && c.id && c.user && typeof c.user === 'object' && typeof c.user.name === 'string').map((c: any) => ({
+              ...c,
+              lastMessage: String(c.lastMessage || ''),
+              time: String(c.time || ''),
+              user: { ...c.user, name: String(c.user.name || ''), username: String(c.user.username || ''), avatar: String(c.user.avatar || '') },
+            }));
           }
         } catch { /* ignore */ }
       }
@@ -87,9 +93,29 @@ export function MessengerPage() {
     api.chats.list().then((data) => {
       if (mounted) {
         if (Array.isArray(data) && data.length > 0) {
-          // API вернул реальные чаты — используем их
-          const hasOracle = data.some((c: Chat) => c.id === 'chat_ai_oracle');
-          const chats = hasOracle ? data : [AI_ORACLE_CHAT, ...data];
+          // Нормализуем API чаты — добавляем user если нет
+          const normalized = data.map((c: any) => ({
+            ...c,
+            user: c.user && typeof c.user === 'object' ? {
+              ...c.user,
+              name: String(c.user.name || c.name || 'Чат'),
+              username: String(c.user.username || c.id || ''),
+              avatar: String(c.user.avatar || ''),
+              id: String(c.user.id || c.id || ''),
+              online: Boolean(c.user.online),
+            } : {
+              id: String(c.id || ''),
+              name: String(c.name || 'Чат'),
+              username: String(c.id || ''),
+              avatar: '',
+              online: false,
+            },
+            messages: Array.isArray(c.messages) ? c.messages : [],
+            lastMessage: String(c.lastMessage || ''),
+            time: String(c.time || 'Сейчас'),
+          })).filter((c: any) => c.id);
+          const hasOracle = normalized.some((c: Chat) => c.id === 'chat_ai_oracle');
+          const chats = hasOracle ? normalized : [AI_ORACLE_CHAT, ...normalized];
           setChatList(chats);
           localStorage.setItem('newage_messenger_chats', JSON.stringify(chats));
           setIsLoading(false);
