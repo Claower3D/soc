@@ -32,6 +32,7 @@ import { CurrencyProvider } from './context/CurrencyContext';
 import { AuthModal } from './components/AuthModal';
 import './styles/theme.css';
 import './App.css';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AppContent() {
   const { isAuthModalOpen, closeAuthModal, authModalMode } = useAuth();
@@ -54,6 +55,7 @@ function AppContent() {
       <div className="app-main-area">
         <Header />
         <main className="app-main-content">
+          <ErrorBoundary>
           <Routes>
             <Route path="/" element={<FeedPage />} />
             <Route path="/search" element={<SearchPage />} />
@@ -85,6 +87,7 @@ function AppContent() {
             <Route path="/profile/me" element={<ProfilePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </ErrorBoundary>
         </main>
       </div>
       <BottomNav />
