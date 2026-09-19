@@ -357,21 +357,21 @@ export function Header() {
                   {notifTab === 'alerts' ? (
                     <div className="notifications-list">
                       <div className="notification-item unread">
-                        <img src={initialUsers[1].avatar} alt="Алиса" />
+                        <img src={initialUsers[1]?.avatar || '/default-avatar.svg'} alt="Алиса" />
                         <div className="notif-content">
                           <p><strong>Алиса Иванова</strong> оценила вашу публикацию</p>
                           <span className="notif-time">5 минут назад</span>
                         </div>
                       </div>
                       <div className="notification-item unread">
-                        <img src={initialUsers[2].avatar} alt="Максим" />
+                        <img src={initialUsers[2]?.avatar || '/default-avatar.svg'} alt="Максим" />
                         <div className="notif-content">
                           <p><strong>Максим Петров</strong> пригласил вас в <strong>Конференцию</strong></p>
                           <span className="notif-time">12 минут назад</span>
                         </div>
                       </div>
                       <div className="notification-item">
-                        <img src={initialUsers[3].avatar} alt="Екатерина" />
+                        <img src={initialUsers[3]?.avatar || '/default-avatar.svg'} alt="Екатерина" />
                         <div className="notif-content">
                           <p><strong>Екатерина Смирнова</strong> подписалась на ваши обновления</p>
                           <span className="notif-time">1 час назад</span>
