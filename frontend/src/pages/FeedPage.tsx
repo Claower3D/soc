@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, Image as ImageIcon, Video, Headphones, Sparkles, LogIn, ArrowRight, ShieldCheck, LifeBuoy } from 'lucide-react';
 import { StoriesBar } from '../components/StoriesBar';
@@ -6,7 +6,8 @@ import { PostCard } from '../components/PostCard';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { CreatePostModal } from '../components/CreatePostModal';
 import { AuthModal } from '../components/AuthModal';
-import { stories, posts as mockPosts, initialUsers, type Post } from '../data/mock';
+import { type Post, type Story } from '../data/mock';
+import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { cacheService } from '../utils/cacheService';
 import './FeedPage.css';
@@ -14,11 +15,44 @@ import './FeedPage.css';
 export function FeedPage() {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
-  const [posts, setPosts] = useState<Post[]>(() => {
-    return cacheService.get<Post[]>('feed_posts_cache') || mockPosts;
+  const [feedPosts, setFeedPosts] = useState<Post[]>(() => {
+    return cacheService.get<Post[]>('feed_posts_cache') || [];
   });
-  const [feedStories, setFeedStories] = useState(() => {
-    return cacheService.get<typeof stories>('feed_stories_cache') || stories;
+  const [feedLoading, setFeedLoading] = useState(true);
+
+  useEffect(() => {
+    const loadFeed = async () => {
+      try {
+        const response = await api.posts.list();
+        const data = response.data || response;
+        if (Array.isArray(data)) {
+          setFeedPosts(data);
+          cacheService.set('feed_posts_cache', data, 3600 * 24, 'feed');
+        }
+      } catch (err) {
+        console.warn('Не удалось загрузить ленту:', err);
+      } finally {
+        setFeedLoading(false);
+      }
+    };
+    const loadStories = async () => {
+      try {
+        if (api.stories && api.stories.list) {
+          const res = await api.stories.list();
+          const data = res.data || res;
+          if (Array.isArray(data)) {
+            setFeedStories(data);
+            cacheService.set('feed_stories_cache', data, 3600 * 24, 'stories');
+          }
+        }
+      } catch (err) {}
+    };
+    loadFeed();
+    loadStories();
+  }, []);
+
+  const [feedStories, setFeedStories] = useState<Story[]>(() => {
+    return cacheService.get<Story[]>('feed_stories_cache') || [];
   });
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
@@ -29,13 +63,12 @@ export function FeedPage() {
     '7': false,
   });
 
-  const handleAddStory = (newStory: typeof stories[0]) => {
+  const handleAddStory = (newStory: Story) => {
     setFeedStories(prev => {
       const updated = [newStory, ...prev];
       cacheService.set('feed_stories_cache', updated, 3600 * 24, 'stories');
       return updated;
     });
-    stories.unshift(newStory);
   };
 
   const handleDeleteStory = (storyId: string) => {
@@ -44,21 +77,18 @@ export function FeedPage() {
       cacheService.set('feed_stories_cache', updated, 3600 * 24, 'stories');
       return updated;
     });
-    const sIdx = stories.findIndex(s => s.id === storyId);
-    if (sIdx !== -1) stories.splice(sIdx, 1);
   };
 
   const handleCreatePost = (newPost: Post) => {
-    setPosts(prev => {
+    setFeedPosts(prev => {
       const updated = [newPost, ...prev];
       cacheService.set('feed_posts_cache', updated, 3600 * 24, 'feed');
       return updated;
     });
-    mockPosts.unshift(newPost);
   };
 
   const handleLike = (postId: string) => {
-    setPosts(prev => {
+    setFeedPosts(prev => {
       const updated = prev.map(p =>
         p.id === postId
           ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 }
@@ -85,21 +115,21 @@ export function FeedPage() {
   const [feedTab, setFeedTab] = useState<'for_you' | 'following' | 'popular' | 'tech'>('for_you');
 
   // Recommendations list (users not yet followed)
-  const recommendations = initialUsers.filter(u => u.id !== 'me').slice(1, 5);
+  const recommendations: { id: string; name: string; username: string; avatar: string }[] = [];
 
   const filteredPosts = useMemo<Post[]>(() => {
     if (feedTab === 'following') {
-      const followed = posts.filter(p => p.user.id !== 'me' && followedMap[p.user.id]);
-      return followed.length > 0 ? followed : posts;
+      const followed = feedPosts.filter(p => p.user.id !== 'me' && followedMap[p.user.id]);
+      return followed.length > 0 ? followed : feedPosts;
     }
     if (feedTab === 'popular') {
-      return [...posts].sort((a, b) => b.likes - a.likes);
+      return [...feedPosts].sort((a, b) => b.likes - a.likes);
     }
     if (feedTab === 'tech') {
-      return posts.filter(p => p.caption.toLowerCase().includes('код') || p.caption.toLowerCase().includes('react') || p.caption.toLowerCase().includes('go') || p.caption.toLowerCase().includes('демо'));
+      return feedPosts.filter(p => p.caption.toLowerCase().includes('код') || p.caption.toLowerCase().includes('react') || p.caption.toLowerCase().includes('go') || p.caption.toLowerCase().includes('демо'));
     }
-    return posts;
-  }, [posts, feedTab, followedMap]);
+    return feedPosts;
+  }, [feedPosts, feedTab, followedMap]);
 
   return (
     <div className="feed-page-layout">
@@ -188,14 +218,20 @@ export function FeedPage() {
         </div>
 
         <div className="feed-posts-list">
-          {filteredPosts.map(post => (
-            <PostCard 
-              key={post.id} 
-              post={post} 
-              onLike={handleLike}
-              onOpenModal={setSelectedPost}
-            />
-          ))}
+          {feedLoading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+              Загрузка...
+            </div>
+          ) : (
+            filteredPosts.map(post => (
+              <PostCard 
+                key={post.id} 
+                post={post} 
+                onLike={handleLike}
+                onOpenModal={setSelectedPost}
+              />
+            ))
+          )}
         </div>
       </div>
 
@@ -369,7 +405,7 @@ export function FeedPage() {
           onLikePost={handleLike}
           onUpdatePost={(updated) => {
             setSelectedPost(updated);
-            setPosts(prev => prev.map(p => p.id === updated.id ? updated : p));
+            setFeedPosts(prev => prev.map(p => p.id === updated.id ? updated : p));
           }}
         />
       )}

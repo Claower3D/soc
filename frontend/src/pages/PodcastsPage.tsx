@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Radio, Headphones, Plus, Lock } from 'lucide-react';
 import { PodcastCard } from '../components/PodcastCard';
 import { PodcastPlayer } from '../components/PodcastPlayer';
 import { UploadPodcastModal } from '../components/UploadPodcastModal';
-import { podcasts, type Podcast, type Episode } from '../data/mock';
+import { type Podcast, type Episode } from '../data/mock';
+import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './PodcastsPage.css';
@@ -12,9 +13,28 @@ const categories = ['Все', 'Технологии & IT', 'Дизайн & Пр�
 
 export function PodcastsPage() {
   const { isAuthenticated, openAuthModal } = useAuth();
-  const [podcastList, setPodcastList] = useState<Podcast[]>(podcasts);
-  const [activePodcast, setActivePodcast] = useState<Podcast | null>(podcasts[0]);
-  const [activeEpisode, setActiveEpisode] = useState<Episode | null>(podcasts[0].episodes[0]);
+  const [podcastList, setPodcastList] = useState<Podcast[]>([]);
+  const [activePodcast, setActivePodcast] = useState<Podcast | null>(null);
+  const [activeEpisode, setActiveEpisode] = useState<Episode | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    api.podcasts.list().then((data) => {
+      if (mounted) {
+        setPodcastList(data);
+        if (data.length > 0) {
+          setActivePodcast(data[0]);
+          setActiveEpisode(data[0].episodes[0]);
+        }
+        setIsLoading(false);
+      }
+    }).catch(err => {
+      console.warn('Failed to load podcasts', err);
+      if (mounted) setIsLoading(false);
+    });
+    return () => { mounted = false; };
+  }, []);
   const [isPlaying, setIsPlaying] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Все');
@@ -42,6 +62,10 @@ export function PodcastsPage() {
     if (selectedCategory === 'Все') return matchesSearch;
     return matchesSearch && pod.category === selectedCategory;
   });
+
+  if (isLoading) {
+    return <div style={{ padding: '20px', color: '#fff' }}>Загрузка...</div>;
+  }
 
   if (!isAuthenticated) {
     return (

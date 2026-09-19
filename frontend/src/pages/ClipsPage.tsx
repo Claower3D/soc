@@ -5,8 +5,8 @@ import {
   Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send, Smile,
   Radio, Users, Sparkles, Flame
 } from 'lucide-react';
-import { initialClips } from '../data/mock';
-import type { Clip, ClipComment } from '../data/mock';
+import { type Clip, type ClipComment } from '../data/mock';
+import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import './ClipsPage.css';
 
@@ -14,21 +14,34 @@ type ClipTab = 'all' | 'live' | 'trending';
 
 export function ClipsPage() {
   const { currentUser, isAuthenticated, openAuthModal } = useAuth();
-  const [clips, setClips] = useState<Clip[]>(() => {
-    const saved = localStorage.getItem('newage_clips_state');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Ensure new live clips from mock are always present
-        const ids = new Set(parsed.map((c: Clip) => c.id));
-        const missing = initialClips.filter(c => !ids.has(c.id));
-        return [...missing, ...parsed];
-      } catch (e) {
-        console.error('Failed to parse saved clips', e);
+  const [clips, setClips] = useState<Clip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    api.clips.list().then((data) => {
+      if (mounted) {
+        const saved = localStorage.getItem('newage_clips_state');
+        let finalClips = data;
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            const ids = new Set(parsed.map((c: Clip) => c.id));
+            const missing = data.filter((c: Clip) => !ids.has(c.id));
+            finalClips = [...missing, ...parsed];
+          } catch (e) {
+            console.error('Failed to parse saved clips', e);
+          }
+        }
+        setClips(finalClips);
+        setIsLoading(false);
       }
-    }
-    return initialClips;
-  });
+    }).catch(err => {
+      console.warn('Failed to load clips', err);
+      if (mounted) setIsLoading(false);
+    });
+    return () => { mounted = false; };
+  }, []);
 
   const [activeTab, setActiveTab] = useState<ClipTab>('all');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -257,6 +270,10 @@ export function ClipsPage() {
     if (activeTab === 'trending') return c.likesCount > 10000;
     return true;
   });
+
+  if (isLoading) {
+    return <div style={{ padding: '20px', color: '#fff' }}>Загрузка...</div>;
+  }
 
   return (
     <div className="clips-page-container">

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Search, Upload, Lock, Film, Baby, 
   Compass, Radio, Tv, Flame, Sparkles, Filter, 
@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { UploadVideoModal } from '../components/UploadVideoModal';
-import { videos, type Video } from '../data/mock';
+import { type Video } from '../data/mock';
+import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import './VideoPage.css';
 
@@ -14,7 +15,22 @@ type VideoCategoryTab = 'all' | 'streams' | 'videos' | 'movies' | 'series' | 'ki
 
 export function VideoPage() {
   const { isAuthenticated, openAuthModal } = useAuth();
-  const [videoList, setVideoList] = useState<Video[]>(videos);
+  const [videoList, setVideoList] = useState<Video[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    api.videos.list().then((data) => {
+      if (mounted) {
+        setVideoList(data);
+        setIsLoading(false);
+      }
+    }).catch((err) => {
+      console.warn('Failed to load videos', err);
+      if (mounted) setIsLoading(false);
+    });
+    return () => { mounted = false; };
+  }, []);
   
   // Режим просмотра: если выбран конкретный ролик/стрим — показываем плеер + рекомендации, если null — витрину YouTube
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
@@ -113,6 +129,10 @@ export function VideoPage() {
   // =========================================================================
   // RENDER: РЕЖИМ ПРОСМОТРА РОЛИКА (WATCH VIEW)
   // =========================================================================
+  if (isLoading) {
+    return <div style={{ padding: '20px', color: '#fff' }}>Загрузка...</div>;
+  }
+
   if (selectedVideo) {
     const queueVideos = videoList.filter(v => v.id !== selectedVideo.id);
 

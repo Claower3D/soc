@@ -3,8 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { ChatList } from '../components/ChatList';
 import { ChatWindow } from '../components/ChatWindow';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
-import { chats, type Chat } from '../data/mock';
+import { type Chat } from '../data/mock';
 import { INITIAL_DATING_PROFILES } from '../data/datingData';
+import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import './MessengerPage.css';
 
@@ -14,37 +15,54 @@ export function MessengerPage() {
   const requestedChatId = searchParams.get('chat') || searchParams.get('id');
   const datingProfileId = searchParams.get('datingProfile');
 
-  const [chatList, setChatList] = useState<Chat[]>(() => {
-    // Check saved chats from localStorage
-    const saved = localStorage.getItem('newage_messenger_chats');
-    let baseChats = chats;
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          baseChats = parsed;
+  const [chatList, setChatList] = useState<Chat[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    api.chats.list().then((data) => {
+      if (mounted) {
+        const saved = localStorage.getItem('newage_messenger_chats');
+        let baseChats = data;
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              baseChats = parsed;
+            }
+          } catch { /* ignore */ }
         }
-      } catch { /* ignore */ }
-    }
 
-    // If initial active chat exists, mark it read on initial load
-    const firstId = baseChats[0]?.id;
-    if (!firstId) return baseChats;
-    return baseChats.map(c => {
-      if (c.id === firstId) {
-        return {
-          ...c,
-          unread: 0,
-          messages: c.messages.map(m => (!m.fromMe || !m.status ? { ...m, status: 'read' as const } : m))
-        };
+        const firstId = baseChats[0]?.id;
+        if (firstId) {
+        baseChats = baseChats.map((c: Chat) => {
+            if (c.id === firstId) {
+              return {
+                ...c,
+                unread: 0,
+                messages: c.messages.map((m: any) => (!m.fromMe || !m.status ? { ...m, status: 'read' as const } : m))
+              };
+            }
+            return c;
+          });
+        }
+        setChatList(baseChats);
+        setIsLoading(false);
       }
-      return c;
+    }).catch(err => {
+      console.warn('Failed to load chats', err);
+      if (mounted) setIsLoading(false);
     });
-  });
+    return () => { mounted = false; };
+  }, []);
 
-  const [activeChatId, setActiveChatId] = useState<string | null>(() => {
-    return requestedChatId || chatList[0]?.id || null;
-  });
+  const [activeChatId, setActiveChatId] = useState<string | null>(requestedChatId);
+
+  useEffect(() => {
+    if (!isLoading && !activeChatId && chatList.length > 0 && !requestedChatId && !datingProfileId) {
+      setActiveChatId(chatList[0].id);
+    }
+  }, [isLoading, activeChatId, chatList, requestedChatId, datingProfileId]);
 
   // Handle incoming query params: requestedChatId or datingProfileId
   useEffect(() => {
@@ -183,6 +201,10 @@ export function MessengerPage() {
       return updated;
     });
   };
+
+  if (isLoading) {
+    return <div style={{ padding: '20px', color: '#fff' }}>Загрузка...</div>;
+  }
 
   if (!isAuthenticated) {
     return (
