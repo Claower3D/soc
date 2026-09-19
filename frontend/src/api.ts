@@ -37,6 +37,11 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}, isMultip
     throw new Error(data.message || data.error || 'Ошибка запроса к API');
   }
 
+  // Автоматически извлекаем .data из обёртки {status: "ok", data: ...}
+  if (data && typeof data === 'object' && 'data' in data && data.status === 'ok') {
+    return data.data;
+  }
+
   return data;
 }
 
