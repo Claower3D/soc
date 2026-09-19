@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Tv, Video, Play, Upload, Bell, Check, Share2, 
@@ -8,13 +8,14 @@ import {
 import { UploadVideoModal } from '../components/UploadVideoModal';
 import { EditChannelModal } from '../components/EditChannelModal';
 import { 
-  currentUser, initialUsers, videos as initialVideos, 
   type User, type Video as VideoType 
 } from '../data/mock';
+import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './ChannelPage.css';
 
+// Community posts will be dynamic
 interface CommunityPost {
   id: string;
   author: User;
@@ -25,28 +26,6 @@ interface CommunityPost {
   liked: boolean;
   commentsCount: number;
 }
-
-const initialCommunityPosts: CommunityPost[] = [
-  {
-    id: 'cp1',
-    author: currentUser,
-    text: 'Привет всем подписчикам канала! 🚀 Готовим большой выпуск по разбору архитектуры React 19 + Go 1.26 с реальным стримингом видео и WebRTC конференциями. О каких темах рассказать подробнее?',
-    date: 'Вчера в 14:20',
-    likes: 142,
-    liked: false,
-    commentsCount: 18,
-  },
-  {
-    id: 'cp2',
-    author: currentUser,
-    text: 'Превью нашего нового дизайна в светлых тонах ✨ Оцените скриншот интерфейса плеера и чатов!',
-    image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=900&q=80',
-    date: '3 дня назад',
-    likes: 284,
-    liked: true,
-    commentsCount: 34,
-  },
-];
 
 const playlists = [
   {
@@ -75,23 +54,38 @@ const playlists = [
 export function ChannelPage() {
   const { channelId } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated, openAuthModal } = useAuth();
+  const { isAuthenticated, openAuthModal, currentUser, updateProfile } = useAuth();
+  
+  const isMe = !channelId || channelId === 'me' || (currentUser?.id && channelId === currentUser.id);
 
-  const isMe = !channelId || channelId === 'me' || channelId === currentUser.id;
+  const [channelData, setChannelData] = useState<User | null>(null);
 
-  const channelUser: User = useMemo(() => {
-    if (isMe) return currentUser;
-    const found = initialUsers.find(u => u.id === channelId || u.username === channelId);
-    return found || initialUsers[2];
-  }, [isMe, channelId]);
+  useEffect(() => {
+    if (isMe && currentUser) {
+      setChannelData(currentUser);
+    } else {
+      api.users.list().then(list => {
+        const found = list.find((u: User) => u.id === channelId || u.username === channelId) || list[0];
+        setChannelData(found);
+      }).catch(console.warn);
+    }
+  }, [channelId, isMe, currentUser]);
+
+  const channelUser = useMemo(() => channelData || currentUser || ({} as User), [channelData, currentUser]);
 
   const [activeTab, setActiveTab] = useState<'home' | 'videos' | 'playlists' | 'community' | 'about'>('home');
-  const [channelVideos, setChannelVideos] = useState<VideoType[]>(() => {
-    if (isMe) {
-      return initialVideos;
-    }
-    return initialVideos.filter(v => v.channel.id === channelUser.id || v.channel.name === channelUser.name);
-  });
+  const [channelVideos, setChannelVideos] = useState<VideoType[]>([]);
+
+  useEffect(() => {
+    api.videos.list().then((data: any) => {
+      const vids = data.data || data || [];
+      if (isMe) {
+        setChannelVideos(vids);
+      } else {
+        setChannelVideos(vids.filter((v: any) => v.channel?.id === channelUser.id || v.channel?.name === channelUser.name));
+      }
+    }).catch(console.warn);
+  }, [isMe, channelUser.id, channelUser.name]);
   const [videoSort, setVideoSort] = useState<'newest' | 'popular'>('newest');
   const [isSubscribed, setIsSubscribed] = useState(channelUser.isFollowed ?? false);
   const [subsCount, setSubsCount] = useState(channelUser.followersCount || 14200);
@@ -106,7 +100,7 @@ export function ChannelPage() {
     banner: channelUser.coverImage || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1400&q=80',
     avatar: channelUser.avatar,
   });
-  const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>(initialCommunityPosts);
+  const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([]);
   const [newCommunityText, setNewCommunityText] = useState('');
 
   const featuredVideo = channelVideos[0];
@@ -141,7 +135,6 @@ export function ChannelPage() {
 
   const handleUploadVideo = (newVideo: VideoType) => {
     setChannelVideos(prev => [newVideo, ...prev]);
-    initialVideos.unshift(newVideo);
   };
 
   const handleDeleteVideo = (videoId: string, e: React.MouseEvent) => {
@@ -615,13 +608,15 @@ export function ChannelPage() {
         channelUser={channelUser}
         onSaveChannel={(updated) => {
           setChannelInfo(updated);
-          if (isMe) {
-            currentUser.name = updated.title;
-            currentUser.username = updated.handle;
-            currentUser.bio = updated.bio;
-            currentUser.website = updated.website;
-            currentUser.coverImage = updated.banner;
-            currentUser.avatar = updated.avatar;
+          if (isMe && currentUser) {
+            updateProfile({
+              name: updated.title,
+              username: updated.handle,
+              bio: updated.bio,
+              website: updated.website,
+              coverImage: updated.banner,
+              avatar: updated.avatar
+            });
           }
         }}
       />

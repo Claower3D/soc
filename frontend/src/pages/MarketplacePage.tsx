@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
   Search, ShoppingBag, Star, ArrowUpDown, Sparkles, Plus 
 } from 'lucide-react';
-import { initialProducts, type Product, type CartItem } from '../data/mock';
+import { type Product, type CartItem } from '../data/mock';
+import { api } from '../api';
 import { ProductDetailModal } from '../components/ProductDetailModal';
 import { CartDrawer } from '../components/CartDrawer';
 import { CreateProductModal } from '../components/CreateProductModal';
@@ -28,8 +29,19 @@ export function MarketplacePage() {
   const { isAuthenticated } = useAuth();
   const { formatPrice } = useCurrency();
   const [productsList, setProductsList] = useState<Product[]>(() => {
-    return cacheService.get<Product[]>('market_products_cache') || initialProducts;
+    return cacheService.get<Product[]>('market_products_cache') || [];
   });
+  
+  useEffect(() => {
+    if (productsList.length === 0) {
+      api.marketplace.products().then(data => {
+        setProductsList(data);
+        cacheService.set('market_products_cache', data, 3600 * 24 * 7, 'marketplace');
+      }).catch(err => {
+        console.warn('Failed to load marketplace products:', err);
+      });
+    }
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Все товары');
   const [sortBy, setSortBy] = useState<'popular' | 'price_asc' | 'price_desc' | 'rating'>('popular');
@@ -46,7 +58,6 @@ export function MarketplacePage() {
       cacheService.set('market_products_cache', updated, 3600 * 24 * 7, 'marketplace');
       return updated;
     });
-    initialProducts.unshift(newProd);
   };
 
   // Cart operations with cache

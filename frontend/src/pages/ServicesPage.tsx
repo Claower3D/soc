@@ -4,7 +4,6 @@ import {
   ArrowRight, Sparkles, TrendingUp, Compass, Flower2,
   Music, Gamepad2, UtensilsCrossed, HeartHandshake
 } from 'lucide-react';
-import { currentUser } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './ServicesPage.css';
@@ -140,13 +139,20 @@ const SERVICES: ServiceItem[] = [
     route: '/admin',
     badge: 'Staff Only',
     colorGradient: 'linear-gradient(135deg, #EF4444, #B91C1C)',
-    stats: currentUser.role === 'admin' ? 'Доступ разрешен' : 'Ограниченный доступ'
+    stats: 'Ограниченный доступ'
   }
 ];
 
 export function ServicesPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
+
+  const servicesList = SERVICES.map(s => {
+    if (s.id === 'admin') {
+      return { ...s, stats: currentUser?.role === 'admin' ? 'Доступ разрешен' : 'Ограниченный доступ' };
+    }
+    return s;
+  });
 
   if (!isAuthenticated) {
     return (
@@ -194,7 +200,7 @@ export function ServicesPage() {
 
       {/* Services Grid */}
       <div className="services-grid">
-        {SERVICES.map((service) => {
+        {servicesList.map((service) => {
           const Icon = service.icon;
           return (
             <div 

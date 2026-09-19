@@ -3,7 +3,7 @@ import {
   Trophy, Star, Users, RotateCcw, 
   Sparkles, Zap, ChevronUp, ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
-import { initialUsers } from '../data/mock';
+import { api } from '../api';
 import './GamesPage.css';
 
 interface GameCatalogItem {
@@ -109,6 +109,12 @@ export function GamesPage() {
     b = addRandomTile(b);
     return addRandomTile(b);
   });
+  const [_searchQuery, _setSearchQuery] = useState('');
+  const [users, setUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.users.list().then(setUsers).catch(console.warn);
+  }, []);
   const [score, setScore] = useState<number>(0);
   const [bestScore, setBestScore] = useState<number>(() => {
     return parseInt(localStorage.getItem('game_2048_best') || '1280', 10);
@@ -509,7 +515,7 @@ export function GamesPage() {
           </div>
 
           <div className="leaderboard-table">
-            {initialUsers.slice(0, 5).map((usr, index) => (
+            {users.slice(0, 5).map((usr, index) => (
               <div key={usr.id} className={`leader-row ${index < 3 ? 'top-rank' : ''}`}>
                 <div className="leader-left">
                   <span className="leader-place">

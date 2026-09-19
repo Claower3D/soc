@@ -17,7 +17,8 @@ import {
   Trash2,
   Zap
 } from 'lucide-react';
-import { initialUsers, initialProducts, type User } from '../data/mock';
+import { type User } from '../data/mock';
+import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import { cacheService, type CacheStats } from '../utils/cacheService';
@@ -37,6 +38,13 @@ interface ModerationReport {
 export const AdminPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<'kpi' | 'moderation' | 'users' | 'cache'>('kpi');
+  const [usersList, setUsersList] = useState<User[]>([]);
+  const [productsList, setProductsList] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.users.list().then(setUsersList).catch(console.warn);
+    api.marketplace.products().then(setProductsList).catch(console.warn);
+  }, []);
 
   if (!isAuthenticated) {
     return (
@@ -52,7 +60,7 @@ export const AdminPage: React.FC = () => {
   }
   
   // User Management
-  const [usersList, setUsersList] = useState<User[]>(initialUsers);
+
   const [userSearch, setUserSearch] = useState('');
 
   // Moderation Queue
@@ -323,7 +331,7 @@ export const AdminPage: React.FC = () => {
             <div className="breakdown-card">
               <h4>Популярные товары маркетплейса</h4>
               <ul className="products-mini-list">
-                {initialProducts.slice(0, 3).map((p) => (
+                {productsList.slice(0, 3).map((p) => (
                   <li key={p.id} className="p-item">
                     <img src={p.images[0]} alt={p.title} className="p-thumb" />
                     <div className="p-meta">

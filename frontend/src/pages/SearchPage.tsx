@@ -5,11 +5,11 @@ import {
   Image as ImageIcon, Heart, MessageCircle, Play, 
   Check, UserPlus, Flame, Sparkles
 } from 'lucide-react';
-import { posts, videos, type Post } from '../data/mock';
+import { type Post } from '../data/mock';
+import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { 
-  getAllUsersPool, 
   getStoredFollowingIds, 
   toggleUserFollow 
 } from '../utils/followStorage';
@@ -20,7 +20,7 @@ type SearchTab = 'all' | 'accounts' | 'videos' | 'posts';
 export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { currentUser, allAccounts, isAuthenticated, openAuthModal } = useAuth();
+  const { currentUser, isAuthenticated, openAuthModal } = useAuth();
 
   const queryParam = searchParams.get('q') || '';
   const tabParam = (searchParams.get('tab') as SearchTab) || 'all';
@@ -30,12 +30,29 @@ export function SearchPage() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds());
 
+  const [poolUsers, setPoolUsers] = useState<any[]>([]);
+  const [videos, setVideos] = useState<any[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
+
   // Listen to follow updates
   useEffect(() => {
     const handleSync = () => setFollowingIds(getStoredFollowingIds());
     window.addEventListener('follow_change', handleSync);
     return () => window.removeEventListener('follow_change', handleSync);
   }, []);
+
+  useEffect(() => {
+    api.posts.list().then(setPosts).catch(console.warn);
+    api.videos.list().then(setVideos).catch(console.warn);
+  }, []);
+
+  useEffect(() => {
+    if (query.trim()) {
+      api.users.search(query).then(setPoolUsers).catch(console.warn);
+    } else {
+      api.users.list().then(setPoolUsers).catch(console.warn);
+    }
+  }, [query]);
 
   // Synchronize internal state with URL query parameters
   useEffect(() => {
@@ -86,9 +103,7 @@ export function SearchPage() {
     setFollowingIds(getStoredFollowingIds());
   };
 
-  const poolUsers = useMemo(() => {
-    return getAllUsersPool(currentUser, allAccounts);
-  }, [currentUser, allAccounts]);
+
 
   const trimmed = query.trim().toLowerCase();
 
@@ -111,7 +126,7 @@ export function SearchPage() {
       v.description.toLowerCase().includes(trimmed) ||
       v.channel.name.toLowerCase().includes(trimmed)
     );
-  }, [trimmed]);
+  }, [trimmed, videos]);
 
   const filteredPosts = useMemo(() => {
     if (!trimmed) return posts;
@@ -120,7 +135,7 @@ export function SearchPage() {
       p.user.name.toLowerCase().includes(trimmed) ||
       p.user.username.toLowerCase().includes(trimmed)
     );
-  }, [trimmed]);
+  }, [trimmed, posts]);
 
   const totalResultsCount = filteredUsers.length + filteredVideos.length + filteredPosts.length;
 

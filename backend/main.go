@@ -593,6 +593,9 @@ func main() {
 	mux.HandleFunc("GET /api/posts/{id}/comments", handleGetComments)
 	mux.HandleFunc("DELETE /api/posts/{id}", handleDeletePost)
 
+	// Сторис и клипы
+	mux.HandleFunc("GET /api/stories", handleStories)
+	mux.HandleFunc("GET /api/clips", handleClips)
 	// DB Admin эндпоинты
 	mux.HandleFunc("GET /api/admin/db-status", handleDBStatus)
 	mux.HandleFunc("POST /api/admin/init-db", handleInitDB)
@@ -660,6 +663,32 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// formatTimeAgo возвращает "сколько времени назад" на русском
+func formatTimeAgo(t time.Time) string {
+	diff := time.Since(t)
+	switch {
+	case diff < time.Minute:
+		return "только что"
+	case diff < time.Hour:
+		m := int(diff.Minutes())
+		return fmt.Sprintf("%d мин назад", m)
+	case diff < 24*time.Hour:
+		h := int(diff.Hours())
+		if h == 1 { return "1 час назад" }
+		return fmt.Sprintf("%d часов назад", h)
+	case diff < 7*24*time.Hour:
+		d := int(diff.Hours() / 24)
+		if d == 1 { return "вчера" }
+		return fmt.Sprintf("%d дней назад", d)
+	case diff < 30*24*time.Hour:
+		w := int(diff.Hours() / 24 / 7)
+		if w == 1 { return "1 неделю назад" }
+		return fmt.Sprintf("%d недель назад", w)
+	default:
+		return t.Format("02.01.2006")
+	}
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -991,13 +1020,43 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	posts := []Post{
-		{ID: "p0", User: currentUser, Image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=900&q=80", Caption: "Релиз обновленного интерфейса! 💻", Likes: 312, TimeAgo: "15 минут назад"},
-		{ID: "p1", User: mockUsers[1], Image: "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=80", Caption: "Утренний кофе и вдохновение ☕✨", Likes: 842, TimeAgo: "2 часа назад"},
-		{ID: "p2", User: mockUsers[4], Image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=900&q=80", Caption: "Закат в горах Кавказа 🏔️", Likes: 1450, TimeAgo: "5 часов назад"},
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT p.id, p.caption, p.location, p.likes_count, p.comments_count, p.created_at,
+				u.id, u.name, u.username, u.avatar, COALESCE(u.verified, false)
+			FROM posts p
+			JOIN users u ON p.user_id = u.id
+			ORDER BY p.created_at DESC LIMIT 50
+		`)
+		if err == nil {
+			defer rows.Close()
+			var posts []map[string]interface{}
+			for rows.Next() {
+				var id, caption, location, userId, userName, userUsername, userAvatar string
+				var likesCount, commentsCount int
+				var verified bool
+				var createdAt time.Time
+				if err := rows.Scan(&id, &caption, &location, &likesCount, &commentsCount, &createdAt, &userId, &userName, &userUsername, &userAvatar, &verified); err == nil {
+					timeAgo := formatTimeAgo(createdAt)
+					// Get first media URL
+					var image string
+					db.QueryRow("SELECT media_url FROM post_media WHERE post_id = $1 LIMIT 1", id).Scan(&image)
+					posts = append(posts, map[string]interface{}{
+						"id": id, "caption": caption, "location": location,
+						"likes": likesCount, "commentsCount": commentsCount,
+						"image": image, "timeAgo": timeAgo,
+						"user": map[string]interface{}{"id": userId, "name": userName, "username": userUsername, "avatar": userAvatar, "verified": verified},
+					})
+				}
+			}
+			globalCache.Set("api:feed", posts, 30*time.Second, "feed")
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: posts})
+			return
+		}
 	}
-	globalCache.Set("api:feed", posts, 60*time.Second, "feed")
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: posts})
+
+	// Fallback: empty feed
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
 }
 
 func handleVideos(w http.ResponseWriter, r *http.Request) {
@@ -1005,92 +1064,197 @@ func handleVideos(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: cached})
 		return
 	}
-
-	videos := []Video{
-		{ID: "v1", Title: "Как создать полнофункциональную соцсеть на React + Go", Channel: mockUsers[2], Thumbnail: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80", Views: "128K просмотров", Duration: "45:20", TimeAgo: "3 дня назад", Description: "Архитектура современного приложения"},
-		{ID: "v2", Title: "React 19 & TypeScript: современные паттерны и фичи", Channel: mockUsers[1], Thumbnail: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80", Views: "94K просмотров", Duration: "18:42", TimeAgo: "1 неделю назад", Description: "Обзор новых возможностей"},
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT v.id, v.title, v.description, v.thumbnail_url, v.video_url, v.duration, v.views_count, v.likes_count, v.created_at,
+				u.id, u.name, u.username, u.avatar
+			FROM videos v JOIN users u ON v.user_id = u.id
+			WHERE v.status = 'published' ORDER BY v.created_at DESC LIMIT 50
+		`)
+		if err == nil {
+			defer rows.Close()
+			var videos []map[string]interface{}
+			for rows.Next() {
+				var id, title, desc, thumb, videoUrl, userId, userName, userUsername, userAvatar string
+				var duration int
+				var viewsCount, likesCount int
+				var createdAt time.Time
+				if err := rows.Scan(&id, &title, &desc, &thumb, &videoUrl, &duration, &viewsCount, &likesCount, &createdAt, &userId, &userName, &userUsername, &userAvatar); err == nil {
+					videos = append(videos, map[string]interface{}{
+						"id": id, "title": title, "description": desc,
+						"thumbnail": thumb, "videoUrl": videoUrl,
+						"duration": fmt.Sprintf("%d:%02d", duration/60, duration%60),
+						"views": fmt.Sprintf("%dK просмотров", viewsCount/1000),
+						"likes": likesCount,
+						"timeAgo": formatTimeAgo(createdAt),
+						"channel": map[string]interface{}{"id": userId, "name": userName, "username": userUsername, "avatar": userAvatar},
+					})
+				}
+			}
+			globalCache.Set("api:videos", videos, 60*time.Second, "videos")
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: videos})
+			return
+		}
 	}
-	globalCache.Set("api:videos", videos, 120*time.Second, "videos")
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: videos})
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
 }
 
 func handleChats(w http.ResponseWriter, r *http.Request) {
-	chats := []ChatPreview{
-		{ID: "ch1", User: mockUsers[1], LastMessage: "Привет! Как продвигается разработка профилей и конференций?", Time: "12:45", Unread: 2},
-		{ID: "ch2", User: mockUsers[2], LastMessage: "Подключись в конференцию в 16:00, обсудим релиз", Time: "11:20", Unread: 1},
-		{ID: "ch3", User: mockUsers[3], LastMessage: "Макеты светлого интерфейса отличные! 👍", Time: "Вчера", Unread: 0},
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Авторизация требуется"})
+		return
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: chats})
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT c.id, c.chat_type, c.name,
+				COALESCE((SELECT content FROM messages WHERE chat_id = c.id ORDER BY created_at DESC LIMIT 1), '') as last_msg,
+				COALESCE((SELECT COUNT(*) FROM messages WHERE chat_id = c.id AND sender_id != $1 AND is_read = false), 0) as unread
+			FROM chats c
+			JOIN chat_members cm ON c.id = cm.chat_id
+			WHERE cm.user_id = $1
+			ORDER BY c.updated_at DESC
+		`, claims.UserID)
+		if err == nil {
+			defer rows.Close()
+			var chats []map[string]interface{}
+			for rows.Next() {
+				var id, chatType, name, lastMsg string
+				var unread int
+				if err := rows.Scan(&id, &chatType, &name, &lastMsg, &unread); err == nil {
+					chats = append(chats, map[string]interface{}{"id": id, "type": chatType, "name": name, "lastMessage": lastMsg, "unread": unread})
+				}
+			}
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: chats})
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
 }
 
 func handlePodcasts(w http.ResponseWriter, r *http.Request) {
-	podcasts := []Podcast{
-		{
-			ID: "pod1", Title: "Код и Кофе", Author: "Артём Волков",
-			Cover: "https://images.unsplash.com/photo-1589903308904-1010c2294adc?auto=format&fit=crop&w=400&q=80",
-			Description: "Еженедельный подкаст об архитектуре ПО и Go",
-			Episodes: []Episode{
-				{ID: "ep1", Title: "Выпуск #1: Архитектура соцсети на Go и React", Duration: "42:15", Date: "12 мая"},
-				{ID: "ep2", Title: "Выпуск #2: Микросервисы или монолит в 2026?", Duration: "38:40", Date: "5 мая"},
-			},
-		},
+	if db != nil {
+		rows, err := db.Query(`SELECT id, title, author, cover_url, description FROM podcasts ORDER BY created_at DESC LIMIT 20`)
+		if err == nil {
+			defer rows.Close()
+			var podcasts []map[string]interface{}
+			for rows.Next() {
+				var id, title, author, cover, desc string
+				if err := rows.Scan(&id, &title, &author, &cover, &desc); err == nil {
+					// Get episodes
+					epRows, _ := db.Query(`SELECT id, title, duration, TO_CHAR(created_at, 'DD Mon') FROM podcast_episodes WHERE podcast_id = $1 ORDER BY episode_number DESC`, id)
+					var episodes []map[string]interface{}
+					if epRows != nil {
+						for epRows.Next() {
+							var eid, etitle, edur, edate string
+							if epRows.Scan(&eid, &etitle, &edur, &edate) == nil {
+								episodes = append(episodes, map[string]interface{}{"id": eid, "title": etitle, "duration": edur, "date": edate})
+							}
+						}
+						epRows.Close()
+					}
+					podcasts = append(podcasts, map[string]interface{}{"id": id, "title": title, "author": author, "cover": cover, "description": desc, "episodes": episodes})
+				}
+			}
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: podcasts})
+			return
+		}
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: podcasts})
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
 }
 
 func handleMarketplace(w http.ResponseWriter, r *http.Request) {
-	products := []map[string]interface{}{
-		{
-			"id":       "prod1",
-			"title":    "Мини-курс: Практика Дыхания и Пранаяма",
-			"price":    1990,
-			"currency": "RUB",
-			"rating":   4.9,
-			"author":   "Мастер Самадхи",
-			"image":    "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=600&q=80",
-			"category": "Медитации",
-		},
-		{
-			"id":       "prod2",
-			"title":    "Индивидуальный разбор Натальной карты",
-			"price":    4500,
-			"currency": "RUB",
-			"rating":   5.0,
-			"author":   "Астролог Аэлита",
-			"image":    "https://images.unsplash.com/photo-1532968961962-8a0cb3a2d4f5?auto=format&fit=crop&w=600&q=80",
-			"category": "Астрология",
-		},
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT p.id, p.title, p.price, p.currency, p.rating, p.image_url, p.status,
+				u.name as author, c.name as category
+			FROM marketplace_products p
+			JOIN users u ON p.seller_id = u.id
+			LEFT JOIN marketplace_categories c ON p.category_id = c.id
+			WHERE p.status = 'active'
+			ORDER BY p.created_at DESC LIMIT 50
+		`)
+		if err == nil {
+			defer rows.Close()
+			var products []map[string]interface{}
+			for rows.Next() {
+				var id, title, currency, imageUrl, status, author, category string
+				var price float64
+				var rating float64
+				if err := rows.Scan(&id, &title, &price, &currency, &rating, &imageUrl, &status, &author, &category); err == nil {
+					products = append(products, map[string]interface{}{"id": id, "title": title, "price": price, "currency": currency, "rating": rating, "image": imageUrl, "author": author, "category": category})
+				}
+			}
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: products})
+			return
+		}
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: products})
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
 }
 
 func handleCommunities(w http.ResponseWriter, r *http.Request) {
-	communities := []map[string]interface{}{
-		{
-			"id":           "com1",
-			"name":         "Осознанность и Дзен",
-			"avatar":       "https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=300&q=80",
-			"membersCount": 12450,
-			"isPrivate":    false,
-		},
-		{
-			"id":           "com2",
-			"name":         "Клуб Астрологии и Human Design",
-			"avatar":       "https://images.unsplash.com/photo-1532968961962-8a0cb3a2d4f5?auto=format&fit=crop&w=300&q=80",
-			"membersCount": 8400,
-			"isPrivate":    false,
-		},
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT id, name, description, avatar_url, cover_url, members_count, category, is_verified
+			FROM communities ORDER BY members_count DESC LIMIT 50
+		`)
+		if err == nil {
+			defer rows.Close()
+			var communities []map[string]interface{}
+			for rows.Next() {
+				var id, name, desc, avatar, cover, category string
+				var membersCount int
+				var isVerified bool
+				if err := rows.Scan(&id, &name, &desc, &avatar, &cover, &membersCount, &category, &isVerified); err == nil {
+					communities = append(communities, map[string]interface{}{"id": id, "name": name, "description": desc, "avatar": avatar, "cover": cover, "membersCount": membersCount, "category": category, "isVerified": isVerified})
+				}
+			}
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: communities})
+			return
+		}
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: communities})
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
 }
 
 func handleWallet(w http.ResponseWriter, r *http.Request) {
-	walletData := map[string]interface{}{
-		"balance":  14850,
-		"currency": "RUB",
-		"status":   "active",
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Авторизация требуется"})
+		return
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: walletData})
+	if db != nil {
+		var balance float64
+		var currency string
+		err := db.QueryRow("SELECT balance, currency FROM wallet_accounts WHERE user_id = $1", claims.UserID).Scan(&balance, &currency)
+		if err != nil {
+			// Create wallet if not exists
+			db.Exec("INSERT INTO wallet_accounts (user_id, balance, currency) VALUES ($1, 0, 'RUB') ON CONFLICT DO NOTHING", claims.UserID)
+			balance = 0
+			currency = "RUB"
+		}
+		// Get recent transactions
+		txRows, _ := db.Query(`
+			SELECT id, transaction_type, amount, currency, description, created_at
+			FROM wallet_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20
+		`, claims.UserID)
+		var transactions []map[string]interface{}
+		if txRows != nil {
+			defer txRows.Close()
+			for txRows.Next() {
+				var tid, txType, txCurrency, txDesc string
+				var txAmount float64
+				var txDate time.Time
+				if txRows.Scan(&tid, &txType, &txAmount, &txCurrency, &txDesc, &txDate) == nil {
+					transactions = append(transactions, map[string]interface{}{"id": tid, "type": txType, "amount": txAmount, "currency": txCurrency, "description": txDesc, "date": txDate.Format("02.01.2006")})
+				}
+			}
+		}
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"balance": balance, "currency": currency, "transactions": transactions}})
+		return
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"balance": 0, "currency": "RUB", "transactions": []interface{}{}}})
 }
 
 func handleAdminStats(w http.ResponseWriter, r *http.Request) {
@@ -1995,6 +2159,67 @@ func handleDeletePost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusForbidden, Response{Status: "error", Message: "Нет прав для удаления"})
+}
+
+func handleStories(w http.ResponseWriter, r *http.Request) {
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT s.id, s.media_url, s.media_type, s.caption, s.created_at, s.expires_at, s.views_count,
+				u.id, u.name, u.username, u.avatar
+			FROM stories s JOIN users u ON s.user_id = u.id
+			WHERE s.expires_at > NOW()
+			ORDER BY s.created_at DESC
+		`)
+		if err == nil {
+			defer rows.Close()
+			var stories []map[string]interface{}
+			for rows.Next() {
+				var sid, mediaUrl, mediaType, caption, uid, uname, uusername, uavatar string
+				var createdAt, expiresAt time.Time
+				var viewsCount int
+				if rows.Scan(&sid, &mediaUrl, &mediaType, &caption, &createdAt, &expiresAt, &viewsCount, &uid, &uname, &uusername, &uavatar) == nil {
+					stories = append(stories, map[string]interface{}{
+						"id": sid, "mediaUrl": mediaUrl, "mediaType": mediaType, "caption": caption,
+						"viewsCount": viewsCount, "timeAgo": formatTimeAgo(createdAt),
+						"user": map[string]interface{}{"id": uid, "name": uname, "username": uusername, "avatar": uavatar},
+					})
+				}
+			}
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: stories})
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
+}
+
+func handleClips(w http.ResponseWriter, r *http.Request) {
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT c.id, c.video_url, c.thumbnail_url, c.caption, c.likes_count, c.views_count, c.comments_count, c.created_at,
+				u.id, u.name, u.username, u.avatar
+			FROM clips c JOIN users u ON c.user_id = u.id
+			ORDER BY c.created_at DESC LIMIT 50
+		`)
+		if err == nil {
+			defer rows.Close()
+			var clips []map[string]interface{}
+			for rows.Next() {
+				var cid, videoUrl, thumbUrl, caption, uid, uname, uusername, uavatar string
+				var likesCount, viewsCount, commentsCount int
+				var createdAt time.Time
+				if rows.Scan(&cid, &videoUrl, &thumbUrl, &caption, &likesCount, &viewsCount, &commentsCount, &createdAt, &uid, &uname, &uusername, &uavatar) == nil {
+					clips = append(clips, map[string]interface{}{
+						"id": cid, "videoUrl": videoUrl, "thumbnail": thumbUrl, "caption": caption,
+						"likes": likesCount, "views": viewsCount, "commentsCount": commentsCount,
+						"user": map[string]interface{}{"id": uid, "name": uname, "username": uusername, "avatar": uavatar},
+					})
+				}
+			}
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: clips})
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {

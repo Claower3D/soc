@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Wallet,
   ArrowUpRight,
@@ -16,11 +16,10 @@ import {
   Copy
 } from 'lucide-react';
 import {
-  initialTransactions,
-  initialSubscriptionTiers,
   currentUser,
   type WalletTransaction
 } from '../data/mock';
+import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
@@ -29,8 +28,23 @@ import './WalletPage.css';
 export const WalletPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
   const { formatPrice, currencyConfig, currency } = useCurrency();
-  const [balance, setBalance] = useState(14850);
-  const [transactions, setTransactions] = useState<WalletTransaction[]>(initialTransactions);
+  const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [subscriptionTiers, setSubscriptionTiers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      api.wallet.balance().then(data => {
+        setBalance(data.balance || 0);
+        setTransactions(data.transactions || []);
+        if (data.subscriptionTiers) {
+            setSubscriptionTiers(data.subscriptionTiers);
+        }
+      }).catch(err => {
+        console.warn('Failed to load wallet data:', err);
+      });
+    }
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return (
@@ -235,7 +249,7 @@ export const WalletPage: React.FC = () => {
         </div>
 
         <div className="tiers-grid">
-          {initialSubscriptionTiers.map((tier) => (
+          {subscriptionTiers.map((tier) => (
             <div key={tier.id} className="tier-card">
               <div className="tier-top">
                 <h4>{tier.title}</h4>
@@ -246,7 +260,7 @@ export const WalletPage: React.FC = () => {
               </div>
 
               <ul className="tier-perks">
-                {tier.perks.map((perk, idx) => (
+                {tier.perks.map((perk: string, idx: number) => (
                   <li key={idx}>
                     <Check size={14} className="tier-check-icon" />
                     <span>{perk}</span>

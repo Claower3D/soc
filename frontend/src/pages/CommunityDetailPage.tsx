@@ -16,20 +16,30 @@ import {
   Award,
   ChevronLeft
 } from 'lucide-react';
-import { initialCommunities, currentUser, type Community, type CommunityEvent } from '../data/mock';
+import { type Community, type CommunityEvent } from '../data/mock';
+import { api } from '../api';
+import { useAuth } from '../context/AuthContext';
 import './CommunityDetailPage.css';
 
 export const CommunityDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [community] = useState<Community | undefined>(() =>
-    initialCommunities.find((c) => c.id === id) || initialCommunities[0]
-  );
+  const { currentUser } = useAuth();
+  const [community, setCommunity] = useState<Community | undefined>(undefined);
+
+  React.useEffect(() => {
+    api.communities.list().then(list => {
+      const found = list.find((c: Community) => c.id === id) || list[0];
+      setCommunity(found);
+      setIsJoined(!!found?.isJoined);
+      setMembersCount(found?.membersCount || 0);
+    }).catch(console.warn);
+  }, [id]);
 
   const [activeTab, setActiveTab] = useState<'feed' | 'events' | 'members' | 'rules'>('feed');
-  const [isJoined, setIsJoined] = useState<boolean>(!!community?.isJoined);
-  const [membersCount, setMembersCount] = useState<number>(community?.membersCount || 0);
+  const [isJoined, setIsJoined] = useState<boolean>(false);
+  const [membersCount, setMembersCount] = useState<number>(0);
 
   // New post in community feed
   const [newPostText, setNewPostText] = useState('');

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users,
@@ -11,7 +11,8 @@ import {
   Calendar,
   Filter
 } from 'lucide-react';
-import { initialCommunities, type Community } from '../data/mock';
+import { type Community } from '../data/mock';
+import { api } from '../api';
 import { CreateCommunityModal } from '../components/CreateCommunityModal';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
@@ -31,10 +32,18 @@ const CATEGORIES = [
 export const CommunitiesPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const [communities, setCommunities] = useState<Community[]>(initialCommunities);
+  const [communities, setCommunities] = useState<Community[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Все направления');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  useEffect(() => {
+    api.communities.list().then(data => {
+      setCommunities(data);
+    }).catch(err => {
+      console.warn('Failed to load communities:', err);
+    });
+  }, []);
 
   const handleToggleJoin = (e: React.MouseEvent, communityId: string) => {
     e.stopPropagation();

@@ -8,10 +8,10 @@ import {
   Calendar, Moon
 } from 'lucide-react';
 import { 
-  initialUsers, posts, stories, videos, podcasts, initialProducts, 
   RELIGIONS_CATALOG, type User, type Post, type Story, type Video as VideoType, 
   type Podcast, type Product 
 } from '../data/mock';
+import { api } from '../api';
 import { calculateZodiacProfile } from '../utils/astrology';
 import { ReligionSymbol } from '../components/ReligionSymbols';
 import { useAuth } from '../context/AuthContext';
@@ -52,17 +52,23 @@ export function ProfilePage() {
   const [isUploadVideoOpen, setIsUploadVideoOpen] = useState(false);
   const [isUploadPodcastOpen, setIsUploadPodcastOpen] = useState(false);
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
-  const [profilePosts, setProfilePosts] = useState<Post[]>(posts);
-  const [profileStories, setProfileStories] = useState<Story[]>(stories);
+  const [profilePosts, setProfilePosts] = useState<Post[]>([]);
+  const [profileStories, setProfileStories] = useState<Story[]>([]);
   const [isViewingStory, setIsViewingStory] = useState(false);
-  const [profileVideos, setProfileVideos] = useState<VideoType[]>(videos);
-  const [profilePodcasts, setProfilePodcasts] = useState<Podcast[]>(podcasts);
-  const [profileProducts, setProfileProducts] = useState<Product[]>(initialProducts);
+  const [profileVideos, setProfileVideos] = useState<VideoType[]>([]);
+  const [profilePodcasts, setProfilePodcasts] = useState<Podcast[]>([]);
+  const [profileProducts, setProfileProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    api.posts.list().then(setProfilePosts).catch(console.warn);
+    api.stories.list().then(setProfileStories).catch(console.warn);
+    api.videos.list().then(setProfileVideos).catch(console.warn);
+    api.podcasts.list().then(setProfilePodcasts).catch(console.warn);
+    api.marketplace.products().then(setProfileProducts).catch(console.warn);
+  }, []);
 
   const handleDeleteStory = (storyId: string) => {
     setProfileStories(prev => prev.filter(s => s.id !== storyId));
-    const sIdx = stories.findIndex(s => s.id === storyId);
-    if (sIdx !== -1) stories.splice(sIdx, 1);
   };
 
   // Normalize route param (e.g. '@claower' -> 'claower', 'me', or custom ID)
@@ -88,13 +94,8 @@ export function ProfilePage() {
         a => a.id.toLowerCase() === cleanParam || a.username.toLowerCase() === cleanParam
       );
       if (fromRegistered) return fromRegistered as unknown as User;
-
-      const found = initialUsers.find(
-        u => u.id.toLowerCase() === cleanParam || u.username.toLowerCase() === cleanParam
-      );
-      if (found) return found;
     }
-    return initialUsers[1];
+    return currentUser;
   }, [isMe, cleanParam, currentUser, allAccounts]);
 
   const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds());
@@ -921,7 +922,6 @@ export function ProfilePage() {
         onClose={() => setIsCreatePostOpen(false)}
         onCreatePost={(newPost) => {
           setProfilePosts(prev => [newPost, ...prev]);
-          posts.unshift(newPost);
           setIsCreatePostOpen(false);
         }}
       />
@@ -932,7 +932,6 @@ export function ProfilePage() {
         onClose={() => setIsCreateStoryOpen(false)}
         onCreateStory={(newStory) => {
           setProfileStories(prev => [newStory, ...prev]);
-          stories.unshift(newStory);
           setIsCreateStoryOpen(false);
           alert('История успешно опубликована!');
         }}
@@ -955,7 +954,6 @@ export function ProfilePage() {
         onClose={() => setIsUploadVideoOpen(false)}
         onUploadVideo={(newVideo) => {
           setProfileVideos(prev => [newVideo, ...prev]);
-          videos.unshift(newVideo);
           setIsUploadVideoOpen(false);
           alert('Видео успешно загружено и опубликовано на вашем канале!');
         }}
@@ -967,7 +965,6 @@ export function ProfilePage() {
         onClose={() => setIsUploadPodcastOpen(false)}
         onUploadPodcast={(newPodcast) => {
           setProfilePodcasts(prev => [newPodcast, ...prev]);
-          podcasts.unshift(newPodcast);
           setIsUploadPodcastOpen(false);
           alert('Подкаст успешно опубликован!');
         }}
@@ -979,7 +976,6 @@ export function ProfilePage() {
         onClose={() => setIsCreateProductOpen(false)}
         onCreateProduct={(newProduct) => {
           setProfileProducts(prev => [newProduct, ...prev]);
-          initialProducts.unshift(newProduct);
           setIsCreateProductOpen(false);
           alert('Товар успешно добавлен в ваш магазин!');
         }}
