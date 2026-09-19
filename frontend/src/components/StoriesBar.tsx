@@ -7,7 +7,7 @@ import {
   Search, Info, CheckCircle2, Music, Film,
   Share2, ArrowLeft
 } from 'lucide-react';
-import { type Story, type User, type StoryStats, createMockStats, mockStoryViewers } from '../data/mock';
+import { type Story, type User, type StoryStats } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { CreateStoryModal, STORY_FILTERS } from './CreateStoryModal';
 import './StoriesBar.css';
@@ -293,13 +293,33 @@ export function StoriesBar({
   // Get active story stats fallback
   const activeStats: StoryStats = useMemo(() => {
     if (activeStory?.stats) return activeStory.stats;
-    const viewsCount = activeStory?.viewsCount || 13;
-    return createMockStats(viewsCount, 92.3);
+    const viewsCount = activeStory?.viewsCount || 0;
+    return {
+      viewsCount,
+      followersPercent: 0,
+      nonFollowersPercent: 0,
+      uniqueViewersCount: viewsCount,
+      interactionsCount: 0,
+      storyInteractionsCount: 0,
+      likesCount: 0,
+      sharesCount: 0,
+      repliesCount: 0,
+      navigationTotal: 0,
+      navigationForward: 0,
+      navigationExits: 0,
+      navigationNext: 0,
+      profileActions: 0,
+      profileVisits: 0,
+      linkClicks: 0,
+      companyAddressClicks: 0,
+      followsCount: 0,
+      viewers: [],
+    };
   }, [activeStory]);
 
   // Filtered viewers list in statistics tab
   const filteredViewers = useMemo(() => {
-    const list = activeStats.viewers || mockStoryViewers;
+    const list = activeStats.viewers || [];
     if (!viewerSearchQuery.trim()) return list;
     const q = viewerSearchQuery.toLowerCase();
     return list.filter(v => 
@@ -637,7 +657,7 @@ export function StoriesBar({
                 title="Посмотреть статистику и зрителей истории"
               >
                 <div className="viewers-avatar-stack">
-                  {(activeStats.viewers || mockStoryViewers).slice(0, 3).map((v, i) => (
+                  {(activeStats.viewers || []).slice(0, 3).map((v, i) => (
                     <img 
                       key={v.id || i}
                       src={v.avatar} 

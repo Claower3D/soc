@@ -14,12 +14,21 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './CallsPage.css';
+interface Recording {
+  id: string;
+  title: string;
+  date: string;
+  duration: string;
+  participantsCount: number;
+  thumbnail: string;
+  chatGroupId: string;
+}
 
 export function ConferencesPage() {
   const navigate = useNavigate();
   const { isAuthenticated, openAuthModal } = useAuth();
   const [conferences, setConferences] = useState<Conference[]>(initialConferences);
-  const [recordings, setRecordings] = useState(initialRecordings);
+  const [recordings, setRecordings] = useState<Recording[]>(initialRecordings as any);
   const [activeTab, setActiveTab] = useState<'all' | 'open' | 'private' | 'recordings'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeConference, setActiveConference] = useState<Conference | null>(null);
@@ -114,7 +123,7 @@ export function ConferencesPage() {
   const handleLeaveCall = () => {
     if (activeConference && activeConference.hasRecording) {
       // Save new recording to list
-      const newRec = {
+      const newRec: Recording = {
         id: `rec_${Date.now()}`,
         title: `Запись: ${activeConference.title}`,
         date: 'Сегодня',
