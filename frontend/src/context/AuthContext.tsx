@@ -143,21 +143,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     })
       .then((res) => {
         if (!res.ok) {
-          throw new Error('Token expired or invalid');
+          console.warn('Backend session verification note: Token expired or invalid');
+          return null;
         }
         return res.json();
       })
       .then((data) => {
-        if (data.user) {
+        if (data && data.user) {
           setActiveUser(data.user);
           setIsAuthenticated(true);
           localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(data.user));
           localStorage.setItem('new_age_is_auth', 'true');
         }
       })
-      .catch((err) => {
-        console.warn('Backend session verification note:', err.message);
-        // If server is not responding, keep local user state if valid
+      .catch(() => {
+        // Backend unavailable — keep local user state
       });
   }, []);
 
