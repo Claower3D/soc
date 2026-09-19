@@ -1380,7 +1380,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                     <div className="tg-bubble sticker-bubble" style={{ background: 'transparent', boxShadow: 'none', border: 'none', padding: 0 }}>
                       <img src={msg.stickerUrl} alt="Sticker" className="tg-sticker-message" />
                       <div className="tg-meta" style={{ justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
-                        <span className="tg-time">{msg.time}</span>
+                        <span className="tg-time">{typeof msg.time === 'string' ? msg.time : ''}</span>
                         {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
@@ -1391,7 +1391,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                     <div className="tg-bubble" style={{ padding: 6, maxWidth: 260 }}>
                       <img src={msg.gifUrl} alt="GIF" className="tg-gif-message" />
                       <div className="tg-meta">
-                        <span className="tg-time">{msg.time}</span>
+                        <span className="tg-time">{typeof msg.time === 'string' ? msg.time : ''}</span>
                         {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
@@ -1428,7 +1428,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                         </div>
                       </div>
                       <div className="tg-meta">
-                        <span className="tg-time">{msg.time}</span>
+                        <span className="tg-time">{typeof msg.time === 'string' ? msg.time : ''}</span>
                         {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
@@ -1453,7 +1453,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                         </button>
                       </div>
                       <div className="tg-meta">
-                        <span className="tg-time">{msg.time}</span>
+                        <span className="tg-time">{typeof msg.time === 'string' ? msg.time : ''}</span>
                         {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
@@ -1480,7 +1480,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                         </div>
                       </div>
                       <div className="tg-meta" style={{ padding: '2px 6px' }}>
-                        <span className="tg-time">{msg.time}</span>
+                        <span className="tg-time">{typeof msg.time === 'string' ? msg.time : ''}</span>
                         {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
@@ -1503,7 +1503,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                         </button>
                       </div>
                       <div className="tg-meta">
-                        <span className="tg-time">{msg.time}</span>
+                        <span className="tg-time">{typeof msg.time === 'string' ? msg.time : ''}</span>
                         {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
@@ -1517,12 +1517,12 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                           <FileText size={20} />
                         </div>
                         <div className="doc-file-info">
-                          <span className="doc-file-name">{msg.text}</span>
+                          <span className="doc-file-name">{typeof msg.text === 'string' ? msg.text : 'Файл'}</span>
                           <span className="doc-file-size">1.4 МБ · Документ</span>
                         </div>
                       </div>
                       <div className="tg-meta">
-                        <span className="tg-time">{msg.time}</span>
+                        <span className="tg-time">{typeof msg.time === 'string' ? msg.time : ''}</span>
                         {isMe && renderMessageTicks(msg)}
                       </div>
                     </div>
@@ -1545,7 +1545,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                       {msg.forwardedFrom && (
                         <div className="tg-forwarded-bubble-header">
                           <Forward size={12} className="tg-forward-header-icon" />
-                          <span>Переслано от <strong>{msg.forwardedFrom}</strong></span>
+                          <span>Переслано от <strong>{typeof msg.forwardedFrom === 'string' ? msg.forwardedFrom : 'пользователя'}</strong></span>
                         </div>
                       )}
 
@@ -1616,13 +1616,13 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                       )}
 
                       {/* Text Content */}
-                      {msg.text && (!isVoice || msg.text !== 'Голосовое сообщение') && (
+                      {msg.text && typeof msg.text === 'string' && (!isVoice || msg.text !== 'Голосовое сообщение') && (
                         <div className="tg-text">{msg.text}</div>
                       )}
 
                       {/* Timestamp, Seen ticks & Attached Reactions (Screenshot 5) */}
                       <div className="tg-meta">
-                        <span className="tg-time">{msg.time}</span>
+                        <span className="tg-time">{typeof msg.time === 'string' ? msg.time : ''}</span>
                         {isMe && renderMessageTicks(msg)}
                         {msg.reactions && msg.reactions.length > 0 && (
                           <div className="msg-reaction-badges-row">
