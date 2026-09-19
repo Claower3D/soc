@@ -515,7 +515,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
       ? `💬 [В ответ]: ${replyingToMessage.text ? replyingToMessage.text.slice(0, 30) + '...' : 'вложение'}\n`
       : '';
 
-    const isRecipientOnline = chat ? (chat.isGroup || chat.id === 'ai_guru_bot' || chat.user.online) : false;
+    const isRecipientOnline = chat ? (chat.isGroup || chat.id === 'ai_guru_bot' || chat.id === 'chat_ai_oracle' || chat.user.online) : false;
     const initialStatus: 'sent' | 'delivered' = isRecipientOnline ? 'delivered' : 'sent';
 
     const newMsg: Message = {
@@ -595,6 +595,56 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
           return list;
         });
       }, 700);
+    }
+
+    // ИИ Оракул авто-ответ
+    if (chat?.id === 'chat_ai_oracle') {
+      const userText = (newMsg.text || '').toLowerCase();
+      setTimeout(() => {
+        // Генерируем ответ на основе ключевых слов
+        let oracleAnswer: string;
+        if (userText.includes('привет') || userText.includes('здравствуй') || userText.includes('хай')) {
+          oracleAnswer = '👋 Привет! Рад тебя видеть в New Age! Чем могу помочь?';
+        } else if (userText.includes('как дела') || userText.includes('как ты')) {
+          oracleAnswer = '✨ У меня всё отлично, я же ИИ — всегда в форме! А как у тебя?';
+        } else if (userText.includes('помощь') || userText.includes('помоги') || userText.includes('help')) {
+          oracleAnswer = '🤝 Конечно помогу! Ты можешь:\n\n• 📸 Публиковать посты и сторис\n• 🎥 Загружать видео и клипы\n• 💬 Общаться в мессенджере\n• 🛒 Продавать на маркетплейсе\n• 👥 Вступать в сообщества\n\nЧто именно интересует?';
+        } else if (userText.includes('кто ты') || userText.includes('что ты')) {
+          oracleAnswer = '🔮 Я ИИ Оракул — встроенный ассистент платформы New Age. Я помогаю пользователям ориентироваться и отвечаю на вопросы!';
+        } else if (userText.includes('спасибо') || userText.includes('thanks')) {
+          oracleAnswer = '😊 Всегда пожалуйста! Обращайся если что.';
+        } else {
+          const replies = [
+            '🤔 Интересный вопрос! Я пока учусь, но скоро смогу помогать с этим.',
+            '✨ Принял! Когда подключат полноценный AI, я смогу ответить подробнее.',
+            '💭 Хмм, дай подумать... Пока что я знаю базовые команды, но развиваюсь!',
+            '🚀 Отличная мысль! Платформа New Age только растёт.',
+            '👀 Записал. Если что-то ещё нужно — пиши, я всегда на связи!',
+          ];
+          oracleAnswer = replies[Math.floor(Math.random() * replies.length)];
+        }
+
+        const replyMsg: Message = {
+          id: `oracle_reply_${Date.now()}`,
+          text: oracleAnswer,
+          fromMe: false,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: 'read'
+        };
+
+        setMessages(mPrev => {
+          const list = [...mPrev, replyMsg];
+          if (chat && onUpdateChat) {
+            onUpdateChat(chat.id, {
+              messages: list,
+              lastMessage: oracleAnswer,
+              time: replyMsg.time,
+              unread: 0
+            });
+          }
+          return list;
+        });
+      }, 800 + Math.random() * 1200);
     }
   };
 

@@ -19,55 +19,89 @@ export function MessengerPage() {
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ИИ Оракул — встроенный ИИ-ассистент, всегда первый чат
+  const AI_ORACLE_CHAT: Chat = {
+    id: 'chat_ai_oracle',
+    user: {
+      id: 'ai_oracle',
+      name: 'ИИ Оракул',
+      username: 'ai_oracle',
+      avatar: '',
+      online: true,
+      verified: true,
+      followersCount: 0,
+      followingCount: 0,
+      postsCount: 0,
+    },
+    lastMessage: '✨ Привет! Я ИИ Оракул — твой цифровой помощник',
+    time: 'Сейчас',
+    unread: 0,
+    isFavorite: true,
+    messages: [
+      {
+        id: 'ai_welcome_1',
+        text: '✨ Привет! Я **ИИ Оракул** — твой цифровой помощник в New Age.\n\nЯ могу:\n• 💬 Поддержать беседу на любую тему\n• 🔮 Помочь разобраться с платформой\n• 📝 Ответить на вопросы\n\nНапиши мне что-нибудь!',
+        fromMe: false,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: 'read'
+      }
+    ]
+  };
+
+
+
   useEffect(() => {
     let mounted = true;
-    api.chats.list().then((data) => {
-      if (mounted) {
-        let baseChats: Chat[] = Array.isArray(data) ? data : [];
-        
-        // Если API вернул пусто — пробуем localStorage
-        const saved = localStorage.getItem('newage_messenger_chats');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              baseChats = parsed;
-            }
-          } catch { /* ignore */ }
-        }
 
-        if (baseChats.length > 0) {
-          const firstId = baseChats[0]?.id;
-          if (firstId) {
-            baseChats = baseChats.map((c: Chat) => {
-              if (c.id === firstId) {
-                return {
-                  ...c,
-                  unread: 0,
-                  messages: c.messages?.map((m: any) => (!m.fromMe || !m.status ? { ...m, status: 'read' as const } : m)) || []
-                };
-              }
-              return c;
-            });
-          }
-        }
-        setChatList(baseChats);
-        setIsLoading(false);
-      }
-    }).catch(err => {
-      console.warn('Failed to load chats', err);
-      // Фолбэк на localStorage при ошибке API
-      if (mounted) {
+    const loadChats = () => {
+      let userChats: Chat[] = [];
+
+      // Загружаем сохранённые чаты из localStorage
+      const saved = localStorage.getItem('newage_messenger_chats');
+      if (saved) {
         try {
-          const saved = localStorage.getItem('newage_messenger_chats');
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) setChatList(parsed);
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            userChats = parsed;
           }
         } catch { /* ignore */ }
+      }
+
+      // Убеждаемся что ИИ Оракул ВСЕГДА первый
+      const hasOracle = userChats.some(c => c.id === 'chat_ai_oracle');
+      if (!hasOracle) {
+        userChats = [AI_ORACLE_CHAT, ...userChats];
+      } else {
+        // Переносим Оракула на первое место
+        const oracle = userChats.find(c => c.id === 'chat_ai_oracle')!;
+        userChats = [oracle, ...userChats.filter(c => c.id !== 'chat_ai_oracle')];
+      }
+
+      if (mounted) {
+        setChatList(userChats);
+        localStorage.setItem('newage_messenger_chats', JSON.stringify(userChats));
         setIsLoading(false);
       }
+    };
+
+    // Пробуем загрузить с API, фолбэк на localStorage
+    api.chats.list().then((data) => {
+      if (mounted) {
+        if (Array.isArray(data) && data.length > 0) {
+          // API вернул реальные чаты — используем их
+          const hasOracle = data.some((c: Chat) => c.id === 'chat_ai_oracle');
+          const chats = hasOracle ? data : [AI_ORACLE_CHAT, ...data];
+          setChatList(chats);
+          localStorage.setItem('newage_messenger_chats', JSON.stringify(chats));
+          setIsLoading(false);
+        } else {
+          loadChats();
+        }
+      }
+    }).catch(() => {
+      if (mounted) loadChats();
     });
+
     return () => { mounted = false; };
   }, []);
 
