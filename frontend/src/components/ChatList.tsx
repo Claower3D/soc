@@ -470,10 +470,12 @@ export function ChatList({
           </div>
         ) : (
           filteredChats.map(chat => {
+            // Защита от повреждённых данных из localStorage
+            if (!chat || !chat.user || typeof chat.user !== 'object') return null;
             const isGroup = chat.isGroup;
-            const isAi = chat.id === 'ai_guru_bot' || chat.isSystem;
-            const displayName = chat.groupTitle || chat.user.name;
-            const displayAvatar = chat.groupAvatar || chat.user.avatar;
+            const isAi = chat.id === 'ai_guru_bot' || chat.id === 'chat_ai_oracle' || chat.isSystem;
+            const displayName = chat.groupTitle || chat.user.name || 'Чат';
+            const displayAvatar = chat.groupAvatar || chat.user.avatar || '';
 
             return (
               <div
@@ -522,7 +524,7 @@ export function ChatList({
                       )}
                       {chat.isArchived && <span className="archive-tag-inline">Архив</span>}
                     </span>
-                    <span className="chat-time">{chat.time}</span>
+                    <span className="chat-time">{typeof chat.time === 'string' ? chat.time : ''}</span>
                   </div>
 
                   <div className="chat-item-bottom">
@@ -546,7 +548,7 @@ export function ChatList({
                                 )}
                               </span>
                             )}
-                            <span className="chat-preview-text">{chat.lastMessage}</span>
+                            <span className="chat-preview-text">{typeof chat.lastMessage === 'string' ? chat.lastMessage : ''}</span>
                           </span>
                         );
                       })()}
