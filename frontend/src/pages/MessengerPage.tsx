@@ -7,7 +7,6 @@ import { type Chat } from '../data/mock';
 import { INITIAL_DATING_PROFILES } from '../data/datingData';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { ErrorBoundary } from '../components/ErrorBoundary';
 import './MessengerPage.css';
 
 export function MessengerPage() {
@@ -271,7 +270,6 @@ export function MessengerPage() {
   return (
     <div className="messenger-page">
       <div className={`messenger-list ${activeChatId ? 'hide-mobile' : ''}`}>
-        <ErrorBoundary fallback={<div style={{color:'#fff',padding:20}}>Ошибка в ChatList</div>}>
         <ChatList
           chats={chatList}
           activeChatId={activeChatId}
@@ -280,10 +278,8 @@ export function MessengerPage() {
           onCreateGroup={handleCreateGroup}
           onUpdateChat={handleUpdateChat}
         />
-        </ErrorBoundary>
       </div>
       <div className={`messenger-chat ${!activeChatId ? 'hide-mobile' : ''}`}>
-        <ErrorBoundary fallback={<div style={{color:'#fff',padding:20}}>Ошибка в ChatWindow</div>}>
         <ChatWindow 
           chat={activeChat} 
           onBack={() => setActiveChatId(null)} 
@@ -292,7 +288,6 @@ export function MessengerPage() {
           availableChats={chatList}
           onSelectChat={handleSelectChat}
         />
-        </ErrorBoundary>
       </div>
     </div>
   );
