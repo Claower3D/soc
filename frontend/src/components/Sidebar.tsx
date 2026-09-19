@@ -100,7 +100,6 @@ export function Sidebar() {
           <NavLink to="/messenger" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <MessageCircle className="nav-icon" size={19} />
             <span className="nav-label">{t('nav.messenger')}</span>
-            <span className="nav-badge">3</span>
           </NavLink>
         ) : (
           <div 

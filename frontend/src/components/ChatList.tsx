@@ -300,16 +300,6 @@ export function ChatList({
           </div>
         </div>
 
-        {/* BIRTHDAY BANNER NOTICE (EXACT SCREENSHOT MATCH 3) */}
-        <div className="messenger-birthday-card" onClick={() => alert('Поздравление отправлено Алине! 🎂')}>
-          <div className="birthday-avatar-badge">
-            <span>А</span>
-          </div>
-          <div className="birthday-card-info">
-            <span className="birthday-title">Алина празднует день рождения! 🎂</span>
-            <span className="birthday-action-link">Отправить подарок / пожелание</span>
-          </div>
-        </div>
 
         {/* FOLDER TABS & LABELS (EXACT SCREENSHOT MATCH 1 & 2) */}
         <div className="chat-list-filter-tabs">
