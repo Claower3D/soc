@@ -623,18 +623,24 @@ func main() {
 
 	if distDir != "" {
 		fs := http.FileServer(http.Dir(distDir))
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasPrefix(r.URL.Path, "/api") {
-				http.NotFound(w, r)
+		// SPA fallback — обрабатывает ТОЛЬКО не-API пути
+		spaHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// API-запросы сюда попасть не должны (они обрабатываются конкретными routes)
+			// Но если попали — значит роут не найден
+			if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api" {
+				writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "API endpoint not found"})
 				return
 			}
+			// Проверяем есть ли файл на диске
 			filePath := distDir + r.URL.Path
 			if fi, err := os.Stat(filePath); err == nil && !fi.IsDir() {
 				fs.ServeHTTP(w, r)
 				return
 			}
+			// SPA fallback — всё остальное → index.html
 			http.ServeFile(w, r, distDir+"/index.html")
 		})
+		mux.Handle("GET /", spaHandler)
 		log.Printf("📁 Раздача статических файлов фронтенда из: %s", distDir)
 	}
 
