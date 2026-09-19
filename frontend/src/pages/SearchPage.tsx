@@ -42,15 +42,16 @@ export function SearchPage() {
   }, []);
 
   useEffect(() => {
-    api.posts.list().then(setPosts).catch(console.warn);
-    api.videos.list().then(setVideos).catch(console.warn);
+    api.posts.list().then((d: any) => Array.isArray(d) && setPosts(d)).catch(console.warn);
+    api.videos.list().then((d: any) => Array.isArray(d) && setVideos(d)).catch(console.warn);
   }, []);
 
   useEffect(() => {
+    const safeFn = (d: any) => Array.isArray(d) && setPoolUsers(d);
     if (query.trim()) {
-      api.users.search(query).then(setPoolUsers).catch(console.warn);
+      api.users.search(query).then(safeFn).catch(console.warn);
     } else {
-      api.users.list().then(setPoolUsers).catch(console.warn);
+      api.users.list().then(safeFn).catch(console.warn);
     }
   }, [query]);
 

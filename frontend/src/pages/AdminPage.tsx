@@ -42,8 +42,8 @@ export const AdminPage: React.FC = () => {
   const [productsList, setProductsList] = useState<any[]>([]);
 
   useEffect(() => {
-    api.users.list().then(setUsersList).catch(console.warn);
-    api.marketplace.products().then(setProductsList).catch(console.warn);
+    api.users.list().then((d: any) => Array.isArray(d) && setUsersList(d)).catch(console.warn);
+    api.marketplace.products().then((d: any) => Array.isArray(d) && setProductsList(d)).catch(console.warn);
   }, []);
 
   if (!isAuthenticated) {

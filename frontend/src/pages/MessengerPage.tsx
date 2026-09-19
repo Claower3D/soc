@@ -22,8 +22,10 @@ export function MessengerPage() {
     let mounted = true;
     api.chats.list().then((data) => {
       if (mounted) {
+        let baseChats: Chat[] = Array.isArray(data) ? data : [];
+        
+        // Если API вернул пусто — пробуем localStorage
         const saved = localStorage.getItem('newage_messenger_chats');
-        let baseChats = data;
         if (saved) {
           try {
             const parsed = JSON.parse(saved);
@@ -33,25 +35,37 @@ export function MessengerPage() {
           } catch { /* ignore */ }
         }
 
-        const firstId = baseChats[0]?.id;
-        if (firstId) {
-        baseChats = baseChats.map((c: Chat) => {
-            if (c.id === firstId) {
-              return {
-                ...c,
-                unread: 0,
-                messages: c.messages.map((m: any) => (!m.fromMe || !m.status ? { ...m, status: 'read' as const } : m))
-              };
-            }
-            return c;
-          });
+        if (baseChats.length > 0) {
+          const firstId = baseChats[0]?.id;
+          if (firstId) {
+            baseChats = baseChats.map((c: Chat) => {
+              if (c.id === firstId) {
+                return {
+                  ...c,
+                  unread: 0,
+                  messages: c.messages?.map((m: any) => (!m.fromMe || !m.status ? { ...m, status: 'read' as const } : m)) || []
+                };
+              }
+              return c;
+            });
+          }
         }
         setChatList(baseChats);
         setIsLoading(false);
       }
     }).catch(err => {
       console.warn('Failed to load chats', err);
-      if (mounted) setIsLoading(false);
+      // Фолбэк на localStorage при ошибке API
+      if (mounted) {
+        try {
+          const saved = localStorage.getItem('newage_messenger_chats');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed)) setChatList(parsed);
+          }
+        } catch { /* ignore */ }
+        setIsLoading(false);
+      }
     });
     return () => { mounted = false; };
   }, []);

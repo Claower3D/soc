@@ -60,11 +60,14 @@ export function ProfilePage() {
   const [profileProducts, setProfileProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    api.posts.list().then(setProfilePosts).catch(console.warn);
-    api.stories.list().then(setProfileStories).catch(console.warn);
-    api.videos.list().then(setProfileVideos).catch(console.warn);
-    api.podcasts.list().then(setProfilePodcasts).catch(console.warn);
-    api.marketplace.products().then(setProfileProducts).catch(console.warn);
+    const safeSet = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>) => (data: any) => {
+      if (Array.isArray(data)) setter(data);
+    };
+    api.posts.list().then(safeSet(setProfilePosts)).catch(console.warn);
+    api.stories.list().then(safeSet(setProfileStories)).catch(console.warn);
+    api.videos.list().then(safeSet(setProfileVideos)).catch(console.warn);
+    api.podcasts.list().then(safeSet(setProfilePodcasts)).catch(console.warn);
+    api.marketplace.products().then(safeSet(setProfileProducts)).catch(console.warn);
   }, []);
 
   const handleDeleteStory = (storyId: string) => {
