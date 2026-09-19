@@ -622,30 +622,34 @@ func main() {
 	}
 
 	if distDir != "" {
-		fs := http.FileServer(http.Dir(distDir))
-		// SPA fallback — обрабатывает ТОЛЬКО не-API пути
-		spaHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// API-запросы сюда попасть не должны (они обрабатываются конкретными routes)
-			// Но если попали — значит роут не найден
-			if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api" {
-				writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "API endpoint not found"})
-				return
-			}
-			// Проверяем есть ли файл на диске
-			filePath := distDir + r.URL.Path
-			if fi, err := os.Stat(filePath); err == nil && !fi.IsDir() {
-				fs.ServeHTTP(w, r)
-				return
-			}
-			// SPA fallback — всё остальное → index.html
-			http.ServeFile(w, r, distDir+"/index.html")
-		})
-		mux.Handle("GET /", spaHandler)
 		log.Printf("📁 Раздача статических файлов фронтенда из: %s", distDir)
 	}
 
+	// Оборачиваем: API → mux, остальное → SPA static
+	var rootHandler http.Handler
+	if distDir != "" {
+		fsHandler := http.FileServer(http.Dir(distDir))
+		rootHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Все /api/* запросы идут в mux (там зарегистрированы все API handlers)
+			if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api" {
+				mux.ServeHTTP(w, r)
+				return
+			}
+			// Проверяем есть ли статический файл
+			filePath := distDir + r.URL.Path
+			if fi, err := os.Stat(filePath); err == nil && !fi.IsDir() {
+				fsHandler.ServeHTTP(w, r)
+				return
+			}
+			// SPA fallback → index.html
+			http.ServeFile(w, r, distDir+"/index.html")
+		})
+	} else {
+		rootHandler = mux
+	}
+
 	// CORS middleware
-	handler := corsMiddleware(mux)
+	handler := corsMiddleware(rootHandler)
 
 	port := os.Getenv("PORT")
 	if port == "" {
