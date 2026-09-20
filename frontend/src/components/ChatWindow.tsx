@@ -1036,6 +1036,21 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
     }
   };
 
+  // DEBUG: Log all message fields to find the object causing #310
+  if (chat) {
+    console.log('[ChatWindow] Rendering chat:', chat.id, 'messages:', messages.length);
+    messages.forEach((m, i) => {
+      const fields = Object.entries(m).map(([k,v]) => `${k}:${typeof v}`).join(', ');
+      console.log(`  msg[${i}]: ${fields}`);
+      // Check each field — if any is an object, it would crash React
+      Object.entries(m).forEach(([key, val]) => {
+        if (val !== null && val !== undefined && typeof val === 'object' && !Array.isArray(val)) {
+          console.error(`  ⚠️ msg[${i}].${key} IS AN OBJECT:`, JSON.stringify(val).slice(0, 200));
+        }
+      });
+    });
+  }
+
   return (
     <div className="tg-chat-container">
       {/* Hidden File Inputs */}
@@ -1252,6 +1267,22 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
           </div>
         ) : (
           messages.map((msg) => {
+            // Safety: validate msg is a proper object with string fields
+            if (!msg || typeof msg !== 'object' || !msg.id) {
+              console.error('[ChatWindow] Invalid message object:', msg);
+              return null;
+            }
+            // Force all renderable fields to strings
+            const safeMsg = {
+              ...msg,
+              text: typeof msg.text === 'string' ? msg.text : (msg.text ? String(msg.text) : ''),
+              time: typeof msg.time === 'string' ? msg.time : (msg.time ? String(msg.time) : ''),
+              forwardedFrom: typeof msg.forwardedFrom === 'string' ? msg.forwardedFrom : undefined,
+              voiceDuration: typeof msg.voiceDuration === 'string' ? msg.voiceDuration : (msg.voiceDuration ? String(msg.voiceDuration) : undefined),
+            };
+            // Apply safe values
+            Object.assign(msg, safeMsg);
+
             const isMe = msg.fromMe;
             const isVoice = msg.mediaType === 'voice';
             const isImage = msg.mediaType === 'image';

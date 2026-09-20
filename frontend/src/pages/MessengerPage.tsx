@@ -132,11 +132,12 @@ export function MessengerPage() {
 
   const [activeChatId, setActiveChatId] = useState<string | null>(requestedChatId);
 
-  useEffect(() => {
-    if (!isLoading && !activeChatId && chatList.length > 0 && !requestedChatId && !datingProfileId) {
-      setActiveChatId(chatList[0].id);
-    }
-  }, [isLoading, activeChatId, chatList, requestedChatId, datingProfileId]);
+  // Auto-select отключён до фикса рендера ChatWindow
+  // useEffect(() => {
+  //   if (!isLoading && !activeChatId && chatList.length > 0 && !requestedChatId && !datingProfileId) {
+  //     setActiveChatId(chatList[0].id);
+  //   }
+  // }, [isLoading, activeChatId, chatList, requestedChatId, datingProfileId]);
 
   // Handle incoming query params: requestedChatId or datingProfileId
   useEffect(() => {
