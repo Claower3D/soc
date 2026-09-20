@@ -341,3 +341,162 @@
     transform: scale(1);
   }
 }
+
+/* ---- Context Menu (ПКМ) ---- */
+.cw-ctx-menu {
+  position: fixed;
+  z-index: 1000;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+  padding: 6px 0;
+  min-width: 180px;
+  animation: cw-ctx-fade 0.15s ease;
+}
+
+@keyframes cw-ctx-fade {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.cw-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 16px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  color: #1c1c1e;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.cw-ctx-item:hover {
+  background: #f2f2f7;
+}
+
+.cw-ctx-item.danger {
+  color: #ff3b30;
+}
+
+.cw-ctx-item.danger:hover {
+  background: #fff0f0;
+}
+
+.cw-ctx-divider {
+  height: 1px;
+  background: #e5e5ea;
+  margin: 4px 0;
+}
+
+/* ---- Emoji Picker ---- */
+.cw-emoji-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 8px 12px;
+  background: #fff;
+  border-top: 1px solid #e5e5ea;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.cw-emoji-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.1s;
+}
+
+.cw-emoji-btn:hover {
+  background: #f2f2f7;
+}
+
+/* ---- Reply Bar (in input area) ---- */
+.cw-reply-bar-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f9f9fb;
+  border-top: 1px solid #e5e5ea;
+}
+
+.cw-reply-bar {
+  width: 3px;
+  height: 100%;
+  min-height: 20px;
+  background: #6C5CE7;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.cw-reply-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cw-reply-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6C5CE7;
+}
+
+.cw-reply-preview-text {
+  font-size: 13px;
+  color: #8e8e93;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cw-reply-close {
+  background: none;
+  border: none;
+  color: #8e8e93;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cw-reply-close:hover {
+  background: #f2f2f7;
+  color: #1c1c1e;
+}
+
+/* ---- Reply Preview (in bubble) ---- */
+.cw-reply-preview {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.05);
+  font-size: 12px;
+  color: #8e8e93;
+}
+
+.cw-bubble.me .cw-reply-preview {
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.7);
+}
+
+.cw-reply-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -402,6 +402,8 @@ export interface Message {
     date: string;
     code: string;
   };
+  replyToId?: string;
+  replyToText?: string;
 }
 
 export interface ChatTag {
