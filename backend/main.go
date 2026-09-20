@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -12,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	mathrand "math/rand"
 	"net/http"
@@ -608,6 +610,9 @@ func main() {
 	mux.HandleFunc("GET /api/cache/stats", handleCacheStats)
 	mux.HandleFunc("POST /api/cache/clear", handleCacheClear)
 	mux.HandleFunc("POST /api/cache/sync", handleCacheSync)
+
+	// ИИ Оракул
+	mux.HandleFunc("POST /api/ai/chat", handleAIChat)
 
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
@@ -2238,4 +2243,233 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		log.Printf("Ошибка записи JSON: %v", err)
 	}
+}
+
+// ==================== ИИ ОРАКУЛ — Gemini AI Chat ====================
+
+const oracleSystemPrompt = `Ты — ИИ Оракул, мудрый цифровой помощник платформы New Age — мультифункциональной социальной экосистемы.
+
+ТВОЯ РОЛЬ:
+• Ты духовный наставник, жизненный коуч и мудрый советник
+• Ты помогаешь людям в вопросах морали, этики, духовного развития, религии и повседневной жизни
+• Ты уважаешь ВСЕ религии и духовные традиции — буддизм, ислам, христианство, индуизм, даосизм, иудаизм и другие
+• Ты НЕ навязываешь никакую конкретную религию, а помогаешь человеку найти СВОЙ путь
+
+СТИЛЬ ОБЩЕНИЯ:
+• Говори тепло, с эмпатией и уважением
+• Используй эмодзи умеренно (✨ 🙏 💫 🌟 💡) для выразительности
+• Отвечай на русском языке
+• Будь конкретным — давай практичные советы, а не абстрактные фразы
+• Если вопрос сложный — предложи посмотреть на ситуацию с разных сторон
+• Можешь цитировать мудрость из разных традиций (Будда, Руми, Библия, Коран, Бхагавад-Гита, стоики, Лао-Цзы)
+
+ЧТО ТЫ УМЕЕШЬ:
+• Жизненные советы — отношения, семья, карьера, финансы, здоровье
+• Духовное развитие — медитация, осознанность, практики, самопознание
+• Моральные дилеммы — помоги разобраться что правильно
+• Религиозные вопросы — расскажи о разных традициях с уважением
+• Эмоциональная поддержка — выслушай, поддержи, дай надежду
+• Мотивация — вдохнови на действия и перемены
+• Помощь с платформой New Age — объясни функции приложения
+
+ОГРАНИЧЕНИЯ:
+• НЕ давай медицинских диагнозов — направляй к врачу
+• НЕ давай юридических консультаций — направляй к юристу
+• НЕ поддерживай насилие, ненависть или дискриминацию
+• Если человеку очень плохо — аккуратно направь к профессиональной помощи
+
+Отвечай содержательно, но не слишком длинно — 2-4 абзаца максимум.`
+
+type aiChatRequest struct {
+	Message string `json:"message"`
+	History []struct {
+		Role string `json:"role"`
+		Text string `json:"text"`
+	} `json:"history"`
+}
+
+func handleAIChat(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != "POST" {
+		writeJSON(w, 405, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	var req aiChatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, map[string]string{"error": "invalid request"})
+		return
+	}
+
+	if strings.TrimSpace(req.Message) == "" {
+		writeJSON(w, 400, map[string]string{"error": "empty message"})
+		return
+	}
+
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		// Без API ключа — используем встроенные ответы
+		reply := getLocalAIReply(req.Message)
+		writeJSON(w, 200, map[string]interface{}{
+			"status": "ok",
+			"reply":  reply,
+			"source": "local",
+		})
+		return
+	}
+
+	// Формируем Gemini API запрос
+	contents := []map[string]interface{}{}
+
+	// Добавляем историю диалога (последние 10 сообщений)
+	historyLimit := 10
+	startIdx := 0
+	if len(req.History) > historyLimit {
+		startIdx = len(req.History) - historyLimit
+	}
+	for _, h := range req.History[startIdx:] {
+		role := "user"
+		if h.Role == "assistant" || h.Role == "model" {
+			role = "model"
+		}
+		contents = append(contents, map[string]interface{}{
+			"role":  role,
+			"parts": []map[string]string{{"text": h.Text}},
+		})
+	}
+
+	// Текущее сообщение
+	contents = append(contents, map[string]interface{}{
+		"role":  "user",
+		"parts": []map[string]string{{"text": req.Message}},
+	})
+
+	geminiBody := map[string]interface{}{
+		"contents": contents,
+		"systemInstruction": map[string]interface{}{
+			"parts": []map[string]string{{"text": oracleSystemPrompt}},
+		},
+		"generationConfig": map[string]interface{}{
+			"temperature":     0.8,
+			"topP":            0.95,
+			"maxOutputTokens": 1024,
+		},
+	}
+
+	bodyBytes, _ := json.Marshal(geminiBody)
+
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=%s", apiKey)
+
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	if err != nil {
+		log.Printf("[AI] Ошибка создания запроса: %v", err)
+		writeJSON(w, 200, map[string]interface{}{
+			"status": "ok",
+			"reply":  getLocalAIReply(req.Message),
+			"source": "local",
+		})
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		log.Printf("[AI] Gemini API ошибка: %v", err)
+		writeJSON(w, 200, map[string]interface{}{
+			"status": "ok",
+			"reply":  getLocalAIReply(req.Message),
+			"source": "local",
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != 200 {
+		log.Printf("[AI] Gemini API %d: %s", resp.StatusCode, string(respBody[:min(len(respBody), 500)]))
+		writeJSON(w, 200, map[string]interface{}{
+			"status": "ok",
+			"reply":  getLocalAIReply(req.Message),
+			"source": "local",
+		})
+		return
+	}
+
+	// Parse Gemini response
+	var geminiResp struct {
+		Candidates []struct {
+			Content struct {
+				Parts []struct {
+					Text string `json:"text"`
+				} `json:"parts"`
+			} `json:"content"`
+		} `json:"candidates"`
+	}
+
+	if err := json.Unmarshal(respBody, &geminiResp); err != nil || len(geminiResp.Candidates) == 0 {
+		log.Printf("[AI] Parse error or empty: %v", err)
+		writeJSON(w, 200, map[string]interface{}{
+			"status": "ok",
+			"reply":  getLocalAIReply(req.Message),
+			"source": "local",
+		})
+		return
+	}
+
+	reply := ""
+	for _, p := range geminiResp.Candidates[0].Content.Parts {
+		reply += p.Text
+	}
+
+	if strings.TrimSpace(reply) == "" {
+		reply = getLocalAIReply(req.Message)
+	}
+
+	writeJSON(w, 200, map[string]interface{}{
+		"status": "ok",
+		"reply":  reply,
+		"source": "gemini",
+	})
+}
+
+func getLocalAIReply(text string) string {
+	lower := strings.ToLower(strings.TrimSpace(text))
+
+	replies := map[string]string{
+		"привет":   "Привет! 👋 Я ИИ Оракул — мудрый помощник платформы New Age. Чем могу помочь? Спрашивай о жизни, духовности, отношениях — я здесь для тебя ✨",
+		"помощь":   "📚 Я могу помочь с:\n\n• 🙏 Духовное развитие и медитация\n• 💡 Жизненные советы и мотивация\n• ❤️ Отношения и семья\n• ⚖️ Моральные вопросы\n• 🌟 Самопознание\n• 📱 Функции платформы New Age\n\nПросто напиши свой вопрос!",
+		"кто ты":   "🤖 Я ИИ Оракул — цифровой наставник платформы New Age. Моя задача — помогать людям на их жизненном пути: советами, поддержкой и мудростью из разных духовных традиций мира ✨",
+		"спасибо":  "Пожалуйста! 🙏 Помни: каждый день — это возможность стать лучшей версией себя. Обращайся в любое время 💫",
+		"смысл жизни": "✨ Великие мудрецы отвечали по-разному:\n\n🙏 Будда: «Цель жизни — избавление от страданий через осознанность»\n📖 Виктор Франкл: «Смысл не дан нам — мы сами его создаём»\n🌟 Конфуций: «Найди дело, которое любишь, и не будешь работать ни дня»\n\nТвой смысл — это то, что даёт тебе энергию, радость и ощущение нужности. Что сейчас наполняет твою жизнь?",
+		"медитация": "🧘 Простая медитация для начинающих:\n\n1. Сядь удобно, закрой глаза\n2. Сосредоточься на дыхании — вдох 4 сек, задержка 4 сек, выдох 6 сек\n3. Когда мысли уносят — мягко верни внимание к дыханию\n4. Начни с 5 минут, постепенно увеличивай\n\n✨ Регулярная практика снижает стресс, улучшает сон и повышает концентрацию. Главное — не результат, а процесс 🙏",
+	}
+
+	for key, reply := range replies {
+		if strings.Contains(lower, key) {
+			return reply
+		}
+	}
+
+	// Категория ответов
+	genericReplies := []string{
+		"✨ Интересный вопрос! Каждый жизненный вызов — это возможность для роста. Расскажи подробнее, и я постараюсь помочь 🙏",
+		"💫 Мудрость приходит через опыт и размышления. Давай разберёмся в этом вместе. Что именно тебя волнует?",
+		"🌟 Как говорил Лао-Цзы: «Путь в тысячу ли начинается с первого шага». Я рядом, чтобы помочь сделать этот шаг ✨",
+		"💡 Каждая ситуация имеет решение. Иногда нужно просто посмотреть на неё под другим углом. Расскажи больше!",
+		"🙏 Я слышу тебя. Расскажи подробнее — вместе мы найдём ответ. Помни: ты сильнее, чем думаешь ✨",
+	}
+
+	return genericReplies[mathrand.Intn(len(genericReplies))]
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

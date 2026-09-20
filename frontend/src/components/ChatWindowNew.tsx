@@ -12,26 +12,26 @@ interface ChatWindowProps {
   onSelectChat?: (id: string) => void;
 }
 
-const AI_REPLIES: Record<string, string> = {
-  'привет': 'Привет! 👋 Чем могу помочь?',
-  'помощь': '📚 Я могу:\n• Ответить на вопросы о платформе\n• Поддержать беседу\n• Помочь найти функции\n\nПросто напиши!',
-  'кто ты': '🤖 Я ИИ Оракул — цифровой помощник платформы New Age. Задавай любые вопросы!',
-  'спасибо': 'Пожалуйста! 😊 Обращайся в любое время.',
-};
 
-function getAiReply(text: string): string {
-  const lower = text.toLowerCase().trim();
-  for (const [key, reply] of Object.entries(AI_REPLIES)) {
-    if (lower.includes(key)) return reply;
+async function fetchAiReply(text: string, history: Array<{ role: string; text: string }>): Promise<string> {
+  try {
+    const resp = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, history }),
+    });
+    if (!resp.ok) throw new Error('API error');
+    const data = await resp.json();
+    return String(data.reply || 'Не удалось получить ответ. Попробуй ещё раз!');
+  } catch {
+    // Fallback если API недоступен
+    const fallbacks = [
+      '✨ Интересный вопрос! Расскажи подробнее 🙏',
+      '💫 Давай разберёмся вместе. Что именно тебя волнует?',
+      '🌟 Я здесь для тебя. Расскажи больше!',
+    ];
+    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
   }
-  const replies = [
-    'Интересно! Расскажи подробнее 🤔',
-    'Понял тебя! Что-нибудь ещё?',
-    'Хороший вопрос! Давай обсудим.',
-    '✨ Отличная мысль!',
-    'Я тебя слышу. Продолжай!',
-  ];
-  return replies[Math.floor(Math.random() * replies.length)];
 }
 
 function formatTime(): string {
@@ -41,6 +41,7 @@ function formatTime(): string {
 export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -99,10 +100,18 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     }, 1500);
 
     if (isAi) {
-      setTimeout(() => {
+      // Собираем историю для Gemini API
+      const history = [...messages, newMsg].map(m => ({
+        role: m.fromMe ? 'user' : 'assistant',
+        text: String(m.text || ''),
+      }));
+
+      setIsAiTyping(true);
+
+      fetchAiReply(text, history).then(replyText => {
         const reply: Message = {
           id: `msg_ai_${Date.now()}`,
-          text: getAiReply(text),
+          text: replyText,
           fromMe: false,
           time: formatTime(),
           status: 'read',
@@ -114,7 +123,8 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           }
           return updated;
         });
-      }, 800 + Math.random() * 1200);
+        setIsAiTyping(false);
+      });
     }
 
     inputRef.current?.focus();
@@ -191,6 +201,17 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               </div>
             );
           })
+        )}
+        {isAiTyping && (
+          <div className="cw-msg-row incoming">
+            <div className="cw-bubble them cw-typing-bubble">
+              <div className="cw-typing-dots">
+                <span className="cw-dot" />
+                <span className="cw-dot" />
+                <span className="cw-dot" />
+              </div>
+            </div>
+          </div>
         )}
         <div ref={messagesEndRef} />
       </div>
