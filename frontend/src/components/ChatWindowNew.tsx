@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video } from 'lucide-react';
 import { type Chat, type Message } from '../data/mock';
+import './ChatWindowNew.css';
 
 interface ChatWindowProps {
   chat: Chat | null;
@@ -11,7 +12,6 @@ interface ChatWindowProps {
   onSelectChat?: (id: string) => void;
 }
 
-// ИИ-ответы
 const AI_REPLIES: Record<string, string> = {
   'привет': 'Привет! 👋 Чем могу помочь?',
   'помощь': '📚 Я могу:\n• Ответить на вопросы о платформе\n• Поддержать беседу\n• Помочь найти функции\n\nПросто напиши!',
@@ -44,7 +44,6 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Sync messages when chat changes
   useEffect(() => {
     if (chat?.messages && Array.isArray(chat.messages)) {
       setMessages(chat.messages);
@@ -54,16 +53,14 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     setInputValue('');
   }, [chat?.id]);
 
-  // Auto scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Empty state
   if (!chat) {
     return (
-      <div className="chat-window-empty">
-        <div className="empty-message-bubble">Выберите диалог для начала общения</div>
+      <div className="cw-empty">
+        <div className="cw-empty-text">💬 Выберите диалог для начала общения</div>
       </div>
     );
   }
@@ -89,28 +86,19 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     setMessages(updatedMessages);
     setInputValue('');
 
-    // Save to parent
     if (onUpdateChat) {
-      onUpdateChat(chat.id, {
-        messages: updatedMessages,
-        lastMessage: text,
-        time: formatTime(),
-      });
+      onUpdateChat(chat.id, { messages: updatedMessages, lastMessage: text, time: formatTime() });
     }
 
-    // Mark as delivered after 500ms
     setTimeout(() => {
       setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, status: 'delivered' as const } : m));
     }, 500);
 
-    // Mark as read after 1.5s
     setTimeout(() => {
       setMessages(prev => prev.map(m => m.id === newMsg.id ? { ...m, status: 'read' as const } : m));
     }, 1500);
 
-    // AI reply
     if (isAi) {
-      const delay = 800 + Math.random() * 1200;
       setTimeout(() => {
         const reply: Message = {
           id: `msg_ai_${Date.now()}`,
@@ -122,15 +110,11 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         setMessages(prev => {
           const updated = [...prev, reply];
           if (onUpdateChat) {
-            onUpdateChat(chat.id, {
-              messages: updated,
-              lastMessage: String(reply.text || '').slice(0, 50),
-              time: formatTime(),
-            });
+            onUpdateChat(chat.id, { messages: updated, lastMessage: String(reply.text || '').slice(0, 50), time: formatTime() });
           }
           return updated;
         });
-      }, delay);
+      }, 800 + Math.random() * 1200);
     }
 
     inputRef.current?.focus();
@@ -143,117 +127,65 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     }
   };
 
-  const renderTicks = (msg: Message) => {
-    if (!msg.fromMe) return null;
-    const s = String(msg.status || 'sent');
-    if (s === 'read') return <span className="tg-ticks read">✓✓</span>;
-    if (s === 'delivered') return <span className="tg-ticks">✓✓</span>;
-    return <span className="tg-ticks">✓</span>;
-  };
-
   return (
-    <div className="tg-chat-container" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="cw-container">
       {/* Header */}
-      <div className="tg-chat-header" style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
-        borderBottom: '1px solid var(--color-border, #2a2a3a)',
-        background: 'var(--color-surface, #1a1a2e)', flexShrink: 0,
-      }}>
-        <button onClick={onBack} className="tg-back-btn" style={{
-          background: 'none', border: 'none', color: 'var(--color-text, #fff)', cursor: 'pointer',
-          display: 'none', padding: 4,
-        }}>
+      <div className="cw-header">
+        <button onClick={onBack} className="cw-back-btn">
           <ArrowLeft size={22} />
         </button>
 
-        <div style={{ position: 'relative' }}>
+        <div className="cw-avatar-wrap">
           {chatAvatar ? (
-            <img src={chatAvatar} alt={chatName} style={{
-              width: 40, height: 40, borderRadius: '50%', objectFit: 'cover',
-            }} />
+            <img src={chatAvatar} alt={chatName} className="cw-avatar-img" />
           ) : (
-            <div style={{
-              width: 40, height: 40, borderRadius: '50%',
-              background: isAi ? 'linear-gradient(135deg, #a855f7, #ec4899)' : '#6C5CE7',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontWeight: 700, fontSize: 16,
-            }}>
+            <div className={`cw-avatar-placeholder ${isAi ? 'ai' : ''}`}>
               {chatName.charAt(0)}
             </div>
           )}
-          {isOnline && (
-            <div style={{
-              position: 'absolute', bottom: 0, right: 0, width: 10, height: 10,
-              borderRadius: '50%', background: '#4ade80', border: '2px solid var(--color-surface, #1a1a2e)',
-            }} />
-          )}
+          {isOnline && <div className="cw-online-dot" />}
         </div>
 
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, color: 'var(--color-text, #fff)', fontSize: 15 }}>
+        <div className="cw-header-info">
+          <div className="cw-header-name">
             {chatName}
-            {isAi && <span style={{
-              fontSize: 10, fontWeight: 700, marginLeft: 6,
-              background: 'linear-gradient(135deg, #a855f7, #ec4899)',
-              color: '#fff', padding: '1px 6px', borderRadius: 8,
-            }}>ИИ</span>}
+            {isAi && <span className="cw-ai-badge">ИИ</span>}
           </div>
-          <div style={{ fontSize: 12, color: isOnline ? '#4ade80' : 'var(--color-text-secondary, #888)' }}>
+          <div className={`cw-header-status ${isOnline ? 'online' : ''}`}>
             {isAi ? 'Нейросетевой помощник' : isOnline ? 'в сети' : 'был(а) недавно'}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary, #888)', cursor: 'pointer', padding: 6 }}>
-            <Phone size={18} />
-          </button>
-          <button style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary, #888)', cursor: 'pointer', padding: 6 }}>
-            <Video size={18} />
-          </button>
-          <button style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary, #888)', cursor: 'pointer', padding: 6 }}>
-            <MoreVertical size={18} />
-          </button>
+        <div className="cw-header-actions">
+          <button className="cw-action-btn"><Phone size={18} /></button>
+          <button className="cw-action-btn"><Video size={18} /></button>
+          <button className="cw-action-btn"><MoreVertical size={18} /></button>
         </div>
       </div>
 
       {/* Messages */}
-      <div style={{
-        flex: 1, overflowY: 'auto', padding: '16px 12px',
-        display: 'flex', flexDirection: 'column', gap: 6,
-        background: 'var(--color-bg, #0f0f1a)',
-      }}>
+      <div className="cw-messages">
         {messages.length === 0 ? (
-          <div style={{ textAlign: 'center', color: 'var(--color-text-secondary, #666)', marginTop: 40, fontSize: 14 }}>
-            Сообщений пока нет. Начните диалог!
-          </div>
+          <div className="cw-no-messages">Сообщений пока нет. Начните диалог!</div>
         ) : (
           messages.map((msg) => {
             if (!msg || typeof msg !== 'object') return null;
             const isMe = Boolean(msg.fromMe);
             const text = String(msg.text || '');
             const time = String(msg.time || '');
+            const status = String(msg.status || 'sent');
 
             return (
-              <div key={String(msg.id)} style={{
-                display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start',
-                padding: '0 4px',
-              }}>
-                <div style={{
-                  maxWidth: '70%', padding: '8px 12px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                  background: isMe
-                    ? 'linear-gradient(135deg, #6C5CE7, #a855f7)'
-                    : 'var(--color-surface, #1e1e32)',
-                  color: '#fff', fontSize: 14, lineHeight: 1.45,
-                  wordBreak: 'break-word', position: 'relative',
-                }}>
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-                    gap: 4, marginTop: 4, fontSize: 11,
-                    color: isMe ? 'rgba(255,255,255,0.6)' : 'var(--color-text-secondary, #666)',
-                  }}>
-                    <span>{time}</span>
-                    {renderTicks(msg)}
+              <div key={String(msg.id)} className={`cw-msg-row ${isMe ? 'outgoing' : 'incoming'}`}>
+                <div className={`cw-bubble ${isMe ? 'me' : 'them'}`}>
+                  <div className="cw-bubble-text">{text}</div>
+                  <div className="cw-bubble-meta">
+                    <span className="cw-bubble-time">{time}</span>
+                    {isMe && (
+                      <span className={`cw-ticks ${status === 'read' ? 'read' : ''}`}>
+                        {status === 'sent' ? '✓' : '✓✓'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -264,17 +196,9 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       </div>
 
       {/* Input */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-        borderTop: '1px solid var(--color-border, #2a2a3a)',
-        background: 'var(--color-surface, #1a1a2e)', flexShrink: 0,
-      }}>
-        <button style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary, #888)', cursor: 'pointer', padding: 6 }}>
-          <Smile size={22} />
-        </button>
-        <button style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary, #888)', cursor: 'pointer', padding: 6 }}>
-          <Paperclip size={20} />
-        </button>
+      <div className="cw-input-bar">
+        <button className="cw-input-icon"><Smile size={22} /></button>
+        <button className="cw-input-icon"><Paperclip size={20} /></button>
         <input
           ref={inputRef}
           type="text"
@@ -282,23 +206,12 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           onChange={e => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Написать сообщение..."
-          style={{
-            flex: 1, background: 'var(--color-bg, #0f0f1a)', border: '1px solid var(--color-border, #2a2a3a)',
-            borderRadius: 20, padding: '10px 16px', color: 'var(--color-text, #fff)', fontSize: 14,
-            outline: 'none',
-          }}
+          className="cw-input"
         />
         <button
           onClick={handleSend}
           disabled={!inputValue.trim()}
-          style={{
-            background: inputValue.trim() ? 'linear-gradient(135deg, #6C5CE7, #a855f7)' : 'transparent',
-            border: 'none', borderRadius: '50%', width: 40, height: 40,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: inputValue.trim() ? 'pointer' : 'default',
-            color: inputValue.trim() ? '#fff' : 'var(--color-text-secondary, #555)',
-            transition: 'all 0.2s',
-          }}
+          className={`cw-send-btn ${inputValue.trim() ? 'active' : ''}`}
         >
           <Send size={20} />
         </button>
