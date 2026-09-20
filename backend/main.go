@@ -2359,81 +2359,91 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 
 	bodyBytes, _ := json.Marshal(geminiBody)
 
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=%s", apiKey)
+	// Список моделей: основная + fallback
+	models := []string{"gemini-3.6-flash", "gemini-3.5-flash"}
+	var lastErr string
 
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-	defer cancel()
+	for _, model := range models {
+		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey)
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
-	if err != nil {
-		log.Printf("[AI] Ошибка создания запроса: %v", err)
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+		if err != nil {
+			cancel()
+			log.Printf("[AI] Ошибка создания запроса для %s: %v", model, err)
+			lastErr = err.Error()
+			continue
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(httpReq)
+		if err != nil {
+			cancel()
+			log.Printf("[AI] Gemini API (%s) ошибка: %v", model, err)
+			lastErr = err.Error()
+			continue
+		}
+
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		cancel()
+
+		if resp.StatusCode == 503 || resp.StatusCode == 429 {
+			log.Printf("[AI] Модель %s перегружена (%d), пробуем следующую...", model, resp.StatusCode)
+			lastErr = fmt.Sprintf("model %s: %d", model, resp.StatusCode)
+			continue
+		}
+
+		if resp.StatusCode != 200 {
+			log.Printf("[AI] Gemini API (%s) %d: %s", model, resp.StatusCode, string(respBody[:min(len(respBody), 500)]))
+			lastErr = fmt.Sprintf("model %s: %d", model, resp.StatusCode)
+			continue
+		}
+
+		// Parse Gemini response
+		var geminiResp struct {
+			Candidates []struct {
+				Content struct {
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"content"`
+			} `json:"candidates"`
+		}
+
+		if err := json.Unmarshal(respBody, &geminiResp); err != nil || len(geminiResp.Candidates) == 0 {
+			log.Printf("[AI] Parse error (%s): %v", model, err)
+			lastErr = "parse error"
+			continue
+		}
+
+		reply := ""
+		for _, p := range geminiResp.Candidates[0].Content.Parts {
+			reply += p.Text
+		}
+
+		if strings.TrimSpace(reply) == "" {
+			lastErr = "empty reply"
+			continue
+		}
+
+		log.Printf("[AI] Ответ от модели %s (длина %d)", model, len(reply))
 		writeJSON(w, 200, map[string]interface{}{
 			"status": "ok",
-			"reply":  getLocalAIReply(req.Message),
-			"source": "local",
+			"reply":  reply,
+			"source": "gemini",
+			"model":  model,
 		})
 		return
 	}
-	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		log.Printf("[AI] Gemini API ошибка: %v", err)
-		writeJSON(w, 200, map[string]interface{}{
-			"status": "ok",
-			"reply":  getLocalAIReply(req.Message),
-			"source": "local",
-		})
-		return
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode != 200 {
-		log.Printf("[AI] Gemini API %d: %s", resp.StatusCode, string(respBody[:min(len(respBody), 500)]))
-		writeJSON(w, 200, map[string]interface{}{
-			"status": "ok",
-			"reply":  getLocalAIReply(req.Message),
-			"source": "local",
-		})
-		return
-	}
-
-	// Parse Gemini response
-	var geminiResp struct {
-		Candidates []struct {
-			Content struct {
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
-			} `json:"content"`
-		} `json:"candidates"`
-	}
-
-	if err := json.Unmarshal(respBody, &geminiResp); err != nil || len(geminiResp.Candidates) == 0 {
-		log.Printf("[AI] Parse error or empty: %v", err)
-		writeJSON(w, 200, map[string]interface{}{
-			"status": "ok",
-			"reply":  getLocalAIReply(req.Message),
-			"source": "local",
-		})
-		return
-	}
-
-	reply := ""
-	for _, p := range geminiResp.Candidates[0].Content.Parts {
-		reply += p.Text
-	}
-
-	if strings.TrimSpace(reply) == "" {
-		reply = getLocalAIReply(req.Message)
-	}
-
+	// Все модели отказали — fallback
+	log.Printf("[AI] Все модели недоступны: %s — используем локальные ответы", lastErr)
 	writeJSON(w, 200, map[string]interface{}{
 		"status": "ok",
-		"reply":  reply,
-		"source": "gemini",
+		"reply":  getLocalAIReply(req.Message),
+		"source": "local",
 	})
 }
 
