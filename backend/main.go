@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 )
 
@@ -598,6 +599,28 @@ func main() {
 	// Сторис и клипы
 	mux.HandleFunc("GET /api/stories", handleStories)
 	mux.HandleFunc("GET /api/clips", handleClips)
+
+	// Сообщения
+	mux.HandleFunc("GET /api/chats/{id}/messages", handleGetMessages)
+	mux.HandleFunc("POST /api/chats/{id}/messages", handleSendMessage)
+	mux.HandleFunc("POST /api/chats/direct", handleCreateDirectChat)
+	mux.HandleFunc("POST /api/chats/{id}/read", handleMarkRead)
+
+	// Сообщества
+	mux.HandleFunc("POST /api/communities", handleCreateCommunity)
+	mux.HandleFunc("POST /api/communities/{id}/join", handleJoinCommunity)
+	mux.HandleFunc("DELETE /api/communities/{id}/leave", handleLeaveCommunity)
+	mux.HandleFunc("GET /api/communities/{id}/members", handleCommunityMembers)
+
+	// Сторис
+	mux.HandleFunc("POST /api/stories", handleCreateStory)
+	mux.HandleFunc("POST /api/stories/{id}/view", handleViewStory)
+
+	// Клипы
+	mux.HandleFunc("POST /api/clips", handleCreateClip)
+	mux.HandleFunc("POST /api/clips/{id}/like", handleLikeClip)
+	mux.HandleFunc("POST /api/clips/{id}/view", handleViewClip)
+
 	// DB Admin эндпоинты
 	mux.HandleFunc("GET /api/admin/db-status", handleDBStatus)
 	mux.HandleFunc("POST /api/admin/init-db", handleInitDB)
@@ -2445,6 +2468,496 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		"reply":  getLocalAIReply(req.Message),
 		"source": "local",
 	})
+}
+
+// GET /api/chats/{id}/messages — get messages for a chat
+func handleGetMessages(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	chatID := r.PathValue("id")
+	if chatID == "" {
+		writeJSON(w, 400, Response{Status: "error", Message: "chat id required"})
+		return
+	}
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	rows, err := dbConn.Query(`
+		SELECT m.id, m.text, m.media_url, m.media_type, m.sender_id, m.created_at, m.is_read, u.name, u.avatar
+		FROM messages m 
+		JOIN users u ON m.sender_id = u.id 
+		WHERE m.chat_id = $1 
+		ORDER BY m.created_at ASC LIMIT 100`, chatID)
+	if err != nil {
+		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var messages []map[string]interface{}
+	for rows.Next() {
+		var (
+			id, text, mediaUrl, mediaType, senderId, name, avatarUrl sql.NullString
+			createdAt                                                  time.Time
+			isRead                                                     bool
+		)
+		if err := rows.Scan(&id, &text, &mediaUrl, &mediaType, &senderId, &createdAt, &isRead, &name, &avatarUrl); err != nil {
+			continue
+		}
+		messages = append(messages, map[string]interface{}{
+			"id":         id.String,
+			"text":       text.String,
+			"media_url":  mediaUrl.String,
+			"media_type": mediaType.String,
+			"sender_id":  senderId.String,
+			"created_at": createdAt,
+			"is_read":    isRead,
+			"name":       name.String,
+			"avatar_url": avatarUrl.String,
+		})
+	}
+
+	// Mark messages as read where sender_id != currentUser
+	dbConn.Exec(`UPDATE messages SET is_read = true, status = 'read' WHERE chat_id = $1 AND sender_id != $2 AND is_read = false`, chatID, claims.UserID)
+	dbConn.Exec(`UPDATE chat_members SET unread_count = 0 WHERE chat_id = $1 AND user_id = $2`, chatID, claims.UserID)
+
+	writeJSON(w, 200, Response{Status: "ok", Data: messages})
+}
+
+// POST /api/chats/{id}/messages — send message
+func handleSendMessage(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	chatID := r.PathValue("id")
+
+	var req struct {
+		Text      string `json:"text"`
+		MediaUrl  string `json:"mediaUrl"`
+		MediaType string `json:"mediaType"`
+		ReplyToId string `json:"replyToId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+		return
+	}
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	msgID := uuid.New().String()
+	_, err = dbConn.Exec(`
+		INSERT INTO messages (id, chat_id, sender_id, reply_to_id, text, media_url, media_type, status, is_read, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, 'sent', false, NOW())
+	`, msgID, chatID, claims.UserID, req.ReplyToId, req.Text, req.MediaUrl, req.MediaType)
+	if err != nil {
+		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+		return
+	}
+
+	dbConn.Exec(`UPDATE chats SET last_message = $1, last_message_at = NOW() WHERE id = $2`, req.Text, chatID)
+	dbConn.Exec(`UPDATE chat_members SET unread_count = unread_count + 1 WHERE chat_id = $1 AND user_id != $2`, chatID, claims.UserID)
+
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]string{"id": msgID}})
+}
+
+// POST /api/chats/direct — create or get direct chat
+func handleCreateDirectChat(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	var req struct {
+		UserId string `json:"userId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+		return
+	}
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	var chatID string
+	err = dbConn.QueryRow(`
+		SELECT c.id 
+		FROM chats c
+		JOIN chat_members m1 ON c.id = m1.chat_id
+		JOIN chat_members m2 ON c.id = m2.chat_id
+		WHERE c.is_group = false AND m1.user_id = $1 AND m2.user_id = $2
+		LIMIT 1
+	`, claims.UserID, req.UserId).Scan(&chatID)
+
+	if err == sql.ErrNoRows {
+		chatID = uuid.New().String()
+		_, err = dbConn.Exec(`INSERT INTO chats (id, is_group, owner_id) VALUES ($1, false, $2)`, chatID, claims.UserID)
+		if err != nil {
+			writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+			return
+		}
+		dbConn.Exec(`INSERT INTO chat_members (chat_id, user_id, role) VALUES ($1, $2, 'member')`, chatID, claims.UserID)
+		if claims.UserID != req.UserId {
+			dbConn.Exec(`INSERT INTO chat_members (chat_id, user_id, role) VALUES ($1, $2, 'member')`, chatID, req.UserId)
+		}
+	} else if err != nil {
+		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+		return
+	}
+
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]string{"id": chatID}})
+}
+
+// POST /api/chats/{id}/read — mark messages as read  
+func handleMarkRead(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	chatID := r.PathValue("id")
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	dbConn.Exec(`UPDATE messages SET is_read = true, status = 'read' WHERE chat_id = $1 AND sender_id != $2`, chatID, claims.UserID)
+	dbConn.Exec(`UPDATE chat_members SET unread_count = 0 WHERE chat_id = $1 AND user_id = $2`, chatID, claims.UserID)
+
+	writeJSON(w, 200, Response{Status: "ok"})
+}
+
+// POST /api/communities — create community
+func handleCreateCommunity(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+		return
+	}
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	commID := uuid.New().String()
+	_, err = dbConn.Exec(`
+		INSERT INTO communities (id, name, description, creator_id, member_count, is_public) 
+		VALUES ($1, $2, $3, $4, 1, true)
+	`, commID, req.Name, req.Description, claims.UserID)
+	if err != nil {
+		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+		return
+	}
+
+	dbConn.Exec(`INSERT INTO community_members (community_id, user_id, role) VALUES ($1, $2, 'owner')`, commID, claims.UserID)
+
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]string{"id": commID}})
+}
+
+// POST /api/communities/{id}/join — join community
+func handleJoinCommunity(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	commID := r.PathValue("id")
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	res, err := dbConn.Exec(`INSERT INTO community_members (community_id, user_id, role) VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING`, commID, claims.UserID)
+	if err != nil {
+		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+		return
+	}
+	
+	if affected, _ := res.RowsAffected(); affected > 0 {
+		dbConn.Exec(`UPDATE communities SET member_count = member_count + 1 WHERE id = $1`, commID)
+	}
+
+	writeJSON(w, 200, Response{Status: "ok"})
+}
+
+// DELETE /api/communities/{id}/leave
+func handleLeaveCommunity(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	commID := r.PathValue("id")
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	res, err := dbConn.Exec(`DELETE FROM community_members WHERE community_id = $1 AND user_id = $2`, commID, claims.UserID)
+	if err != nil {
+		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+		return
+	}
+
+	if affected, _ := res.RowsAffected(); affected > 0 {
+		dbConn.Exec(`UPDATE communities SET member_count = member_count - 1 WHERE id = $1`, commID)
+	}
+
+	writeJSON(w, 200, Response{Status: "ok"})
+}
+
+// GET /api/communities/{id}/members
+func handleCommunityMembers(w http.ResponseWriter, r *http.Request) {
+	commID := r.PathValue("id")
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	rows, err := dbConn.Query(`
+		SELECT u.id, u.name, u.avatar, cm.role 
+		FROM community_members cm 
+		JOIN users u ON cm.user_id = u.id 
+		WHERE cm.community_id = $1`, commID)
+	if err != nil {
+		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var members []map[string]interface{}
+	for rows.Next() {
+		var id, name, avatarUrl, role sql.NullString
+		if err := rows.Scan(&id, &name, &avatarUrl, &role); err != nil {
+			continue
+		}
+		members = append(members, map[string]interface{}{
+			"id":         id.String,
+			"name":       name.String,
+			"avatar_url": avatarUrl.String,
+			"role":       role.String,
+		})
+	}
+
+	writeJSON(w, 200, Response{Status: "ok", Data: members})
+}
+
+// POST /api/stories — create story
+func handleCreateStory(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	var req struct {
+		MediaUrl    string `json:"mediaUrl"`
+		MediaType   string `json:"mediaType"`
+		TextOverlay string `json:"textOverlay"`
+		BgColor     string `json:"bgColor"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+		return
+	}
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	storyID := uuid.New().String()
+	_, err = dbConn.Exec(`
+		INSERT INTO stories (id, user_id, media_url, media_type, text_overlay, bg_color, expires_at, created_at) 
+		VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours', NOW())
+	`, storyID, claims.UserID, req.MediaUrl, req.MediaType, req.TextOverlay, req.BgColor)
+	if err != nil {
+		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+		return
+	}
+
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]string{"id": storyID}})
+}
+
+// POST /api/stories/{id}/view — record story view
+func handleViewStory(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	storyID := r.PathValue("id")
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	res, err := dbConn.Exec(`INSERT INTO story_views (story_id, viewer_id, viewed_at) VALUES ($1, $2, NOW()) ON CONFLICT DO NOTHING`, storyID, claims.UserID)
+	if err != nil {
+		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+		return
+	}
+
+	if affected, _ := res.RowsAffected(); affected > 0 {
+		dbConn.Exec(`UPDATE stories SET views_count = views_count + 1 WHERE id = $1`, storyID)
+	}
+
+	writeJSON(w, 200, Response{Status: "ok"})
+}
+
+// POST /api/clips — create clip
+func handleCreateClip(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	var req struct {
+		VideoUrl     string `json:"videoUrl"`
+		ThumbnailUrl string `json:"thumbnailUrl"`
+		Description  string `json:"description"`
+		SoundTitle   string `json:"soundTitle"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+		return
+	}
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	clipID := uuid.New().String()
+	_, err = dbConn.Exec(`
+		INSERT INTO clips (id, user_id, video_url, thumbnail_url, description, sound_title, created_at) 
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+	`, clipID, claims.UserID, req.VideoUrl, req.ThumbnailUrl, req.Description, req.SoundTitle)
+	if err != nil {
+		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+		return
+	}
+
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]string{"id": clipID}})
+}
+
+// POST /api/clips/{id}/like — toggle like
+func handleLikeClip(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	_, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	clipID := r.PathValue("id")
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	dbConn.Exec(`UPDATE clips SET likes_count = likes_count + 1 WHERE id = $1`, clipID)
+
+	writeJSON(w, 200, Response{Status: "ok"})
+}
+
+// POST /api/clips/{id}/view — record view
+func handleViewClip(w http.ResponseWriter, r *http.Request) {
+	clipID := r.PathValue("id")
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	dbConn.Exec(`UPDATE clips SET views_count = views_count + 1 WHERE id = $1`, clipID)
+
+	writeJSON(w, 200, Response{Status: "ok"})
 }
 
 func getLocalAIReply(text string) string {
