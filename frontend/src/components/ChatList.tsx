@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Search, Users, Trash2, Plus, Sparkles, X, Check, CheckCheck,
   Archive, ArchiveRestore, Lock, Unlock, KeyRound, Shield,
@@ -727,7 +728,7 @@ export function ChatList({
       )}
 
       {/* Delete Chat Confirmation Modal */}
-      {chatToDelete && (
+      {chatToDelete && createPortal(
         <div className="tg-modal-overlay" onClick={() => setChatToDelete(null)}>
           <div className="tg-delete-modal-box" onClick={e => e.stopPropagation()}>
             <div className="delete-modal-icon-badge">
@@ -752,11 +753,12 @@ export function ChatList({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* PIN Enter Modal (to open locked chat or tab) */}
-      {showPinModal && (
+      {showPinModal && createPortal(
         <div className="tg-modal-overlay" onClick={() => setShowPinModal(false)}>
           <div className="tg-pin-modal-box" onClick={e => e.stopPropagation()}>
             <div className="pin-modal-icon-badge">
@@ -806,11 +808,12 @@ export function ChatList({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Set PIN Configuration Modal */}
-      {chatToSetLock && (
+      {chatToSetLock && createPortal(
         <div className="tg-modal-overlay" onClick={() => setChatToSetLock(null)}>
           <div className="tg-group-modal-box" onClick={e => e.stopPropagation()}>
             <div className="group-modal-header">
@@ -867,10 +870,11 @@ export function ChatList({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       {/* NEW TAG CREATION MODAL */}
-      {showNewTagModal && (
+      {showNewTagModal && createPortal(
         <div className="chat-list-modal-overlay" onClick={() => setShowNewTagModal(false)}>
           <div className="chat-list-modal-box" onClick={e => e.stopPropagation()}>
             <div className="group-modal-header">
@@ -923,11 +927,12 @@ export function ChatList({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* MESSENGER STORY VIEWER MODAL */}
-      {activeStoryIndex !== null && stories[activeStoryIndex] && (
+      {activeStoryIndex !== null && stories[activeStoryIndex] && createPortal(
         <div className="messenger-story-viewer-overlay" onClick={() => setActiveStoryIndex(null)}>
           <div className="messenger-story-viewer-card" onClick={e => e.stopPropagation()}>
             <div className="story-viewer-top-bar">
@@ -982,7 +987,8 @@ export function ChatList({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
