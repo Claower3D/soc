@@ -902,13 +902,17 @@ export function SpiritualPage() {
           </div>
 
           <div className="spiritual-practices-grid">
-            {SPIRITUAL_PRACTICES_CARDS.map((card) => {
+            {SPIRITUAL_PRACTICES_CARDS.map((card, index) => {
               const Icon = card.icon;
               return (
                 <div 
                   key={card.id}
                   className="spiritual-practice-card"
                   onClick={() => handleTabChange(card.id)}
+                  style={{ 
+                    '--card-gradient': card.gradient,
+                    animationDelay: `${index * 0.06}s`
+                  } as React.CSSProperties}
                 >
                   <div className="spiritual-practice-card-top">
                     <div 
@@ -933,7 +937,7 @@ export function SpiritualPage() {
                   <div className="spiritual-practice-card-footer">
                     <span className="spiritual-practice-stats">{card.stats}</span>
                     <div className="spiritual-practice-action-btn">
-                      <span>Открыть страницу</span>
+                      <span>Открыть</span>
                       <ArrowRight size={16} />
                     </div>
                   </div>
