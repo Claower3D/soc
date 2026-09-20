@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Check, MapPin, Trash2 } from 'lucide-react';
 import { currentUser, type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { PremiumBadge } from './PremiumBadge';
 import './PostCard.css';
 
 interface PostCardProps {
@@ -113,6 +114,7 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
           <div className="post-user-info">
             <div className="user-name-line">
               <span className="post-user-fullname">{post.user.name}</span>
+              {post.user.isPremium && <PremiumBadge size="sm" />}
               <span className="post-author-handle">@{post.user.username}</span>
             </div>
             <div className="post-meta-line">

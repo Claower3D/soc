@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { AuthModal } from './AuthModal';
+import { PremiumBadge } from './PremiumBadge';
 import logoImg from '../assets/logo.png';
 import './Sidebar.css';
 
@@ -529,6 +530,7 @@ export function Sidebar() {
             </div>
             <div className="footer-user-info">
               <span className="footer-user-name">{String(currentUser.name || '')}</span>
+              {currentUser.isPremium && <PremiumBadge size="sm" />}
               <span className="footer-user-handle">@{String(currentUser.username || '')}</span>
             </div>
           </div>

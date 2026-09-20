@@ -12,6 +12,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { useTranslation } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { AuthModal } from './AuthModal';
+import { PremiumBadge } from './PremiumBadge';
 import './Header.css';
 
 export function Header() {
@@ -473,6 +474,7 @@ export function Header() {
               <img src={currentUser.avatar} alt={currentUser.name} className="header-avatar" />
               <div className="header-profile-text">
                 <span className="header-user-name">{typeof currentUser.name === 'string' ? currentUser.name.split(' ')[0] : ''}</span>
+                {currentUser.isPremium && <PremiumBadge size="sm" />}
                 <span className="header-user-handle">@{String(currentUser.username || '')}</span>
               </div>
             </button>

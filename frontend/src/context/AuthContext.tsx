@@ -15,6 +15,7 @@ export interface RegisteredAccount {
   role: UserRole;
   beliefType: string;
   beliefPrivacy: BeliefPrivacy;
+  isPremium?: boolean;
   verified?: boolean;
   followersCount: number;
   followingCount: number;
@@ -78,6 +79,7 @@ export const GUEST_USER: User = {
   role: 'user',
   beliefType: 'Не указано',
   beliefPrivacy: 'private',
+  isPremium: false,
   verified: false,
 };
 
@@ -121,6 +123,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id && parsed.id !== 'guest' && parsed.id !== 'me') {
+          // ТЕСТ: hardcode isPremium = true (убрать после подключения бэкенда)
+          parsed.isPremium = true;
           Object.assign(defaultCurrentUser, parsed);
           return parsed;
         }

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { type Post, type Comment } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { PremiumBadge } from './PremiumBadge';
 import './PostDetailModal.css';
 
 interface PostDetailModalProps {
@@ -147,6 +148,7 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
               <div className="modal-author-names">
                 <div className="modal-author-top">
                   <span className="author-fullname">{post.user.name}</span>
+                  {post.user.isPremium && <PremiumBadge size="sm" />}
                   <span className="author-username">@{post.user.username}</span>
                 </div>
                 <div className="modal-author-meta">
@@ -221,7 +223,9 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
                           onClick={(e) => handleProfileClick(c.user.id, e)}
                         >
                           {c.user.username || c.user.name}
-                        </span>{' '}
+                        </span>
+                        {c.user.isPremium && <PremiumBadge size="sm" />}
+                        {' '}
                         <span className="comment-body-text">{c.text}</span>
                       </div>
 

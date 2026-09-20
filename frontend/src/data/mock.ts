@@ -140,6 +140,8 @@ export interface User {
   gender?: 'male' | 'female' | 'other' | 'hidden'; // Пол
   showBirthDate?: boolean; // Показывать дату рождения
   showZodiac?: boolean; // Показывать знак зодиака
+  isPremium?: boolean; // New Age Premium подписка
+  premiumSince?: string; // Дата оформления Premium
 }
 
 export interface Highlight {

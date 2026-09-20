@@ -26,6 +26,7 @@ import { UploadPodcastModal } from '../components/UploadPodcastModal';
 import { CreateProductModal } from '../components/CreateProductModal';
 import { AuthModal } from '../components/AuthModal';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
+import { PremiumBadge } from '../components/PremiumBadge';
 import { ConsciousnessClassModal } from '../components/ConsciousnessClassModal';
 import { useCurrency } from '../context/CurrencyContext';
 import { 
@@ -250,7 +251,7 @@ export function ProfilePage() {
               }}
               title={userHasStories ? 'Нажмите, чтобы посмотреть историю' : undefined}
             >
-              <img src={activeUser.avatar} alt={activeUser.name} className="profile-main-avatar" />
+              <img src={activeUser.avatar} alt={activeUser.name} className={`profile-main-avatar ${activeUser.isPremium ? 'profile-premium-frame' : ''}`} />
               {activeUser.online && <span className="profile-online-indicator" title="В сети" />}
               {userHasStories && <span className="profile-story-badge-hint">История</span>}
             </div>
@@ -358,9 +359,16 @@ export function ProfilePage() {
           {/* User Details */}
           <div className="profile-identity">
             <div className="name-row">
-              <h1 className="profile-fullname">{activeUser.name}</h1>
+              <h1 className={`profile-fullname ${activeUser.isPremium ? 'profile-name-premium-glow' : ''}`}>{activeUser.name}</h1>
               <span title="Подтвержденный профиль"><CheckCircle2 size={18} className="verified-badge" /></span>
               
+              {/* New Age Premium */}
+              {activeUser.isPremium && (
+                <span className="profile-premium-tag" title="New Age Premium подписчик">
+                  <PremiumBadge size="lg" showText />
+                </span>
+              )}
+
               {/* Роли пользователя */}
               {activeUser.role === 'creator' && (
                 <span className="profile-role-badge creator" title="Автор контента">
