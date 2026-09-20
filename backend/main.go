@@ -2353,7 +2353,7 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		"generationConfig": map[string]interface{}{
 			"temperature":     0.8,
 			"topP":            0.95,
-			"maxOutputTokens": 1024,
+			"maxOutputTokens": 8192,
 		},
 	}
 
