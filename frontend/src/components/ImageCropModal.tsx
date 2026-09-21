@@ -29,29 +29,56 @@ export function ImageCropModal({ imageUrl, onCrop, onCancel }: ImageCropModalPro
     }
   }, [imageLoaded]);
 
-  const handlePointerDown = (clientX: number, clientY: number) => {
+  const handlePointerDown = (clientX: number, clientY: number, e?: React.SyntheticEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
     setIsDragging(true);
     setDragStart({ x: clientX, y: clientY });
     setInitialCrop({ x: crop.x, y: crop.y });
   };
 
-  const handlePointerMove = (clientX: number, clientY: number) => {
-    if (!isDragging || !imageRef.current) return;
-    const dx = clientX - dragStart.x;
-    const dy = clientY - dragStart.y;
-    
-    let newX = initialCrop.x + dx;
-    let newY = initialCrop.y + dy;
-    
-    // Constrain to image bounds
-    const maxX = imageRef.current.clientWidth - crop.size;
-    const maxY = imageRef.current.clientHeight - crop.size;
-    
-    newX = Math.max(0, Math.min(newX, maxX));
-    newY = Math.max(0, Math.min(newY, maxY));
-    
-    setCrop(prev => ({ ...prev, x: newX, y: newY }));
-  };
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      if (!imageRef.current) return;
+      const dx = clientX - dragStart.x;
+      const dy = clientY - dragStart.y;
+      
+      let newX = initialCrop.x + dx;
+      let newY = initialCrop.y + dy;
+      
+      const maxX = imageRef.current.clientWidth - crop.size;
+      const maxY = imageRef.current.clientHeight - crop.size;
+      
+      newX = Math.max(0, Math.min(newX, maxX));
+      newY = Math.max(0, Math.min(newY, maxY));
+      
+      setCrop(prev => ({ ...prev, x: newX, y: newY }));
+    };
+
+    const onUp = (e: MouseEvent | TouchEvent) => {
+      e.preventDefault();
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', onMove, { passive: false });
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [isDragging, dragStart, initialCrop, crop.size]);
 
   const handlePointerUp = () => {
     setIsDragging(false);
@@ -89,8 +116,8 @@ export function ImageCropModal({ imageUrl, onCrop, onCancel }: ImageCropModalPro
   };
 
   return (
-    <div className="crop-modal-overlay">
-      <div className="crop-modal-container">
+    <div className="crop-modal-overlay" onClick={e => e.stopPropagation()}>
+      <div className="crop-modal-container" onClick={e => e.stopPropagation()}>
         <button className="crop-close-btn" onClick={onCancel}>
           <X size={20} color="#fff" />
         </button>
@@ -101,10 +128,7 @@ export function ImageCropModal({ imageUrl, onCrop, onCancel }: ImageCropModalPro
           <div 
             className="crop-workspace" 
             ref={containerRef}
-            onMouseMove={e => isDragging && handlePointerMove(e.clientX, e.clientY)}
             onMouseUp={handlePointerUp}
-            onMouseLeave={handlePointerUp}
-            onTouchMove={e => isDragging && handlePointerMove(e.touches[0].clientX, e.touches[0].clientY)}
             onTouchEnd={handlePointerUp}
           >
             <img 
@@ -131,8 +155,8 @@ export function ImageCropModal({ imageUrl, onCrop, onCancel }: ImageCropModalPro
                     width: crop.size,
                     height: crop.size
                   }}
-                  onMouseDown={e => handlePointerDown(e.clientX, e.clientY)}
-                  onTouchStart={e => handlePointerDown(e.touches[0].clientX, e.touches[0].clientY)}
+                  onMouseDown={e => handlePointerDown(e.clientX, e.clientY, e)}
+                  onTouchStart={e => handlePointerDown(e.touches[0].clientX, e.touches[0].clientY, e)}
                 >
                   <div className="crop-circle-mask"></div>
                   <div className="crop-handle tl"></div>

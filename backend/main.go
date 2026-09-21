@@ -1271,11 +1271,11 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 		rows, err := db.Query(`
 			SELECT p.id, COALESCE(p.caption, ''), COALESCE(p.image, ''), COALESCE(p.location, ''), 
 			       COALESCE(p.likes_count, 0), p.created_at,
-			       u.id, u.name, u.username, COALESCE(u.avatar, ''), COALESCE(u.verified, false)
+			       COALESCE(u.id, p.user_id), COALESCE(u.name, p.user_id), COALESCE(u.username, p.user_id), COALESCE(u.avatar, ''), COALESCE(u.verified, false)
 			FROM posts p
-			JOIN users u ON p.user_id = u.id
+			LEFT JOIN users u ON (p.user_id = u.id OR LOWER(REPLACE(u.username, '@', '')) = LOWER(REPLACE(p.user_id, '@', '')))
 			WHERE (TRIM(COALESCE(p.image, '')) != '' OR TRIM(COALESCE(p.caption, '')) != '')
-			ORDER BY p.created_at DESC LIMIT 50
+			ORDER BY p.created_at DESC LIMIT 100
 		`)
 		if err == nil {
 			defer rows.Close()
@@ -1327,10 +1327,13 @@ func handleUserPosts(w http.ResponseWriter, r *http.Request) {
 		rows, err := db.Query(`
 			SELECT p.id, COALESCE(p.caption, ''), COALESCE(p.image, ''), COALESCE(p.location, ''), 
 			       COALESCE(p.likes_count, 0), p.created_at,
-			       u.id, u.name, u.username, COALESCE(u.avatar, ''), COALESCE(u.verified, false)
+			       COALESCE(u.id, p.user_id), COALESCE(u.name, p.user_id), COALESCE(u.username, p.user_id), COALESCE(u.avatar, ''), COALESCE(u.verified, false)
 			FROM posts p
-			JOIN users u ON p.user_id = u.id
-			WHERE (u.id = $1 OR LOWER(u.username) = LOWER($1) OR LOWER(u.username) = LOWER($2))
+			LEFT JOIN users u ON (p.user_id = u.id OR LOWER(REPLACE(u.username, '@', '')) = LOWER(REPLACE(p.user_id, '@', '')))
+			WHERE (p.user_id = $1 
+			   OR LOWER(REPLACE(p.user_id, '@', '')) = LOWER($2)
+			   OR u.id = $1 
+			   OR LOWER(REPLACE(u.username, '@', '')) = LOWER($2))
 			  AND (TRIM(COALESCE(p.image, '')) != '' OR TRIM(COALESCE(p.caption, '')) != '')
 			ORDER BY p.created_at DESC
 		`, targetID, cleanTarget)
@@ -2991,6 +2994,12 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if db != nil {
+		var targetID string
+		db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($1, '@', '')) LIMIT 1", claims.UserID).Scan(&targetID)
+		if targetID == "" {
+			targetID = claims.UserID
+		}
+
 		_, err := db.Exec(`
 			UPDATE users SET 
 				name = COALESCE(NULLIF($1, ''), name), 
@@ -3003,8 +3012,8 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 				belief_privacy = $8,
 				birth_date = $9,
 				gender = $10
-			WHERE id = $11
-		`, req.Name, req.Bio, req.Avatar, req.CoverImage, req.Location, req.Website, req.BeliefType, req.BeliefPrivacy, req.BirthDate, req.Gender, claims.UserID)
+			WHERE id = $11 OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($11, '@', ''))
+		`, req.Name, req.Bio, req.Avatar, req.CoverImage, req.Location, req.Website, req.BeliefType, req.BeliefPrivacy, req.BirthDate, req.Gender, targetID)
 		if err != nil {
 			log.Printf("⚠️ Ошибка обновления профиля в DB: %v", err)
 			writeJSON(w, http.StatusInternalServerError, Response{Status: "error", Message: "Ошибка обновления профиля"})
@@ -3014,7 +3023,18 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	// Синхронизируем также с локальным дисковым хранилищем
 	store.mu.Lock()
-	acc, ok := store.accounts[claims.UserID]
+	accountKey := claims.UserID
+	acc, ok := store.accounts[accountKey]
+	if !ok {
+		for k, a := range store.accounts {
+			if a.User.ID == claims.UserID || strings.EqualFold(strings.TrimPrefix(a.User.Username, "@"), strings.TrimPrefix(claims.UserID, "@")) {
+				accountKey = k
+				acc = a
+				ok = true
+				break
+			}
+		}
+	}
 	if ok {
 		if req.Name != "" { acc.User.Name = req.Name }
 		acc.User.Bio = req.Bio
@@ -3026,7 +3046,7 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		if req.BeliefPrivacy != "" { acc.User.BeliefPrivacy = req.BeliefPrivacy }
 		acc.User.BirthDate = req.BirthDate
 		acc.User.Gender = req.Gender
-		store.accounts[claims.UserID] = acc
+		store.accounts[accountKey] = acc
 	}
 	store.saveToDisk()
 	store.mu.Unlock()
@@ -3078,21 +3098,40 @@ func handleCreatePost(w http.ResponseWriter, r *http.Request) {
 
 	postID := "post_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
 	var author User
+	var realUserID string
 	if db != nil {
-		db.QueryRow("SELECT id, name, username, COALESCE(avatar, ''), COALESCE(verified, false) FROM users WHERE id = $1", claims.UserID).Scan(
+		db.QueryRow(`
+			SELECT id, name, username, COALESCE(avatar, ''), COALESCE(verified, false) 
+			FROM users 
+			WHERE id = $1 OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($1, '@', '')) 
+			LIMIT 1
+		`, claims.UserID).Scan(
 			&author.ID, &author.Name, &author.Username, &author.Avatar, &author.Verified,
 		)
+		if author.ID != "" {
+			realUserID = author.ID
+		}
+	}
+	if realUserID == "" {
+		realUserID = claims.UserID
 	}
 	if author.ID == "" {
 		store.mu.RLock()
 		if acc, ok := store.accounts[claims.UserID]; ok {
 			author = acc.User
+		} else {
+			for _, a := range store.accounts {
+				if a.User.ID == claims.UserID || strings.EqualFold(strings.TrimPrefix(a.User.Username, "@"), strings.TrimPrefix(claims.UserID, "@")) {
+					author = a.User
+					break
+				}
+			}
 		}
 		store.mu.RUnlock()
 	}
 	if author.ID == "" {
 		for _, mu := range mockUsers {
-			if mu.ID == claims.UserID || mu.Username == claims.Username {
+			if mu.ID == claims.UserID || mu.Username == claims.Username || strings.EqualFold(strings.TrimPrefix(mu.Username, "@"), strings.TrimPrefix(claims.Username, "@")) {
 				author = mu
 				break
 			}
@@ -3100,7 +3139,7 @@ func handleCreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	if author.ID == "" {
 		author = User{
-			ID:       claims.UserID,
+			ID:       realUserID,
 			Username: claims.Username,
 			Name:     claims.Username,
 		}
@@ -3108,7 +3147,7 @@ func handleCreatePost(w http.ResponseWriter, r *http.Request) {
 
 	newPost := Post{
 		ID:        postID,
-		UserID:    claims.UserID,
+		UserID:    realUserID,
 		User:      author,
 		Image:     image,
 		Caption:   caption,
@@ -3125,11 +3164,15 @@ func handleCreatePost(w http.ResponseWriter, r *http.Request) {
 		_, err := db.Exec(`
 			INSERT INTO posts (id, user_id, image, caption, location)
 			VALUES ($1, $2, $3, $4, $5)
-		`, postID, claims.UserID, image, caption, location)
+			ON CONFLICT (id) DO UPDATE SET 
+				image = EXCLUDED.image,
+				caption = EXCLUDED.caption,
+				location = EXCLUDED.location
+		`, postID, realUserID, image, caption, location)
 		if err != nil {
 			log.Printf("⚠️ Ошибка сохранения поста в Postgres: %v", err)
 		} else {
-			db.Exec("UPDATE users SET posts_count = posts_count + 1 WHERE id = $1", claims.UserID)
+			db.Exec("UPDATE users SET posts_count = posts_count + 1 WHERE id = $1", realUserID)
 		}
 	}
 
@@ -3139,6 +3182,9 @@ func handleCreatePost(w http.ResponseWriter, r *http.Request) {
 	if acc, ok := store.accounts[claims.UserID]; ok {
 		acc.User.PostsCount++
 		store.accounts[claims.UserID] = acc
+	} else if acc, ok := store.accounts[realUserID]; ok {
+		acc.User.PostsCount++
+		store.accounts[realUserID] = acc
 	}
 	store.saveToDisk()
 	store.mu.Unlock()

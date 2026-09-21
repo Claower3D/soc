@@ -11,11 +11,12 @@ import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { cacheService } from '../utils/cacheService';
 import { syncLocalStoriesWithServer } from '../utils/syncStories';
+import { getStoredFollowingIds, isUserFollowed, toggleUserFollow, getAllUsersPool } from '../utils/followStorage';
 import './FeedPage.css';
 
 export function FeedPage() {
   const navigate = useNavigate();
-  const { currentUser, isAuthenticated } = useAuth();
+  const { currentUser, isAuthenticated, allAccounts } = useAuth();
   const [feedPosts, setFeedPosts] = useState<Post[]>(() => {
     return cacheService.get<Post[]>('feed_posts_cache') || [];
   });
@@ -120,11 +121,15 @@ export function FeedPage() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [followedMap, setFollowedMap] = useState<Record<string, boolean>>({
-    '2': false,
-    '5': false,
-    '7': false,
-  });
+  const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds(currentUser?.id));
+
+  useEffect(() => {
+    const handleFollowChange = () => {
+      setFollowingIds(getStoredFollowingIds(currentUser?.id));
+    };
+    window.addEventListener('follow_change', handleFollowChange);
+    return () => window.removeEventListener('follow_change', handleFollowChange);
+  }, [currentUser?.id]);
 
   const handleAddStory = (newStory: Story) => {
     setFeedStories(prev => {
@@ -167,23 +172,42 @@ export function FeedPage() {
       setAuthModalOpen(true);
       return;
     }
-    setFollowedMap(prev => ({
-      ...prev,
-      [userId]: !prev[userId],
-    }));
+    toggleUserFollow(userId, currentUser?.id);
+    setFollowingIds(getStoredFollowingIds(currentUser?.id));
   };
-
-
 
   const [feedTab, setFeedTab] = useState<'for_you' | 'following' | 'popular' | 'tech'>('for_you');
 
   // Recommendations list (users not yet followed)
-  const recommendations: { id: string; name: string; username: string; avatar: string }[] = [];
+  const recommendations = useMemo(() => {
+    const pool = getAllUsersPool(currentUser, allAccounts);
+    const myId = currentUser?.id || 'guest';
+    const myCleanUsername = (currentUser?.username || '').replace(/^@+/, '').toLowerCase();
+
+    return pool
+      .filter(u => {
+        if (!u.id || u.id === myId || u.id === 'guest' || u.id === 'me') return false;
+        const cleanU = (u.username || '').replace(/^@+/, '').toLowerCase();
+        if (cleanU === myCleanUsername) return false;
+        return !isUserFollowed(u.id, currentUser?.id) && !isUserFollowed(u.username, currentUser?.id);
+      })
+      .slice(0, 5)
+      .map(u => ({
+        id: u.id,
+        name: u.name || u.username,
+        username: (u.username || '').replace(/^@+/, ''),
+        avatar: u.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+      }));
+  }, [currentUser, allAccounts, followingIds]);
 
   const filteredPosts = useMemo<Post[]>(() => {
     if (feedTab === 'following') {
-      const followed = feedPosts.filter(p => p.user.id !== 'me' && followedMap[p.user.id]);
-      return followed.length > 0 ? followed : feedPosts;
+      return feedPosts.filter(p => {
+        if (!p.user || p.user.id === currentUser?.id || p.user.id === 'me') return false;
+        return isUserFollowed(p.user.id, currentUser?.id) || 
+               isUserFollowed(p.user.username, currentUser?.id) ||
+               ((p as any).userID && isUserFollowed((p as any).userID, currentUser?.id));
+      });
     }
     if (feedTab === 'popular') {
       return [...feedPosts].sort((a, b) => b.likes - a.likes);
@@ -192,7 +216,7 @@ export function FeedPage() {
       return feedPosts.filter(p => p.caption.toLowerCase().includes('код') || p.caption.toLowerCase().includes('react') || p.caption.toLowerCase().includes('go') || p.caption.toLowerCase().includes('демо'));
     }
     return feedPosts;
-  }, [feedPosts, feedTab, followedMap]);
+  }, [feedPosts, feedTab, followingIds, currentUser?.id]);
 
   return (
     <div className="feed-page-layout">
@@ -285,6 +309,15 @@ export function FeedPage() {
             <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>
               Загрузка...
             </div>
+          ) : filteredPosts.length === 0 ? (
+            <div style={{ padding: '3rem 1.5rem', textAlign: 'center', color: 'var(--color-text-secondary)', background: 'var(--color-bg-card)', borderRadius: '16px', margin: '1rem 0' }}>
+              <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: '8px' }}>
+                {feedTab === 'following' ? 'У вас пока нет публикаций в подписках' : 'Публикаций пока нет'}
+              </p>
+              <p style={{ fontSize: '14px', margin: 0 }}>
+                {feedTab === 'following' ? 'Подпишитесь на авторов в блоке рекомендаций справа, чтобы видеть их публикации здесь.' : 'Будьте первым, кто создаст публикацию!'}
+              </p>
+            </div>
           ) : (
             filteredPosts.map(post => (
               <PostCard 
@@ -375,32 +408,38 @@ export function FeedPage() {
           </div>
 
           <div className="recommendations-list">
-            {recommendations.map(u => {
-              const isFollowed = followedMap[u.id] ?? false;
-              return (
-                <div key={u.id} className="rec-user-row">
-                  <img 
-                    src={u.avatar} 
-                    alt={u.name} 
-                    className="rec-avatar"
-                    onClick={() => navigate(`/profile/${u.id}`)}
-                  />
-                  <div 
-                    className="rec-info"
-                    onClick={() => navigate(`/profile/${u.id}`)}
-                  >
-                    <span className="rec-name">{u.name}</span>
-                    <span className="rec-handle">@{u.username}</span>
+            {recommendations.length === 0 ? (
+              <div style={{ padding: '12px', fontSize: '13px', color: 'var(--color-text-secondary)', textAlign: 'center' }}>
+                Вы подписаны на всех предложенных авторов!
+              </div>
+            ) : (
+              recommendations.map(u => {
+                const isFollowed = isUserFollowed(u.id, currentUser?.id);
+                return (
+                  <div key={u.id} className="rec-user-row">
+                    <img 
+                      src={u.avatar} 
+                      alt={u.name} 
+                      className="rec-avatar"
+                      onClick={() => navigate(`/profile/${u.id}`)}
+                    />
+                    <div 
+                      className="rec-info"
+                      onClick={() => navigate(`/profile/${u.id}`)}
+                    >
+                      <span className="rec-name">{u.name}</span>
+                      <span className="rec-handle">@{u.username}</span>
+                    </div>
+                    <button
+                      className={`rec-follow-btn ${isFollowed ? 'followed' : ''}`}
+                      onClick={() => toggleFollow(u.id)}
+                    >
+                      {isFollowed ? 'Подписки' : 'Подписаться'}
+                    </button>
                   </div>
-                  <button
-                    className={`rec-follow-btn ${isFollowed ? 'followed' : ''}`}
-                    onClick={() => toggleFollow(u.id)}
-                  >
-                    {isFollowed ? 'Подписки' : 'Подписаться'}
-                  </button>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 

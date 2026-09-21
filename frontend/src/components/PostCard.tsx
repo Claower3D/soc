@@ -202,16 +202,23 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
         </div>
 
         {/* Likers Avatars Strip */}
-        <div className="post-likers-preview">
-          <div className="likers-avatars-row">
-            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80" alt="liker" className="mini-liker-img" />
-            <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80" alt="liker" className="mini-liker-img" />
-            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80" alt="liker" className="mini-liker-img" />
+        {post.likes > 0 && (
+          <div className="post-likers-preview">
+            <div className="likers-avatars-row">
+              <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=100&q=80" alt="liker" className="mini-liker-img" />
+              {post.likes > 1 && (
+                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80" alt="liker" className="mini-liker-img" />
+              )}
+            </div>
+            <span className="likers-text-line">
+              {post.likes === 1 ? (
+                <>Нравится <strong>1</strong> пользователю</>
+              ) : (
+                <>Нравится <strong>alice_iv</strong> и ещё <strong>{(post.likes - 1).toLocaleString('ru-RU')}</strong></>
+              )}
+            </span>
           </div>
-          <span className="likers-text-line">
-            Нравится <strong>alice_iv</strong> и ещё <strong>{(post.likes - 1).toLocaleString('ru-RU')}</strong>
-          </span>
-        </div>
+        )}
 
         {/* Caption */}
         <div className="post-caption">

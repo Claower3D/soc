@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { currentUser as defaultCurrentUser, type User, type UserRole, type BeliefPrivacy } from '../data/mock';
+import { api } from '../api';
 
 export interface RegisteredAccount {
   id: string;
@@ -421,24 +422,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Sync to backend DB if authenticated
     const token = localStorage.getItem(STORAGE_KEY_TOKEN);
     if (token) {
-      fetch('/api/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: data.name,
-          bio: data.bio,
-          avatar: data.avatar,
-          cover_image: data.coverImage,
-          location: data.location,
-          website: data.website,
-          belief_type: data.beliefType,
-          belief_privacy: data.beliefPrivacy,
-          birth_date: data.birthDate,
-          gender: data.gender,
-        })
+      api.users.updateProfile({
+        name: data.name,
+        bio: data.bio,
+        avatar: data.avatar,
+        cover_image: data.coverImage,
+        location: data.location,
+        website: data.website,
+        belief_type: data.beliefType,
+        belief_privacy: data.beliefPrivacy,
+        birth_date: data.birthDate,
+        gender: data.gender,
       }).catch(err => console.warn('Failed to sync profile to server:', err));
     }
   };

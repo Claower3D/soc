@@ -71,7 +71,7 @@ const SAMPLE_COVERS = [
 ];
 
 export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalProps) {
-  const { currentUser } = useAuth();
+  const { currentUser, updateProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<EditTab>('general');
   const [name, setName] = useState(currentUser?.name || '');
   const [username, setUsername] = useState(currentUser?.username ? currentUser.username.replace(/^@+/, '') : '');
@@ -148,6 +148,9 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
   const handleCropSave = (croppedUrl: string) => {
     setAvatar(croppedUrl);
     setCropImageUrl(null);
+    if (updateProfile) {
+      updateProfile({ avatar: croppedUrl });
+    }
   };
 
   const handleCropCancel = () => {
@@ -202,11 +205,13 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
   return (
     <div className="edit-modal-overlay" onClick={onClose}>
       {cropImageUrl && (
-        <ImageCropModal 
-          imageUrl={cropImageUrl} 
-          onCrop={handleCropSave} 
-          onCancel={handleCropCancel} 
-        />
+        <div onClick={e => e.stopPropagation()}>
+          <ImageCropModal 
+            imageUrl={cropImageUrl} 
+            onCrop={handleCropSave} 
+            onCancel={handleCropCancel} 
+          />
+        </div>
       )}
       <div className="edit-modal-box" onClick={e => e.stopPropagation()}>
         {/* Hidden inputs for uploading images */}
