@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+﻿import { useState, useRef } from 'react';
 import { X, Image as ImageIcon, MapPin, Sparkles, Compass } from 'lucide-react';
 import { type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -11,19 +11,14 @@ interface CreatePostModalProps {
   onCreatePost: (newPost: Post) => void;
 }
 
-const sampleImages = [
-  'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1000&q=80',
-  'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=1000&q=80',
-];
+
 
 export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostModalProps) {
   const { currentUser } = useAuth();
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(sampleImages[0]);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -46,13 +41,13 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
     const newPost: Post = {
       id: `post_${Date.now()}`,
       user: currentUser,
-      image: selectedImage || sampleImages[1],
-      caption: caption.trim() || 'Новая публикация',
+      image: selectedImage || '',
+      caption: caption.trim() || 'РќРѕРІР°СЏ РїСѓР±Р»РёРєР°С†РёСЏ',
       likes: 1,
       liked: true,
       saved: false,
       comments: [],
-      timeAgo: 'Только что',
+      timeAgo: 'РўРѕР»СЊРєРѕ С‡С‚Рѕ',
       location: location.trim() || undefined,
     };
 
@@ -69,13 +64,13 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           style={{ display: 'none' }}
           onChange={handleFileChange}
         />
 
         <div className="create-post-header">
-          <h3>Создать публикацию</h3>
+          <h3>РЎРѕР·РґР°С‚СЊ РїСѓР±Р»РёРєР°С†РёСЋ</h3>
           <button className="close-btn" onClick={onClose}>
             <X size={20} />
           </button>
@@ -87,13 +82,13 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
             <img src={currentUser.avatar} alt={currentUser.name} className="author-avatar" />
             <div className="author-meta">
               <span className="author-name">{currentUser.name}</span>
-              <span className="author-visibility">🌐 Доступно всем</span>
+              <span className="author-visibility">рџЊђ Р”РѕСЃС‚СѓРїРЅРѕ РІСЃРµРј</span>
             </div>
           </div>
 
           {/* Caption Textarea */}
           <textarea
-            placeholder="О чем вы думаете? Поделитесь новостью или мыслями..."
+            placeholder="Рћ С‡РµРј РІС‹ РґСѓРјР°РµС‚Рµ? РџРѕРґРµР»РёС‚РµСЃСЊ РЅРѕРІРѕСЃС‚СЊСЋ РёР»Рё РјС‹СЃР»СЏРјРё..."
             value={caption}
             onChange={e => setCaption(e.target.value)}
             className="caption-textarea"
@@ -105,45 +100,29 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
           <div className="image-upload-section">
             {selectedImage ? (
               <div className="preview-container">
-                <img src={selectedImage} alt="Превью" className="post-preview-img" />
+                {selectedImage.startsWith('data:video') ? <video src={selectedImage} controls className="post-preview-img" /> : <img src={selectedImage} alt="Медиа" className="post-preview-img" />}
                 <button 
                   type="button" 
                   className="change-image-btn" 
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <ImageIcon size={16} /> Изменить фото
-                </button>
+                  <ImageIcon size={16} /> Изменить</button>
               </div>
             ) : (
               <div className="upload-dropzone" onClick={() => fileInputRef.current?.click()}>
                 <ImageIcon size={32} className="dropzone-icon" />
-                <span>Нажмите, чтобы загрузить фото с компьютера</span>
+                <span>РќР°Р¶РјРёС‚Рµ, С‡С‚РѕР±С‹ Р·Р°РіСЂСѓР·РёС‚СЊ С„РѕС‚Рѕ СЃ РєРѕРјРїСЊСЋС‚РµСЂР°</span>
               </div>
             )}
 
-            {/* Quick Templates */}
-            <div className="sample-images-row">
-              <span className="sample-label">Или выберите тему:</span>
-              <div className="samples-grid">
-                {sampleImages.map((img, idx) => (
-                  <img
-                    key={idx}
-                    src={img}
-                    alt={`Пример ${idx}`}
-                    className={`sample-thumb ${selectedImage === img ? 'selected' : ''}`}
-                    onClick={() => setSelectedImage(img)}
-                  />
-                ))}
-              </div>
             </div>
-          </div>
 
           {/* Location Input */}
           <div className="location-input-row">
             <MapPin size={18} className="loc-icon" />
             <input
               type="text"
-              placeholder="Укажите место (город, страна)..."
+              placeholder="РЈРєР°Р¶РёС‚Рµ РјРµСЃС‚Рѕ (РіРѕСЂРѕРґ, СЃС‚СЂР°РЅР°)..."
               value={location}
               onChange={e => setLocation(e.target.value)}
               className="location-input"
@@ -163,24 +142,24 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
                   setIsDetectingLocation(false);
                 }
               }}
-              title="Определить город и страну автоматически"
+              title="РћРїСЂРµРґРµР»РёС‚СЊ РіРѕСЂРѕРґ Рё СЃС‚СЂР°РЅСѓ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё"
             >
               <Compass size={13} className={isDetectingLocation ? 'spin-anim' : ''} />
-              <span>{isDetectingLocation ? '...' : 'Где я?'}</span>
+              <span>{isDetectingLocation ? '...' : 'Р“РґРµ СЏ?'}</span>
             </button>
           </div>
 
           {/* Footer Submit */}
           <div className="create-post-footer">
             <button type="button" className="btn-cancel-post" onClick={onClose}>
-              Отмена
+              РћС‚РјРµРЅР°
             </button>
             <button 
               type="submit" 
               className="btn-publish-post"
               disabled={!selectedImage && !caption.trim()}
             >
-              <Sparkles size={16} /> Опубликовать
+              <Sparkles size={16} /> РћРїСѓР±Р»РёРєРѕРІР°С‚СЊ
             </button>
           </div>
         </form>
@@ -188,3 +167,4 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
     </div>
   );
 }
+
