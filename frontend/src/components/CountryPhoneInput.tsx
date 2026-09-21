@@ -10,6 +10,58 @@ interface CountryPhoneInputProps {
   required?: boolean;
   autoFocus?: boolean;
   onCountryDetected?: (country: CountryInfo) => void;
+  onlyPhone?: boolean;
+}
+
+/**
+ * Автоматическое форматирование номера по маске страны
+ */
+export function formatPhoneWithMask(rawInput: string, country: CountryInfo): string {
+  let digits = rawInput.replace(/\D/g, '');
+  if (!digits) return '';
+
+  // Для России и Казахстана (+7)
+  if (country.dialCode === '+7') {
+    if (digits.startsWith('7') || digits.startsWith('8')) {
+      digits = digits.slice(1);
+    }
+    digits = digits.slice(0, 10);
+
+    let formatted = '+7';
+    if (digits.length > 0) {
+      formatted += ' (' + digits.slice(0, 3);
+    }
+    if (digits.length >= 3) {
+      formatted += ') ' + digits.slice(3, 6);
+    }
+    if (digits.length >= 6) {
+      formatted += '-' + digits.slice(6, 8);
+    }
+    if (digits.length >= 8) {
+      formatted += '-' + digits.slice(8, 10);
+    }
+    return formatted;
+  }
+
+  // Для остальных стран (Беларусь +375, Узбекистан +998 и др.)
+  const dialDigits = country.dialCode.replace(/\D/g, '');
+  if (digits.startsWith(dialDigits)) {
+    digits = digits.slice(dialDigits.length);
+  }
+  digits = digits.slice(0, 11);
+  if (!digits) return country.dialCode + ' ';
+
+  let formatted = `${country.dialCode} `;
+  if (digits.length <= 2) {
+    formatted += `(${digits}`;
+  } else if (digits.length <= 5) {
+    formatted += `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  } else if (digits.length <= 7) {
+    formatted += `(${digits.slice(0, 2)}) ${digits.slice(2, 5)}-${digits.slice(5)}`;
+  } else {
+    formatted += `(${digits.slice(0, 2)}) ${digits.slice(2, 5)}-${digits.slice(5, 7)}-${digits.slice(7)}`;
+  }
+  return formatted;
 }
 
 export const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
@@ -18,7 +70,8 @@ export const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
   placeholder,
   required = false,
   autoFocus = false,
-  onCountryDetected
+  onCountryDetected,
+  onlyPhone = false
 }) => {
   const [selectedCountry, setSelectedCountry] = useState<CountryInfo>(COUNTRIES[0]);
   const [isOpen, setIsOpen] = useState(false);
@@ -57,9 +110,25 @@ export const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Автоматическое переключение страны, если пользователь вводит другой телефонный код (+375, +998, etc.)
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
+
+    if (onlyPhone) {
+      // Проверяем смену страны по введенному коду
+      if (val.startsWith('+')) {
+        const match = COUNTRIES.find(c => val.startsWith(c.dialCode) && c.code !== selectedCountry.code);
+        if (match) {
+          setSelectedCountry(match);
+          const formatted = formatPhoneWithMask(val, match);
+          onChange(formatted, match);
+          return;
+        }
+      }
+      const formatted = formatPhoneWithMask(val, selectedCountry);
+      onChange(formatted, selectedCountry);
+      return;
+    }
+
     onChange(val, selectedCountry);
 
     // Если ввод содержит @, это email
@@ -87,11 +156,15 @@ export const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
       onCountryDetected(country);
     }
 
-    // Если поле пустое или уже содержало телефонный код, обновляем префикс
-    if (!value || value.startsWith('+')) {
-      onChange(country.dialCode + ' ', country);
+    if (onlyPhone) {
+      const formatted = formatPhoneWithMask(value, country);
+      onChange(formatted || (country.dialCode + ' '), country);
     } else {
-      onChange(value, country);
+      if (!value || value.startsWith('+')) {
+        onChange(country.dialCode + ' ', country);
+      } else {
+        onChange(value, country);
+      }
     }
 
     inputRef.current?.focus();
@@ -125,20 +198,21 @@ export const CountryPhoneInput: React.FC<CountryPhoneInputProps> = ({
 
       {/* Поле ввода телефона или почты */}
       <div className="country-input-box">
-        {value.includes('@') ? (
-          <Mail size={16} className="contact-type-icon mail" />
-        ) : (
+        {onlyPhone || !value.includes('@') ? (
           <Phone size={16} className="contact-type-icon phone" />
+        ) : (
+          <Mail size={16} className="contact-type-icon mail" />
         )}
         <input
           ref={inputRef}
-          type="text"
+          type={onlyPhone ? 'tel' : 'text'}
           className="country-phone-input"
-          placeholder={placeholder || `${selectedCountry.mask} или email`}
+          placeholder={placeholder || (onlyPhone ? selectedCountry.mask : `${selectedCountry.mask} или email`)}
           value={value}
           onChange={handleInputChange}
           required={required}
           autoFocus={autoFocus}
+          autoComplete={onlyPhone ? 'tel' : 'username'}
         />
       </div>
 

@@ -10,6 +10,8 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { LegalModal } from '../components/LegalModal';
 import { SacredQrLogo } from '../components/SacredQrLogo';
+import { CountryPhoneInput } from '../components/CountryPhoneInput';
+import { type CountryInfo } from '../utils/countryDetect';
 import logoImg from '../assets/logo.png';
 import './RegisterPage.css';
 
@@ -37,6 +39,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
   const [usernameFeedback, setUsernameFeedback] = useState<string>('');
   const [emailOrPhone, setEmailOrPhone] = useState('');
+  const [detectedCountry, setDetectedCountry] = useState<CountryInfo | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -111,6 +114,12 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
 
     if (!name.trim() || !cleanUser || !emailOrPhone.trim() || !password) {
       setErrorMessage(t('auth.modal.err_fill_all'));
+      return;
+    }
+
+    const phoneDigits = emailOrPhone.replace(/\D/g, '');
+    if (phoneDigits.length < 7) {
+      setErrorMessage('Пожалуйста, введите корректный номер телефона');
       return;
     }
 
@@ -505,7 +514,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                           <span className="field-icon-at">@</span>
                           <input 
                             type="text" 
-                            placeholder="claower_3d" 
+                            placeholder="username" 
                             value={username}
                             onChange={(e) => handleUsernameChange(e.target.value)}
                             required 
@@ -525,17 +534,25 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                       </div>
 
                       <div className="form-group-field full-width">
-                        <label>{t('auth.modal.contact_label')} *</label>
-                        <div className="form-input-box">
-                          <Mail size={18} className="field-icon" />
-                          <input 
-                            type="text" 
-                            placeholder={t('auth.modal.contact_placeholder')}
-                            value={emailOrPhone}
-                            onChange={(e) => setEmailOrPhone(e.target.value)}
-                            required 
-                          />
+                        <div className="field-label-row">
+                          <label>Номер телефона *</label>
+                          {detectedCountry && (
+                            <span className="country-detected-badge" title="Страна определена автоматически">
+                              📍 {detectedCountry.nameRu}
+                            </span>
+                          )}
                         </div>
+                        <CountryPhoneInput
+                          value={emailOrPhone}
+                          onChange={(val) => setEmailOrPhone(val)}
+                          onCountryDetected={(c) => setDetectedCountry(c)}
+                          onlyPhone={true}
+                          placeholder="+7 (999) 000-00-00"
+                          required
+                        />
+                        <span className="field-hint-text">
+                          Номер телефона используется для входа и защиты аккаунта
+                        </span>
                       </div>
 
                       <div className="form-group-field">

@@ -357,7 +357,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                         <div className="auth-field">
                           <div className="auth-field-header-row">
-                            <label>{t('auth.modal.contact_label')}</label>
+                            <label>Номер телефона *</label>
                             {detectedCountry && (
                               <span className="auth-detected-badge" title="Страна определена автоматически">
                                 📍 {detectedCountry.nameRu}
@@ -368,7 +368,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             value={emailOrPhone}
                             onChange={(val) => setEmailOrPhone(val)}
                             onCountryDetected={(c) => setDetectedCountry(c)}
-                            placeholder={t('auth.modal.contact_placeholder')}
+                            onlyPhone={true}
+                            placeholder="+7 (999) 000-00-00"
                             required
                           />
                         </div>

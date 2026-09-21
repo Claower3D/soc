@@ -7,16 +7,16 @@
   display: flex;
   align-items: center;
   width: 100%;
-  border: 1px solid #CBD5E1;
-  border-radius: 8px;
-  background: #F8FAFC;
-  transition: all 0.15s ease;
+  border: 1px solid var(--color-border, #CBD5E1);
+  border-radius: var(--radius-md, 10px);
+  background: var(--color-bg-secondary, #F8FAFC);
+  transition: all 0.2s ease;
 }
 
 .country-phone-wrapper:focus-within {
-  background: #FFFFFF;
-  border-color: #6366F1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  background: var(--color-bg-card, #FFFFFF);
+  border-color: var(--color-accent, #6366F1);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle, rgba(99, 102, 241, 0.12));
 }
 
 /* Кнопка выбора страны */
@@ -24,11 +24,11 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.55rem 0.65rem 0.55rem 0.75rem;
+  padding: 0.65rem 0.75rem 0.65rem 0.85rem;
   background: transparent;
   border: 0;
-  border-right: 1px solid #E2E8F0;
-  border-radius: 8px 0 0 8px;
+  border-right: 1px solid var(--color-border, #E2E8F0);
+  border-radius: var(--radius-md, 10px) 0 0 var(--radius-md, 10px);
   cursor: pointer;
   outline: none;
   transition: background 0.15s ease;
@@ -37,7 +37,7 @@
 
 .country-select-btn:hover,
 .country-select-btn.active {
-  background: rgba(99, 102, 241, 0.06);
+  background: rgba(99, 102, 241, 0.08);
 }
 
 .country-flag-badge {
@@ -46,9 +46,9 @@
 }
 
 .country-dial-code {
-  font-size: 0.84rem;
+  font-size: 0.86rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--color-text, #334155);
 }
 
 .auto-detect-dot {
@@ -60,13 +60,13 @@
 }
 
 .country-chevron {
-  color: #94A3B8;
+  color: var(--color-text-tertiary, #94A3B8);
   transition: transform 0.2s ease;
 }
 
 .country-chevron.open {
   transform: rotate(180deg);
-  color: #6366F1;
+  color: var(--color-accent, #6366F1);
 }
 
 /* Поле ввода */
@@ -80,12 +80,12 @@
 .contact-type-icon {
   position: absolute;
   left: 0.75rem;
-  color: #94A3B8;
+  color: var(--color-text-tertiary, #94A3B8);
   pointer-events: none;
 }
 
 .contact-type-icon.phone {
-  color: #6366F1;
+  color: var(--color-accent, #6366F1);
 }
 
 .contact-type-icon.mail {
@@ -94,12 +94,28 @@
 
 .country-phone-input {
   width: 100%;
-  padding: 0.6rem 0.85rem 0.6rem 2.2rem;
+  padding: 0.65rem 0.95rem 0.65rem 2.3rem;
   border: 0;
   background: transparent;
-  font-size: 0.86rem;
-  color: #0F172A;
+  font-size: 0.88rem;
+  color: var(--color-text, #0F172A);
   outline: none;
+}
+
+.country-phone-input::placeholder {
+  color: var(--color-text-tertiary, #94A3B8);
+  opacity: 0.7;
+}
+
+/* Бейдж автоматического определения */
+.country-detected-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #10B981;
+  background: rgba(16, 185, 129, 0.08);
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 /* Выпадающий список стран */
@@ -109,10 +125,10 @@
   left: 0;
   width: 320px;
   max-width: 90vw;
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
+  background: var(--color-bg-card, #FFFFFF);
+  border: 1px solid var(--color-border, #E2E8F0);
   border-radius: 12px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
   z-index: 1000;
   overflow: hidden;
   animation: countryFadeIn 0.15s ease-out;
@@ -134,30 +150,30 @@
   display: flex;
   align-items: center;
   padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid #F1F5F9;
-  background: #F8FAFC;
+  border-bottom: 1px solid var(--color-border, #F1F5F9);
+  background: var(--color-bg-secondary, #F8FAFC);
 }
 
 .country-search-icon {
   position: absolute;
   left: 1.15rem;
-  color: #94A3B8;
+  color: var(--color-text-tertiary, #94A3B8);
   pointer-events: none;
 }
 
 .country-search-input {
   width: 100%;
   padding: 0.45rem 0.6rem 0.45rem 2rem;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--color-border, #E2E8F0);
   border-radius: 6px;
-  background: #FFFFFF;
+  background: var(--color-bg-card, #FFFFFF);
   font-size: 0.8rem;
-  color: #0F172A;
+  color: var(--color-text, #0F172A);
   outline: none;
 }
 
 .country-search-input:focus {
-  border-color: #6366F1;
+  border-color: var(--color-accent, #6366F1);
 }
 
 .country-list-scroll {
@@ -177,13 +193,13 @@
 }
 
 .country-item:hover {
-  background: #F1F5F9;
+  background: var(--color-bg-secondary, #F1F5F9);
 }
 
 .country-item.selected {
-  background: rgba(99, 102, 241, 0.08);
+  background: rgba(99, 102, 241, 0.1);
   font-weight: 600;
-  color: #4F46E5;
+  color: var(--color-accent, #4F46E5);
 }
 
 .country-item-flag {
@@ -195,26 +211,26 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #1E293B;
+  color: var(--color-text, #1E293B);
 }
 
 .country-item-code {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #64748B;
+  color: var(--color-text-tertiary, #64748B);
 }
 
 .country-item.selected .country-item-code {
-  color: #4F46E5;
+  color: var(--color-accent, #4F46E5);
 }
 
 .country-item-check {
-  color: #4F46E5;
+  color: var(--color-accent, #4F46E5);
 }
 
 .country-not-found {
   padding: 1.25rem;
   text-align: center;
   font-size: 0.82rem;
-  color: #94A3B8;
+  color: var(--color-text-tertiary, #94A3B8);
 }
