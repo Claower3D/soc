@@ -1497,3 +1497,111 @@
     gap: 4px;
   }
 }
+
+
+/* INSTAGRAM STYLE PROFILE LAYOUT */
+.profile-header-card.profile-instagram-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-top: 1.5rem;
+}
+
+.profile-top-layout {
+  display: flex;
+  gap: 2.5rem;
+  align-items: flex-start;
+}
+
+.profile-instagram-layout .profile-avatar-wrapper {
+  margin-top: -60px;
+}
+
+.profile-instagram-layout .profile-main-avatar {
+  width: 130px;
+  height: 130px;
+  border-width: 5px;
+}
+
+.profile-info-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.profile-info-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-name-and-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.profile-name-and-badges .profile-fullname {
+  margin: 0;
+  font-size: 1.6rem;
+  line-height: 1.2;
+}
+
+.profile-info-header .username-role-row {
+  margin: 0;
+}
+
+.profile-stats-compact {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  font-size: 0.95rem;
+  color: var(--color-text);
+  flex-wrap: wrap;
+}
+
+.profile-stats-compact .stat-item {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.profile-stats-compact .stat-item.clickable {
+  cursor: pointer;
+}
+.profile-stats-compact .stat-item.clickable:hover b {
+  text-decoration: underline;
+}
+.profile-stats-compact b {
+  font-weight: 700;
+  color: var(--color-text-primary);
+  font-size: 1.05rem;
+}
+
+.profile-meta-groups.compact-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: -0.25rem;
+}
+
+.profile-meta-groups.compact-meta .profile-meta-row {
+  margin: 0;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.profile-actions-bottom-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+.profile-actions-bottom-row .btn {
+  flex: 1;
+  justify-content: center;
+  min-width: 120px;
+}

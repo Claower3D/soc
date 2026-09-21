@@ -248,182 +248,111 @@ export function ProfilePage() {
       </div>
 
       {/* Profile Header Card */}
-      <div className="profile-header-container">
-        <div className="profile-header-card">
-          <div className="profile-top-bar">
-            {/* Avatar with Instagram Story Ring */}
-            <div 
-              className={`profile-avatar-wrapper ${userHasStories ? 'has-story' : ''}`}
-              onClick={() => {
-                if (userHasStories) {
-                  setIsViewingStory(true);
-                }
-              }}
-              title={userHasStories ? 'Нажмите, чтобы посмотреть историю' : undefined}
-            >
-              <img src={activeUser.avatar} alt={activeUser.name} className={`profile-main-avatar ${activeUser.isPremium ? 'profile-premium-frame' : ''}`} />
-              {activeUser.online && <span className="profile-online-indicator" title="В сети" />}
-              {userHasStories && <span className="profile-story-badge-hint">История</span>}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="profile-actions-bar">
-              {isMe ? (
-                isAuthenticated ? (
-                  <>
-                    <button className="btn btn-primary" onClick={() => setIsCreatePostOpen(true)}>
-                      <Plus size={16} /> Опубликовать
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => setIsCreateStoryOpen(true)}>
-                      <Plus size={16} /> Добавить историю
-                    </button>
-                    <button className="btn btn-secondary" onClick={() => setIsEditProfileOpen(true)}>
-                      <Edit3 size={16} /> Редактировать
-                    </button>
-                    <button className="btn btn-secondary" onClick={handleShareProfile}>
-                      <Share2 size={16} /> {copiedLink ? 'Ссылка скопирована!' : 'Поделиться'}
-                    </button>
-                    <button 
-                      className="btn btn-secondary btn-logout" 
-                      onClick={() => {
-                        logout();
-                        navigate('/');
-                      }}
-                      title="Выйти из аккаунта"
-                    >
-                      <LogOut size={16} /> Выйти
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button className="btn btn-primary" onClick={() => setAuthModalOpen(true)}>
-                      <LogIn size={16} /> Войти в аккаунт
-                    </button>
-                    <button className="btn btn-secondary" onClick={handleShareProfile}>
-                      <Share2 size={16} /> Поделиться
-                    </button>
-                  </>
-                )
-              ) : (
-                <>
-                  <button
-                    className={`btn ${isFollowing ? 'btn-following' : 'btn-primary'}`}
-                    onClick={() => {
-                      if (!isAuthenticated) {
-                        setAuthModalOpen(true);
-                        return;
-                      }
-                      handleToggleFollow();
-                    }}
-                  >
-                    {isFollowing ? (
-                      <>
-                        <UserCheck size={16} /> Подписки
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus size={16} /> Подписаться
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    className={`btn btn-critic-toggle ${isCritic ? 'active' : ''}`}
-                    onClick={() => {
-                      if (!isAuthenticated) {
-                        setAuthModalOpen(true);
-                        return;
-                      }
-                      if (currentUser?.id) {
-                        toggleUserCritic(user.id, currentUser.id);
-                      }
-                    }}
-                    title="Стать критиком (следить с акцентом на разбор и рецензии)"
-                  >
-                    <Flame size={15} /> {isCritic ? 'В критиках' : 'Стать критиком'}
-                  </button>
-
-                  <button className="btn btn-secondary" onClick={() => {
-                    if (!isAuthenticated) {
-                      setAuthModalOpen(true);
-                      return;
-                    }
-                    handleSendMessage();
-                  }}>
-                    <MessageCircle size={16} /> Сообщение
-                  </button>
-                  <button className="btn btn-secondary" onClick={() => {
-                    if (!isAuthenticated) {
-                      setAuthModalOpen(true);
-                      return;
-                    }
-                    handleStartCall();
-                  }} title="Начать конференцию">
-                    <Phone size={16} /> Позвонить
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* User Details */}
-          <div className="profile-identity">
-            <div className="name-row">
-              <h1 className={`profile-fullname ${activeUser.isPremium ? 'profile-name-premium-glow' : ''}`}>{activeUser.name}</h1>
-              <span title="Подтвержденный профиль"><CheckCircle2 size={18} className="verified-badge" /></span>
-              
-              {/* New Age Premium */}
-              {activeUser.isPremium && (
-                <span className="profile-premium-tag" title="New Age Premium подписчик">
-                  <PremiumBadge size="lg" showText />
-                </span>
-              )}
-            </div>
-
-            <div className="username-role-row">
-              <button 
-                type="button"
-                className="profile-username-pill"
+            <div className="profile-header-container">
+        <div className="profile-header-card profile-instagram-layout">
+          
+          <div className="profile-top-layout">
+            {/* Left Column: Avatar */}
+            <div className="profile-avatar-col">
+              <div 
+                className={`profile-avatar-wrapper ${userHasStories ? 'has-story' : ''}`}
                 onClick={() => {
-                  navigator.clipboard?.writeText(`@${activeUser.username}`);
-                  alert(`Уникальный ID @${activeUser.username} скопирован в буфер!`);
+                  if (userHasStories) setIsViewingStory(true);
                 }}
-                title="Уникальный ID пользователя. Нажмите, чтобы скопировать"
+                title={userHasStories ? 'Нажмите, чтобы посмотреть историю' : undefined}
               >
-                @{activeUser.username}
-              </button>
-
-              {/* Роли пользователя */}
-              {activeUser.role === 'creator' && (
-                <span className="profile-role-badge creator" title="Автор контента">
-                  <VideoIcon size={12} /> Автор
-                </span>
-              )}
-              {activeUser.role === 'business' && (
-                <span className="profile-role-badge business" title="Проверенный продавец">
-                  <ShoppingBag size={12} /> Магазин {activeUser.businessCategory ? `• ${activeUser.businessCategory}` : ''}
-                </span>
-              )}
+                <img src={activeUser.avatar} alt={activeUser.name} className={`profile-main-avatar ${activeUser.isPremium ? 'profile-premium-frame' : ''}`} />
+                {activeUser.online && <span className="profile-online-indicator" title="В сети" />}
+                {userHasStories && <span className="profile-story-badge-hint">История</span>}
+              </div>
             </div>
 
-            {activeUser.bio && <p className="profile-bio">{activeUser.bio}</p>}
+            {/* Right Column: Info & Stats */}
+            <div className="profile-info-col">
+              
+              {/* Row 1: Name and Badges */}
+              <div className="profile-info-header">
+                <div className="profile-name-and-badges">
+                  <h1 className={`profile-fullname ${activeUser.isPremium ? 'profile-name-premium-glow' : ''}`}>
+                    {activeUser.name}
+                  </h1>
+                  <span title="Подтвержденный профиль"><CheckCircle2 size={18} className="verified-badge" /></span>
+                  {activeUser.isPremium && (
+                    <span className="profile-premium-tag" title="New Age Premium подписчик">
+                      <PremiumBadge size="lg" showText />
+                    </span>
+                  )}
+                </div>
 
-            <div className="profile-meta-groups">
-              {/* Ряд 1: Базовая информация и Геолокация */}
-              <div className="profile-meta-row">
+                <div className="username-role-row" style={{ margin: 0 }}>
+                  <button 
+                    type="button"
+                    className="profile-username-pill"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(`@${activeUser.username}`);
+                      alert(`Уникальный ID @${activeUser.username} скопирован в буфер!`);
+                    }}
+                    title="Уникальный ID пользователя. Нажмите, чтобы скопировать"
+                  >
+                    @{activeUser.username}
+                  </button>
+
+                  {/* Роли пользователя */}
+                  {activeUser.role === 'creator' && (
+                    <span className="profile-role-badge creator" title="Автор контента">
+                      <VideoIcon size={12} /> Автор
+                    </span>
+                  )}
+                  {activeUser.role === 'business' && (
+                    <span className="profile-role-badge business" title="Проверенный продавец">
+                      <ShoppingBag size={12} /> Магазин {activeUser.businessCategory ? `• ${activeUser.businessCategory}` : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Row 2: Compact Stats (Instagram style) */}
+              <div className="profile-stats-compact">
+                <div className="stat-item">
+                  <b>{userPosts.length}</b> публикаций
+                </div>
+                <div className="stat-item clickable" onClick={() => setModalType('Друзья')}>
+                  <b>{(profileData as any)?.friendsCount ?? 0}</b> друзей
+                </div>
+                <div className="stat-item clickable" onClick={() => setModalType('Подписчики')}>
+                  <b>{realFollowersList.length.toLocaleString('ru-RU')}</b> подписчиков
+                </div>
+                <div className="stat-item clickable" onClick={() => setModalType('Подписки')}>
+                  <b>{realFollowingList.length.toLocaleString('ru-RU')}</b> подписок
+                </div>
+                <div className="stat-item">
+                  <b>{(profileData as any)?.clipsCount ?? 0}</b> волны
+                </div>
+                <div className="stat-item clickable critic-stat" onClick={() => setModalType('Критики')} title="Пользователи, следящие за профилем в режиме конструктивной критики">
+                  <Flame size={14} className="critic-flame-icon" style={{marginRight: '2px'}} />
+                  <b>{realCriticsList.length.toLocaleString('ru-RU')}</b> критиков
+                </div>
+              </div>
+
+              {/* Row 3: Bio */}
+              {activeUser.bio && <p className="profile-bio" style={{ margin: 0 }}>{activeUser.bio}</p>}
+
+              {/* Row 4: Meta Badges (Location, Religion, Class, Zodiac) */}
+              <div className="profile-meta-groups compact-meta">
                 {activeUser.location && (
                   <div className="meta-item">
                     <MapPin size={15} />
                     <span>{activeUser.location}</span>
                   </div>
                 )}
+                
                 {activeUser.website && (
                   <a href={activeUser.website} target="_blank" rel="noreferrer" className="meta-item meta-link">
                     <LinkIcon size={15} />
                     <span>{activeUser.website.replace('https://', '')}</span>
                   </a>
                 )}
-                {/* Чувствительные данные (мировоззрение/вероисповедание с защитой приватности) */}
+
                 {activeUser.beliefType && activeUser.beliefType !== 'Не указано' && activeUser.beliefType !== 'Не указывать / Личное' && (
                   (isMe || activeUser.beliefPrivacy === 'public' || (activeUser.beliefPrivacy === 'followers' && isFollowing)) && (() => {
                     const religion = RELIGIONS_CATALOG.find(r => r.name === activeUser.beliefType);
@@ -433,7 +362,7 @@ export function ProfilePage() {
                         title={isMe ? `Видимость: ${activeUser.beliefPrivacy === 'private' ? 'Только мне (Скрыто)' : activeUser.beliefPrivacy === 'followers' ? 'Только подписчикам' : 'Публично'}` : 'Мировоззрение'}
                       >
                         {religion ? (
-                          <ReligionSymbol id={religion.id} size={20} className="meta-belief-symbol" />
+                          <ReligionSymbol id={religion.id} size={18} className="meta-belief-symbol" />
                         ) : (
                           <Compass size={15} />
                         )}
@@ -448,72 +377,62 @@ export function ProfilePage() {
                     );
                   })()
                 )}
-              </div>
 
-              {/* Ряд 2: Класс сознания и дата рождения */}
-              {(activeUser.consciousnessLevel || activeUser.birthDate) && (
-                <div className="profile-meta-row">
-                  {/* Класс сознания и язык общения */}
-                  {activeUser.consciousnessLevel ? (
-                    <div 
-                      className="meta-item meta-consciousness" 
-                      onClick={() => setIsConsciousnessModalOpen(true)}
-                      style={{ cursor: 'pointer' }}
-                      title="Класс сознания и ведущий язык восприятия человека. Нажмите для подробностей"
-                    >
-                      <Brain size={15} className="consciousness-icon" />
-                      <span className="consciousness-level-badge">{activeUser.consciousnessLevel} класс</span>
-                      <span className="consciousness-title-text">
-                        {activeUser.consciousnessTitle 
-                          ? activeUser.consciousnessTitle.replace(new RegExp(`^${activeUser.consciousnessLevel}\\s*класс\\s*[-—]*\\s*`, 'i'), '')
-                          : 'Осознанность'}
+                {activeUser.consciousnessLevel ? (
+                  <div 
+                    className="meta-item meta-consciousness" 
+                    onClick={() => setIsConsciousnessModalOpen(true)}
+                    style={{ cursor: 'pointer' }}
+                    title="Класс сознания и ведущий язык восприятия человека. Нажмите для подробностей"
+                  >
+                    <Brain size={15} className="consciousness-icon" />
+                    <span className="consciousness-level-badge">{activeUser.consciousnessLevel} класс</span>
+                    <span className="consciousness-title-text">
+                      {activeUser.consciousnessTitle 
+                        ? activeUser.consciousnessTitle.replace(new RegExp(`^${activeUser.consciousnessLevel}\s*класс\s*[-—]*\s*`, 'i'), '')
+                        : 'Осознанность'}
+                    </span>
+                    {activeUser.cognitionVector && (
+                      <span className="consciousness-vector-tag">
+                        {activeUser.cognitionVector === 'visual_analogies' && '🍏 на яблоках'}
+                        {activeUser.cognitionVector === 'exact_sciences' && '📐 логика и факты'}
+                        {activeUser.cognitionVector === 'pragmatic' && '⚡ польза и действие'}
+                        {activeUser.cognitionVector === 'philosophical' && '📖 смыслы'}
+                        {activeUser.cognitionVector === 'spiritual' && '✨ паттерны и единство'}
                       </span>
-                      {activeUser.cognitionVector && (
-                        <span className="consciousness-vector-tag">
-                          {activeUser.cognitionVector === 'visual_analogies' && '🍏 на яблоках'}
-                          {activeUser.cognitionVector === 'exact_sciences' && '📐 логика и факты'}
-                          {activeUser.cognitionVector === 'pragmatic' && '⚡ польза и действие'}
-                          {activeUser.cognitionVector === 'philosophical' && '📖 смыслы'}
-                          {activeUser.cognitionVector === 'spiritual' && '✨ паттерны и единство'}
-                        </span>
-                      )}
+                    )}
+                  </div>
+                ) : (
+                  isMe && (
+                    <button 
+                      type="button" 
+                      className="meta-item meta-consciousness-empty"
+                      onClick={() => setIsConsciousnessModalOpen(true)}
+                      title="Пройти диагностику класса сознания и определить свой язык общения"
+                    >
+                      <Brain size={15} />
+                      <span>Определить класс сознания</span>
+                      <Sparkles size={12} className="meta-sparkle" />
+                    </button>
+                  )
+                )}
+
+                {activeUser.birthDate && (isMe || activeUser.showBirthDate !== false) && (() => {
+                  const astro = calculateZodiacProfile(activeUser.birthDate);
+                  const dateObj = new Date(activeUser.birthDate);
+                  const formattedDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+                  return (
+                    <div className="meta-item meta-birthdate" title="Дата рождения и возраст">
+                      <Calendar size={15} />
+                      <span>{formattedDate} {astro ? `(${astro.age} лет)` : ''}</span>
                     </div>
-                  ) : (
-                    isMe && (
-                      <button 
-                        type="button" 
-                        className="meta-item meta-consciousness-empty"
-                        onClick={() => setIsConsciousnessModalOpen(true)}
-                        title="Пройти диагностику класса сознания и определить свой язык общения"
-                      >
-                        <Brain size={15} />
-                        <span>Определить класс сознания</span>
-                        <Sparkles size={12} className="meta-sparkle" />
-                      </button>
-                    )
-                  )}
+                  );
+                })()}
 
-                  {/* Дата рождения и возраст */}
-                  {activeUser.birthDate && (isMe || activeUser.showBirthDate !== false) && (() => {
-                    const astro = calculateZodiacProfile(activeUser.birthDate);
-                    const dateObj = new Date(activeUser.birthDate);
-                    const formattedDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
-                    return (
-                      <div className="meta-item meta-birthdate" title="Дата рождения и возраст">
-                        <Calendar size={15} />
-                        <span>{formattedDate} {astro ? `(${astro.age} лет)` : ''}</span>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Ряд 3: Астрология (Зодиак) */}
-              {activeUser.birthDate && (isMe || activeUser.showZodiac !== false) && (() => {
-                const astro = calculateZodiacProfile(activeUser.birthDate);
-                if (!astro) return null;
-                return (
-                  <div className="profile-meta-row">
+                {activeUser.birthDate && (isMe || activeUser.showZodiac !== false) && (() => {
+                  const astro = calculateZodiacProfile(activeUser.birthDate);
+                  if (!astro) return null;
+                  return (
                     <div 
                       className="meta-item meta-zodiac" 
                       title={`Стихия: ${astro.element}, Планета: ${astro.planet}. Восточный знак: ${astro.easternElement} ${astro.easternSign}`}
@@ -523,44 +442,9 @@ export function ProfilePage() {
                       <span className="zodiac-element-pill">{astro.element}</span>
                       <span className="zodiac-eastern-pill">{astro.easternSign}</span>
                     </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* Statistics Counters: Публикации, Друзья, Подписчики, Подписки, Волны, Критики */}
-          <div className="profile-stats-row">
-            <div className="stat-card">
-              <span className="stat-number">{userPosts.length}</span>
-              <span className="stat-label">публикаций</span>
-            </div>
-            <div className="stat-card clickable" onClick={() => setModalType('Друзья')}>
-              <span className="stat-number">{(profileData as any)?.friendsCount ?? 0}</span>
-              <span className="stat-label">друзей</span>
-              <ChevronRight size={14} className="stat-arrow" />
-            </div>
-            <div className="stat-card clickable" onClick={() => setModalType('Подписчики')}>
-              <span className="stat-number">{realFollowersList.length.toLocaleString('ru-RU')}</span>
-              <span className="stat-label">подписчиков</span>
-              <ChevronRight size={14} className="stat-arrow" />
-            </div>
-            <div className="stat-card clickable" onClick={() => setModalType('Подписки')}>
-              <span className="stat-number">{realFollowingList.length.toLocaleString('ru-RU')}</span>
-              <span className="stat-label">подписок</span>
-              <ChevronRight size={14} className="stat-arrow" />
-            </div>
-            <div className="stat-card">
-              <span className="stat-number">{(profileData as any)?.clipsCount ?? 0}</span>
-              <span className="stat-label">волны</span>
-            </div>
-            <div className="stat-card clickable critic-stat-card" onClick={() => setModalType('Критики')} title="Пользователи, следящие за профилем в режиме конструктивной критики">
-              <span className="stat-number critic-number">
-                <Flame size={14} className="critic-flame-icon" />
-                {realCriticsList.length.toLocaleString('ru-RU')}
-              </span>
-              <span className="stat-label">критиков</span>
-              <ChevronRight size={14} className="stat-arrow" />
+                  );
+                })()}
+              </div>
             </div>
           </div>
 
@@ -580,6 +464,106 @@ export function ProfilePage() {
               </div>
             </div>
           )}
+
+          {/* Bottom Row: Action Buttons (full width) */}
+          <div className="profile-actions-bottom-row">
+            {isMe ? (
+              isAuthenticated ? (
+                <>
+                  <button className="btn btn-primary" onClick={() => setIsCreatePostOpen(true)}>
+                    <Plus size={16} /> Опубликовать
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setIsCreateStoryOpen(true)}>
+                    <Plus size={16} /> Добавить историю
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setIsEditProfileOpen(true)}>
+                    <Edit3 size={16} /> Редактировать профиль
+                  </button>
+                  <button className="btn btn-secondary" onClick={handleShareProfile}>
+                    <Share2 size={16} /> {copiedLink ? 'Ссылка скопирована!' : 'Поделиться'}
+                  </button>
+                  <button 
+                    className="btn btn-secondary btn-logout" 
+                    onClick={() => {
+                      logout();
+                      navigate('/');
+                    }}
+                    title="Выйти из аккаунта"
+                  >
+                    <LogOut size={16} /> Выйти
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="btn btn-primary" onClick={() => setAuthModalOpen(true)}>
+                    <LogIn size={16} /> Войти в аккаунт
+                  </button>
+                  <button className="btn btn-secondary" onClick={handleShareProfile}>
+                    <Share2 size={16} /> Поделиться
+                  </button>
+                </>
+              )
+            ) : (
+              <>
+                <button
+                  className={`btn ${isFollowing ? 'btn-following' : 'btn-primary'}`}
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      setAuthModalOpen(true);
+                      return;
+                    }
+                    handleToggleFollow();
+                  }}
+                >
+                  {isFollowing ? (
+                    <>
+                      <UserCheck size={16} /> Подписки
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus size={16} /> Подписаться
+                    </>
+                  )}
+                </button>
+
+                <button
+                  className={`btn btn-critic-toggle ${isCritic ? 'active' : ''}`}
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      setAuthModalOpen(true);
+                      return;
+                    }
+                    if (currentUser?.id) {
+                      toggleUserCritic(user.id, currentUser.id);
+                    }
+                  }}
+                  title="Стать критиком (следить с акцентом на разбор и рецензии)"
+                >
+                  <Flame size={15} /> {isCritic ? 'В критиках' : 'Стать критиком'}
+                </button>
+
+                <button className="btn btn-secondary" onClick={() => {
+                  if (!isAuthenticated) {
+                    setAuthModalOpen(true);
+                    return;
+                  }
+                  handleSendMessage();
+                }}>
+                  <MessageCircle size={16} /> Написать
+                </button>
+                <button className="btn btn-secondary" onClick={() => {
+                  if (!isAuthenticated) {
+                    setAuthModalOpen(true);
+                    return;
+                  }
+                  handleStartCall();
+                }} title="Начать видеозвонок">
+                  <Phone size={16} /> Позвонить
+                </button>
+              </>
+            )}
+          </div>
+
         </div>
       </div>
 
