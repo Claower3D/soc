@@ -671,10 +671,25 @@ func main() {
 			// Проверяем есть ли статический файл
 			filePath := distDir + r.URL.Path
 			if fi, err := os.Stat(filePath); err == nil && !fi.IsDir() {
+				// Принудительно ставим charset=utf-8 для текстовых ассетов,
+				// иначе на Windows Go отдаёт .js без charset и браузер
+				// на русской локали читает UTF-8 как CP1251 → кракозябры.
+				if strings.HasSuffix(r.URL.Path, ".js") {
+					w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+				} else if strings.HasSuffix(r.URL.Path, ".css") {
+					w.Header().Set("Content-Type", "text/css; charset=utf-8")
+				} else if strings.HasSuffix(r.URL.Path, ".html") {
+					w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				} else if strings.HasSuffix(r.URL.Path, ".json") {
+					w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				} else if strings.HasSuffix(r.URL.Path, ".svg") {
+					w.Header().Set("Content-Type", "image/svg+xml; charset=utf-8")
+				}
 				fsHandler.ServeHTTP(w, r)
 				return
 			}
 			// SPA fallback → index.html
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			http.ServeFile(w, r, distDir+"/index.html")
 		})
 	} else {
