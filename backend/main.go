@@ -3489,8 +3489,8 @@ func handleStories(w http.ResponseWriter, r *http.Request) {
 func handleClips(w http.ResponseWriter, r *http.Request) {
 	if db != nil {
 		rows, err := db.Query(`
-			SELECT c.id, c.video_url, c.thumbnail_url, c.caption, c.likes_count, c.views_count, c.comments_count, c.created_at,
-				u.id, u.name, u.username, u.avatar
+			SELECT c.id, c.video_url, COALESCE(c.poster, ''), COALESCE(c.caption, ''), COALESCE(c.likes_count, 0), COALESCE(c.views_count, 0), COALESCE(c.comments_count, 0), c.created_at,
+				u.id, u.name, u.username, COALESCE(u.avatar, '')
 			FROM clips c JOIN users u ON c.user_id = u.id
 			ORDER BY c.created_at DESC LIMIT 50
 		`)
@@ -3498,16 +3498,30 @@ func handleClips(w http.ResponseWriter, r *http.Request) {
 			defer rows.Close()
 			var clips []map[string]interface{}
 			for rows.Next() {
-				var cid, videoUrl, thumbUrl, caption, uid, uname, uusername, uavatar string
+				var cid, videoUrl, poster, caption, uid, uname, uusername, uavatar string
 				var likesCount, viewsCount, commentsCount int
 				var createdAt time.Time
-				if rows.Scan(&cid, &videoUrl, &thumbUrl, &caption, &likesCount, &viewsCount, &commentsCount, &createdAt, &uid, &uname, &uusername, &uavatar) == nil {
+				if rows.Scan(&cid, &videoUrl, &poster, &caption, &likesCount, &viewsCount, &commentsCount, &createdAt, &uid, &uname, &uusername, &uavatar) == nil {
 					clips = append(clips, map[string]interface{}{
-						"id": cid, "videoUrl": videoUrl, "thumbnail": thumbUrl, "caption": caption,
-						"likes": likesCount, "views": viewsCount, "commentsCount": commentsCount,
-						"user": map[string]interface{}{"id": uid, "name": uname, "username": uusername, "avatar": uavatar},
+						"id":            cid,
+						"videoUrl":      videoUrl,
+						"poster":        poster,
+						"caption":       caption,
+						"likesCount":    likesCount,
+						"viewsCount":    viewsCount,
+						"commentsCount": commentsCount,
+						"sharesCount":   0,
+						"user": map[string]interface{}{
+							"id":       uid,
+							"name":     uname,
+							"username": uusername,
+							"avatar":   uavatar,
+						},
 					})
 				}
+			}
+			if clips == nil {
+				clips = []map[string]interface{}{}
 			}
 			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: clips})
 			return
@@ -4505,12 +4519,13 @@ func handleCreateClip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clipID := uuid.New().String()
+	clipID := "clip_" + time.Now().Format("20060102150405")
 	_, err = dbConn.Exec(`
-		INSERT INTO clips (id, user_id, video_url, thumbnail_url, description, sound_title, created_at) 
+		INSERT INTO clips (id, user_id, video_url, poster, caption, music_title, created_at) 
 		VALUES ($1, $2, $3, $4, $5, $6, NOW())
 	`, clipID, claims.UserID, req.VideoUrl, req.ThumbnailUrl, req.Description, req.SoundTitle)
 	if err != nil {
+		log.Printf("⚠️ Ошибка создания клипа в БД: %v", err)
 		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
 		return
 	}

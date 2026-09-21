@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { 
   Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, 
   Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send, Smile,
-  Radio, Users, Sparkles, Flame
+  Radio, Users, Sparkles, Flame, Video
 } from 'lucide-react';
 import { type Clip, type ClipComment } from '../data/mock';
 import { api } from '../api';
@@ -105,6 +105,13 @@ export function ClipsPage() {
     setSelectedVideoFile(null);
     setActiveIndex(0);
     if (feedRef.current) feedRef.current.scrollTop = 0;
+
+    api.clips.create({
+      videoUrl,
+      thumbnailUrl: '',
+      description: waveDescription,
+      soundTitle: 'Оригинальный звук'
+    }).catch((err) => console.warn('Backend clip save notice:', err));
   };
 
   const feedRef = useRef<HTMLDivElement>(null);
@@ -330,32 +337,45 @@ export function ClipsPage() {
 
   return (
     <div className="clips-page-container">
-      {/* Category Tab Selector (Все / LIVE 🔴 / Тренды) */}
+      {/* Category Tab Selector & Upload Button (Top Bar) */}
       <div className="clips-category-nav-bar">
+        <div className="clips-category-tabs">
+          <button 
+            type="button" 
+            className={`clips-cat-tab ${activeTab === 'all' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('all'); setActiveIndex(0); scrollToClip(0); }}
+          >
+            <Sparkles size={14} />
+            <span>Все клипы</span>
+          </button>
+          <button 
+            type="button" 
+            className={`clips-cat-tab live-tab ${activeTab === 'live' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('live'); setActiveIndex(0); scrollToClip(0); }}
+          >
+            <Radio size={14} className="clip-live-pulse-icon" />
+            <span>Прямой эфир • LIVE</span>
+            <span className="clips-live-dot" />
+          </button>
+          <button 
+            type="button" 
+            className={`clips-cat-tab ${activeTab === 'trending' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('trending'); setActiveIndex(0); scrollToClip(0); }}
+          >
+            <Flame size={14} />
+            <span>В тренде</span>
+          </button>
+        </div>
+
+        {/* Prominent Upload Clip Button in Top Bar */}
         <button 
           type="button" 
-          className={`clips-cat-tab ${activeTab === 'all' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('all'); setActiveIndex(0); scrollToClip(0); }}
+          className="clips-upload-btn-header"
+          onClick={handleTriggerUpload}
+          title="Загрузить свой клип"
         >
-          <Sparkles size={14} />
-          <span>Все клипы</span>
-        </button>
-        <button 
-          type="button" 
-          className={`clips-cat-tab live-tab ${activeTab === 'live' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('live'); setActiveIndex(0); scrollToClip(0); }}
-        >
-          <Radio size={14} className="clip-live-pulse-icon" />
-          <span>Прямой эфир • LIVE</span>
-          <span className="clips-live-dot" />
-        </button>
-        <button 
-          type="button" 
-          className={`clips-cat-tab ${activeTab === 'trending' ? 'active' : ''}`}
-          onClick={() => { setActiveTab('trending'); setActiveIndex(0); scrollToClip(0); }}
-        >
-          <Flame size={14} />
-          <span>В тренде</span>
+          <Plus size={16} />
+          <span>Загрузить клип</span>
         </button>
       </div>
 
@@ -363,9 +383,17 @@ export function ClipsPage() {
         <div className="clip-nav-arrows">
           <button 
             type="button"
+            className="clip-arrow-btn clip-upload-side-btn" 
+            onClick={handleTriggerUpload}
+            title="Загрузить клип"
+          >
+            <Plus size={20} />
+          </button>
+          <button 
+            type="button"
             className="clip-arrow-btn" 
             onClick={() => scrollToClip(activeIndex - 1)}
-            disabled={activeIndex === 0}
+            disabled={activeIndex === 0 || displayedClips.length === 0}
             title="Предыдущий клип"
           >
             <ChevronUp size={22} />
@@ -374,7 +402,7 @@ export function ClipsPage() {
             type="button"
             className="clip-arrow-btn" 
             onClick={() => scrollToClip(activeIndex + 1)}
-            disabled={activeIndex === displayedClips.length - 1}
+            disabled={activeIndex === displayedClips.length - 1 || displayedClips.length === 0}
             title="Следующий клип"
           >
             <ChevronDown size={22} />
@@ -382,7 +410,26 @@ export function ClipsPage() {
         </div>
 
         <div className="clips-feed" ref={feedRef} onScroll={handleScroll}>
-          {displayedClips.map((clip, index) => {
+          {displayedClips.length === 0 ? (
+            <div className="clips-empty-state">
+              <div className="clips-empty-icon-wrapper">
+                <Video size={48} />
+              </div>
+              <h2 className="clips-empty-title">Клипов пока нет</h2>
+              <p className="clips-empty-subtitle">
+                Опубликуйте первое короткое видео и запустите новую волну в экосистеме!
+              </p>
+              <button 
+                type="button" 
+                className="clips-empty-btn"
+                onClick={handleTriggerUpload}
+              >
+                <Plus size={18} />
+                <span>Загрузить первый клип</span>
+              </button>
+            </div>
+          ) : (
+            displayedClips.map((clip, index) => {
             const isCurrent = index === activeIndex;
             const isFollowed = followedAuthors[clip.user.id];
             const isCaptionExpanded = expandedCaptions[clip.id];
@@ -601,7 +648,7 @@ export function ClipsPage() {
                 </div>
               </div>
             );
-          })}
+          }))}
         </div>
       </div>
 
@@ -727,6 +774,16 @@ export function ClipsPage() {
         setDescription={setWaveDescription}
         onPublish={handlePublishWave}
       />
+
+      {/* Floating Action Button for quick upload */}
+      <button 
+        type="button" 
+        className="clips-mobile-fab-btn"
+        onClick={handleTriggerUpload}
+        title="Загрузить клип"
+      >
+        <Plus size={24} />
+      </button>
     </div>
   );
 }
