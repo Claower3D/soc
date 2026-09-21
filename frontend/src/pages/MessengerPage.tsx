@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChatList } from '../components/ChatList';
-import { ChatWindow } from '../components/ChatWindow';
+import { ChatWindowNew } from '../components/ChatWindowNew';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import { type Chat } from '../data/mock';
 import { INITIAL_DATING_PROFILES } from '../data/datingData';
@@ -314,7 +314,7 @@ export function MessengerPage() {
         />
       </div>
       <div className={`messenger-chat ${!activeChatId ? 'hide-mobile' : ''}`}>
-        <ChatWindow 
+        <ChatWindowNew 
           chat={activeChat} 
           onBack={() => setActiveChatId(null)} 
           onDeleteChat={handleDeleteChat}

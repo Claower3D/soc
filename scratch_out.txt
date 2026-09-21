@@ -1,0 +1,23 @@
+eading">🌟 Главные достижения:</span>
+                  <ul className="profile-check-list">
+                    {profile.achievements.map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {profile.lifeGoals && profile.lifeGoals.length > 0 && (
+                <div className="profile-sublist-group">
+                  <span className="sublist-heading">🎯 Цели на будущее:</span>
+                  <ul className="profile-check-list">
+                    {profile.lifeGoals.map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Section: Interes

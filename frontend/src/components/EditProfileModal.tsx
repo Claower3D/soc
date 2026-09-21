@@ -12,6 +12,7 @@ import { spiritualAudio } from '../utils/spiritualAudio';
 import { calculateZodiacProfile, type ZodiacInfo } from '../utils/astrology';
 import { detectUserCityAndCountry } from '../utils/countryDetect';
 import { ReligionSymbol } from './ReligionSymbols';
+import { ImageCropModal } from './ImageCropModal';
 import './EditProfileModal.css';
 
 interface EditProfileModalProps {
@@ -106,6 +107,8 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
     }
   }, [birthDate]);
 
+  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
+
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -115,9 +118,18 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = () => setAvatar(reader.result as string);
+      reader.onload = () => setCropImageUrl(reader.result as string);
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleCropSave = (croppedUrl: string) => {
+    setAvatar(croppedUrl);
+    setCropImageUrl(null);
+  };
+
+  const handleCropCancel = () => {
+    setCropImageUrl(null);
   };
 
   const handleCoverFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,6 +180,13 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
 
   return (
     <div className="edit-modal-overlay" onClick={onClose}>
+      {cropImageUrl && (
+        <ImageCropModal 
+          imageUrl={cropImageUrl} 
+          onCrop={handleCropSave} 
+          onCancel={handleCropCancel} 
+        />
+      )}
       <div className="edit-modal-box" onClick={e => e.stopPropagation()}>
         {/* Hidden inputs for uploading images */}
         <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarFile} />
