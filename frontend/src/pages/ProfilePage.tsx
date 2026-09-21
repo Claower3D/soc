@@ -463,7 +463,11 @@ export function ProfilePage() {
                     >
                       <Brain size={15} className="consciousness-icon" />
                       <span className="consciousness-level-badge">{activeUser.consciousnessLevel} класс</span>
-                      <span className="consciousness-title-text">{activeUser.consciousnessTitle || 'Осознанность'}</span>
+                      <span className="consciousness-title-text">
+                        {activeUser.consciousnessTitle 
+                          ? activeUser.consciousnessTitle.replace(new RegExp(`^${activeUser.consciousnessLevel}\\s*класс\\s*[-—]*\\s*`, 'i'), '')
+                          : 'Осознанность'}
+                      </span>
                       {activeUser.cognitionVector && (
                         <span className="consciousness-vector-tag">
                           {activeUser.cognitionVector === 'visual_analogies' && '🍏 на яблоках'}
@@ -526,7 +530,7 @@ export function ProfilePage() {
           </div>
 
           {/* Statistics Counters: Публикации, Друзья, Подписчики, Подписки, Волны, Критики */}
-          <div className="profile-stats-row four-stats">
+          <div className="profile-stats-row">
             <div className="stat-card">
               <span className="stat-number">{userPosts.length}</span>
               <span className="stat-label">публикаций</span>
