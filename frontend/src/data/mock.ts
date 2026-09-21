@@ -1,4 +1,4 @@
-// ==================== ТПЫ ====================
+﻿// ==================== РўРРџР« ====================
 
 export type UserRole = 'user' | 'creator' | 'business' | 'admin' | 'expert' | 'critic';
 export type BeliefPrivacy = 'public' | 'followers' | 'private';
@@ -14,94 +14,94 @@ export interface ReligionItem {
 export const RELIGIONS_CATALOG: ReligionItem[] = [
   {
     id: 'christianity',
-    name: 'Христианство',
-    symbolTitle: 'Крест',
+    name: 'РҐСЂРёСЃС‚РёР°РЅСЃС‚РІРѕ',
+    symbolTitle: 'РљСЂРµСЃС‚',
     iconImg: '/symbols/christianity.jpg',
-    description: 'Вера в исуса Христа, любовь к ближнему и спасение'
+    description: 'Р’РµСЂР° РІ РРёСЃСѓСЃР° РҐСЂРёСЃС‚Р°, Р»СЋР±РѕРІСЊ Рє Р±Р»РёР¶РЅРµРјСѓ Рё СЃРїР°СЃРµРЅРёРµ'
   },
   {
     id: 'islam',
-    name: 'слам',
-    symbolTitle: 'Полумесяц и Звезда',
+    name: 'РСЃР»Р°Рј',
+    symbolTitle: 'РџРѕР»СѓРјРµСЃСЏС† Рё Р—РІРµР·РґР°',
     iconImg: '/symbols/islam.jpg',
-    description: 'Единобожие (Таухид), следование Корану и Сунне'
+    description: 'Р•РґРёРЅРѕР±РѕР¶РёРµ (РўР°СѓС…РёРґ), СЃР»РµРґРѕРІР°РЅРёРµ РљРѕСЂР°РЅСѓ Рё РЎСѓРЅРЅРµ'
   },
   {
     id: 'judaism',
-    name: 'удаизм',
-    symbolTitle: 'Звезда Давида (Маген Давид)',
+    name: 'РСѓРґР°РёР·Рј',
+    symbolTitle: 'Р—РІРµР·РґР° Р”Р°РІРёРґР° (РњР°РіРµРЅ Р”Р°РІРёРґ)',
     iconImg: '/symbols/judaism.jpg',
-    description: 'Завет с Всевышним, Тора, этический монотеизм'
+    description: 'Р—Р°РІРµС‚ СЃ Р’СЃРµРІС‹С€РЅРёРј, РўРѕСЂР°, СЌС‚РёС‡РµСЃРєРёР№ РјРѕРЅРѕС‚РµРёР·Рј'
   },
   {
     id: 'hinduism',
-    name: 'ндуизм',
-    symbolTitle: 'Ом (Аум)',
+    name: 'РРЅРґСѓРёР·Рј',
+    symbolTitle: 'РћРј (РђСѓРј)',
     iconImg: '/symbols/hinduism.jpg',
-    description: 'Дхарма, карма, сансара, мокша и сакральный звук Ом'
+    description: 'Р”С…Р°СЂРјР°, РєР°СЂРјР°, СЃР°РЅСЃР°СЂР°, РјРѕРєС€Р° Рё СЃР°РєСЂР°Р»СЊРЅС‹Р№ Р·РІСѓРє РћРј'
   },
   {
     id: 'buddhism',
-    name: 'Буддизм',
-    symbolTitle: 'Колесо Дхармы (Дхармачакра)',
+    name: 'Р‘СѓРґРґРёР·Рј',
+    symbolTitle: 'РљРѕР»РµСЃРѕ Р”С…Р°СЂРјС‹ (Р”С…Р°СЂРјР°С‡Р°РєСЂР°)',
     iconImg: '/symbols/buddhism.jpg',
-    description: 'Благородный восьмеричный путь, осознанность и просветление'
+    description: 'Р‘Р»Р°РіРѕСЂРѕРґРЅС‹Р№ РІРѕСЃСЊРјРµСЂРёС‡РЅС‹Р№ РїСѓС‚СЊ, РѕСЃРѕР·РЅР°РЅРЅРѕСЃС‚СЊ Рё РїСЂРѕСЃРІРµС‚Р»РµРЅРёРµ'
   },
   {
     id: 'taoism',
-    name: 'Даосизм',
-    symbolTitle: 'нь-Ян',
+    name: 'Р”Р°РѕСЃРёР·Рј',
+    symbolTitle: 'РРЅСЊ-РЇРЅ',
     iconImg: '/symbols/taoism.jpg',
-    description: 'Путь Дао, гармония противоположностей и естественность'
+    description: 'РџСѓС‚СЊ Р”Р°Рѕ, РіР°СЂРјРѕРЅРёСЏ РїСЂРѕС‚РёРІРѕРїРѕР»РѕР¶РЅРѕСЃС‚РµР№ Рё РµСЃС‚РµСЃС‚РІРµРЅРЅРѕСЃС‚СЊ'
   },
   {
     id: 'shinto',
-    name: 'Синтоизм',
-    symbolTitle: 'Тории',
+    name: 'РЎРёРЅС‚РѕРёР·Рј',
+    symbolTitle: 'РўРѕСЂРёРё',
     iconImg: '/symbols/shinto.jpg',
-    description: 'Почитание духов природы (Ками), чистота и гармония'
+    description: 'РџРѕС‡РёС‚Р°РЅРёРµ РґСѓС…РѕРІ РїСЂРёСЂРѕРґС‹ (РљР°РјРё), С‡РёСЃС‚РѕС‚Р° Рё РіР°СЂРјРѕРЅРёСЏ'
   },
   {
     id: 'jainism',
-    name: 'Джайнизм',
-    symbolTitle: 'Ахимса (Рука)',
+    name: 'Р”Р¶Р°Р№РЅРёР·Рј',
+    symbolTitle: 'РђС…РёРјСЃР° (Р СѓРєР°)',
     iconImg: '/symbols/jainism.jpg',
-    description: 'Ненасилие (Ахимса), самодисциплина и уважение к жизни'
+    description: 'РќРµРЅР°СЃРёР»РёРµ (РђС…РёРјСЃР°), СЃР°РјРѕРґРёСЃС†РёРїР»РёРЅР° Рё СѓРІР°Р¶РµРЅРёРµ Рє Р¶РёР·РЅРё'
   },
   {
     id: 'sikhism',
-    name: 'Сикхизм',
-    symbolTitle: 'Кханда',
+    name: 'РЎРёРєС…РёР·Рј',
+    symbolTitle: 'РљС…Р°РЅРґР°',
     iconImg: '/symbols/sikhism.jpg',
-    description: 'Служение людям, равенство, честность и медитация на мя Бога'
+    description: 'РЎР»СѓР¶РµРЅРёРµ Р»СЋРґСЏРј, СЂР°РІРµРЅСЃС‚РІРѕ, С‡РµСЃС‚РЅРѕСЃС‚СЊ Рё РјРµРґРёС‚Р°С†РёСЏ РЅР° РРјСЏ Р‘РѕРіР°'
   },
   {
     id: 'zoroastrianism',
-    name: 'Зороастризм',
-    symbolTitle: 'Фаравахар',
+    name: 'Р—РѕСЂРѕР°СЃС‚СЂРёР·Рј',
+    symbolTitle: 'Р¤Р°СЂР°РІР°С…Р°СЂ',
     iconImg: '/symbols/zoroastrianism.jpg',
-    description: 'Благие мысли, благие слова, благие деяния'
+    description: 'Р‘Р»Р°РіРёРµ РјС‹СЃР»Рё, Р±Р»Р°РіРёРµ СЃР»РѕРІР°, Р±Р»Р°РіРёРµ РґРµСЏРЅРёСЏ'
   },
   {
     id: 'ayyavazhi',
-    name: 'Айяважи',
-    symbolTitle: 'Ловец Зла (Нама)',
+    name: 'РђР№СЏРІР°Р¶Рё',
+    symbolTitle: 'Р›РѕРІРµС† Р—Р»Р° (РќР°РјР°)',
     iconImg: '/symbols/ayyavazhi.jpg',
-    description: 'Победа света над тьмой и духовное единство'
+    description: 'РџРѕР±РµРґР° СЃРІРµС‚Р° РЅР°Рґ С‚СЊРјРѕР№ Рё РґСѓС…РѕРІРЅРѕРµ РµРґРёРЅСЃС‚РІРѕ'
   },
   {
     id: 'humanism',
-    name: 'Гуманизм / Светский человек',
-    symbolTitle: 'Счастливый Человек',
+    name: 'Р“СѓРјР°РЅРёР·Рј / РЎРІРµС‚СЃРєРёР№ С‡РµР»РѕРІРµРє',
+    symbolTitle: 'РЎС‡Р°СЃС‚Р»РёРІС‹Р№ Р§РµР»РѕРІРµРє',
     iconImg: '/symbols/humanism.jpg',
-    description: 'Человек, наука, разум, созидание и свобода совести'
+    description: 'Р§РµР»РѕРІРµРє, РЅР°СѓРєР°, СЂР°Р·СѓРј, СЃРѕР·РёРґР°РЅРёРµ Рё СЃРІРѕР±РѕРґР° СЃРѕРІРµСЃС‚Рё'
   },
   {
     id: 'none',
-    name: 'Не указывать / Личное',
-    symbolTitle: 'Скрыто',
+    name: 'РќРµ СѓРєР°Р·С‹РІР°С‚СЊ / Р›РёС‡РЅРѕРµ',
+    symbolTitle: 'РЎРєСЂС‹С‚Рѕ',
     iconImg: '',
-    description: 'Предпочитаю не указывать мировоззрение'
+    description: 'РџСЂРµРґРїРѕС‡РёС‚Р°СЋ РЅРµ СѓРєР°Р·С‹РІР°С‚СЊ РјРёСЂРѕРІРѕР·Р·СЂРµРЅРёРµ'
   }
 ];
 
@@ -133,18 +133,18 @@ export interface User {
   businessCategory?: string;
   rating?: number;
   salesCount?: number;
-  consciousnessLevel?: number; // Класс сознания от 1 до 11
-  consciousnessTitle?: string; // Название класса сознания
-  cognitionVector?: 'spiritual' | 'exact_sciences' | 'visual_analogies' | 'philosophical' | 'pragmatic'; // Вектор восприятия
-  birthDate?: string; // Дата рождения (ГГГГ-ММ-ДД)
-  zodiacSign?: string; // Знак зодиака (Овен, Телец...)
-  easternZodiac?: string; // Восточный знак (Дракон, Тигр...)
-  gender?: 'male' | 'female' | 'other' | 'hidden'; // Пол
-  showBirthDate?: boolean; // Показывать дату рождения
-  showZodiac?: boolean; // Показывать знак зодиака
-  isPremium?: boolean; // New Age Premium подписка
-  premiumSince?: string; // Дата оформления Premium
-  phone_number?: string; // Номер телефона
+  consciousnessLevel?: number; // РљР»Р°СЃСЃ СЃРѕР·РЅР°РЅРёСЏ РѕС‚ 1 РґРѕ 11
+  consciousnessTitle?: string; // РќР°Р·РІР°РЅРёРµ РєР»Р°СЃСЃР° СЃРѕР·РЅР°РЅРёСЏ
+  cognitionVector?: 'spiritual' | 'exact_sciences' | 'visual_analogies' | 'philosophical' | 'pragmatic'; // Р’РµРєС‚РѕСЂ РІРѕСЃРїСЂРёСЏС‚РёСЏ
+  birthDate?: string; // Р”Р°С‚Р° СЂРѕР¶РґРµРЅРёСЏ (Р“Р“Р“Р“-РњРњ-Р”Р”)
+  zodiacSign?: string; // Р—РЅР°Рє Р·РѕРґРёР°РєР° (РћРІРµРЅ, РўРµР»РµС†...)
+  easternZodiac?: string; // Р’РѕСЃС‚РѕС‡РЅС‹Р№ Р·РЅР°Рє (Р”СЂР°РєРѕРЅ, РўРёРіСЂ...)
+  gender?: 'male' | 'female' | 'other' | 'hidden'; // РџРѕР»
+  showBirthDate?: boolean; // РџРѕРєР°Р·С‹РІР°С‚СЊ РґР°С‚Сѓ СЂРѕР¶РґРµРЅРёСЏ
+  showZodiac?: boolean; // РџРѕРєР°Р·С‹РІР°С‚СЊ Р·РЅР°Рє Р·РѕРґРёР°РєР°
+  isPremium?: boolean; // New Age Premium РїРѕРґРїРёСЃРєР°
+  premiumSince?: string; // Р”Р°С‚Р° РѕС„РѕСЂРјР»РµРЅРёСЏ Premium
+  phone_number?: string; // РќРѕРјРµСЂ С‚РµР»РµС„РѕРЅР°
 }
 
 export interface Highlight {
@@ -283,7 +283,7 @@ export interface Video {
     currentEpisode?: number;
     episodes?: SeriesEpisode[];
   };
-  rating?: number; // Рейтинг Кинопоиск/IMDb для фильмов и сериалов (e.g. 8.4)
+  rating?: number; // Р РµР№С‚РёРЅРі РљРёРЅРѕРїРѕРёСЃРє/IMDb РґР»СЏ С„РёР»СЊРјРѕРІ Рё СЃРµСЂРёР°Р»РѕРІ (e.g. 8.4)
   ageRating?: string; // 0+, 6+, 12+, 16+, 18+
   genre?: string;
   releaseYear?: number;
@@ -418,10 +418,10 @@ export interface ChatTag {
 }
 
 export const CHAT_TAGS: ChatTag[] = [
-  { id: 'new_client', title: 'Новый клиент', color: '#3B82F6' },
-  { id: 'order_completed', title: 'Заказ выполнен', color: '#10B981' },
-  { id: 'in_progress', title: 'В работе', color: '#F59E0B' },
-  { id: 'payment_waiting', title: 'Ожидает оплаты', color: '#EC4899' },
+  { id: 'new_client', title: 'РќРѕРІС‹Р№ РєР»РёРµРЅС‚', color: '#3B82F6' },
+  { id: 'order_completed', title: 'Р—Р°РєР°Р· РІС‹РїРѕР»РЅРµРЅ', color: '#10B981' },
+  { id: 'in_progress', title: 'Р’ СЂР°Р±РѕС‚Рµ', color: '#F59E0B' },
+  { id: 'payment_waiting', title: 'РћР¶РёРґР°РµС‚ РѕРїР»Р°С‚С‹', color: '#EC4899' },
 ];
 
 export interface ChatTheme {
@@ -439,7 +439,7 @@ export interface ChatTheme {
 export const CHAT_THEMES: ChatTheme[] = [
   {
     id: 'default',
-    name: 'Классическая',
+    name: 'РљР»Р°СЃСЃРёС‡РµСЃРєР°СЏ',
     previewBg: '#F8FAFC',
     background: 'var(--color-bg)',
     bubbleMeBg: '#6366F1',
@@ -450,7 +450,7 @@ export const CHAT_THEMES: ChatTheme[] = [
   },
   {
     id: 'space',
-    name: 'Космический Zen',
+    name: 'РљРѕСЃРјРёС‡РµСЃРєРёР№ Zen',
     previewBg: 'linear-gradient(135deg, #0F172A 0%, #1E1B4B 100%)',
     background: 'linear-gradient(160deg, #0b0f19 0%, #17153b 50%, #0d1117 100%)',
     bubbleMeBg: 'linear-gradient(135deg, #8B5CF6 0%, #6366F1 100%)',
@@ -461,7 +461,7 @@ export const CHAT_THEMES: ChatTheme[] = [
   },
   {
     id: 'cyberpunk',
-    name: 'Неон & Киберпанк',
+    name: 'РќРµРѕРЅ & РљРёР±РµСЂРїР°РЅРє',
     previewBg: 'linear-gradient(135deg, #18052B 0%, #3B0764 100%)',
     background: 'linear-gradient(150deg, #10001f 0%, #290838 50%, #080010 100%)',
     bubbleMeBg: 'linear-gradient(135deg, #EC4899 0%, #A855F7 100%)',
@@ -472,7 +472,7 @@ export const CHAT_THEMES: ChatTheme[] = [
   },
   {
     id: 'emerald',
-    name: 'зумрудный Оазис',
+    name: 'РР·СѓРјСЂСѓРґРЅС‹Р№ РћР°Р·РёСЃ',
     previewBg: 'linear-gradient(135deg, #022C22 0%, #064E3B 100%)',
     background: 'linear-gradient(150deg, #021a14 0%, #063d2e 50%, #021b14 100%)',
     bubbleMeBg: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
@@ -483,7 +483,7 @@ export const CHAT_THEMES: ChatTheme[] = [
   },
   {
     id: 'sunset',
-    name: 'Солнечный Закат',
+    name: 'РЎРѕР»РЅРµС‡РЅС‹Р№ Р—Р°РєР°С‚',
     previewBg: 'linear-gradient(135deg, #431407 0%, #7C2D12 100%)',
     background: 'linear-gradient(150deg, #1f0802 0%, #4a1908 50%, #1c0602 100%)',
     bubbleMeBg: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
@@ -494,7 +494,7 @@ export const CHAT_THEMES: ChatTheme[] = [
   },
   {
     id: 'minimal_dark',
-    name: 'Темный Минимализм',
+    name: 'РўРµРјРЅС‹Р№ РњРёРЅРёРјР°Р»РёР·Рј',
     previewBg: '#1E293B',
     background: '#0F172A',
     bubbleMeBg: '#334155',
@@ -531,7 +531,7 @@ export interface Chat {
 export interface Conference {
   id: string;
   title: string;
-  isPrivate: boolean; // true = только по ссылке 🔒, false = открытая 🌐
+  isPrivate: boolean; // true = С‚РѕР»СЊРєРѕ РїРѕ СЃСЃС‹Р»РєРµ рџ”’, false = РѕС‚РєСЂС‹С‚Р°СЏ рџЊђ
   inviteCode: string;
   host: User;
   status: 'live' | 'scheduled' | 'ended';
@@ -569,7 +569,7 @@ export interface ConferenceMessage {
   time: string;
 }
 
-// ==================== МАРКЕТПЛЕЙС ====================
+// ==================== РњРђР РљР•РўРџР›Р•Р™РЎ ====================
 
 export interface Product {
   id: string;
@@ -606,7 +606,7 @@ export interface Order {
   paymentMethod: 'wallet' | 'card';
 }
 
-// ==================== СООБЩЕСТВА ====================
+// ==================== РЎРћРћР‘Р©Р•РЎРўР’Рђ ====================
 
 export interface Community {
   id: string;
@@ -638,7 +638,7 @@ export interface CommunityEvent {
   isAttending?: boolean;
 }
 
-// ==================== КОШЕЛЕК  ПОДПСК ====================
+// ==================== РљРћРЁР•Р›Р•Рљ Р РџРћР”РџРРЎРљР ====================
 
 export interface WalletTransaction {
   id: string;
@@ -659,11 +659,11 @@ export interface SubscriptionTier {
   isSubscribed?: boolean;
 }
 
-// ==================== ТЕКУЩЙ ПОЛЬЗОВАТЕЛЬ (по умолчанию — гость) ====================
+// ==================== РўР•РљРЈР©РР™ РџРћР›Р¬Р—РћР’РђРўР•Р›Р¬ (РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ вЂ” РіРѕСЃС‚СЊ) ====================
 
 export const currentUser: User = {
   id: 'guest',
-  name: 'Гость',
+  name: 'Р“РѕСЃС‚СЊ',
   username: 'guest',
   avatar: '',
   followersCount: 0,
@@ -672,7 +672,7 @@ export const currentUser: User = {
   role: 'user',
 };
 
-// ==================== ДАННЫЕ (загружаются с сервера) ====================
+// ==================== Р”РђРќРќР«Р• (Р·Р°РіСЂСѓР¶Р°СЋС‚СЃСЏ СЃ СЃРµСЂРІРµСЂР°) ====================
 
 export const initialUsers: User[] = [];
 export const stories: Story[] = [];
