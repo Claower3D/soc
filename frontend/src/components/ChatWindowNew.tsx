@@ -129,24 +129,53 @@ function VoiceMessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showText, setShowText] = useState(false);
+  
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    let interval: any;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setProgress(p => {
-          if (p >= 100) {
-            setIsPlaying(false);
-            return 0;
-          }
-          return p + 2;
-        });
-      }, 100);
+    if (msg.mediaUrl) {
+      audioRef.current = new Audio(msg.mediaUrl);
+      audioRef.current.onended = () => {
+        setIsPlaying(false);
+        setProgress(0);
+      };
+      audioRef.current.ontimeupdate = () => {
+        if (audioRef.current) {
+          setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
+        }
+      };
     }
-    return () => clearInterval(interval);
-  }, [isPlaying]);
+  }, [msg.mediaUrl]);
 
-  const togglePlay = () => setIsPlaying(!isPlaying);
+  useEffect(() => {
+    if (!msg.mediaUrl) {
+      // Fake interval for old messages without mediaUrl
+      let interval: any;
+      if (isPlaying) {
+        interval = setInterval(() => {
+          setProgress(p => {
+            if (p >= 100) {
+              setIsPlaying(false);
+              return 0;
+            }
+            return p + 2;
+          });
+        }, 100);
+      }
+      return () => clearInterval(interval);
+    }
+  }, [isPlaying, msg.mediaUrl]);
+
+  const togglePlay = () => {
+    if (!isPlaying) {
+      if (audioRef.current) audioRef.current.play();
+      setIsPlaying(true);
+    } else {
+      if (audioRef.current) audioRef.current.pause();
+      setIsPlaying(false);
+    }
+  };
+  
   const toggleText = () => setShowText(!showText);
 
   return (
@@ -165,17 +194,17 @@ function VoiceMessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
         
         <div style={{flex: 1, display: 'flex', flexDirection: 'column', gap: '6px'}}>
           <div style={{height: '4px', background: isMe ? 'rgba(255,255,255,0.3)' : 'var(--color-border)', width: '100%', borderRadius: '2px', position: 'relative', overflow: 'hidden'}}>
-            <div style={{position: 'absolute', left: 0, top: 0, height: '100%', width: `${progress}%`, background: isMe ? '#fff' : 'var(--color-accent, #6C5CE7)', borderRadius: '2px', transition: 'width 0.1s linear'}}></div>
+            <div style={{position: 'absolute', left: 0, top: 0, height: '100%', width: `${progress || 0}%`, background: isMe ? '#fff' : 'var(--color-accent, #6C5CE7)', borderRadius: '2px', transition: 'width 0.1s linear'}}></div>
           </div>
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-            <span style={{fontSize: '11px', opacity: 0.8}}>{isPlaying ? `0:0${Math.floor(progress/20)}` : '0:05'}</span>
+            <span style={{fontSize: '11px', opacity: 0.8}}>{isPlaying ? `0:0${Math.floor((progress||0)/20)}` : '0:05'}</span>
             <button 
               onClick={toggleText}
               style={{
                 background: showText ? (isMe ? 'rgba(255,255,255,0.3)' : 'var(--color-accent)') : 'transparent',
                 color: showText ? '#fff' : (isMe ? 'rgba(255,255,255,0.8)' : 'var(--color-text-secondary)'),
-                border: 'none',
-                borderRadius: '4px',
+                border: '1px solid ' + (isMe ? 'rgba(255,255,255,0.4)' : 'var(--color-border)'),
+                borderRadius: '6px',
                 padding: '2px 6px',
                 fontSize: '11px',
                 fontWeight: 'bold',
@@ -198,7 +227,7 @@ function VoiceMessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
           marginTop: '4px',
           border: isMe ? 'none' : '1px solid var(--color-border)'
         }}>
-          {msg.text || 'Распознанный текст: Привет! Это голосовое сообщение.'}
+          {msg.text || 'Распознанный текст: Это голосовое сообщение.'}
         </div>
       )}
     </div>
@@ -239,6 +268,8 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
 
   
@@ -313,54 +344,54 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   
 
 
-  const handleVoiceRecord = () => {
+  const handleVoiceRecord = async () => {
+    if (isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      return;
+    }
 
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
 
-    setIsRecording(true);
-
-
-    setTimeout(() => {
-
-
-      setIsRecording(false);
-
-
-      const newMsg: Message = {
-
-
-        id: `msg_${Date.now()}`,
-
-
-        text: '',
-
-
-        fromMe: true,
-
-
-        time: formatTime(),
-
-
-        status: 'sent',
-
-
-        mediaType: 'voice',
-
-
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
       };
 
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
 
-      const updatedMessages = [...messages, newMsg];
+        setIsRecording(false);
+        const newMsg: Message = {
+          id: `msg_${Date.now()}`,
+          text: 'Распознанный текст: Это тестовое голосовое сообщение.',
+          fromMe: true,
+          time: formatTime(),
+          status: 'sent',
+          mediaType: 'voice',
+          mediaUrl: audioUrl, // Pass real audio URL
+        };
+        const updatedMessages = [...messages, newMsg];
+        setMessages(updatedMessages);
+        saveMessages(updatedMessages);
 
+        stream.getTracks().forEach(track => track.stop());
+      };
 
-      setMessages(updatedMessages);
-
-
-      saveMessages(updatedMessages);
-
-
-    }, 2000); // Fake 2 seconds recording
-
-
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Mic error:', err);
+      alert('Ошибка доступа к микрофону. Проверьте разрешения браузера.');
+      setIsRecording(false);
+    }
   };
 
 
