@@ -207,8 +207,8 @@ export function Header() {
           }}
           title="Быстрый старт конференции"
         >
-          <Video size={17} />
-          <span className="btn-text">Конференция</span>
+          <Video size={16} />
+          <span className="btn-text">Встреча</span>
         </button>
 
         {/* Cosmic AI Oracle / AI Guru Trigger */}
@@ -219,26 +219,28 @@ export function Header() {
         >
           <div className="ai-guru-btn-glow" />
           <div className="ai-guru-icon-box">
-            <Sparkles size={14} className="ai-guru-sparkle" />
-            <Bot size={16} className="ai-guru-bot" />
+            <Sparkles size={11} className="ai-guru-sparkle" />
+            <Bot size={15} className="ai-guru-bot" />
           </div>
-          <div className="ai-guru-text-wrapper">
-            <span className="ai-guru-title">ИИ Оракул</span>
-            <span className="ai-guru-badge-pulse">LIVE ZEN</span>
-          </div>
+          <span className="ai-guru-title">ИИ Оракул</span>
+          <span className="ai-guru-live-badge">
+            <span className="ai-guru-pulse-dot" />
+            LIVE
+          </span>
         </button>
+
+        <div className="header-divider" />
 
         {/* Language Switcher Dropdown */}
         <div className="header-lang-wrapper" ref={langRef}>
           <button
-            className={`header-icon-btn header-lang-btn ${langDropdownOpen ? 'active' : ''}`}
+            className={`header-control-pill header-lang-btn ${langDropdownOpen ? 'active' : ''}`}
             onClick={() => setLangDropdownOpen(!langDropdownOpen)}
             title="Выбор языка платформы / Select Language"
           >
-            <span className="lang-active-flag">
-              {languages.find((l) => l.code === currentLang)?.flag || '🌐'}
-            </span>
+            <Globe size={15} className="header-control-icon" />
             <span className="lang-active-code">{currentLang.toUpperCase()}</span>
+            <ChevronDown size={11} className={`header-control-chevron ${langDropdownOpen ? 'open' : ''}`} />
           </button>
 
           {langDropdownOpen && (
@@ -257,9 +259,8 @@ export function Header() {
                       setLangDropdownOpen(false);
                     }}
                   >
-                    <span className="lang-item-flag">{lang.flag}</span>
+                    <span className="lang-code-badge">{lang.code.toUpperCase()}</span>
                     <span className="lang-item-name">{lang.nativeName}</span>
-                    <span className="lang-item-code">{lang.code.toUpperCase()}</span>
                     {currentLang === lang.code && <Check size={14} className="lang-check-icon" />}
                   </button>
                 ))}
@@ -268,16 +269,16 @@ export function Header() {
           )}
         </div>
 
-        {/* Currency Selector (Автоопределение по стране + ручной выбор) */}
+        {/* Currency Selector */}
         <div className="header-currency-wrapper" ref={currencyRef}>
           <button
-            className={`header-currency-btn ${currencyDropdownOpen ? 'active' : ''}`}
+            className={`header-control-pill header-currency-btn ${currencyDropdownOpen ? 'active' : ''}`}
             onClick={() => setCurrencyDropdownOpen(!currencyDropdownOpen)}
             title={`Валюта: ${currencyConfig.name} (${currencyConfig.symbol})`}
           >
-            <span className="header-curr-flag">{currencyConfig.flag}</span>
             <span className="header-curr-symbol">{currencyConfig.symbol}</span>
-            <ChevronDown size={12} className={`header-curr-chevron ${currencyDropdownOpen ? 'open' : ''}`} />
+            <span className="header-curr-code">{currencyConfig.code}</span>
+            <ChevronDown size={11} className={`header-control-chevron ${currencyDropdownOpen ? 'open' : ''}`} />
           </button>
 
           {currencyDropdownOpen && (
@@ -300,9 +301,9 @@ export function Header() {
                       setCurrencyDropdownOpen(false);
                     }}
                   >
-                    <span className="curr-item-flag">{c.flag}</span>
+                    <span className="curr-symbol-badge">{c.symbol}</span>
                     <span className="curr-item-name">{c.name}</span>
-                    <span className="curr-item-symbol">{c.symbol}</span>
+                    <span className="curr-item-code">{c.code}</span>
                     {currency === c.code && <Check size={14} className="curr-check-icon" />}
                   </button>
                 ))}
@@ -317,8 +318,10 @@ export function Header() {
           onClick={toggleTheme}
           title={theme === 'dark' ? "Переключить на дневную тему" : "Переключить на ночную тему (Zen Night)"}
         >
-          {theme === 'dark' ? <Sun size={19} className="theme-sun-icon" /> : <Moon size={19} className="theme-moon-icon" />}
+          {theme === 'dark' ? <Sun size={18} className="theme-sun-icon" /> : <Moon size={18} className="theme-moon-icon" />}
         </button>
+
+        <div className="header-divider" />
 
         {/* Auth / Profile Area */}
         {isAuthenticated ? (
