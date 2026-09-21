@@ -107,6 +107,16 @@ func (c *ServerCache) Clear() {
 	c.items = make(map[string]CacheItem)
 }
 
+func (c *ServerCache) InvalidateTag(tag string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for k, item := range c.items {
+		if item.Tag == tag {
+			delete(c.items, k)
+		}
+	}
+}
+
 func (c *ServerCache) Stats() map[string]interface{} {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -189,12 +199,17 @@ type AccountStoreEntry struct {
 
 // Post — пост в ленте.
 type Post struct {
-	ID      string `json:"id"`
-	User    User   `json:"user"`
-	Image   string `json:"image"`
-	Caption string `json:"caption"`
-	Likes   int    `json:"likes"`
-	TimeAgo string `json:"timeAgo"`
+	ID        string    `json:"id"`
+	UserID    string    `json:"userId,omitempty"`
+	User      User      `json:"user"`
+	Image     string    `json:"image"`
+	Caption   string    `json:"caption"`
+	Location  string    `json:"location,omitempty"`
+	Likes     int       `json:"likes"`
+	Liked     bool      `json:"liked"`
+	Saved     bool      `json:"saved"`
+	TimeAgo   string    `json:"timeAgo"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // Video — видео.
@@ -400,16 +415,68 @@ func initDB() {
 	}()
 }
 
-// Хранилище аккаунтов (In-memory + fallback)
+// Хранилище аккаунтов и данных с постоянным сохранением на диск
 type UserStore struct {
 	mu            sync.RWMutex
 	accounts      map[string]AccountStoreEntry // key: userID
 	relationships map[string][]string          // key: followerID -> []targetID
+	posts         []Post                       // persistent list of posts
+}
+
+type PersistentData struct {
+	Accounts      map[string]AccountStoreEntry `json:"accounts"`
+	Relationships map[string][]string          `json:"relationships"`
+	Posts         []Post                       `json:"posts"`
+}
+
+const storeFilePath = "data/social_network_store.json"
+
+func (s *UserStore) saveToDisk() {
+	if err := os.MkdirAll("data", 0755); err != nil {
+		return
+	}
+	data := PersistentData{
+		Accounts:      s.accounts,
+		Relationships: s.relationships,
+		Posts:         s.posts,
+	}
+	b, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return
+	}
+	tmpPath := storeFilePath + ".tmp"
+	if err := os.WriteFile(tmpPath, b, 0644); err == nil {
+		os.Rename(tmpPath, storeFilePath)
+	}
+}
+
+func (s *UserStore) loadFromDisk() {
+	b, err := os.ReadFile(storeFilePath)
+	if err != nil {
+		return
+	}
+	var data PersistentData
+	if err := json.Unmarshal(b, &data); err != nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if data.Accounts != nil {
+		s.accounts = data.Accounts
+	}
+	if data.Relationships != nil {
+		s.relationships = data.Relationships
+	}
+	if data.Posts != nil {
+		s.posts = data.Posts
+	}
+	log.Printf("📦 Успешно загружено из локального хранилища %s: %d аккаунтов, %d постов", storeFilePath, len(s.accounts), len(s.posts))
 }
 
 var store = &UserStore{
 	accounts:      make(map[string]AccountStoreEntry),
 	relationships: make(map[string][]string),
+	posts:         make([]Post, 0),
 }
 
 var currentUser = User{
@@ -562,6 +629,9 @@ func extractBearerToken(r *http.Request) string {
 // =========================================================================
 
 func main() {
+	// Загрузка постоянных данных из дискового хранилища
+	store.loadFromDisk()
+
 	// Инициализация подключения к PostgreSQL (если предоставлена DATABASE_URL на Railway)
 	initDB()
 
@@ -570,6 +640,9 @@ func main() {
 	// API-маршруты
 	mux.HandleFunc("GET /api/health", handleHealth)
 	mux.HandleFunc("GET /api/feed", handleFeed)
+	mux.HandleFunc("GET /api/posts", handleFeed)
+	mux.HandleFunc("GET /api/users/{id}/posts", handleUserPosts)
+	mux.HandleFunc("GET /api/profile/{id}/posts", handleUserPosts)
 	mux.HandleFunc("GET /api/videos", handleVideos)
 	mux.HandleFunc("GET /api/chats", handleChats)
 	mux.HandleFunc("GET /api/podcasts", handlePodcasts)
@@ -1094,43 +1167,97 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var posts []Post
+
 	if db != nil {
 		rows, err := db.Query(`
-			SELECT p.id, p.caption, p.location, p.likes_count, p.comments_count, p.created_at,
-				u.id, u.name, u.username, u.avatar, COALESCE(u.verified, false)
+			SELECT p.id, COALESCE(p.caption, ''), COALESCE(p.image, ''), COALESCE(p.location, ''), 
+			       COALESCE(p.likes_count, 0), p.created_at,
+			       u.id, u.name, u.username, COALESCE(u.avatar, ''), COALESCE(u.verified, false)
 			FROM posts p
 			JOIN users u ON p.user_id = u.id
 			ORDER BY p.created_at DESC LIMIT 50
 		`)
 		if err == nil {
 			defer rows.Close()
-			var posts []map[string]interface{}
 			for rows.Next() {
-				var id, caption, location, userId, userName, userUsername, userAvatar string
-				var likesCount, commentsCount int
-				var verified bool
-				var createdAt time.Time
-				if err := rows.Scan(&id, &caption, &location, &likesCount, &commentsCount, &createdAt, &userId, &userName, &userUsername, &userAvatar, &verified); err == nil {
-					timeAgo := formatTimeAgo(createdAt)
-					// Get first media URL
-					var image string
-					db.QueryRow("SELECT media_url FROM post_media WHERE post_id = $1 LIMIT 1", id).Scan(&image)
-					posts = append(posts, map[string]interface{}{
-						"id": id, "caption": caption, "location": location,
-						"likes": likesCount, "commentsCount": commentsCount,
-						"image": image, "timeAgo": timeAgo,
-						"user": map[string]interface{}{"id": userId, "name": userName, "username": userUsername, "avatar": userAvatar, "verified": verified},
-					})
+				var p Post
+				if err := rows.Scan(
+					&p.ID, &p.Caption, &p.Image, &p.Location,
+					&p.Likes, &p.CreatedAt,
+					&p.User.ID, &p.User.Name, &p.User.Username, &p.User.Avatar, &p.User.Verified,
+				); err == nil {
+					p.UserID = p.User.ID
+					p.TimeAgo = formatTimeAgo(p.CreatedAt)
+					posts = append(posts, p)
 				}
 			}
-			globalCache.Set("api:feed", posts, 30*time.Second, "feed")
-			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: posts})
-			return
 		}
 	}
 
-	// Fallback: empty feed
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
+	if len(posts) == 0 {
+		store.mu.RLock()
+		posts = make([]Post, len(store.posts))
+		copy(posts, store.posts)
+		store.mu.RUnlock()
+	}
+
+	if posts == nil {
+		posts = []Post{}
+	}
+
+	globalCache.Set("api:feed", posts, 10*time.Second, "feed")
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: posts})
+}
+
+// GET /api/users/{id}/posts & GET /api/profile/{id}/posts
+func handleUserPosts(w http.ResponseWriter, r *http.Request) {
+	targetID := r.PathValue("id")
+	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
+	var userPosts []Post
+
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT p.id, COALESCE(p.caption, ''), COALESCE(p.image, ''), COALESCE(p.location, ''), 
+			       COALESCE(p.likes_count, 0), p.created_at,
+			       u.id, u.name, u.username, COALESCE(u.avatar, ''), COALESCE(u.verified, false)
+			FROM posts p
+			JOIN users u ON p.user_id = u.id
+			WHERE u.id = $1 OR LOWER(u.username) = LOWER($1) OR LOWER(u.username) = LOWER($2)
+			ORDER BY p.created_at DESC
+		`, targetID, cleanTarget)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var p Post
+				if err := rows.Scan(
+					&p.ID, &p.Caption, &p.Image, &p.Location,
+					&p.Likes, &p.CreatedAt,
+					&p.User.ID, &p.User.Name, &p.User.Username, &p.User.Avatar, &p.User.Verified,
+				); err == nil {
+					p.UserID = p.User.ID
+					p.TimeAgo = formatTimeAgo(p.CreatedAt)
+					userPosts = append(userPosts, p)
+				}
+			}
+		}
+	}
+
+	if len(userPosts) == 0 {
+		store.mu.RLock()
+		for _, p := range store.posts {
+			if p.UserID == targetID || strings.ToLower(p.User.Username) == cleanTarget || strings.ToLower(p.UserID) == cleanTarget {
+				userPosts = append(userPosts, p)
+			}
+		}
+		store.mu.RUnlock()
+	}
+
+	if userPosts == nil {
+		userPosts = []Post{}
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: userPosts})
 }
 
 func handleVideos(w http.ResponseWriter, r *http.Request) {
@@ -1523,6 +1650,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	store.mu.Lock()
 	store.accounts[newID] = AccountStoreEntry{
 		User:         newUser,
 		EmailOrPhone: cleanEmailOrPhone,
@@ -1530,6 +1658,8 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		Salt:         salt,
 		CreatedAt:    time.Now(),
 	}
+	store.saveToDisk()
+	store.mu.Unlock()
 
 	mockUsers = append([]User{newUser}, mockUsers...)
 	currentUser = newUser
@@ -1995,6 +2125,7 @@ func handleFollow(w http.ResponseWriter, r *http.Request) {
 	if !alreadyFollowing {
 		store.relationships[claims.UserID] = append(store.relationships[claims.UserID], targetID)
 	}
+	store.saveToDisk()
 	store.mu.Unlock()
 
 	followers, _, friends := getRelationshipCounts(targetID)
@@ -2101,6 +2232,7 @@ func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	store.relationships[claims.UserID] = updated
+	store.saveToDisk()
 	store.mu.Unlock()
 
 	followers, _, friends := getRelationshipCounts(targetID)
@@ -2511,6 +2643,7 @@ func handleRemoveFriend(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	store.relationships[targetID] = updatedFriend
+	store.saveToDisk()
 	store.mu.Unlock()
 
 	followers, _, friends := getRelationshipCounts(targetID)
@@ -2563,6 +2696,8 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 
 		// Clips count
 		db.QueryRow(`SELECT COUNT(*) FROM clips WHERE user_id = $1`, user.ID).Scan(&user.ClipsCount)
+		// Dynamic posts count from DB
+		db.QueryRow(`SELECT COUNT(*) FROM posts WHERE user_id = $1`, user.ID).Scan(&user.PostsCount)
 
 		if claims != nil {
 			var count int
@@ -2607,6 +2742,17 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 
 		// Accurate dynamic relationship counts in-memory
 		user.FollowersCount, user.FollowingCount, user.FriendsCount = getRelationshipCounts(user.ID)
+
+		// Accurate dynamic posts count
+		postCount := 0
+		store.mu.RLock()
+		for _, p := range store.posts {
+			if p.UserID == user.ID || (user.Username != "" && strings.ToLower(p.User.Username) == cleanTarget) || strings.ToLower(p.UserID) == cleanTarget {
+				postCount++
+			}
+		}
+		store.mu.RUnlock()
+		user.PostsCount = postCount
 
 		if claims != nil {
 			store.mu.RLock()
@@ -2677,24 +2823,26 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, Response{Status: "error", Message: "Ошибка обновления профиля"})
 			return
 		}
-	} else {
-		store.mu.Lock()
-		acc, ok := store.accounts[claims.UserID]
-		if ok {
-			if req.Name != "" { acc.User.Name = req.Name }
-			acc.User.Bio = req.Bio
-			if req.Avatar != "" { acc.User.Avatar = req.Avatar }
-			if req.CoverImage != "" { acc.User.CoverImage = req.CoverImage }
-			acc.User.Location = req.Location
-			acc.User.Website = req.Website
-			if req.BeliefType != "" { acc.User.BeliefType = req.BeliefType }
-			if req.BeliefPrivacy != "" { acc.User.BeliefPrivacy = req.BeliefPrivacy }
-			acc.User.BirthDate = req.BirthDate
-			acc.User.Gender = req.Gender
-			store.accounts[claims.UserID] = acc
-		}
-		store.mu.Unlock()
 	}
+
+	// Синхронизируем также с локальным дисковым хранилищем
+	store.mu.Lock()
+	acc, ok := store.accounts[claims.UserID]
+	if ok {
+		if req.Name != "" { acc.User.Name = req.Name }
+		acc.User.Bio = req.Bio
+		if req.Avatar != "" { acc.User.Avatar = req.Avatar }
+		if req.CoverImage != "" { acc.User.CoverImage = req.CoverImage }
+		acc.User.Location = req.Location
+		acc.User.Website = req.Website
+		if req.BeliefType != "" { acc.User.BeliefType = req.BeliefType }
+		if req.BeliefPrivacy != "" { acc.User.BeliefPrivacy = req.BeliefPrivacy }
+		acc.User.BirthDate = req.BirthDate
+		acc.User.Gender = req.Gender
+		store.accounts[claims.UserID] = acc
+	}
+	store.saveToDisk()
+	store.mu.Unlock()
 
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Профиль обновлен"})
 }
@@ -2708,33 +2856,107 @@ func handleCreatePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Caption  string `json:"caption"`
-		Image    string `json:"image"`
-		Location string `json:"location"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
-		return
+	var caption, image, location string
+
+	contentType := r.Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		r.ParseMultipartForm(32 << 20)
+		caption = r.FormValue("caption")
+		location = r.FormValue("location")
+		file, _, fileErr := r.FormFile("image")
+		if fileErr == nil {
+			defer file.Close()
+			buf, _ := io.ReadAll(file)
+			image = "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(buf)
+		} else {
+			image = r.FormValue("image")
+		}
+	} else {
+		var req struct {
+			Caption  string `json:"caption"`
+			Image    string `json:"image"`
+			Location string `json:"location"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			caption = req.Caption
+			image = req.Image
+			location = req.Location
+		}
 	}
 
-	postID := "p_" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	postID := "post_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+	var author User
+	if db != nil {
+		db.QueryRow("SELECT id, name, username, COALESCE(avatar, ''), COALESCE(verified, false) FROM users WHERE id = $1", claims.UserID).Scan(
+			&author.ID, &author.Name, &author.Username, &author.Avatar, &author.Verified,
+		)
+	}
+	if author.ID == "" {
+		store.mu.RLock()
+		if acc, ok := store.accounts[claims.UserID]; ok {
+			author = acc.User
+		}
+		store.mu.RUnlock()
+	}
+	if author.ID == "" {
+		for _, mu := range mockUsers {
+			if mu.ID == claims.UserID || mu.Username == claims.Username {
+				author = mu
+				break
+			}
+		}
+	}
+	if author.ID == "" {
+		author = User{
+			ID:       claims.UserID,
+			Username: claims.Username,
+			Name:     claims.Username,
+		}
+	}
+
+	newPost := Post{
+		ID:        postID,
+		UserID:    claims.UserID,
+		User:      author,
+		Image:     image,
+		Caption:   caption,
+		Location:  location,
+		Likes:     1,
+		Liked:     true,
+		Saved:     false,
+		TimeAgo:   "Только что",
+		CreatedAt: time.Now(),
+	}
 
 	if db != nil {
 		_, err := db.Exec(`
-			INSERT INTO posts (id, user_id, content, type, location)
-			VALUES ($1, $2, $3, 'post', $4)
-		`, postID, claims.UserID, req.Caption, req.Location)
-		if err == nil && req.Image != "" {
-			db.Exec(`
-				INSERT INTO post_media (post_id, url, type, order_index)
-				VALUES ($1, $2, 'image', 0)
-			`, postID, req.Image)
+			INSERT INTO posts (id, user_id, image, caption, location)
+			VALUES ($1, $2, $3, $4, $5)
+		`, postID, claims.UserID, image, caption, location)
+		if err != nil {
+			log.Printf("⚠️ Ошибка сохранения поста в Postgres: %v", err)
+		} else {
+			db.Exec("UPDATE users SET posts_count = posts_count + 1 WHERE id = $1", claims.UserID)
 		}
-		db.Exec("UPDATE users SET posts_count = posts_count + 1 WHERE id = $1", claims.UserID)
 	}
 
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"id": postID}})
+	// Всегда сохраняем в постоянное дисковое хранилище
+	store.mu.Lock()
+	store.posts = append([]Post{newPost}, store.posts...)
+	if acc, ok := store.accounts[claims.UserID]; ok {
+		acc.User.PostsCount++
+		store.accounts[claims.UserID] = acc
+	}
+	store.saveToDisk()
+	store.mu.Unlock()
+
+	globalCache.InvalidateTag("feed")
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: "Публикация успешно создана",
+		Data:    newPost,
+	})
 }
 
 // POST /api/posts/{id}/like

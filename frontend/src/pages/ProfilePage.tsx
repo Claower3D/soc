@@ -55,7 +55,16 @@ export function ProfilePage() {
   const [isUploadVideoOpen, setIsUploadVideoOpen] = useState(false);
   const [isUploadPodcastOpen, setIsUploadPodcastOpen] = useState(false);
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
-  const [profilePosts, setProfilePosts] = useState<Post[]>([]);
+  const [profilePosts, setProfilePosts] = useState<Post[]>(() => {
+    try {
+      const saved = localStorage.getItem('new_age_user_posts');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
   const [profileStories, setProfileStories] = useState<Story[]>([]);
   const [isViewingStory, setIsViewingStory] = useState(false);
   const [profileVideos, setProfileVideos] = useState<VideoType[]>([]);
@@ -66,7 +75,19 @@ export function ProfilePage() {
     const safeSet = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>) => (data: any) => {
       if (Array.isArray(data)) setter(data);
     };
-    api.posts.list().then(safeSet(setProfilePosts)).catch(console.warn);
+    api.posts.list().then((data: any) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setProfilePosts(prev => {
+          const ids = new Set(data.map((p: any) => p.id));
+          const localOnly = prev.filter(p => !ids.has(p.id));
+          const merged = [...data, ...localOnly];
+          try {
+            localStorage.setItem('new_age_user_posts', JSON.stringify(merged));
+          } catch {}
+          return merged;
+        });
+      }
+    }).catch(console.warn);
     try {
       const savedStories = localStorage.getItem('new_age_user_stories');
       if (savedStories) {
@@ -87,6 +108,24 @@ export function ProfilePage() {
     api.videos.list().then(safeSet(setProfileVideos)).catch(console.warn);
     api.podcasts.list().then(safeSet(setProfilePodcasts)).catch(console.warn);
     api.marketplace.products().then(safeSet(setProfileProducts)).catch(console.warn);
+  }, []);
+
+  useEffect(() => {
+    const handlePostCreated = (e: any) => {
+      const p = e.detail;
+      if (p && (p.id || p.caption)) {
+        setProfilePosts(prev => {
+          if (prev.some(existing => existing.id === p.id)) return prev;
+          const updated = [p, ...prev];
+          try {
+            localStorage.setItem('new_age_user_posts', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+    };
+    window.addEventListener('post_created', handlePostCreated);
+    return () => window.removeEventListener('post_created', handlePostCreated);
   }, []);
 
   const handleDeleteStory = (storyId: string) => {
@@ -291,10 +330,24 @@ export function ProfilePage() {
   // Filter user's posts, videos, and podcasts
   const userPosts = useMemo(() => {
     if (!activeUser) return [];
-    return profilePosts.filter(
-      p => p.user.id === activeUser.id || 
-           (isMe && (p.user.id === 'me' || p.user.id === currentUser.id || p.user.username === currentUser.username))
-    );
+    const targetId = activeUser.id ? String(activeUser.id).toLowerCase() : '';
+    const targetUsername = activeUser.username ? activeUser.username.replace(/^@+/, '').toLowerCase() : '';
+    const myId = currentUser?.id ? String(currentUser.id).toLowerCase() : '';
+    const myUsername = currentUser?.username ? currentUser.username.replace(/^@+/, '').toLowerCase() : '';
+
+    return profilePosts.filter(p => {
+      const pUserId = p.user?.id ? String(p.user.id).toLowerCase() : '';
+      const pUsername = p.user?.username ? p.user.username.replace(/^@+/, '').toLowerCase() : '';
+      const fallbackUserId = (p as any).userId ? String((p as any).userId).toLowerCase() : '';
+
+      if (targetId && (pUserId === targetId || fallbackUserId === targetId)) return true;
+      if (targetUsername && pUsername === targetUsername) return true;
+      if (isMe) {
+        if (pUserId === 'me' || (myId && pUserId === myId) || (myId && fallbackUserId === myId)) return true;
+        if (myUsername && pUsername === myUsername) return true;
+      }
+      return false;
+    });
   }, [profilePosts, activeUser, isMe, currentUser]);
 
   const savedPosts = useMemo(() => {
@@ -1171,7 +1224,13 @@ export function ProfilePage() {
         isOpen={isCreatePostOpen}
         onClose={() => setIsCreatePostOpen(false)}
         onCreatePost={(newPost) => {
-          setProfilePosts(prev => [newPost, ...prev]);
+          setProfilePosts(prev => {
+            const updated = [newPost, ...prev];
+            try {
+              localStorage.setItem('new_age_user_posts', JSON.stringify(updated));
+            } catch {}
+            return updated;
+          });
           setIsCreatePostOpen(false);
         }}
       />

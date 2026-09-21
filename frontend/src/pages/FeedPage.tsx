@@ -51,6 +51,22 @@ export function FeedPage() {
     loadStories();
   }, []);
 
+  useEffect(() => {
+    const handlePostCreated = (e: any) => {
+      const p = e.detail;
+      if (p && (p.id || p.caption)) {
+        setFeedPosts(prev => {
+          if (prev.some(existing => existing.id === p.id)) return prev;
+          const updated = [p, ...prev];
+          cacheService.set('feed_posts_cache', updated, 3600 * 24, 'feed');
+          return updated;
+        });
+      }
+    };
+    window.addEventListener('post_created', handlePostCreated);
+    return () => window.removeEventListener('post_created', handlePostCreated);
+  }, []);
+
   const [feedStories, setFeedStories] = useState<Story[]>(() => {
     return cacheService.get<Story[]>('feed_stories_cache') || [];
   });

@@ -68,7 +68,13 @@ export const api = {
   },
   posts: {
     list: () => apiFetch<any>('/api/feed'),
-    create: (formData: FormData) => apiFetch<any>('/api/posts', { method: 'POST', body: formData }, true),
+    userPosts: (userId: string) => apiFetch<any>(`/api/users/${userId}/posts`),
+    create: (data: FormData | any) => {
+      if (data instanceof FormData) {
+        return apiFetch<any>('/api/posts', { method: 'POST', body: data }, true);
+      }
+      return apiFetch<any>('/api/posts', { method: 'POST', body: JSON.stringify(data) });
+    },
     like: (id: string) => apiFetch<any>(`/api/posts/${id}/like`, { method: 'POST' }),
     unlike: (id: string) => apiFetch<any>(`/api/posts/${id}/like`, { method: 'DELETE' }),
     save: (id: string) => apiFetch<any>(`/api/posts/${id}/save`, { method: 'POST' }),
