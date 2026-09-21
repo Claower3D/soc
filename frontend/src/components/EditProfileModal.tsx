@@ -76,6 +76,7 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
   const [location, setLocation] = useState(currentUser.location || '');
   const [website, setWebsite] = useState(currentUser.website || '');
   const [avatar, setAvatar] = useState(currentUser.avatar);
+  const [customAvatarUrl, setCustomAvatarUrl] = useState('');
   const [coverImage, setCoverImage] = useState(currentUser.coverImage || SAMPLE_COVERS[0].url);
   const [customCoverUrl, setCustomCoverUrl] = useState('');
   const [online, setOnline] = useState(currentUser.online ?? true);
@@ -584,6 +585,39 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
                       {avatar === av && <Check size={14} className="avatar-check-mark" />}
                     </div>
                   ))}
+                </div>
+
+                {/* Custom URL Input for Avatar */}
+                <div className="custom-url-row" style={{ marginTop: '1rem' }}>
+                  <input
+                    type="url"
+                    value={customAvatarUrl}
+                    onChange={e => setCustomAvatarUrl(e.target.value)}
+                    placeholder="Вставьте прямую ссылку на аватар..."
+                    className="edit-input-ctrl"
+                  />
+                  <button 
+                    type="button" 
+                    className="apply-url-btn"
+                    onClick={() => {
+                      if (customAvatarUrl.trim()) {
+                        setAvatar(customAvatarUrl.trim());
+                        setCustomAvatarUrl('');
+                        spiritualAudio.playCrystalChime();
+                      }
+                    }}
+                  >
+                    Применить
+                  </button>
+                  <button 
+                    type="button" 
+                    className="apply-url-btn"
+                    style={{ background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                    onClick={() => avatarInputRef.current?.click()}
+                  >
+                    <Camera size={14} style={{ marginRight: '4px' }}/>
+                    С устройства
+                  </button>
                 </div>
               </div>
             </div>
