@@ -3,7 +3,7 @@ import {
   Search, Upload, Lock, Film, Baby, 
   Compass, Radio, Tv, Flame, Sparkles, Filter, 
   ArrowLeft, CheckCircle2, ChevronRight, SlidersHorizontal, Gamepad2, Music
-} from 'lucide-react';
+, PlayCircle } from 'lucide-react';
 import { VideoPlayer } from '../components/VideoPlayer';
 import { UploadVideoModal } from '../components/UploadVideoModal';
 import { type Video } from '../data/mock';
@@ -436,12 +436,12 @@ export function VideoPage() {
       {/* ========================================================================= */}
       {isBrowseHome ? (
         <div className="portal-sections-container">
-          {/* SECTION 1: TWITCH LIVE STREAMS ZONE */}
+                    {/* SECTION 1: TWITCH LIVE STREAMS ZONE */}
           <section className="portal-row-section twitch-zone-section">
             <div className="section-title-bar">
               <div className="section-title-left">
                 <span className="live-pulsing-circle" />
-                <h2 className="section-main-heading">В прямом эфире (Стримы как на Twitch)</h2>
+                <h2 className="section-main-heading">Прямые эфиры</h2>
               </div>
               <button className="btn-section-see-all" onClick={() => setActiveCategory('streams')}>
                 <span>Смотреть все стримы</span>
@@ -449,44 +449,51 @@ export function VideoPage() {
               </button>
             </div>
 
-            <div className="portal-cards-horizontal-scroll">
-              {liveStreams.map(stream => (
-                <div 
-                  key={stream.id} 
-                  className="portal-video-card stream-card"
-                  onClick={() => handleSelectVideo(stream)}
-                >
-                  <div className="portal-card-thumb-wrap">
-                    <img src={stream.thumbnail} alt={stream.title} />
-                    <div className="card-badge-live">
-                      <Radio size={12} className="animate-spin-slow" />
-                      <span>LIVE • {stream.viewersCount?.toLocaleString('ru-RU')}</span>
+            {liveStreams.length > 0 ? (
+              <div className="portal-cards-horizontal-scroll">
+                {liveStreams.map(stream => (
+                  <div 
+                    key={stream.id} 
+                    className="portal-video-card stream-card"
+                    onClick={() => handleSelectVideo(stream)}
+                  >
+                    <div className="portal-card-thumb-wrap">
+                      <img src={stream.thumbnail} alt={stream.title} />
+                      <div className="card-badge-live">
+                        <Radio size={12} className="animate-spin-slow" />
+                        <span>LIVE • {stream.viewersCount?.toLocaleString('ru-RU')}</span>
+                      </div>
+                      {stream.streamGameOrTopic && (
+                        <span className="stream-game-tag">{stream.streamGameOrTopic}</span>
+                      )}
                     </div>
-                    {stream.streamGameOrTopic && (
-                      <span className="stream-game-tag">{stream.streamGameOrTopic}</span>
-                    )}
-                  </div>
-                  <div className="portal-card-body">
-                    <img src={stream.channel.avatar} alt={stream.channel.name} className="portal-channel-avatar" />
-                    <div className="portal-card-meta">
-                      <h4 className="portal-card-title" title={stream.title}>{stream.title}</h4>
-                      <div className="portal-card-channel-name">{stream.channel.name}</div>
-                      <div className="portal-card-subline">
-                        <span className="stream-category-accent">{stream.genre}</span>
+                    <div className="portal-card-body">
+                      <img src={stream.channel.avatar} alt={stream.channel.name} className="portal-channel-avatar" />
+                      <div className="portal-card-meta">
+                        <h4 className="portal-card-title" title={stream.title}>{stream.title}</h4>
+                        <div className="portal-card-channel-name">{stream.channel.name}</div>
+                        <div className="portal-card-subline">
+                          <span className="stream-category-accent">{stream.genre}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state-card">
+                <Radio size={24} color="var(--color-text-tertiary)" />
+                <span>Сейчас нет активных трансляций</span>
+              </div>
+            )}
           </section>
 
-          {/* SECTION 2: RECOMMENDED VIDEOS (YOUTUBE SCREENSHOT STYLE) */}
+                    {/* SECTION 2: RECOMMENDED VIDEOS (YOUTUBE SCREENSHOT STYLE) */}
           <section className="portal-row-section">
             <div className="section-title-bar">
               <div className="section-title-left">
                 <Sparkles size={20} color="var(--color-accent)" />
-                <h2 className="section-main-heading">Рекомендации (Recommended)</h2>
+                <h2 className="section-main-heading">Рекомендации</h2>
               </div>
               <button className="btn-section-see-all" onClick={() => setActiveCategory('videos')}>
                 <span>Показать ещё</span>
@@ -494,78 +501,92 @@ export function VideoPage() {
               </button>
             </div>
 
-            <div className="portal-cards-grid">
-              {recommendedVideos.map(item => (
-                <div 
-                  key={item.id} 
-                  className="portal-video-card"
-                  onClick={() => handleSelectVideo(item)}
-                >
-                  <div className="portal-card-thumb-wrap">
-                    <img src={item.thumbnail} alt={item.title} />
-                    <span className="card-duration-badge">{item.duration}</span>
-                  </div>
-                  <div className="portal-card-body">
-                    <img src={item.channel.avatar} alt={item.channel.name} className="portal-channel-avatar" />
-                    <div className="portal-card-meta">
-                      <h4 className="portal-card-title" title={item.title}>{item.title}</h4>
-                      <div className="portal-card-channel-name">{item.channel.name}</div>
-                      <div className="portal-card-subline">
-                        <span>{item.views}</span>
-                        <span className="dot">•</span>
-                        <span>{item.timeAgo}</span>
+            {recommendedVideos.length > 0 ? (
+              <div className="portal-cards-grid">
+                {recommendedVideos.map(item => (
+                  <div 
+                    key={item.id} 
+                    className="portal-video-card"
+                    onClick={() => handleSelectVideo(item)}
+                  >
+                    <div className="portal-card-thumb-wrap">
+                      <img src={item.thumbnail} alt={item.title} />
+                      <span className="card-duration-badge">{item.duration}</span>
+                    </div>
+                    <div className="portal-card-body">
+                      <img src={item.channel.avatar} alt={item.channel.name} className="portal-channel-avatar" />
+                      <div className="portal-card-meta">
+                        <h4 className="portal-card-title" title={item.title}>{item.title}</h4>
+                        <div className="portal-card-channel-name">{item.channel.name}</div>
+                        <div className="portal-card-subline">
+                          <span>{item.views}</span>
+                          <span className="dot">•</span>
+                          <span>{item.timeAgo}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state-card">
+                <PlayCircle size={24} color="var(--color-text-tertiary)" />
+                <span>Для вас пока нет новых видеороликов</span>
+              </div>
+            )}
           </section>
 
-          {/* SECTION 3: FROM YOUR SUBSCRIPTIONS (ИЗ ВАШИХ ПОДПИСОК) */}
+                    {/* SECTION 3: FROM YOUR SUBSCRIPTIONS (ИЗ ВАШИХ ПОДПИСОК) */}
           <section className="portal-row-section subscriptions-section">
             <div className="section-title-bar">
               <div className="section-title-left">
                 <CheckCircle2 size={20} color="#10b981" />
-                <h2 className="section-main-heading">Из ваших подписок (From your subscriptions)</h2>
+                <h2 className="section-main-heading">Ваши подписки</h2>
               </div>
               <span className="section-badge-counter">{subscriptionVideos.length} свежих</span>
             </div>
 
-            <div className="portal-cards-grid">
-              {subscriptionVideos.map(item => (
-                <div 
-                  key={item.id} 
-                  className="portal-video-card"
-                  onClick={() => handleSelectVideo(item)}
-                >
-                  <div className="portal-card-thumb-wrap">
-                    <img src={item.thumbnail} alt={item.title} />
-                    <span className="card-duration-badge">{item.duration}</span>
-                  </div>
-                  <div className="portal-card-body">
-                    <img src={item.channel.avatar} alt={item.channel.name} className="portal-channel-avatar" />
-                    <div className="portal-card-meta">
-                      <h4 className="portal-card-title" title={item.title}>{item.title}</h4>
-                      <div className="portal-card-channel-name">{item.channel.name}</div>
-                      <div className="portal-card-subline">
-                        <span>{item.views}</span>
-                        <span className="dot">•</span>
-                        <span>{item.timeAgo}</span>
+            {subscriptionVideos.length > 0 ? (
+              <div className="portal-cards-grid">
+                {subscriptionVideos.map(item => (
+                  <div 
+                    key={item.id} 
+                    className="portal-video-card"
+                    onClick={() => handleSelectVideo(item)}
+                  >
+                    <div className="portal-card-thumb-wrap">
+                      <img src={item.thumbnail} alt={item.title} />
+                      <span className="card-duration-badge">{item.duration}</span>
+                    </div>
+                    <div className="portal-card-body">
+                      <img src={item.channel.avatar} alt={item.channel.name} className="portal-channel-avatar" />
+                      <div className="portal-card-meta">
+                        <h4 className="portal-card-title" title={item.title}>{item.title}</h4>
+                        <div className="portal-card-channel-name">{item.channel.name}</div>
+                        <div className="portal-card-subline">
+                          <span>{item.views}</span>
+                          <span className="dot">•</span>
+                          <span>{item.timeAgo}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state-card">
+                <CheckCircle2 size={24} color="var(--color-text-tertiary)" />
+                <span>В ваших подписках нет новых видео</span>
+              </div>
+            )}
           </section>
 
-          {/* SECTION 4: MOVIES (ФИЛЬМЫ) */}
+                    {/* SECTION 4: MOVIES (ФИЛЬМЫ) */}
           <section className="portal-row-section">
             <div className="section-title-bar">
               <div className="section-title-left">
                 <Film size={20} color="#f59e0b" />
-                <h2 className="section-main-heading">Кинозал & Фильмы</h2>
+                <h2 className="section-main-heading">Кинозал</h2>
               </div>
               <button className="btn-section-see-all" onClick={() => setActiveCategory('movies')}>
                 <span>Все фильмы</span>
@@ -573,36 +594,43 @@ export function VideoPage() {
               </button>
             </div>
 
-            <div className="portal-cards-grid">
-              {moviesList.map(item => (
-                <div 
-                  key={item.id} 
-                  className="portal-video-card movie-card"
-                  onClick={() => handleSelectVideo(item)}
-                >
-                  <div className="portal-card-thumb-wrap">
-                    <img src={item.thumbnail} alt={item.title} />
-                    <span className="card-duration-badge">{item.duration}</span>
-                    <span className="card-rating-badge">★ {item.rating}</span>
-                    <span className="card-age-badge">{item.ageRating}</span>
-                  </div>
-                  <div className="portal-card-body">
-                    <img src={item.channel.avatar} alt={item.channel.name} className="portal-channel-avatar" />
-                    <div className="portal-card-meta">
-                      <h4 className="portal-card-title" title={item.title}>{item.title}</h4>
-                      <div className="portal-card-subline">
-                        <span className="movie-genre-badge">{item.genre}</span>
-                        <span className="dot">•</span>
-                        <span>{item.releaseYear} г.</span>
+            {moviesList.length > 0 ? (
+              <div className="portal-cards-grid">
+                {moviesList.map(item => (
+                  <div 
+                    key={item.id} 
+                    className="portal-video-card movie-card"
+                    onClick={() => handleSelectVideo(item)}
+                  >
+                    <div className="portal-card-thumb-wrap">
+                      <img src={item.thumbnail} alt={item.title} />
+                      <span className="card-duration-badge">{item.duration}</span>
+                      <span className="card-rating-badge">★ {item.rating}</span>
+                      <span className="card-age-badge">{item.ageRating}</span>
+                    </div>
+                    <div className="portal-card-body">
+                      <img src={item.channel.avatar} alt={item.channel.name} className="portal-channel-avatar" />
+                      <div className="portal-card-meta">
+                        <h4 className="portal-card-title" title={item.title}>{item.title}</h4>
+                        <div className="portal-card-subline">
+                          <span className="movie-genre-badge">{item.genre}</span>
+                          <span className="dot">•</span>
+                          <span>{item.releaseYear} г.</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state-card">
+                <Film size={24} color="var(--color-text-tertiary)" />
+                <span>Фильмы скоро появятся</span>
+              </div>
+            )}
           </section>
 
-          {/* SECTION 5: SERIES (СЕРИАЛЫ) */}
+                    {/* SECTION 5: SERIES (СЕРИАЛЫ) */}
           <section className="portal-row-section">
             <div className="section-title-bar">
               <div className="section-title-left">
@@ -615,74 +643,86 @@ export function VideoPage() {
               </button>
             </div>
 
-            <div className="portal-cards-grid">
-              {seriesList.map(item => (
-                <div 
-                  key={item.id} 
-                  className="portal-video-card series-card"
-                  onClick={() => handleSelectVideo(item)}
-                >
-                  <div className="portal-card-thumb-wrap">
-                    <img src={item.thumbnail} alt={item.title} />
-                    <span className="card-duration-badge">{item.duration}</span>
-                    <span className="card-rating-badge">★ {item.rating}</span>
-                  </div>
-                  <div className="portal-card-body">
-                    <img src={item.channel.avatar} alt={item.channel.name} className="portal-channel-avatar" />
-                    <div className="portal-card-meta">
-                      <h4 className="portal-card-title" title={item.title}>{item.title}</h4>
-                      <div className="portal-card-subline">
-                        <span>{item.genre}</span>
-                        <span className="dot">•</span>
-                        <span className="series-seasons-text">{item.seriesInfo?.seasonsCount} сезона</span>
+            {seriesList.length > 0 ? (
+              <div className="portal-cards-grid">
+                {seriesList.map(item => (
+                  <div 
+                    key={item.id} 
+                    className="portal-video-card movie-card"
+                    onClick={() => handleSelectVideo(item)}
+                  >
+                    <div className="portal-card-thumb-wrap">
+                      <img src={item.thumbnail} alt={item.title} />
+                      <span className="card-duration-badge">{item.duration}</span>
+                      <span className="card-rating-badge">★ {item.rating}</span>
+                      <span className="card-age-badge">{item.ageRating}</span>
+                    </div>
+                    <div className="portal-card-body">
+                      <img src={item.channel.avatar} alt={item.channel.name} className="portal-channel-avatar" />
+                      <div className="portal-card-meta">
+                        <h4 className="portal-card-title" title={item.title}>{item.title}</h4>
+                        <div className="portal-card-subline">
+                          <span className="movie-genre-badge">{item.genre}</span>
+                          <span className="dot">•</span>
+                          <span>{item.seriesInfo?.seasonsCount} {item.seriesInfo?.seasonsCount === 1 ? 'сезон' : 'сезона'}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state-card">
+                <Tv size={24} color="var(--color-text-tertiary)" />
+                <span>Сериалы скоро появятся</span>
+              </div>
+            )}
           </section>
 
-          {/* SECTION 6: KIDS & CARTOONS (ДЕТСКИЙ РАЗДЕЛ) */}
-          <section className="portal-row-section kids-highlight-section">
+                    {/* SECTION 6: KIDS MODE (ДЕТСКОЕ) */}
+          <section className="portal-row-section kids-zone-section">
             <div className="section-title-bar">
               <div className="section-title-left">
                 <Baby size={20} color="#ec4899" />
-                <h2 className="section-main-heading">Детский уголок New Age Kids 🎈</h2>
+                <h2 className="section-main-heading" style={{ color: '#ec4899' }}>Детский уголок</h2>
               </div>
-              <button className="btn-section-see-all" onClick={() => { setActiveCategory('kids'); setIsKidsModeActive(true); }}>
+              <button 
+                className="btn-section-see-all" 
+                onClick={handleToggleKidsMode}
+                style={{ color: '#ec4899', borderColor: 'rgba(236,72,153,0.3)' }}
+              >
                 <span>Включить детский режим</span>
                 <ChevronRight size={15} />
               </button>
             </div>
 
-            <div className="portal-cards-grid">
-              {kidsList.map(item => (
-                <div 
-                  key={item.id} 
-                  className="portal-video-card kids-card"
-                  onClick={() => handleSelectVideo(item)}
-                >
-                  <div className="portal-card-thumb-wrap">
-                    <img src={item.thumbnail} alt={item.title} />
-                    <span className="card-duration-badge">{item.duration}</span>
-                    <span className="card-kids-rating-pill">0+ / 6+</span>
-                  </div>
-                  <div className="portal-card-body">
-                    <img src={item.channel.avatar} alt={item.channel.name} className="portal-channel-avatar" />
-                    <div className="portal-card-meta">
-                      <h4 className="portal-card-title" title={item.title}>{item.title}</h4>
-                      <div className="portal-card-channel-name">{item.channel.name}</div>
-                      <div className="portal-card-subline">
-                        <span>{item.views}</span>
-                        <span className="dot">•</span>
-                        <span>{item.timeAgo}</span>
+            {kidsList.length > 0 ? (
+              <div className="portal-cards-horizontal-scroll">
+                {kidsList.map(item => (
+                  <div 
+                    key={item.id} 
+                    className="portal-video-card"
+                    onClick={() => handleSelectVideo(item)}
+                  >
+                    <div className="portal-card-thumb-wrap kids-thumb">
+                      <img src={item.thumbnail} alt={item.title} />
+                      <span className="card-duration-badge">{item.duration}</span>
+                    </div>
+                    <div className="portal-card-body">
+                      <div className="portal-card-meta" style={{ paddingLeft: 0 }}>
+                        <h4 className="portal-card-title" title={item.title}>{item.title}</h4>
+                        <div className="portal-card-channel-name">{item.channel.name}</div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state-card" style={{ borderColor: 'rgba(236,72,153,0.3)', color: '#ec4899' }}>
+                <Baby size={24} color="#ec4899" />
+                <span>Детские видео скоро появятся</span>
+              </div>
+            )}
           </section>
         </div>
       ) : (
