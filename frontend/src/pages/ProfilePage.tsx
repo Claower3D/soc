@@ -54,6 +54,14 @@ const getPluralForm = (n: number, one: string, few: string, many: string) => {
   return many;
 };
 
+export const getAvatarUrl = (u?: Partial<User> | null) => {
+  if (u?.avatar && u.avatar.trim() !== '' && u.avatar !== 'undefined') {
+    return u.avatar;
+  }
+  const seed = u?.username ? u.username.replace(/^@+/, '') : (u?.name || u?.id || 'newage_user');
+  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
+};
+
 export function ProfilePage() {
   const { userId } = useParams();
   const navigate = useNavigate();
@@ -154,6 +162,24 @@ export function ProfilePage() {
     };
     window.addEventListener('post_deleted', handlePostDeleted);
     return () => window.removeEventListener('post_deleted', handlePostDeleted);
+  }, []);
+
+  useEffect(() => {
+    const handleStoryCreated = (e: any) => {
+      const s = e.detail;
+      if (s && s.id) {
+        setProfileStories(prev => {
+          if (prev.some(existing => existing.id === s.id)) return prev;
+          const updated = [s, ...prev];
+          try {
+            localStorage.setItem('new_age_user_stories', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+    };
+    window.addEventListener('story_created', handleStoryCreated);
+    return () => window.removeEventListener('story_created', handleStoryCreated);
   }, []);
 
   const handleDeleteStory = (storyId: string) => {
@@ -355,12 +381,21 @@ export function ProfilePage() {
 
   const userHasStories = useMemo(() => {
     if (!activeUser) return false;
-    return profileStories.some(s => 
-      s.user.id === activeUser.id || 
-      (activeUser.username && s.user.username === activeUser.username) || 
-      (isMe && (s.user.id === 'me' || s.user.id === currentUser.id))
-    );
-  }, [profileStories, activeUser, isMe, currentUser.id]);
+    const targetId = activeUser.id ? String(activeUser.id).toLowerCase() : '';
+    const targetUsername = activeUser.username ? activeUser.username.replace(/^@+/, '').toLowerCase() : '';
+    const cleanP = cleanParam || '';
+
+    return profileStories.some(s => {
+      const sUserId = s.user?.id ? String(s.user.id).toLowerCase() : '';
+      const sUsername = s.user?.username ? s.user.username.replace(/^@+/, '').toLowerCase() : '';
+      
+      if (targetId && (sUserId === targetId || sUsername === targetId)) return true;
+      if (targetUsername && (sUsername === targetUsername || sUserId === targetUsername)) return true;
+      if (cleanP && (sUserId === cleanP || sUsername === cleanP)) return true;
+      if (isMe && (sUserId === 'me' || sUserId === cleanMyId || sUsername === cleanMyUsername)) return true;
+      return false;
+    });
+  }, [profileStories, activeUser, isMe, cleanParam, cleanMyId, cleanMyUsername]);
 
   // Filter user's posts, videos, and podcasts
   const userPosts = useMemo(() => {
@@ -550,7 +585,15 @@ export function ProfilePage() {
                 }}
                 title={userHasStories ? 'Нажмите, чтобы посмотреть историю' : undefined}
               >
-                <img src={activeUser.avatar} alt={activeUser.name} className={`profile-main-avatar ${activeUser.isPremium ? 'profile-premium-frame' : ''}`} />
+                <img 
+                  src={getAvatarUrl(activeUser)} 
+                  alt={activeUser.name} 
+                  className={`profile-main-avatar ${activeUser.isPremium ? 'profile-premium-frame' : ''}`} 
+                  onError={(e) => {
+                    const seed = activeUser?.username ? activeUser.username.replace(/^@+/, '') : (activeUser?.name || 'newage_user');
+                    (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
+                  }}
+                />
                 {activeUser.online && <span className="profile-online-indicator" title="В сети" />}
                 {userHasStories && <span className="profile-story-badge-hint">История</span>}
               </div>
@@ -1301,7 +1344,7 @@ export function ProfilePage() {
       {isViewingStory && (
         <StoriesBar 
           stories={profileStories} 
-          initialUserId={activeUser.id} 
+          initialUserId={activeUser.username ? activeUser.username.replace(/^@+/, '') : activeUser.id} 
           viewerOnly 
           onCloseViewer={() => setIsViewingStory(false)}
           onDeleteStory={handleDeleteStory}

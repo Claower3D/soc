@@ -469,6 +469,37 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       (newStory as any).isCloseFriends = true;
     }
 
+    const token = localStorage.getItem('new_age_jwt_token') || localStorage.getItem('newage_token') || '';
+    const payload = {
+      id: newStory.id,
+      image: newStory.image,
+      videoUrl: newStory.videoUrl,
+      mediaUrl: newStory.videoUrl || newStory.image || '',
+      isVideo: !!newStory.videoUrl,
+      isLive: newStory.isLive,
+      liveViewers: newStory.liveViewers,
+      filter: newStory.filter,
+      mask: newStory.mask,
+      text: newStory.text,
+      textPosition: newStory.textPosition,
+      gradient: newStory.gradient,
+      musicTrack: newStory.musicTrack,
+    };
+
+    const apiUrl = (import.meta.env.VITE_API_URL || '') + '/api/stories';
+    fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(payload)
+    }).catch(err => {
+      console.warn('Could not post story to server:', err);
+    });
+
+    window.dispatchEvent(new CustomEvent('story_created', { detail: newStory }));
+
     onCreateStory(newStory);
     stopCamera();
     onClose();

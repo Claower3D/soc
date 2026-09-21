@@ -55,7 +55,7 @@ export function StoriesBar({
     const groupsMap = new Map<string, Story[]>();
 
     stories.forEach(s => {
-      const uid = s.user.id;
+      const uid = (s.user?.username ? s.user.username.replace(/^@+/, '').toLowerCase() : (s.user?.id || 'unknown'));
       if (!groupsMap.has(uid)) {
         groupsMap.set(uid, []);
       }
@@ -87,13 +87,21 @@ export function StoriesBar({
   // Auto-open if initialUserId passed
   useEffect(() => {
     if (initialUserId) {
-      const gIdx = userGroups.findIndex(g => g.user.id === initialUserId || g.user.username === initialUserId);
+      const cleanInit = initialUserId.replace(/^@+/, '').toLowerCase();
+      const gIdx = userGroups.findIndex(g => {
+        const gid = g.user.id ? String(g.user.id).toLowerCase() : '';
+        const guser = g.user.username ? g.user.username.replace(/^@+/, '').toLowerCase() : '';
+        return gid === cleanInit || guser === cleanInit || g.user.id === initialUserId || g.user.username === initialUserId;
+      });
       if (gIdx !== -1) {
         setActiveGroupIndex(gIdx);
         setActiveStoryIdxInGroup(0);
+      } else if (viewerOnly && userGroups.length > 0) {
+        setActiveGroupIndex(0);
+        setActiveStoryIdxInGroup(0);
       }
     }
-  }, [initialUserId, userGroups]);
+  }, [initialUserId, userGroups, viewerOnly]);
 
   const [progress, setProgress] = useState(0); // 0 to 100%
   const [isPaused, setIsPaused] = useState(false);
@@ -354,9 +362,12 @@ export function StoriesBar({
               <div className={`insta-avatar-ring ${myStoriesGroup && myStoriesGroup.stories.length > 0 ? (myStoriesGroup.hasUnviewed ? 'ring-gradient' : 'ring-viewed') : 'own-ring'}`}>
                 <div className="insta-avatar-inner">
                   <img 
-                    src={currentUser.avatar} 
+                    src={currentUser.avatar && currentUser.avatar.trim() !== '' && currentUser.avatar !== 'undefined' ? currentUser.avatar : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(currentUser.username || currentUser.name || 'user')}`} 
                     alt="Ваша история" 
                     className="insta-avatar-img" 
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(currentUser.username || currentUser.name || 'user')}`;
+                    }}
                   />
                   {/* Plus badge */}
                   <div 
@@ -389,9 +400,12 @@ export function StoriesBar({
                     <div className={`insta-avatar-ring ${group.isLive ? 'ring-live' : (group.hasUnviewed ? 'ring-gradient' : 'ring-viewed')}`}>
                       <div className="insta-avatar-inner">
                         <img 
-                          src={group.user.avatar} 
+                          src={group.user.avatar && group.user.avatar.trim() !== '' && group.user.avatar !== 'undefined' ? group.user.avatar : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.user.username || group.user.name || group.user.id)}`} 
                           alt={group.user.name} 
                           className="insta-avatar-img" 
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.user.username || group.user.name || group.user.id)}`;
+                          }}
                         />
                         {group.user.online && !group.isLive && <span className="insta-online-indicator" />}
                       </div>
@@ -482,9 +496,12 @@ export function StoriesBar({
                   onClick={(e) => handleAuthorClick(activeStory.user, e)}
                 >
                   <img 
-                    src={activeStory.user.avatar} 
+                    src={activeStory.user.avatar && activeStory.user.avatar.trim() !== '' && activeStory.user.avatar !== 'undefined' ? activeStory.user.avatar : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(activeStory.user.username || activeStory.user.name || activeStory.user.id)}`} 
                     alt={activeStory.user.name} 
                     className="insta-header-avatar" 
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(activeStory.user.username || activeStory.user.name || activeStory.user.id)}`;
+                    }}
                   />
                   <div className="insta-header-text">
                     <div className="insta-header-title-row">

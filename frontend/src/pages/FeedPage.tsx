@@ -83,6 +83,22 @@ export function FeedPage() {
     return () => window.removeEventListener('post_deleted', handlePostDeleted);
   }, []);
 
+  useEffect(() => {
+    const handleStoryCreated = (e: any) => {
+      const s = e.detail;
+      if (s && s.id) {
+        setFeedStories(prev => {
+          if (prev.some(existing => existing.id === s.id)) return prev;
+          const updated = [s, ...prev];
+          cacheService.set('feed_stories_cache', updated, 3600 * 24, 'stories');
+          return updated;
+        });
+      }
+    };
+    window.addEventListener('story_created', handleStoryCreated);
+    return () => window.removeEventListener('story_created', handleStoryCreated);
+  }, []);
+
   const [feedStories, setFeedStories] = useState<Story[]>(() => {
     return cacheService.get<Story[]>('feed_stories_cache') || [];
   });

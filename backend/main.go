@@ -263,6 +263,47 @@ type Episode struct {
 	Date     string `json:"date"`
 }
 
+// Story — история (сторис).
+type Story struct {
+	ID           string `json:"id"`
+	User         User   `json:"user"`
+	Viewed       bool   `json:"viewed"`
+	Image        string `json:"image,omitempty"`
+	VideoURL     string `json:"videoUrl,omitempty"`
+	MediaURL     string `json:"mediaUrl,omitempty"`
+	Gradient     string `json:"gradient,omitempty"`
+	IsLive       bool   `json:"isLive,omitempty"`
+	LiveViewers  int    `json:"liveViewers,omitempty"`
+	Filter       string `json:"filter,omitempty"`
+	Mask         string `json:"mask,omitempty"`
+	Text         string `json:"text,omitempty"`
+	TextPosition string `json:"textPosition,omitempty"`
+	Timestamp    string `json:"timestamp,omitempty"`
+	MusicTrack   string `json:"musicTrack,omitempty"`
+	ViewsCount   int    `json:"viewsCount,omitempty"`
+	ExpiresAt    string `json:"expiresAt,omitempty"`
+	CreatedAt    string `json:"createdAt,omitempty"`
+}
+
+func ensureUserAvatar(u *User) {
+	if u == nil {
+		return
+	}
+	if strings.TrimSpace(u.Avatar) == "" || u.Avatar == "undefined" {
+		seed := u.Username
+		if seed == "" {
+			seed = u.Name
+		}
+		if seed == "" {
+			seed = u.ID
+		}
+		if seed == "" {
+			seed = "user"
+		}
+		u.Avatar = fmt.Sprintf("https://api.dicebear.com/7.x/avataaars/svg?seed=%s", seed)
+	}
+}
+
 var startTime = time.Now()
 
 // JWT Secret Key (читается из окружения или дефолтный безопасный ключ)
@@ -371,6 +412,13 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 		  followers_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u2 ON r.follower_id = u2.id WHERE r.target_id = u.id AND r.rel_type = 'follow');
 	`)
 
+	// Исправление пустых и битых аватарок у всех пользователей в БД
+	_, _ = conn.Exec(`
+		UPDATE users 
+		SET avatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=' || username 
+		WHERE avatar IS NULL OR avatar = '' OR avatar = 'undefined';
+	`)
+
 	return conn, nil
 }
 
@@ -446,12 +494,14 @@ type UserStore struct {
 	accounts      map[string]AccountStoreEntry // key: userID
 	relationships map[string][]string          // key: followerID -> []targetID
 	posts         []Post                       // persistent list of posts
+	stories       []Story                      // persistent list of stories
 }
 
 type PersistentData struct {
 	Accounts      map[string]AccountStoreEntry `json:"accounts"`
 	Relationships map[string][]string          `json:"relationships"`
 	Posts         []Post                       `json:"posts"`
+	Stories       []Story                      `json:"stories,omitempty"`
 }
 
 const storeFilePath = "data/social_network_store.json"
@@ -464,6 +514,7 @@ func (s *UserStore) saveToDisk() {
 		Accounts:      s.accounts,
 		Relationships: s.relationships,
 		Posts:         s.posts,
+		Stories:       s.stories,
 	}
 	b, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -511,13 +562,17 @@ func (s *UserStore) loadFromDisk() {
 	if data.Posts != nil {
 		s.posts = data.Posts
 	}
-	log.Printf("📦 Успешно загружено из локального хранилища %s: %d аккаунтов, %d постов", storeFilePath, len(s.accounts), len(s.posts))
+	if data.Stories != nil {
+		s.stories = data.Stories
+	}
+	log.Printf("📦 Успешно загружено из локального хранилища %s: %d аккаунтов, %d постов, %d историй", storeFilePath, len(s.accounts), len(s.posts), len(s.stories))
 }
 
 var store = &UserStore{
 	accounts:      make(map[string]AccountStoreEntry),
 	relationships: make(map[string][]string),
 	posts:         make([]Post, 0),
+	stories:       make([]Story, 0),
 }
 
 var currentUser = User{
@@ -750,6 +805,7 @@ func main() {
 	// Сторис
 	mux.HandleFunc("POST /api/stories", handleCreateStory)
 	mux.HandleFunc("POST /api/stories/{id}/view", handleViewStory)
+	mux.HandleFunc("DELETE /api/stories/{id}", handleDeleteStory)
 
 	// Клипы
 	mux.HandleFunc("POST /api/clips", handleCreateClip)
@@ -1841,7 +1897,7 @@ func handleAuthMe(w http.ResponseWriter, r *http.Request) {
 	if db != nil {
 		var u User
 		query := `
-		SELECT id, name, username, avatar, COALESCE(bio, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false), followers_count, following_count, critics_count, posts_count
+		SELECT id, name, username, COALESCE(avatar, ''), COALESCE(bio, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false), COALESCE(followers_count, 0), COALESCE(following_count, 0), COALESCE(critics_count, 0), COALESCE(posts_count, 0)
 		FROM users WHERE id = $1 LIMIT 1
 		`
 		err := db.QueryRow(query, claims.UserID).Scan(
@@ -1849,6 +1905,7 @@ func handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		)
 		if err == nil {
 			u.Online = true
+			ensureUserAvatar(&u)
 			u.FollowersCount, u.FollowingCount, u.FriendsCount = getDBRelationshipCounts(u.ID)
 			user = &u
 		}
@@ -1861,6 +1918,7 @@ func handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		store.mu.RUnlock()
 		if exists {
 			uCopy := account.User
+			ensureUserAvatar(&uCopy)
 			uCopy.FollowersCount, uCopy.FollowingCount, uCopy.FriendsCount = getRelationshipCounts(claims.UserID)
 			user = &uCopy
 		}
@@ -1870,6 +1928,8 @@ func handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден в базе"})
 		return
 	}
+
+	ensureUserAvatar(user)
 
 	writeJSON(w, http.StatusOK, Response{
 		Status: "ok",
@@ -2085,26 +2145,40 @@ func getDBRelationshipCounts(targetID string) (followersCount, followingCount, f
 	if db == nil {
 		return 0, 0, 0
 	}
-	db.QueryRow(`
-		SELECT COUNT(*) 
-		FROM user_relationships r 
-		JOIN users u ON r.follower_id = u.id 
-		WHERE r.target_id = $1 AND r.rel_type = 'follow'
-	`, targetID).Scan(&followersCount)
+	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
+	var resolvedID, resolvedUsername string
+	_ = db.QueryRow("SELECT id, username FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", targetID, cleanTarget).Scan(&resolvedID, &resolvedUsername)
+	if resolvedID == "" {
+		resolvedID = targetID
+	}
+	if resolvedUsername == "" {
+		resolvedUsername = cleanTarget
+	}
 
 	db.QueryRow(`
-		SELECT COUNT(*) 
+		SELECT COUNT(DISTINCT u.id) 
 		FROM user_relationships r 
-		JOIN users u ON r.target_id = u.id 
-		WHERE r.follower_id = $1 AND r.rel_type = 'follow'
-	`, targetID).Scan(&followingCount)
+		JOIN users u ON (r.follower_id = u.id OR LOWER(r.follower_id) = LOWER(u.username))
+		WHERE (r.target_id = $1 OR r.target_id = $2 OR LOWER(r.target_id) = LOWER($2)) AND r.rel_type = 'follow'
+	`, resolvedID, resolvedUsername).Scan(&followersCount)
 
 	db.QueryRow(`
-		SELECT COUNT(*) FROM user_relationships r1
-		JOIN user_relationships r2 ON r1.follower_id = r2.target_id AND r1.target_id = r2.follower_id
-		JOIN users u ON r1.target_id = u.id
-		WHERE r1.follower_id = $1 AND r1.rel_type = 'follow' AND r2.rel_type = 'follow'
-	`, targetID).Scan(&friendsCount)
+		SELECT COUNT(DISTINCT u.id) 
+		FROM user_relationships r 
+		JOIN users u ON (r.target_id = u.id OR LOWER(r.target_id) = LOWER(u.username))
+		WHERE (r.follower_id = $1 OR r.follower_id = $2 OR LOWER(r.follower_id) = LOWER($2)) AND r.rel_type = 'follow'
+	`, resolvedID, resolvedUsername).Scan(&followingCount)
+
+	db.QueryRow(`
+		SELECT COUNT(DISTINCT u.id) FROM user_relationships r1
+		JOIN user_relationships r2 ON (
+			(r1.follower_id = r2.target_id OR LOWER(r1.follower_id) = LOWER(r2.target_id)) AND 
+			(r1.target_id = r2.follower_id OR LOWER(r1.target_id) = LOWER(r2.follower_id))
+		)
+		JOIN users u ON (r1.target_id = u.id OR LOWER(r1.target_id) = LOWER(u.username))
+		WHERE (r1.follower_id = $1 OR r1.follower_id = $2 OR LOWER(r1.follower_id) = LOWER($2)) 
+		  AND r1.rel_type = 'follow' AND r2.rel_type = 'follow'
+	`, resolvedID, resolvedUsername).Scan(&friendsCount)
 	return
 }
 
@@ -2338,24 +2412,28 @@ func handleFollowers(w http.ResponseWriter, r *http.Request) {
 	var followers []User
 
 	if db != nil {
-		var resolvedID string
-		err := db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", targetID, cleanTarget).Scan(&resolvedID)
-		if err == nil {
-			targetID = resolvedID
+		var resolvedID, resolvedUsername string
+		_ = db.QueryRow("SELECT id, username FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", targetID, cleanTarget).Scan(&resolvedID, &resolvedUsername)
+		if resolvedID == "" {
+			resolvedID = targetID
+		}
+		if resolvedUsername == "" {
+			resolvedUsername = cleanTarget
 		}
 		rows, err := db.Query(`
-			SELECT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), 
+			SELECT DISTINCT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), 
 			       COALESCE(u.followers_count, 0), COALESCE(u.following_count, 0), COALESCE(u.posts_count, 0), COALESCE(u.verified, false)
 			FROM users u
-			JOIN user_relationships r ON u.id = r.follower_id
-			WHERE r.target_id = $1 AND r.rel_type = 'follow'
-			ORDER BY r.created_at DESC
-		`, targetID)
+			JOIN user_relationships r ON (u.id = r.follower_id OR LOWER(u.username) = LOWER(r.follower_id))
+			WHERE (r.target_id = $1 OR r.target_id = $2 OR LOWER(r.target_id) = LOWER($2)) AND r.rel_type = 'follow'
+			ORDER BY u.name ASC
+		`, resolvedID, resolvedUsername)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
 				var u User
 				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified)
+				ensureUserAvatar(&u)
 				followers = append(followers, u)
 			}
 		}
@@ -2381,11 +2459,15 @@ func handleFollowers(w http.ResponseWriter, r *http.Request) {
 			for _, tid := range targetList {
 				if tid == realTargetID {
 					if acc, ok := store.accounts[followerID]; ok {
-						followers = append(followers, acc.User)
+						u := acc.User
+						ensureUserAvatar(&u)
+						followers = append(followers, u)
 					} else {
 						for _, mu := range mockUsers {
 							if mu.ID == followerID {
-								followers = append(followers, mu)
+								u := mu
+								ensureUserAvatar(&u)
+								followers = append(followers, u)
 								break
 							}
 						}
@@ -2416,24 +2498,28 @@ func handleFollowing(w http.ResponseWriter, r *http.Request) {
 	var following []User
 
 	if db != nil {
-		var resolvedID string
-		err := db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", targetID, cleanTarget).Scan(&resolvedID)
-		if err == nil {
-			targetID = resolvedID
+		var resolvedID, resolvedUsername string
+		_ = db.QueryRow("SELECT id, username FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", targetID, cleanTarget).Scan(&resolvedID, &resolvedUsername)
+		if resolvedID == "" {
+			resolvedID = targetID
+		}
+		if resolvedUsername == "" {
+			resolvedUsername = cleanTarget
 		}
 		rows, err := db.Query(`
-			SELECT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), 
+			SELECT DISTINCT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), 
 			       COALESCE(u.followers_count, 0), COALESCE(u.following_count, 0), COALESCE(u.posts_count, 0), COALESCE(u.verified, false)
 			FROM users u
-			JOIN user_relationships r ON u.id = r.target_id
-			WHERE r.follower_id = $1 AND r.rel_type = 'follow'
-			ORDER BY r.created_at DESC
-		`, targetID)
+			JOIN user_relationships r ON (u.id = r.target_id OR LOWER(u.username) = LOWER(r.target_id))
+			WHERE (r.follower_id = $1 OR r.follower_id = $2 OR LOWER(r.follower_id) = LOWER($2)) AND r.rel_type = 'follow'
+			ORDER BY u.name ASC
+		`, resolvedID, resolvedUsername)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
 				var u User
 				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified)
+				ensureUserAvatar(&u)
 				following = append(following, u)
 			}
 		}
@@ -2458,11 +2544,15 @@ func handleFollowing(w http.ResponseWriter, r *http.Request) {
 		if targets, ok := store.relationships[realTargetID]; ok {
 			for _, tid := range targets {
 				if acc, ok := store.accounts[tid]; ok {
-					following = append(following, acc.User)
+					u := acc.User
+					ensureUserAvatar(&u)
+					following = append(following, u)
 				} else {
 					for _, mu := range mockUsers {
 						if mu.ID == tid {
-							following = append(following, mu)
+							u := mu
+							ensureUserAvatar(&u)
+							following = append(following, u)
 							break
 						}
 					}
@@ -2491,25 +2581,34 @@ func handleFriends(w http.ResponseWriter, r *http.Request) {
 	var users []User
 
 	if db != nil {
-		var resolvedID string
-		err := db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", targetID, cleanTarget).Scan(&resolvedID)
-		if err == nil {
-			targetID = resolvedID
+		var resolvedID, resolvedUsername string
+		_ = db.QueryRow("SELECT id, username FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", targetID, cleanTarget).Scan(&resolvedID, &resolvedUsername)
+		if resolvedID == "" {
+			resolvedID = targetID
+		}
+		if resolvedUsername == "" {
+			resolvedUsername = cleanTarget
 		}
 		rows, err := db.Query(`
 			SELECT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), COALESCE(u.verified, false)
 			FROM users u
 			WHERE u.id IN (
 				SELECT r1.target_id FROM user_relationships r1
-				JOIN user_relationships r2 ON r1.follower_id = r2.target_id AND r1.target_id = r2.follower_id
-				WHERE r1.follower_id = $1 AND r1.rel_type = 'follow' AND r2.rel_type = 'follow'
+				JOIN user_relationships r2 ON (
+					(r1.follower_id = r2.target_id OR LOWER(r1.follower_id) = LOWER(r2.target_id)) AND 
+					(r1.target_id = r2.follower_id OR LOWER(r1.target_id) = LOWER(r2.follower_id))
+				)
+				WHERE (r1.follower_id = $1 OR r1.follower_id = $2 OR LOWER(r1.follower_id) = LOWER($2)) 
+				  AND r1.rel_type = 'follow' AND r2.rel_type = 'follow'
 			)
-		`, targetID)
+			ORDER BY u.name ASC
+		`, resolvedID, resolvedUsername)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
 				var u User
 				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.Verified)
+				ensureUserAvatar(&u)
 				u.IsFriend = true
 				users = append(users, u)
 			}
@@ -2551,6 +2650,7 @@ func handleFriends(w http.ResponseWriter, r *http.Request) {
 						}
 					}
 					if found {
+						ensureUserAvatar(&u)
 						u.IsFriend = true
 						users = append(users, u)
 					}
@@ -2852,6 +2952,8 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 			store.mu.RUnlock()
 		}
 	}
+
+	ensureUserAvatar(&user)
 
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"user": user}})
 }
@@ -3221,34 +3323,93 @@ func handleDeletePost(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleStories(w http.ResponseWriter, r *http.Request) {
+	var stories []Story
+
 	if db != nil {
 		rows, err := db.Query(`
-			SELECT s.id, s.media_url, s.media_type, s.caption, s.created_at, s.expires_at, s.views_count,
-				u.id, u.name, u.username, u.avatar
-			FROM stories s JOIN users u ON s.user_id = u.id
+			SELECT s.id, s.media_url, COALESCE(s.is_video, false), COALESCE(s.is_live, false), COALESCE(s.live_viewers, 0),
+			       COALESCE(s.filter, ''), COALESCE(s.mask, ''), COALESCE(s.text_content, ''),
+			       COALESCE(s.text_position, 'bottom'), COALESCE(s.gradient, ''), COALESCE(s.viewers_count, 0),
+			       s.created_at, s.expires_at,
+			       u.id, u.username, u.name, COALESCE(u.avatar, '')
+			FROM stories s 
+			JOIN users u ON (s.user_id = u.id OR LOWER(s.user_id) = LOWER(u.username))
 			WHERE s.expires_at > NOW()
 			ORDER BY s.created_at DESC
 		`)
 		if err == nil {
 			defer rows.Close()
-			var stories []map[string]interface{}
 			for rows.Next() {
-				var sid, mediaUrl, mediaType, caption, uid, uname, uusername, uavatar string
+				var sid, mediaUrl, filter, mask, textContent, textPos, gradient, uid, uusername, uname, uavatar string
+				var isVideo, isLive bool
+				var liveViewers, viewersCount int
 				var createdAt, expiresAt time.Time
-				var viewsCount int
-				if rows.Scan(&sid, &mediaUrl, &mediaType, &caption, &createdAt, &expiresAt, &viewsCount, &uid, &uname, &uusername, &uavatar) == nil {
-					stories = append(stories, map[string]interface{}{
-						"id": sid, "mediaUrl": mediaUrl, "mediaType": mediaType, "caption": caption,
-						"viewsCount": viewsCount, "timeAgo": formatTimeAgo(createdAt),
-						"user": map[string]interface{}{"id": uid, "name": uname, "username": uusername, "avatar": uavatar},
+				if err := rows.Scan(
+					&sid, &mediaUrl, &isVideo, &isLive, &liveViewers,
+					&filter, &mask, &textContent, &textPos, &gradient, &viewersCount,
+					&createdAt, &expiresAt,
+					&uid, &uusername, &uname, &uavatar,
+				); err == nil {
+					u := User{
+						ID:       uid,
+						Username: uusername,
+						Name:     uname,
+						Avatar:   uavatar,
+					}
+					ensureUserAvatar(&u)
+
+					var img, vid string
+					if isVideo {
+						vid = mediaUrl
+					} else {
+						img = mediaUrl
+					}
+
+					stories = append(stories, Story{
+						ID:           sid,
+						User:         u,
+						Viewed:       false,
+						Image:        img,
+						VideoURL:     vid,
+						MediaURL:     mediaUrl,
+						Gradient:     gradient,
+						IsLive:       isLive,
+						LiveViewers:  liveViewers,
+						Filter:       filter,
+						Mask:         mask,
+						Text:         textContent,
+						TextPosition: textPos,
+						ViewsCount:   viewersCount,
+						Timestamp:    formatTimeAgo(createdAt),
+						ExpiresAt:    expiresAt.Format(time.RFC3339),
+						CreatedAt:    createdAt.Format(time.RFC3339),
 					})
 				}
 			}
-			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: stories})
-			return
+		} else {
+			log.Printf("⚠️ Ошибка выборки stories из PostgreSQL: %v", err)
 		}
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
+
+	// Также объединяем со сторис в памяти (если есть созданные локально или в in-memory режиме)
+	store.mu.RLock()
+	existingIDs := make(map[string]bool)
+	for _, s := range stories {
+		existingIDs[s.ID] = true
+	}
+	for _, s := range store.stories {
+		if !existingIDs[s.ID] {
+			stories = append(stories, s)
+			existingIDs[s.ID] = true
+		}
+	}
+	store.mu.RUnlock()
+
+	if stories == nil {
+		stories = []Story{}
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: stories})
 }
 
 func handleClips(w http.ResponseWriter, r *http.Request) {
@@ -3853,34 +4014,165 @@ func handleCreateStory(w http.ResponseWriter, r *http.Request) {
 	token := extractBearerToken(r)
 	claims, err := parseAndValidateJWT(token)
 	if err != nil {
-		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "unauthorized"})
 		return
 	}
 
 	var req struct {
-		MediaUrl    string `json:"mediaUrl"`
-		MediaType   string `json:"mediaType"`
-		TextOverlay string `json:"textOverlay"`
-		BgColor     string `json:"bgColor"`
+		ID           string `json:"id"`
+		MediaUrl     string `json:"mediaUrl"`
+		Image        string `json:"image"`
+		VideoURL     string `json:"videoUrl"`
+		IsVideo      bool   `json:"isVideo"`
+		IsLive       bool   `json:"isLive"`
+		LiveViewers  int    `json:"liveViewers"`
+		Filter       string `json:"filter"`
+		Mask         string `json:"mask"`
+		Text         string `json:"text"`
+		TextContent  string `json:"textContent"`
+		TextPosition string `json:"textPosition"`
+		Gradient     string `json:"gradient"`
+		MusicTrack   string `json:"musicTrack"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "invalid json"})
 		return
 	}
 
-	storyID := uuid.New().String()
+	storyID := strings.TrimSpace(req.ID)
+	if storyID == "" {
+		storyID = "story_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+	}
+
+	mediaURL := req.MediaUrl
+	if mediaURL == "" {
+		if req.VideoURL != "" {
+			mediaURL = req.VideoURL
+		} else {
+			mediaURL = req.Image
+		}
+	}
+	isVideo := req.IsVideo || req.VideoURL != ""
+	textContent := strings.TrimSpace(req.Text)
+	if textContent == "" {
+		textContent = strings.TrimSpace(req.TextContent)
+	}
+	textPos := req.TextPosition
+	if textPos == "" {
+		textPos = "bottom"
+	}
+
+	// Находим автора истории
+	var author User
+	author.ID = claims.UserID
+	author.Username = claims.Username
+	author.Name = claims.Username
+
+	if db != nil {
+		_ = db.QueryRow("SELECT id, username, name, COALESCE(avatar, '') FROM users WHERE id = $1", claims.UserID).Scan(&author.ID, &author.Username, &author.Name, &author.Avatar)
+	}
+	if author.Avatar == "" {
+		store.mu.RLock()
+		if acc, ok := store.accounts[claims.UserID]; ok {
+			author = acc.User
+		}
+		store.mu.RUnlock()
+	}
+	ensureUserAvatar(&author)
+
+	var img, vid string
+	if isVideo {
+		vid = mediaURL
+	} else {
+		img = mediaURL
+	}
+
+	newStory := Story{
+		ID:           storyID,
+		User:         author,
+		Viewed:       false,
+		Image:        img,
+		VideoURL:     vid,
+		MediaURL:     mediaURL,
+		Gradient:     req.Gradient,
+		IsLive:       req.IsLive,
+		LiveViewers:  req.LiveViewers,
+		Filter:       req.Filter,
+		Mask:         req.Mask,
+		Text:         textContent,
+		TextPosition: textPos,
+		Timestamp:    "Только что",
+		MusicTrack:   req.MusicTrack,
+		ViewsCount:   0,
+		ExpiresAt:    time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+		CreatedAt:    time.Now().Format(time.RFC3339),
+	}
 
 	dbMu.RLock()
 	dbConn := db
 	dbMu.RUnlock()
 	if dbConn != nil {
-		_, _ = dbConn.Exec(`
-			INSERT INTO stories (id, user_id, media_url, media_type, text_overlay, bg_color, expires_at, created_at) 
-			VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours', NOW())
-		`, storyID, claims.UserID, req.MediaUrl, req.MediaType, req.TextOverlay, req.BgColor)
+		_, err := dbConn.Exec(`
+			INSERT INTO stories (
+				id, user_id, media_url, is_video, is_live, live_viewers, 
+				filter, mask, text_content, text_position, gradient, 
+				viewers_count, likes_count, expires_at, created_at
+			) 
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, NOW() + INTERVAL '24 hours', NOW())
+			ON CONFLICT (id) DO UPDATE SET
+				media_url = EXCLUDED.media_url,
+				is_video = EXCLUDED.is_video,
+				text_content = EXCLUDED.text_content
+		`, storyID, claims.UserID, mediaURL, isVideo, req.IsLive, req.LiveViewers, req.Filter, req.Mask, textContent, textPos, req.Gradient)
+		if err != nil {
+			log.Printf("⚠️ Ошибка сохранения story в PostgreSQL: %v", err)
+		} else {
+			log.Printf("📸 История %s от пользователя %s сохранена в БД!", storyID, claims.UserID)
+		}
 	}
 
-	writeJSON(w, 200, Response{Status: "ok", Data: map[string]string{"id": storyID}})
+	// Сохраняем в store
+	store.mu.Lock()
+	store.stories = append([]Story{newStory}, store.stories...)
+	if len(store.stories) > 100 {
+		store.stories = store.stories[:100]
+	}
+	store.saveToDisk()
+	store.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: newStory})
+}
+
+// DELETE /api/stories/{id} — delete story
+func handleDeleteStory(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	storyID := r.PathValue("id")
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn != nil {
+		_, _ = dbConn.Exec(`DELETE FROM stories WHERE id = $1 AND (user_id = $2 OR user_id = $3)`, storyID, claims.UserID, claims.Username)
+	}
+
+	store.mu.Lock()
+	var updated []Story
+	for _, s := range store.stories {
+		if s.ID != storyID {
+			updated = append(updated, s)
+		}
+	}
+	store.stories = updated
+	store.saveToDisk()
+	store.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "История удалена"})
 }
 
 // POST /api/stories/{id}/view — record story view

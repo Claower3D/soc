@@ -55,13 +55,15 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
     const fetchUsers = async () => {
       let remoteUsers: SimpleUser[] = [];
       try {
+        const cleanId = (currentUserId || '').replace(/^@+/, '').trim();
+        const apiBase = (import.meta.env.VITE_API_URL || '');
         let endpoint = '';
         if (activeTab === 'friends') {
-          endpoint = `/api/users/${currentUserId}/friends`;
+          endpoint = `${apiBase}/api/users/${encodeURIComponent(cleanId)}/friends`;
         } else if (activeTab === 'followers') {
-          endpoint = `/api/users/${currentUserId}/followers`;
+          endpoint = `${apiBase}/api/users/${encodeURIComponent(cleanId)}/followers`;
         } else {
-          endpoint = `/api/users/${currentUserId}/following`;
+          endpoint = `${apiBase}/api/users/${encodeURIComponent(cleanId)}/following`;
         }
 
         const token = localStorage.getItem('new_age_jwt_token') || localStorage.getItem('newage_token') || '';
@@ -200,9 +202,12 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
                     onClick={() => handleUserClick(user)}
                   >
                     <img
-                      src={user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`}
+                      src={user.avatar && user.avatar.trim() !== '' && user.avatar !== 'undefined' ? user.avatar : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.username || user.name || user.id)}`}
                       alt={user.name}
                       className="follower-avatar"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.username || user.name || user.id)}`;
+                      }}
                     />
                     <div className="follower-info">
                       <span className="follower-name">@{user.username || user.name}</span>

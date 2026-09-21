@@ -119,7 +119,12 @@ export function setStoredFollowingIds(ids: string[], currentUserId?: string): vo
 
 export function isUserFollowed(targetUserId: string, currentUserId?: string): boolean {
   if (!targetUserId) return false;
-  return getStoredFollowingIds(currentUserId).includes(targetUserId);
+  const list = getStoredFollowingIds(currentUserId);
+  const cleanTarget = targetUserId.replace(/^@+/, '').trim().toLowerCase();
+  return list.some(id => {
+    const cleanId = id.replace(/^@+/, '').trim().toLowerCase();
+    return id === targetUserId || cleanId === cleanTarget;
+  });
 }
 
 export interface ToggleFollowResult {
@@ -254,13 +259,23 @@ export function setStoredFollowersMap(map: Record<string, string[]>): void {
 
 export function getFollowersForUser(targetUserId: string, allUsers: User[], currentUserId?: string): User[] {
   if (!targetUserId) return [];
+  const cleanTarget = targetUserId.replace(/^@+/, '').trim().toLowerCase();
   const map = getStoredFollowersMap();
-  const candidates = allUsers.filter(u => u.id !== targetUserId && u.id !== 'guest');
+  const candidates = allUsers.filter(u => {
+    const uid = u.id ? String(u.id).toLowerCase() : '';
+    const uuser = u.username ? u.username.replace(/^@+/, '').toLowerCase() : '';
+    return uid !== cleanTarget && uuser !== cleanTarget && u.id !== 'guest';
+  });
 
-  if (map[targetUserId] && Array.isArray(map[targetUserId])) {
-    const idSet = new Set(map[targetUserId]);
-    const list = candidates.filter(u => idSet.has(u.id));
-    if (currentUserId && idSet.has(currentUserId) && !list.some(u => u.id === currentUserId)) {
+  const followersList = map[targetUserId] || map[cleanTarget] || map['@' + cleanTarget] || [];
+  if (Array.isArray(followersList) && followersList.length > 0) {
+    const idSet = new Set(followersList.map(id => id.replace(/^@+/, '').toLowerCase()));
+    const list = candidates.filter(u => {
+      const uid = u.id ? String(u.id).toLowerCase() : '';
+      const uuser = u.username ? u.username.replace(/^@+/, '').toLowerCase() : '';
+      return idSet.has(uid) || idSet.has(uuser);
+    });
+    if (currentUserId && idSet.has(currentUserId.replace(/^@+/, '').toLowerCase()) && !list.some(u => u.id === currentUserId)) {
       const me = allUsers.find(u => u.id === currentUserId);
       if (me) list.push(me);
     }
