@@ -44,6 +44,16 @@ import {
 } from '../utils/followStorage';
 import './ProfilePage.css';
 
+const getPluralForm = (n: number, one: string, few: string, many: string) => {
+  const abs = Math.abs(Math.floor(n));
+  const mod10 = abs % 10;
+  const mod100 = abs % 100;
+  if (mod100 >= 11 && mod100 <= 19) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+};
+
 export function ProfilePage() {
   const { userId } = useParams();
   const navigate = useNavigate();
@@ -324,17 +334,24 @@ export function ProfilePage() {
   }, [profileData, activeUser?.friendsCount]);
 
   const followersDisplayCount = useMemo(() => {
-    const fromApi = (profileData as any)?.followersCount ?? activeUser?.followersCount ?? 0;
-    return Math.max(fromApi, realFollowersList.length);
-  }, [profileData, activeUser?.followersCount, realFollowersList.length]);
+    if (profileData && typeof (profileData as any).followersCount === 'number') {
+      return (profileData as any).followersCount;
+    }
+    return realFollowersList.length;
+  }, [profileData, realFollowersList.length]);
 
   const followingDisplayCount = useMemo(() => {
     if (isMe) {
-      return Math.max(followingIds.length, currentUser?.followingCount || 0);
+      if (profileData && typeof (profileData as any).followingCount === 'number') {
+        return (profileData as any).followingCount;
+      }
+      return realFollowingList.length;
     }
-    const fromApi = (profileData as any)?.followingCount ?? activeUser?.followingCount ?? 0;
-    return Math.max(fromApi, realFollowingList.length);
-  }, [isMe, followingIds.length, currentUser?.followingCount, activeUser?.followingCount, realFollowingList.length]);
+    if (profileData && typeof (profileData as any).followingCount === 'number') {
+      return (profileData as any).followingCount;
+    }
+    return realFollowingList.length;
+  }, [isMe, profileData, realFollowingList.length]);
 
   const userHasStories = useMemo(() => {
     if (!activeUser) return false;
@@ -586,23 +603,23 @@ export function ProfilePage() {
               {/* Row 2: Compact Stats (Instagram style) */}
               <div className="profile-stats-compact">
                 <div className="stat-item">
-                  <b>{userPosts.length}</b> публикаций
+                  <b>{userPosts.length}</b> {getPluralForm(userPosts.length, 'публикация', 'публикации', 'публикаций')}
                 </div>
                 <div className="stat-item clickable" onClick={() => setModalType('Друзья')}>
-                  <b>{friendsDisplayCount}</b> друзей
+                  <b>{friendsDisplayCount}</b> {getPluralForm(friendsDisplayCount, 'друг', 'друга', 'друзей')}
                 </div>
                 <div className="stat-item clickable" onClick={() => setModalType('Подписчики')}>
-                  <b>{followersDisplayCount.toLocaleString('ru-RU')}</b> подписчиков
+                  <b>{followersDisplayCount.toLocaleString('ru-RU')}</b> {getPluralForm(followersDisplayCount, 'подписчик', 'подписчика', 'подписчиков')}
                 </div>
                 <div className="stat-item clickable" onClick={() => setModalType('Подписки')}>
-                  <b>{followingDisplayCount.toLocaleString('ru-RU')}</b> подписок
+                  <b>{followingDisplayCount.toLocaleString('ru-RU')}</b> {getPluralForm(followingDisplayCount, 'подписка', 'подписки', 'подписок')}
                 </div>
                 <div className="stat-item">
-                  <b>{(profileData as any)?.clipsCount ?? 0}</b> волны
+                  <b>{(profileData as any)?.clipsCount ?? 0}</b> {getPluralForm((profileData as any)?.clipsCount ?? 0, 'волна', 'волны', 'волн')}
                 </div>
                 <div className="stat-item clickable critic-stat" onClick={() => setModalType('Критики')} title="Пользователи, следящие за профилем в режиме конструктивной критики">
                   <Flame size={14} className="critic-flame-icon" style={{marginRight: '2px'}} />
-                  <b>{realCriticsList.length.toLocaleString('ru-RU')}</b> критиков
+                  <b>{realCriticsList.length.toLocaleString('ru-RU')}</b> {getPluralForm(realCriticsList.length, 'критик', 'критика', 'критиков')}
                 </div>
               </div>
 

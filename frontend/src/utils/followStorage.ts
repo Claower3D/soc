@@ -94,18 +94,26 @@ export function getStoredFollowingIds(currentUserId?: string): string[] {
   try {
     const key = getFollowingStorageKey(currentUserId);
     const raw = localStorage.getItem(key);
-    if (raw !== null) return JSON.parse(raw);
-    if (key !== STORAGE_KEY_FOLLOWING) {
+    let list: string[] = [];
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) list = parsed;
+    } else if (key !== STORAGE_KEY_FOLLOWING) {
       const legacyRaw = localStorage.getItem(STORAGE_KEY_FOLLOWING);
-      if (legacyRaw) return JSON.parse(legacyRaw);
+      if (legacyRaw) {
+        const parsed = JSON.parse(legacyRaw);
+        if (Array.isArray(parsed)) list = parsed;
+      }
     }
+    return Array.from(new Set(list.filter((id: string) => typeof id === 'string' && id && id !== currentUserId && id !== 'guest' && id !== 'me')));
   } catch { /* ignore */ }
   return [];
 }
 
 export function setStoredFollowingIds(ids: string[], currentUserId?: string): void {
   const key = getFollowingStorageKey(currentUserId);
-  localStorage.setItem(key, JSON.stringify(ids));
+  const cleanIds = Array.from(new Set(ids.filter((id: string) => typeof id === 'string' && id && id !== currentUserId && id !== 'guest' && id !== 'me')));
+  localStorage.setItem(key, JSON.stringify(cleanIds));
   window.dispatchEvent(new Event('follow_change'));
 }
 

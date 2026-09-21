@@ -8,7 +8,8 @@ import {
   getFollowingForUser,
   isUserFollowed,
   toggleUserFollowAsync,
-  toggleUserFollow
+  toggleUserFollow,
+  cacheUser
 } from '../utils/followStorage';
 import { api } from '../api';
 import './FollowersModal.css';
@@ -74,6 +75,7 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
 
         if (Array.isArray(rawList) && rawList.length > 0) {
           remoteUsers = rawList;
+          remoteUsers.forEach(u => cacheUser(u as any));
         }
       } catch {
         // network or server fallback

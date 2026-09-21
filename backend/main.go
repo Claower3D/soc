@@ -358,6 +358,19 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 		return nil, fmt.Errorf("ошибка создания таблиц в БД: %w", err)
 	}
 
+	// Очистка битых/осиротевших связей (если пользователь был удален)
+	_, _ = conn.Exec(`
+		DELETE FROM user_relationships 
+		WHERE follower_id NOT IN (SELECT id FROM users) 
+		   OR target_id NOT IN (SELECT id FROM users);
+	`)
+	// Актуализация счетчиков подписок и подписчиков в таблице users
+	_, _ = conn.Exec(`
+		UPDATE users u SET 
+		  following_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u2 ON r.target_id = u2.id WHERE r.follower_id = u.id AND r.rel_type = 'follow'),
+		  followers_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u2 ON r.follower_id = u2.id WHERE r.target_id = u.id AND r.rel_type = 'follow');
+	`)
+
 	return conn, nil
 }
 
@@ -477,7 +490,23 @@ func (s *UserStore) loadFromDisk() {
 		s.accounts = data.Accounts
 	}
 	if data.Relationships != nil {
-		s.relationships = data.Relationships
+		s.relationships = make(map[string][]string)
+		for fid, targets := range data.Relationships {
+			var valid []string
+			for _, tid := range targets {
+				if _, ok := s.accounts[tid]; ok {
+					valid = append(valid, tid)
+					continue
+				}
+				for _, mu := range mockUsers {
+					if mu.ID == tid {
+						valid = append(valid, tid)
+						break
+					}
+				}
+			}
+			s.relationships[fid] = valid
+		}
 	}
 	if data.Posts != nil {
 		s.posts = data.Posts
@@ -1820,6 +1849,7 @@ func handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		)
 		if err == nil {
 			u.Online = true
+			u.FollowersCount, u.FollowingCount, u.FriendsCount = getDBRelationshipCounts(u.ID)
 			user = &u
 		}
 	}
@@ -1830,7 +1860,9 @@ func handleAuthMe(w http.ResponseWriter, r *http.Request) {
 		account, exists := store.accounts[claims.UserID]
 		store.mu.RUnlock()
 		if exists {
-			user = &account.User
+			uCopy := account.User
+			uCopy.FollowersCount, uCopy.FollowingCount, uCopy.FriendsCount = getRelationshipCounts(claims.UserID)
+			user = &uCopy
 		}
 	}
 
@@ -2011,22 +2043,35 @@ func getRelationshipCounts(targetID string) (followersCount, followingCount, fri
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
-	following := store.relationships[targetID]
-	followingCount = len(following)
+	userExists := func(id string) bool {
+		if _, ok := store.accounts[id]; ok {
+			return true
+		}
+		for _, mu := range mockUsers {
+			if mu.ID == id {
+				return true
+			}
+		}
+		return false
+	}
 
-	followingMap := make(map[string]bool, len(following))
+	following := store.relationships[targetID]
+	validFollowingMap := make(map[string]bool)
 	for _, id := range following {
-		followingMap[id] = true
+		if userExists(id) {
+			followingCount++
+			validFollowingMap[id] = true
+		}
 	}
 
 	for followerID, targets := range store.relationships {
-		if followerID == targetID {
+		if followerID == targetID || !userExists(followerID) {
 			continue
 		}
 		for _, tid := range targets {
 			if tid == targetID {
 				followersCount++
-				if followingMap[followerID] {
+				if validFollowingMap[followerID] {
 					friendsCount++
 				}
 				break
@@ -2040,11 +2085,24 @@ func getDBRelationshipCounts(targetID string) (followersCount, followingCount, f
 	if db == nil {
 		return 0, 0, 0
 	}
-	db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE target_id = $1 AND rel_type = 'follow'", targetID).Scan(&followersCount)
-	db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND rel_type = 'follow'", targetID).Scan(&followingCount)
+	db.QueryRow(`
+		SELECT COUNT(*) 
+		FROM user_relationships r 
+		JOIN users u ON r.follower_id = u.id 
+		WHERE r.target_id = $1 AND r.rel_type = 'follow'
+	`, targetID).Scan(&followersCount)
+
+	db.QueryRow(`
+		SELECT COUNT(*) 
+		FROM user_relationships r 
+		JOIN users u ON r.target_id = u.id 
+		WHERE r.follower_id = $1 AND r.rel_type = 'follow'
+	`, targetID).Scan(&followingCount)
+
 	db.QueryRow(`
 		SELECT COUNT(*) FROM user_relationships r1
 		JOIN user_relationships r2 ON r1.follower_id = r2.target_id AND r1.target_id = r2.follower_id
+		JOIN users u ON r1.target_id = u.id
 		WHERE r1.follower_id = $1 AND r1.rel_type = 'follow' AND r2.rel_type = 'follow'
 	`, targetID).Scan(&friendsCount)
 	return
@@ -2079,8 +2137,8 @@ func handleFollow(w http.ResponseWriter, r *http.Request) {
 			VALUES ($1, $2, $3, 'follow') ON CONFLICT DO NOTHING
 		`, uuid.New().String(), claims.UserID, targetID)
 		if err == nil {
-			db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships WHERE target_id = $1 AND rel_type = 'follow') WHERE id = $1", targetID)
-			db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND rel_type = 'follow') WHERE id = $1", claims.UserID)
+			db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.follower_id = u.id WHERE r.target_id = $1 AND r.rel_type = 'follow') WHERE id = $1", targetID)
+			db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.target_id = u.id WHERE r.follower_id = $1 AND r.rel_type = 'follow') WHERE id = $1", claims.UserID)
 		}
 
 		followers, _, friends := getDBRelationshipCounts(targetID)
@@ -2207,8 +2265,8 @@ func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 			WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'
 		`, claims.UserID, targetID)
 		if err == nil {
-			db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships WHERE target_id = $1 AND rel_type = 'follow') WHERE id = $1", targetID)
-			db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND rel_type = 'follow') WHERE id = $1", claims.UserID)
+			db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.follower_id = u.id WHERE r.target_id = $1 AND r.rel_type = 'follow') WHERE id = $1", targetID)
+			db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.target_id = u.id WHERE r.follower_id = $1 AND r.rel_type = 'follow') WHERE id = $1", claims.UserID)
 		}
 
 		followers, _, friends := getDBRelationshipCounts(targetID)
@@ -2609,10 +2667,10 @@ func handleRemoveFriend(w http.ResponseWriter, r *http.Request) {
 		// Remove both directions
 		db.Exec(`DELETE FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'`, claims.UserID, targetID)
 		db.Exec(`DELETE FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'`, targetID, claims.UserID)
-		db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships WHERE target_id = $1 AND rel_type = 'follow') WHERE id = $1", targetID)
-		db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND rel_type = 'follow') WHERE id = $1", targetID)
-		db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships WHERE target_id = $1 AND rel_type = 'follow') WHERE id = $1", claims.UserID)
-		db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND rel_type = 'follow') WHERE id = $1", claims.UserID)
+		db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.follower_id = u.id WHERE r.target_id = $1 AND r.rel_type = 'follow') WHERE id = $1", targetID)
+		db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.target_id = u.id WHERE r.follower_id = $1 AND r.rel_type = 'follow') WHERE id = $1", targetID)
+		db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.follower_id = u.id WHERE r.target_id = $1 AND r.rel_type = 'follow') WHERE id = $1", claims.UserID)
+		db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.target_id = u.id WHERE r.follower_id = $1 AND r.rel_type = 'follow') WHERE id = $1", claims.UserID)
 
 		followers, _, friends := getDBRelationshipCounts(targetID)
 		_, myFollowing, _ := getDBRelationshipCounts(claims.UserID)
