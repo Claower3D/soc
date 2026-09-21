@@ -215,3 +215,15 @@
   background: var(--color-bg-tertiary);
   border-color: var(--color-text-tertiary);
 }
+
+.follower-btn.is-friend {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.follower-btn.is-friend:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.25);
+}

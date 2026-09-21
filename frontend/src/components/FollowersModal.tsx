@@ -1,12 +1,16 @@
-import { X, Search, UserMinus } from 'lucide-react';
+import { X, Search, UserMinus, UserCheck, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   getAllUsersPool, 
   getFollowersForUser, 
-  getFollowingForUser 
+  getFollowingForUser,
+  isUserFollowed,
+  toggleUserFollowAsync,
+  toggleUserFollow
 } from '../utils/followStorage';
+import { api } from '../api';
 import './FollowersModal.css';
 
 type Tab = 'friends' | 'followers' | 'following';
@@ -27,6 +31,7 @@ interface SimpleUser {
   bio?: string;
   verified?: boolean;
   isFriend?: boolean;
+  isFollowed?: boolean;
 }
 
 export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: FollowersModalProps) {
@@ -38,6 +43,7 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
   const [users, setUsers] = useState<SimpleUser[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [followRevision, setFollowRevision] = useState(0);
 
   // Load users when tab changes
   useEffect(() => {
@@ -80,11 +86,11 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
           const localList = getFollowersForUser(currentUserId, pool, currentUser?.id);
           remoteUsers = localList as SimpleUser[];
         } else if (activeTab === 'following') {
-          const localList = getFollowingForUser(currentUserId, pool, !!isMe);
+          const localList = getFollowingForUser(currentUserId, pool, !!isMe, currentUser?.id);
           remoteUsers = localList as SimpleUser[];
         } else if (activeTab === 'friends') {
           const myFollowers = getFollowersForUser(currentUserId, pool, currentUser?.id);
-          const myFollowing = getFollowingForUser(currentUserId, pool, !!isMe);
+          const myFollowing = getFollowingForUser(currentUserId, pool, !!isMe, currentUser?.id);
           const followingIds = new Set(myFollowing.map(u => u.id));
           remoteUsers = myFollowers.filter(u => followingIds.has(u.id)) as SimpleUser[];
         }
@@ -95,26 +101,37 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
     };
 
     fetchUsers();
-  }, [isOpen, activeTab, currentUserId, currentUser, allAccounts, isMe]);
+  }, [isOpen, activeTab, currentUserId, currentUser, allAccounts, isMe, followRevision]);
 
   if (!isOpen) return null;
 
   const filteredUsers = search.trim()
     ? users.filter(u =>
-        u.name.toLowerCase().includes(search.toLowerCase()) ||
-        u.username.toLowerCase().includes(search.toLowerCase())
+        (u.name && u.name.toLowerCase().includes(search.toLowerCase())) ||
+        (u.username && u.username.toLowerCase().includes(search.toLowerCase()))
       )
     : users;
 
   const handleRemoveFriend = async (userId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const token = localStorage.getItem('new_age_jwt_token') || localStorage.getItem('newage_token') || '';
-      await fetch(`/api/users/${userId}/friend`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      await api.users.removeFriend(userId);
+      toggleUserFollow(userId, currentUser?.id);
       setUsers(prev => prev.filter(u => u.id !== userId));
+      setFollowRevision(r => r + 1);
+    } catch { /* ignore */ }
+  };
+
+  const handleToggleFollowFromModal = async (targetUser: SimpleUser, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const isCurrentlyFollowing = isUserFollowed(targetUser.id, currentUser?.id);
+      await toggleUserFollowAsync(targetUser.id, currentUser?.id, targetUser as any);
+      setFollowRevision(r => r + 1);
+
+      if (activeTab === 'following' && isMe && isCurrentlyFollowing) {
+        setUsers(prev => prev.filter(u => u.id !== targetUser.id));
+      }
     } catch { /* ignore */ }
   };
 
@@ -172,6 +189,8 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
             <div className="followers-list">
               {filteredUsers.map(user => {
                 const isMeUser = currentUser?.id === user.id;
+                const followedByMe = isUserFollowed(user.id, currentUser?.id);
+
                 return (
                   <div
                     key={user.id}
@@ -187,13 +206,64 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
                       <span className="follower-name">@{user.username || user.name}</span>
                       <span className="follower-username">{user.name}</span>
                     </div>
-                    {!isMeUser && activeTab === 'friends' && isMe && (
-                      <button
-                        className="follower-btn remove-friend"
-                        onClick={e => handleRemoveFriend(user.id, e)}
-                      >
-                        <UserMinus size={14} /> Удалить
-                      </button>
+
+                    {!isMeUser && (
+                      <div className="follower-action" onClick={e => e.stopPropagation()}>
+                        {activeTab === 'friends' && isMe ? (
+                          <button
+                            className="follower-btn remove-friend"
+                            onClick={e => handleRemoveFriend(user.id, e)}
+                            title="Удалить из друзей"
+                          >
+                            <UserMinus size={14} /> Удалить
+                          </button>
+                        ) : activeTab === 'following' && isMe ? (
+                          <button
+                            className="follower-btn following"
+                            onClick={e => handleToggleFollowFromModal(user, e)}
+                            title="Отписаться"
+                          >
+                            <UserCheck size={14} /> Отписаться
+                          </button>
+                        ) : activeTab === 'followers' && isMe ? (
+                          followedByMe ? (
+                            <button
+                              className="follower-btn following"
+                              onClick={e => handleToggleFollowFromModal(user, e)}
+                              title="Вы подписаны (нажмите, чтобы отписаться)"
+                            >
+                              <UserCheck size={14} /> Вы подписаны
+                            </button>
+                          ) : (
+                            <button
+                              className="follower-btn not-following"
+                              onClick={e => handleToggleFollowFromModal(user, e)}
+                              title="Подписаться в ответ"
+                            >
+                              <UserPlus size={14} /> В ответ
+                            </button>
+                          )
+                        ) : (
+                          // Viewing another user's list
+                          followedByMe ? (
+                            <button
+                              className="follower-btn following"
+                              onClick={e => handleToggleFollowFromModal(user, e)}
+                              title="Отписаться"
+                            >
+                              <UserCheck size={14} /> Вы подписаны
+                            </button>
+                          ) : (
+                            <button
+                              className="follower-btn not-following"
+                              onClick={e => handleToggleFollowFromModal(user, e)}
+                              title="Подписаться"
+                            >
+                              <UserPlus size={14} /> Подписаться
+                            </button>
+                          )
+                        )}
+                      </div>
                     )}
                   </div>
                 );

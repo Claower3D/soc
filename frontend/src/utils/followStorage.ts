@@ -76,39 +76,68 @@ export function getAllUsersPool(currentUser?: User, allAccounts: RegisteredAccou
 
 // ==================== ПОДПИСКИ (FOLLOWING) ====================
 
-export function getStoredFollowingIds(): string[] {
+function getFollowingStorageKey(currentUserId?: string): string {
+  if (currentUserId && currentUserId !== 'guest') {
+    return `new_age_following_map_${currentUserId}`;
+  }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_FOLLOWING);
+    const raw = localStorage.getItem('new_age_user');
+    if (raw) {
+      const u = JSON.parse(raw);
+      if (u?.id && u.id !== 'guest') return `new_age_following_map_${u.id}`;
+    }
+  } catch { /* ignore */ }
+  return STORAGE_KEY_FOLLOWING;
+}
+
+export function getStoredFollowingIds(currentUserId?: string): string[] {
+  try {
+    const key = getFollowingStorageKey(currentUserId);
+    const raw = localStorage.getItem(key);
     if (raw !== null) return JSON.parse(raw);
+    if (key !== STORAGE_KEY_FOLLOWING) {
+      const legacyRaw = localStorage.getItem(STORAGE_KEY_FOLLOWING);
+      if (legacyRaw) return JSON.parse(legacyRaw);
+    }
   } catch { /* ignore */ }
   return [];
 }
 
-export function setStoredFollowingIds(ids: string[]): void {
-  localStorage.setItem(STORAGE_KEY_FOLLOWING, JSON.stringify(ids));
+export function setStoredFollowingIds(ids: string[], currentUserId?: string): void {
+  const key = getFollowingStorageKey(currentUserId);
+  localStorage.setItem(key, JSON.stringify(ids));
   window.dispatchEvent(new Event('follow_change'));
 }
 
-export function isUserFollowed(targetUserId: string): boolean {
+export function isUserFollowed(targetUserId: string, currentUserId?: string): boolean {
   if (!targetUserId) return false;
-  return getStoredFollowingIds().includes(targetUserId);
+  return getStoredFollowingIds(currentUserId).includes(targetUserId);
+}
+
+export interface ToggleFollowResult {
+  isFollowed: boolean;
+  isFriend: boolean;
+  status: string;
+  followersCount?: number;
+  followingCount?: number;
+  friendsCount?: number;
 }
 
 // Подписаться/Отписаться — синхронизирует и свои подписки, и чужих подписчиков!
 export function toggleUserFollow(targetUserId: string, currentUserId?: string, targetUser?: User): boolean {
   if (!targetUserId) return false;
 
-  const followingIds = getStoredFollowingIds();
+  const followingIds = getStoredFollowingIds(currentUserId);
   const isCurrentlyFollowing = followingIds.includes(targetUserId);
   let isNowFollowing: boolean;
 
   // 1. Обновляем свой список подписок (following)
   if (isCurrentlyFollowing) {
-    setStoredFollowingIds(followingIds.filter(id => id !== targetUserId));
+    setStoredFollowingIds(followingIds.filter(id => id !== targetUserId), currentUserId);
     isNowFollowing = false;
     api.users.unfollow(targetUserId).catch(() => {});
   } else {
-    setStoredFollowingIds([...followingIds, targetUserId]);
+    setStoredFollowingIds([...followingIds, targetUserId], currentUserId);
     isNowFollowing = true;
     api.users.follow(targetUserId).catch(() => {});
   }
@@ -138,6 +167,68 @@ export function toggleUserFollow(targetUserId: string, currentUserId?: string, t
   return isNowFollowing;
 }
 
+// Асинхронная версия с получением точного статуса взаимной дружбы от бекенда
+export async function toggleUserFollowAsync(
+  targetUserId: string, 
+  currentUserId?: string, 
+  targetUser?: User
+): Promise<ToggleFollowResult> {
+  if (!targetUserId) return { isFollowed: false, isFriend: false, status: 'none' };
+
+  const followingIds = getStoredFollowingIds(currentUserId);
+  const isCurrentlyFollowing = followingIds.includes(targetUserId);
+  let isNowFollowing: boolean;
+
+  let backendData: any = null;
+  try {
+    if (isCurrentlyFollowing) {
+      backendData = await api.users.unfollow(targetUserId);
+    } else {
+      backendData = await api.users.follow(targetUserId);
+    }
+  } catch (err) {
+    console.warn('Backend follow toggle error, using local fallback:', err);
+  }
+
+  if (isCurrentlyFollowing) {
+    setStoredFollowingIds(followingIds.filter(id => id !== targetUserId), currentUserId);
+    isNowFollowing = false;
+  } else {
+    setStoredFollowingIds([...followingIds, targetUserId], currentUserId);
+    isNowFollowing = true;
+  }
+
+  if (currentUserId && currentUserId !== 'guest') {
+    const followersMap = getStoredFollowersMap();
+    const currentFollowers = followersMap[targetUserId] ? [...followersMap[targetUserId]] : [];
+    const index = currentFollowers.indexOf(currentUserId);
+
+    if (isNowFollowing) {
+      if (index === -1) currentFollowers.push(currentUserId);
+    } else {
+      if (index >= 0) currentFollowers.splice(index, 1);
+    }
+
+    followersMap[targetUserId] = currentFollowers;
+    localStorage.setItem(STORAGE_KEY_FOLLOWERS_MAP, JSON.stringify(followersMap));
+  }
+
+  if (targetUser) {
+    cacheUser(targetUser);
+  }
+
+  window.dispatchEvent(new Event('follow_change'));
+
+  return {
+    isFollowed: isNowFollowing,
+    isFriend: backendData?.isFriend ?? false,
+    status: backendData?.status ?? (isNowFollowing ? 'pending' : 'none'),
+    followersCount: backendData?.followersCount,
+    followingCount: backendData?.followingCount,
+    friendsCount: backendData?.friendsCount,
+  };
+}
+
 // ==================== ПОДПИСЧИКИ (FOLLOWERS) ====================
 
 export function getStoredFollowersMap(): Record<string, string[]> {
@@ -161,7 +252,6 @@ export function getFollowersForUser(targetUserId: string, allUsers: User[], curr
   if (map[targetUserId] && Array.isArray(map[targetUserId])) {
     const idSet = new Set(map[targetUserId]);
     const list = candidates.filter(u => idSet.has(u.id));
-    // Если текущий юзер подписан, но его нет среди кандидатов пула, гарантируем его наличие
     if (currentUserId && idSet.has(currentUserId) && !list.some(u => u.id === currentUserId)) {
       const me = allUsers.find(u => u.id === currentUserId);
       if (me) list.push(me);
@@ -172,12 +262,12 @@ export function getFollowersForUser(targetUserId: string, allUsers: User[], curr
   return [];
 }
 
-export function getFollowingForUser(targetUserId: string, allUsers: User[], isMe: boolean): User[] {
+export function getFollowingForUser(targetUserId: string, allUsers: User[], isMe: boolean, currentUserId?: string): User[] {
   if (!targetUserId) return [];
   const candidates = allUsers.filter(u => u.id !== targetUserId && u.id !== 'guest');
 
   if (isMe) {
-    const myFollowingIds = new Set(getStoredFollowingIds());
+    const myFollowingIds = new Set(getStoredFollowingIds(currentUserId));
     return candidates.filter(u => myFollowingIds.has(u.id));
   }
 

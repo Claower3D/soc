@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Grid, Video as VideoIcon, Headphones, Bookmark, 
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
-  UserCheck, UserPlus, Share2, Edit3, Heart, MessageSquare,
+  UserCheck, UserPlus, Users, Share2, Edit3, Heart, MessageSquare,
   CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn, Plus, Brain, Sparkles,
   Calendar, Moon
 } from 'lucide-react';
@@ -33,6 +33,7 @@ import {
   getStoredFollowingIds, 
   isUserFollowed, 
   toggleUserFollow, 
+  toggleUserFollowAsync,
   getFollowersForUser,
   getFollowingForUser,
   getCriticsForUser,
@@ -197,19 +198,19 @@ export function ProfilePage() {
   // For compatibility with legacy code expecting `user`
   const user: User = activeUser;
 
-  const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds());
+  const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds(currentUser?.id));
   const [socialRevision, setSocialRevision] = useState(0);
-  const isFollowing = useMemo(() => activeUser ? isUserFollowed(activeUser.id) : false, [activeUser?.id, followingIds]);
+  const isFollowing = useMemo(() => activeUser ? isUserFollowed(activeUser.id, currentUser?.id) : false, [activeUser?.id, followingIds, currentUser?.id]);
 
   // Live sync with external follow & critic changes
   useEffect(() => {
     const handleSync = () => {
-      setFollowingIds(getStoredFollowingIds());
+      setFollowingIds(getStoredFollowingIds(currentUser?.id));
       setSocialRevision(r => r + 1);
     };
     window.addEventListener('follow_change', handleSync);
     return () => window.removeEventListener('follow_change', handleSync);
-  }, []);
+  }, [currentUser?.id]);
 
   const realFollowersList = useMemo(() => {
     if (!activeUser) return [];
@@ -218,8 +219,8 @@ export function ProfilePage() {
 
   const realFollowingList = useMemo(() => {
     if (!activeUser) return [];
-    return getFollowingForUser(activeUser.id, poolUsers, !!isMe);
-  }, [activeUser, poolUsers, isMe, socialRevision]);
+    return getFollowingForUser(activeUser.id, poolUsers, !!isMe, currentUser?.id);
+  }, [activeUser, poolUsers, isMe, socialRevision, currentUser?.id]);
 
   const realCriticsList = useMemo(() => {
     if (!activeUser) return [];
@@ -232,14 +233,27 @@ export function ProfilePage() {
   }, [activeUser?.id, currentUser?.id, socialRevision]);
 
   const [profileData, setProfileData] = useState<Partial<User> | null>(null);
+  const [friendStatus, setFriendStatus] = useState<'none' | 'following' | 'friends'>('none');
+  const [followActionLoading, setFollowActionLoading] = useState(false);
 
   useEffect(() => {
     if (activeUser?.id && activeUser.id !== 'guest') {
       api.users.profile(activeUser.id).then((res) => {
-        if (res?.user) setProfileData(res.user);
+        if (res?.user) {
+          setProfileData(res.user);
+          if (!isMe) {
+            if (res.user.isFriend) {
+              setFriendStatus('friends');
+            } else if (res.user.isFollowed || isUserFollowed(activeUser.id, currentUser?.id)) {
+              setFriendStatus('following');
+            } else {
+              setFriendStatus('none');
+            }
+          }
+        }
       }).catch(console.warn);
     }
-  }, [activeUser?.id]);
+  }, [activeUser?.id, isMe, currentUser?.id]);
 
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'podcasts' | 'saved' | 'shop'>('posts');
   const [modalType, setModalType] = useState<'Подписчики' | 'Подписки' | 'Критики' | 'Друзья' | null>(null);
@@ -247,6 +261,10 @@ export function ProfilePage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isConsciousnessModalOpen, setIsConsciousnessModalOpen] = useState(false);
+
+  const friendsDisplayCount = useMemo(() => {
+    return (profileData as any)?.friendsCount ?? activeUser?.friendsCount ?? 0;
+  }, [profileData, activeUser?.friendsCount]);
 
   const followersDisplayCount = useMemo(() => {
     const fromApi = (profileData as any)?.followersCount ?? activeUser?.followersCount ?? 0;
@@ -301,15 +319,54 @@ export function ProfilePage() {
     return profileProducts.filter(p => p.seller.id === activeUser.id || (isMe && (p.seller.id === 'me' || p.seller.id === currentUser.id)));
   }, [profileProducts, activeUser, isMe, currentUser]);
 
-  const handleToggleFollow = () => {
+  const handleToggleFollow = async () => {
     if (!isAuthenticated) {
       setAuthModalOpen(true);
       return;
     }
-    if (activeUser && activeUser.id) {
-      toggleUserFollow(activeUser.id, currentUser?.id, activeUser);
-      setFollowingIds(getStoredFollowingIds());
-      setSocialRevision(r => r + 1);
+    if (!activeUser || !activeUser.id) return;
+
+    setFollowActionLoading(true);
+    try {
+      if (friendStatus === 'friends') {
+        await api.users.removeFriend(activeUser.id);
+        toggleUserFollow(activeUser.id, currentUser?.id, activeUser);
+        setFriendStatus('none');
+        setFollowingIds(getStoredFollowingIds(currentUser?.id));
+        setSocialRevision(r => r + 1);
+        setProfileData(prev => prev ? {
+          ...prev,
+          isFriend: false,
+          isFollowed: false,
+          friendsCount: Math.max(0, ((prev as any).friendsCount || 1) - 1),
+          followersCount: Math.max(0, ((prev as any).followersCount || 1) - 1)
+        } : null);
+      } else {
+        const res = await toggleUserFollowAsync(activeUser.id, currentUser?.id, activeUser);
+        setFollowingIds(getStoredFollowingIds(currentUser?.id));
+        setSocialRevision(r => r + 1);
+
+        if (res.isFriend || res.status === 'accepted') {
+          setFriendStatus('friends');
+        } else if (res.isFollowed) {
+          setFriendStatus('following');
+        } else {
+          setFriendStatus('none');
+        }
+
+        setProfileData(prev => prev ? {
+          ...prev,
+          isFriend: res.isFriend,
+          isFollowed: res.isFollowed,
+          friendsCount: res.friendsCount ?? (prev as any).friendsCount,
+          followersCount: res.followersCount ?? (prev as any).followersCount,
+          followingCount: res.followingCount ?? (prev as any).followingCount
+        } : null);
+      }
+    } catch (err) {
+      console.error('Follow toggle error:', err);
+    } finally {
+      setFollowActionLoading(false);
     }
   };
 
@@ -461,7 +518,7 @@ export function ProfilePage() {
                   <b>{userPosts.length}</b> публикаций
                 </div>
                 <div className="stat-item clickable" onClick={() => setModalType('Друзья')}>
-                  <b>{(profileData as any)?.friendsCount ?? 0}</b> друзей
+                  <b>{friendsDisplayCount}</b> друзей
                 </div>
                 <div className="stat-item clickable" onClick={() => setModalType('Подписчики')}>
                   <b>{followersDisplayCount.toLocaleString('ru-RU')}</b> подписчиков
@@ -650,7 +707,14 @@ export function ProfilePage() {
             ) : (
               <>
                 <button
-                  className={`btn ${isFollowing ? 'btn-following' : 'btn-primary'}`}
+                  disabled={followActionLoading}
+                  className={`btn ${
+                    friendStatus === 'friends'
+                      ? 'btn-friends'
+                      : friendStatus === 'following'
+                      ? 'btn-following'
+                      : 'btn-primary'
+                  }`}
                   onClick={() => {
                     if (!isAuthenticated) {
                       setAuthModalOpen(true);
@@ -658,10 +722,21 @@ export function ProfilePage() {
                     }
                     handleToggleFollow();
                   }}
+                  title={
+                    friendStatus === 'friends'
+                      ? 'Вы взаимные друзья. Нажмите, чтобы удалить из друзей'
+                      : friendStatus === 'following'
+                      ? 'Вы подписаны. Нажмите, чтобы отписаться'
+                      : 'Подписаться на пользователя'
+                  }
                 >
-                  {isFollowing ? (
+                  {friendStatus === 'friends' ? (
                     <>
-                      <UserCheck size={16} /> Подписки
+                      <Users size={16} /> В друзьях
+                    </>
+                  ) : friendStatus === 'following' ? (
+                    <>
+                      <UserCheck size={16} /> Вы подписаны
                     </>
                   ) : (
                     <>

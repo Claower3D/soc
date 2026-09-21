@@ -591,13 +591,21 @@ func main() {
 	mux.HandleFunc("POST /api/auth/send-code", handleSendCode)
 	mux.HandleFunc("POST /api/auth/verify-code", handleVerifyCode)
 
-	// Подписки и профили
+	// Подписки и друзья (полная совместимость с E:\соц и текущей архитектурой)
 	mux.HandleFunc("POST /api/users/{id}/follow", handleFollow)
 	mux.HandleFunc("DELETE /api/users/{id}/follow", handleUnfollow)
+	mux.HandleFunc("POST /api/friends/request/{id}", handleFollow)
+	mux.HandleFunc("DELETE /api/friends/{id}", handleUnfollow)
+	mux.HandleFunc("GET /api/friends", handleMyFriends)
+	mux.HandleFunc("GET /api/friends/requests", handleFriendRequests)
 	mux.HandleFunc("GET /api/users/{id}/followers", handleFollowers)
 	mux.HandleFunc("GET /api/users/{id}/following", handleFollowing)
 	mux.HandleFunc("GET /api/users/{id}/friends", handleFriends)
 	mux.HandleFunc("DELETE /api/users/{id}/friend", handleRemoveFriend)
+	mux.HandleFunc("GET /api/profile/{id}", handleUserProfile)
+	mux.HandleFunc("GET /api/profile/{id}/followers", handleFollowers)
+	mux.HandleFunc("GET /api/profile/{id}/following", handleFollowing)
+	mux.HandleFunc("GET /api/profile/{id}/friends", handleFriends)
 	mux.HandleFunc("GET /api/users/{id}/profile", handleUserProfile)
 	mux.HandleFunc("PUT /api/profile", handleUpdateProfile)
 
@@ -1848,7 +1856,50 @@ func handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /api/users/{id}/follow
+func getRelationshipCounts(targetID string) (followersCount, followingCount, friendsCount int) {
+	store.mu.RLock()
+	defer store.mu.RUnlock()
+
+	following := store.relationships[targetID]
+	followingCount = len(following)
+
+	followingMap := make(map[string]bool, len(following))
+	for _, id := range following {
+		followingMap[id] = true
+	}
+
+	for followerID, targets := range store.relationships {
+		if followerID == targetID {
+			continue
+		}
+		for _, tid := range targets {
+			if tid == targetID {
+				followersCount++
+				if followingMap[followerID] {
+					friendsCount++
+				}
+				break
+			}
+		}
+	}
+	return
+}
+
+func getDBRelationshipCounts(targetID string) (followersCount, followingCount, friendsCount int) {
+	if db == nil {
+		return 0, 0, 0
+	}
+	db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE target_id = $1 AND rel_type = 'follow'", targetID).Scan(&followersCount)
+	db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND rel_type = 'follow'", targetID).Scan(&followingCount)
+	db.QueryRow(`
+		SELECT COUNT(*) FROM user_relationships r1
+		JOIN user_relationships r2 ON r1.follower_id = r2.target_id AND r1.target_id = r2.follower_id
+		WHERE r1.follower_id = $1 AND r1.rel_type = 'follow' AND r2.rel_type = 'follow'
+	`, targetID).Scan(&friendsCount)
+	return
+}
+
+// POST /api/users/{id}/follow & POST /api/friends/request/{id}
 func handleFollow(w http.ResponseWriter, r *http.Request) {
 	token := extractBearerToken(r)
 	claims, err := parseAndValidateJWT(token)
@@ -1877,50 +1928,110 @@ func handleFollow(w http.ResponseWriter, r *http.Request) {
 			VALUES ($1, $2, $3, 'follow') ON CONFLICT DO NOTHING
 		`, uuid.New().String(), claims.UserID, targetID)
 		if err == nil {
-			db.Exec("UPDATE users SET followers_count = followers_count + 1 WHERE id = $1", targetID)
-			db.Exec("UPDATE users SET following_count = following_count + 1 WHERE id = $1", claims.UserID)
-		}
-	} else {
-		store.mu.Lock()
-		targetID = rawTarget
-		for id, acc := range store.accounts {
-			if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
-				targetID = id
-				break
-			}
+			db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships WHERE target_id = $1 AND rel_type = 'follow') WHERE id = $1", targetID)
+			db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND rel_type = 'follow') WHERE id = $1", claims.UserID)
 		}
 
-		if claims.UserID == targetID {
-			store.mu.Unlock()
-			writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Нельзя подписаться на самого себя"})
-			return
+		followers, _, friends := getDBRelationshipCounts(targetID)
+		_, myFollowing, _ := getDBRelationshipCounts(claims.UserID)
+
+		var reverseCount int
+		db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'", targetID, claims.UserID).Scan(&reverseCount)
+		isFriend := reverseCount > 0
+
+		status := "pending"
+		msg := "Вы подписались"
+		if isFriend {
+			status = "accepted"
+			msg = "Взаимная подписка! Вы теперь друзья"
 		}
 
-		alreadyFollowing := false
-		for _, tid := range store.relationships[claims.UserID] {
-			if tid == targetID {
-				alreadyFollowing = true
-				break
-			}
-		}
-		if !alreadyFollowing {
-			store.relationships[claims.UserID] = append(store.relationships[claims.UserID], targetID)
-			if targetAcc, ok := store.accounts[targetID]; ok {
-				targetAcc.User.FollowersCount++
-				store.accounts[targetID] = targetAcc
-			}
-			if myAcc, ok := store.accounts[claims.UserID]; ok {
-				myAcc.User.FollowingCount++
-				store.accounts[claims.UserID] = myAcc
-			}
-		}
-		store.mu.Unlock()
+		writeJSON(w, http.StatusOK, Response{
+			Status:  "ok",
+			Message: msg,
+			Data: map[string]interface{}{
+				"status":         status,
+				"isFollowed":     true,
+				"isFriend":       isFriend,
+				"followersCount": followers,
+				"followingCount": myFollowing,
+				"friendsCount":   friends,
+			},
+		})
+		return
 	}
 
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Вы подписались"})
+	// In-memory store
+	store.mu.Lock()
+	targetID = rawTarget
+	for id, acc := range store.accounts {
+		if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
+			targetID = id
+			break
+		}
+	}
+	if targetID == rawTarget {
+		for _, mu := range mockUsers {
+			if strings.ToLower(mu.ID) == cleanTarget || strings.ToLower(mu.Username) == cleanTarget {
+				targetID = mu.ID
+				break
+			}
+		}
+	}
+
+	if claims.UserID == targetID {
+		store.mu.Unlock()
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Нельзя подписаться на самого себя"})
+		return
+	}
+
+	alreadyFollowing := false
+	for _, tid := range store.relationships[claims.UserID] {
+		if tid == targetID {
+			alreadyFollowing = true
+			break
+		}
+	}
+	if !alreadyFollowing {
+		store.relationships[claims.UserID] = append(store.relationships[claims.UserID], targetID)
+	}
+	store.mu.Unlock()
+
+	followers, _, friends := getRelationshipCounts(targetID)
+	_, myFollowing, _ := getRelationshipCounts(claims.UserID)
+
+	isFriend := false
+	store.mu.RLock()
+	for _, tid := range store.relationships[targetID] {
+		if tid == claims.UserID {
+			isFriend = true
+			break
+		}
+	}
+	store.mu.RUnlock()
+
+	status := "pending"
+	msg := "Вы подписались"
+	if isFriend {
+		status = "accepted"
+		msg = "Взаимная подписка! Вы теперь друзья"
+	}
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: msg,
+		Data: map[string]interface{}{
+			"status":         status,
+			"isFollowed":     true,
+			"isFriend":       isFriend,
+			"followersCount": followers,
+			"followingCount": myFollowing,
+			"friendsCount":   friends,
+		},
+	})
 }
 
-// DELETE /api/users/{id}/follow
+// DELETE /api/users/{id}/follow & DELETE /api/friends/{id}
 func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 	token := extractBearerToken(r)
 	claims, err := parseAndValidateJWT(token)
@@ -1939,59 +2050,77 @@ func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 			targetID = rawTarget
 		}
 
-		res, err := db.Exec(`
+		_, err = db.Exec(`
 			DELETE FROM user_relationships 
 			WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'
 		`, claims.UserID, targetID)
 		if err == nil {
-			affected, _ := res.RowsAffected()
-			if affected > 0 {
-				db.Exec("UPDATE users SET followers_count = GREATEST(0, followers_count - 1) WHERE id = $1", targetID)
-				db.Exec("UPDATE users SET following_count = GREATEST(0, following_count - 1) WHERE id = $1", claims.UserID)
-			}
+			db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships WHERE target_id = $1 AND rel_type = 'follow') WHERE id = $1", targetID)
+			db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND rel_type = 'follow') WHERE id = $1", claims.UserID)
 		}
-	} else {
-		store.mu.Lock()
-		targetID = rawTarget
-		for id, acc := range store.accounts {
-			if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
-				targetID = id
+
+		followers, _, friends := getDBRelationshipCounts(targetID)
+		_, myFollowing, _ := getDBRelationshipCounts(claims.UserID)
+
+		writeJSON(w, http.StatusOK, Response{
+			Status:  "ok",
+			Message: "Вы отписались",
+			Data: map[string]interface{}{
+				"status":         "none",
+				"isFollowed":     false,
+				"isFriend":       false,
+				"followersCount": followers,
+				"followingCount": myFollowing,
+				"friendsCount":   friends,
+			},
+		})
+		return
+	}
+
+	store.mu.Lock()
+	targetID = rawTarget
+	for id, acc := range store.accounts {
+		if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
+			targetID = id
+			break
+		}
+	}
+	if targetID == rawTarget {
+		for _, mu := range mockUsers {
+			if strings.ToLower(mu.ID) == cleanTarget || strings.ToLower(mu.Username) == cleanTarget {
+				targetID = mu.ID
 				break
 			}
 		}
-
-		var updated []string
-		found := false
-		for _, tid := range store.relationships[claims.UserID] {
-			if tid == targetID {
-				found = true
-			} else {
-				updated = append(updated, tid)
-			}
-		}
-		store.relationships[claims.UserID] = updated
-
-		if found {
-			if targetAcc, ok := store.accounts[targetID]; ok {
-				if targetAcc.User.FollowersCount > 0 {
-					targetAcc.User.FollowersCount--
-				}
-				store.accounts[targetID] = targetAcc
-			}
-			if myAcc, ok := store.accounts[claims.UserID]; ok {
-				if myAcc.User.FollowingCount > 0 {
-					myAcc.User.FollowingCount--
-				}
-				store.accounts[claims.UserID] = myAcc
-			}
-		}
-		store.mu.Unlock()
 	}
 
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Вы отписались"})
+	var updated []string
+	for _, tid := range store.relationships[claims.UserID] {
+		if tid != targetID {
+			updated = append(updated, tid)
+		}
+	}
+	store.relationships[claims.UserID] = updated
+	store.mu.Unlock()
+
+	followers, _, friends := getRelationshipCounts(targetID)
+	_, myFollowing, _ := getRelationshipCounts(claims.UserID)
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: "Вы отписались",
+		Data: map[string]interface{}{
+			"status":         "none",
+			"isFollowed":     false,
+			"isFriend":       false,
+			"followersCount": followers,
+			"followingCount": myFollowing,
+			"friendsCount":   friends,
+		},
+	})
 }
 
-// GET /api/users/{id}/followers
+// GET /api/users/{id}/followers & GET /api/profile/{id}/followers
 func handleFollowers(w http.ResponseWriter, r *http.Request) {
 	targetID := r.PathValue("id")
 	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
@@ -2028,11 +2157,27 @@ func handleFollowers(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
+		if realTargetID == targetID {
+			for _, mu := range mockUsers {
+				if strings.ToLower(mu.ID) == cleanTarget || strings.ToLower(mu.Username) == cleanTarget {
+					realTargetID = mu.ID
+					break
+				}
+			}
+		}
+
 		for followerID, targetList := range store.relationships {
 			for _, tid := range targetList {
 				if tid == realTargetID {
 					if acc, ok := store.accounts[followerID]; ok {
 						followers = append(followers, acc.User)
+					} else {
+						for _, mu := range mockUsers {
+							if mu.ID == followerID {
+								followers = append(followers, mu)
+								break
+							}
+						}
 					}
 					break
 				}
@@ -2046,14 +2191,14 @@ func handleFollowers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, Response{
-		Status: "ok", 
+		Status: "ok",
 		Data: map[string]interface{}{
 			"users": followers,
 		},
 	})
 }
 
-// GET /api/users/{id}/following
+// GET /api/users/{id}/following & GET /api/profile/{id}/following
 func handleFollowing(w http.ResponseWriter, r *http.Request) {
 	targetID := r.PathValue("id")
 	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
@@ -2090,10 +2235,26 @@ func handleFollowing(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
+		if realTargetID == targetID {
+			for _, mu := range mockUsers {
+				if strings.ToLower(mu.ID) == cleanTarget || strings.ToLower(mu.Username) == cleanTarget {
+					realTargetID = mu.ID
+					break
+				}
+			}
+		}
+
 		if targets, ok := store.relationships[realTargetID]; ok {
 			for _, tid := range targets {
 				if acc, ok := store.accounts[tid]; ok {
 					following = append(following, acc.User)
+				} else {
+					for _, mu := range mockUsers {
+						if mu.ID == tid {
+							following = append(following, mu)
+							break
+						}
+					}
 				}
 			}
 		}
@@ -2105,14 +2266,14 @@ func handleFollowing(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, Response{
-		Status: "ok", 
+		Status: "ok",
 		Data: map[string]interface{}{
 			"users": following,
 		},
 	})
 }
 
-// GET /api/users/{id}/friends — mutual follows (оба подписаны)
+// GET /api/users/{id}/friends & GET /api/profile/{id}/friends
 func handleFriends(w http.ResponseWriter, r *http.Request) {
 	targetID := r.PathValue("id")
 	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
@@ -2151,12 +2312,34 @@ func handleFriends(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
+		if realTargetID == targetID {
+			for _, mu := range mockUsers {
+				if strings.ToLower(mu.ID) == cleanTarget || strings.ToLower(mu.Username) == cleanTarget {
+					realTargetID = mu.ID
+					break
+				}
+			}
+		}
+
 		targets := store.relationships[realTargetID]
 		for _, tid := range targets {
 			for _, rtid := range store.relationships[tid] {
 				if rtid == realTargetID {
+					var u User
+					found := false
 					if acc, ok := store.accounts[tid]; ok {
-						u := acc.User
+						u = acc.User
+						found = true
+					} else {
+						for _, mu := range mockUsers {
+							if mu.ID == tid {
+								u = mu
+								found = true
+								break
+							}
+						}
+					}
+					if found {
 						u.IsFriend = true
 						users = append(users, u)
 					}
@@ -2174,6 +2357,83 @@ func handleFriends(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"users": users}})
 }
 
+// GET /api/friends - текущий пользователь
+func handleMyFriends(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+	r.SetPathValue("id", claims.UserID)
+	handleFriends(w, r)
+}
+
+// GET /api/friends/requests - входящие ожидающие заявки (подписаны на меня, но я не в ответ)
+func handleFriendRequests(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	var pending []User
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), COALESCE(u.verified, false)
+			FROM users u
+			JOIN user_relationships r ON u.id = r.follower_id
+			WHERE r.target_id = $1 AND r.rel_type = 'follow'
+			  AND u.id NOT IN (
+				  SELECT target_id FROM user_relationships WHERE follower_id = $1 AND rel_type = 'follow'
+			  )
+			ORDER BY r.created_at DESC
+		`, claims.UserID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var u User
+				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.Verified)
+				pending = append(pending, u)
+			}
+		}
+	} else {
+		store.mu.RLock()
+		myFollowingMap := make(map[string]bool)
+		for _, tid := range store.relationships[claims.UserID] {
+			myFollowingMap[tid] = true
+		}
+		for followerID, targetList := range store.relationships {
+			if followerID == claims.UserID {
+				continue
+			}
+			for _, tid := range targetList {
+				if tid == claims.UserID && !myFollowingMap[followerID] {
+					if acc, ok := store.accounts[followerID]; ok {
+						pending = append(pending, acc.User)
+					} else {
+						for _, mu := range mockUsers {
+							if mu.ID == followerID {
+								pending = append(pending, mu)
+								break
+							}
+						}
+					}
+					break
+				}
+			}
+		}
+		store.mu.RUnlock()
+	}
+
+	if pending == nil {
+		pending = []User{}
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"users": pending}})
+}
+
 // DELETE /api/users/{id}/friend — удалить из друзей (отписаться обоим)
 func handleRemoveFriend(w http.ResponseWriter, r *http.Request) {
 	token := extractBearerToken(r)
@@ -2183,39 +2443,94 @@ func handleRemoveFriend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	friendID := r.PathValue("id")
+	rawTarget := r.PathValue("id")
+	cleanTarget := strings.ToLower(strings.TrimPrefix(rawTarget, "@"))
+	var targetID string
 
 	if db != nil {
-		// Remove both directions
-		db.Exec(`DELETE FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'`, claims.UserID, friendID)
-		db.Exec(`DELETE FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'`, friendID, claims.UserID)
-		// Decrement counters
-		db.Exec(`UPDATE users SET followers_count = GREATEST(followers_count - 1, 0), following_count = GREATEST(following_count - 1, 0) WHERE id = $1`, claims.UserID)
-		db.Exec(`UPDATE users SET followers_count = GREATEST(followers_count - 1, 0), following_count = GREATEST(following_count - 1, 0) WHERE id = $1`, friendID)
-	} else {
-		store.mu.Lock()
-		var updatedMe []string
-		for _, tid := range store.relationships[claims.UserID] {
-			if tid != friendID {
-				updatedMe = append(updatedMe, tid)
-			}
+		err := db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", rawTarget, cleanTarget).Scan(&targetID)
+		if err != nil {
+			targetID = rawTarget
 		}
-		store.relationships[claims.UserID] = updatedMe
 
-		var updatedFriend []string
-		for _, tid := range store.relationships[friendID] {
-			if tid != claims.UserID {
-				updatedFriend = append(updatedFriend, tid)
-			}
-		}
-		store.relationships[friendID] = updatedFriend
-		store.mu.Unlock()
+		// Remove both directions
+		db.Exec(`DELETE FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'`, claims.UserID, targetID)
+		db.Exec(`DELETE FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'`, targetID, claims.UserID)
+		db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships WHERE target_id = $1 AND rel_type = 'follow') WHERE id = $1", targetID)
+		db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND rel_type = 'follow') WHERE id = $1", targetID)
+		db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships WHERE target_id = $1 AND rel_type = 'follow') WHERE id = $1", claims.UserID)
+		db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND rel_type = 'follow') WHERE id = $1", claims.UserID)
+
+		followers, _, friends := getDBRelationshipCounts(targetID)
+		_, myFollowing, _ := getDBRelationshipCounts(claims.UserID)
+
+		writeJSON(w, http.StatusOK, Response{
+			Status:  "ok",
+			Message: "Друг удалён",
+			Data: map[string]interface{}{
+				"status":         "none",
+				"isFollowed":     false,
+				"isFriend":       false,
+				"followersCount": followers,
+				"followingCount": myFollowing,
+				"friendsCount":   friends,
+			},
+		})
+		return
 	}
 
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Друг удалён"})
+	store.mu.Lock()
+	targetID = rawTarget
+	for id, acc := range store.accounts {
+		if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
+			targetID = id
+			break
+		}
+	}
+	if targetID == rawTarget {
+		for _, mu := range mockUsers {
+			if strings.ToLower(mu.ID) == cleanTarget || strings.ToLower(mu.Username) == cleanTarget {
+				targetID = mu.ID
+				break
+			}
+		}
+	}
+
+	var updatedMe []string
+	for _, tid := range store.relationships[claims.UserID] {
+		if tid != targetID {
+			updatedMe = append(updatedMe, tid)
+		}
+	}
+	store.relationships[claims.UserID] = updatedMe
+
+	var updatedFriend []string
+	for _, tid := range store.relationships[targetID] {
+		if tid != claims.UserID {
+			updatedFriend = append(updatedFriend, tid)
+		}
+	}
+	store.relationships[targetID] = updatedFriend
+	store.mu.Unlock()
+
+	followers, _, friends := getRelationshipCounts(targetID)
+	_, myFollowing, _ := getRelationshipCounts(claims.UserID)
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: "Друг удалён",
+		Data: map[string]interface{}{
+			"status":         "none",
+			"isFollowed":     false,
+			"isFriend":       false,
+			"followersCount": followers,
+			"followingCount": myFollowing,
+			"friendsCount":   friends,
+		},
+	})
 }
 
-// GET /api/users/{id}/profile
+// GET /api/users/{id}/profile & GET /api/profile/{id}
 func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 	targetID := r.PathValue("id")
 	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
@@ -2243,12 +2558,8 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		
-		// Friends count = mutual follows
-		db.QueryRow(`
-			SELECT COUNT(*) FROM user_relationships r1
-			JOIN user_relationships r2 ON r1.follower_id = r2.target_id AND r1.target_id = r2.follower_id
-			WHERE r1.follower_id = $1 AND r1.rel_type = 'follow' AND r2.rel_type = 'follow'
-		`, user.ID).Scan(&user.FriendsCount)
+		// Accurate dynamic relationship counts
+		user.FollowersCount, user.FollowingCount, user.FriendsCount = getDBRelationshipCounts(user.ID)
 
 		// Clips count
 		db.QueryRow(`SELECT COUNT(*) FROM clips WHERE user_id = $1`, user.ID).Scan(&user.ClipsCount)
@@ -2293,6 +2604,9 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		user = foundAcc.User
+
+		// Accurate dynamic relationship counts in-memory
+		user.FollowersCount, user.FollowingCount, user.FriendsCount = getRelationshipCounts(user.ID)
 
 		if claims != nil {
 			store.mu.RLock()
