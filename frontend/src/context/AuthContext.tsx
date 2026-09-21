@@ -125,6 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id && parsed.id !== 'guest' && parsed.id !== 'me') {
+          if (parsed.username) parsed.username = String(parsed.username).replace(/^@+/, '');
           // ТЕСТ: hardcode isPremium = true (убрать после подключения бэкенда)
           parsed.isPremium = true;
           Object.assign(defaultCurrentUser, parsed);
@@ -155,11 +156,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return res.json();
       })
       .then((data) => {
-        if (data && data.user) {
-          setActiveUser(data.user);
+        const u = data?.data?.user || data?.user;
+        if (u && (u.id || u.username)) {
+          if (u.username) u.username = String(u.username).replace(/^@+/, '');
+          u.isPremium = true;
+          setActiveUser(u);
           setIsAuthenticated(true);
-          localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(data.user));
+          localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(u));
           localStorage.setItem('new_age_is_auth', 'true');
+          Object.assign(defaultCurrentUser, u);
         }
       })
       .catch(() => {
@@ -329,12 +334,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const resData = await response.json();
 
       const token = resData.data?.token || resData.token;
-      const user = resData.data?.user || resData.user;
+      let user = resData.data?.user || resData.user;
 
       if (response.ok && token && user) {
+        if (user.username) user.username = String(user.username).replace(/^@+/, '');
+        user.isPremium = true;
         setJwtToken(token);
         setActiveUser(user);
         setIsAuthenticated(true);
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+        localStorage.setItem(STORAGE_KEY_TOKEN, token);
+        localStorage.setItem('new_age_is_auth', 'true');
+        Object.assign(defaultCurrentUser, user);
+
+        setAllAccounts((prev) => {
+          const exists = prev.some((a) => a && (a.id === user.id || a.username === user.username));
+          if (!exists) {
+            return [
+              {
+                ...user,
+                emailOrPhone: query,
+                createdAt: new Date().toISOString(),
+              } as RegisteredAccount,
+              ...prev,
+            ];
+          }
+          return prev.map((a) => (a && (a.id === user.id || a.username === user.username) ? { ...a, ...user } : a));
+        });
         return { success: true };
       }
 
@@ -351,7 +377,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Local Fallback
     const account = allAccounts.find((a) => {
       if (!a) return false;
-      const u = a.username ? String(a.username).toLowerCase() : '';
+      const u = a.username ? String(a.username).replace(/^@+/, '').toLowerCase() : '';
       const e = a.emailOrPhone ? String(a.emailOrPhone).toLowerCase() : '';
       return (u && u === query) || (e && e === query);
     });
@@ -364,8 +390,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'Неверный пароль' };
     }
 
+    if (account.username) account.username = String(account.username).replace(/^@+/, '');
+    account.isPremium = true;
     setActiveUser(account);
     setIsAuthenticated(true);
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(account));
+    localStorage.setItem('new_age_is_auth', 'true');
+    Object.assign(defaultCurrentUser, account);
     return { success: true };
   };
 
@@ -378,9 +409,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfile = (data: Partial<User>) => {
     setActiveUser((prev) => {
       const updated = { ...prev, ...data };
+      if (updated.username) updated.username = String(updated.username).replace(/^@+/, '');
       setAllAccounts((accounts) =>
         accounts.map((acc) => (acc.id === updated.id ? { ...acc, ...data } : acc))
       );
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(updated));
+      Object.assign(defaultCurrentUser, updated);
       return updated;
     });
 
@@ -397,9 +431,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: data.name,
           bio: data.bio,
           avatar: data.avatar,
+          cover_image: data.coverImage,
           location: data.location,
+          website: data.website,
           belief_type: data.beliefType,
-          belief_privacy: data.beliefPrivacy
+          belief_privacy: data.beliefPrivacy,
+          birth_date: data.birthDate,
+          gender: data.gender,
         })
       }).catch(err => console.warn('Failed to sync profile to server:', err));
     }

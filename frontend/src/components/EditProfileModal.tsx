@@ -5,9 +5,10 @@ import {
   Flame, Award, Eye, Calendar, Moon, Sun, Compass
 } from 'lucide-react';
 import { 
-  currentUser, type User, type UserRole, type BeliefPrivacy, 
+  type User, type UserRole, type BeliefPrivacy, 
   RELIGIONS_CATALOG 
 } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import { spiritualAudio } from '../utils/spiritualAudio';
 import { calculateZodiacProfile, type ZodiacInfo } from '../utils/astrology';
 import { detectUserCityAndCountry } from '../utils/countryDetect';
@@ -70,33 +71,54 @@ const SAMPLE_COVERS = [
 ];
 
 export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalProps) {
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<EditTab>('general');
-  const [name, setName] = useState(currentUser.name);
-  const [username, setUsername] = useState(currentUser.username);
-  const [bio, setBio] = useState(currentUser.bio || '');
-  const [location, setLocation] = useState(currentUser.location || '');
-  const [website, setWebsite] = useState(currentUser.website || '');
-  const [avatar, setAvatar] = useState(currentUser.avatar);
+  const [name, setName] = useState(currentUser?.name || '');
+  const [username, setUsername] = useState(currentUser?.username ? currentUser.username.replace(/^@+/, '') : '');
+  const [bio, setBio] = useState(currentUser?.bio || '');
+  const [location, setLocation] = useState(currentUser?.location || '');
+  const [website, setWebsite] = useState(currentUser?.website || '');
+  const [avatar, setAvatar] = useState(currentUser?.avatar || '');
   const [customAvatarUrl, setCustomAvatarUrl] = useState('');
-  const [coverImage, setCoverImage] = useState(currentUser.coverImage || SAMPLE_COVERS[0].url);
+  const [coverImage, setCoverImage] = useState(currentUser?.coverImage || SAMPLE_COVERS[0].url);
   const [customCoverUrl, setCustomCoverUrl] = useState('');
-  const [online, setOnline] = useState(currentUser.online ?? true);
+  const [online, setOnline] = useState(currentUser?.online ?? true);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<UserRole>(currentUser.role || 'creator');
-  const [beliefType, setBeliefType] = useState<string>(currentUser.beliefType || 'Христианство');
-  const [beliefPrivacy, setBeliefPrivacy] = useState<BeliefPrivacy>(currentUser.beliefPrivacy || 'public');
+  const [role, setRole] = useState<UserRole>(currentUser?.role || 'user');
+  const [beliefType, setBeliefType] = useState<string>(currentUser?.beliefType || 'Не указано');
+  const [beliefPrivacy, setBeliefPrivacy] = useState<BeliefPrivacy>(currentUser?.beliefPrivacy || 'public');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   // Личные данные: Дата рождения, Знак зодиака, Пол
-  const [birthDate, setBirthDate] = useState(currentUser.birthDate || '1995-04-12');
-  const [gender, setGender] = useState<'male' | 'female' | 'other' | 'hidden'>(currentUser.gender || 'male');
-  const [showBirthDate, setShowBirthDate] = useState(currentUser.showBirthDate ?? true);
-  const [showZodiac, setShowZodiac] = useState(currentUser.showZodiac ?? true);
+  const [birthDate, setBirthDate] = useState(currentUser?.birthDate || '1995-04-12');
+  const [gender, setGender] = useState<'male' | 'female' | 'other' | 'hidden'>(currentUser?.gender || 'male');
+  const [showBirthDate, setShowBirthDate] = useState(currentUser?.showBirthDate ?? true);
+  const [showZodiac, setShowZodiac] = useState(currentUser?.showZodiac ?? true);
 
   // Вычисленные зодиакальные параметры
-  const [zodiacInfo, setZodiacInfo] = useState<ZodiacInfo | null>(() => calculateZodiacProfile(currentUser.birthDate || '1995-04-12'));
+  const [zodiacInfo, setZodiacInfo] = useState<ZodiacInfo | null>(() => calculateZodiacProfile(currentUser?.birthDate || '1995-04-12'));
+
+  useEffect(() => {
+    if (isOpen && currentUser) {
+      setName(currentUser.name || '');
+      setUsername(currentUser.username ? currentUser.username.replace(/^@+/, '') : '');
+      setBio(currentUser.bio || '');
+      setLocation(currentUser.location || '');
+      setWebsite(currentUser.website || '');
+      setAvatar(currentUser.avatar || '');
+      setCoverImage(currentUser.coverImage || SAMPLE_COVERS[0].url);
+      setOnline(currentUser.online ?? true);
+      setRole(currentUser.role || 'user');
+      setBeliefType(currentUser.beliefType || 'Не указано');
+      setBeliefPrivacy(currentUser.beliefPrivacy || 'public');
+      setBirthDate(currentUser.birthDate || '1995-04-12');
+      setGender(currentUser.gender || 'male');
+      setShowBirthDate(currentUser.showBirthDate ?? true);
+      setShowZodiac(currentUser.showZodiac ?? true);
+    }
+  }, [isOpen, currentUser]);
 
   useEffect(() => {
     if (birthDate) {
@@ -153,8 +175,8 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
     e.preventDefault();
     const updated: User = {
       ...currentUser,
-      name: name.trim() || currentUser.name,
-      username: username.trim().replace('@', '') || currentUser.username,
+      name: name.trim() || currentUser?.name || 'Пользователь',
+      username: username.trim().replace(/^@+/, '') || currentUser?.username || '',
       bio: bio.trim(),
       location: location.trim(),
       website: website.trim(),
@@ -172,7 +194,6 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
       showZodiac
     };
 
-    Object.assign(currentUser, updated);
     spiritualAudio.playCrystalChime();
     onSave(updated);
     onClose();

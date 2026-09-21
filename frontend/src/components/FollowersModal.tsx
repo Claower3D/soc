@@ -2,6 +2,11 @@ import { X, Search, UserMinus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { 
+  getAllUsersPool, 
+  getFollowersForUser, 
+  getFollowingForUser 
+} from '../utils/followStorage';
 import './FollowersModal.css';
 
 type Tab = 'friends' | 'followers' | 'following';
@@ -26,7 +31,7 @@ interface SimpleUser {
 
 export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: FollowersModalProps) {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, allAccounts } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>(
     title === 'Друзья' ? 'friends' : title === 'Подписчики' ? 'followers' : 'following'
   );
@@ -41,6 +46,7 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
     setUsers([]);
 
     const fetchUsers = async () => {
+      let remoteUsers: SimpleUser[] = [];
       try {
         let endpoint = '';
         if (activeTab === 'friends') {
@@ -53,21 +59,43 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
 
         const token = localStorage.getItem('new_age_jwt_token') || localStorage.getItem('newage_token') || '';
         const res = await fetch(endpoint, {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
         });
         const data = await res.json();
-        if (data.status === 'ok' && data.data?.users) {
-          setUsers(data.data.users);
+        const rawList = Array.isArray(data.data) 
+          ? data.data 
+          : (data.data?.users || data.users || (Array.isArray(data) ? data : []));
+
+        if (Array.isArray(rawList) && rawList.length > 0) {
+          remoteUsers = rawList;
         }
       } catch {
-        // fallback — пустой список
-      } finally {
-        setLoading(false);
+        // network or server fallback
       }
+
+      // Fallback or merge with local followStorage pool
+      if (remoteUsers.length === 0) {
+        const pool = getAllUsersPool(currentUser, allAccounts);
+        if (activeTab === 'followers') {
+          const localList = getFollowersForUser(currentUserId, pool, currentUser?.id);
+          remoteUsers = localList as SimpleUser[];
+        } else if (activeTab === 'following') {
+          const localList = getFollowingForUser(currentUserId, pool, !!isMe);
+          remoteUsers = localList as SimpleUser[];
+        } else if (activeTab === 'friends') {
+          const myFollowers = getFollowersForUser(currentUserId, pool, currentUser?.id);
+          const myFollowing = getFollowingForUser(currentUserId, pool, !!isMe);
+          const followingIds = new Set(myFollowing.map(u => u.id));
+          remoteUsers = myFollowers.filter(u => followingIds.has(u.id)) as SimpleUser[];
+        }
+      }
+
+      setUsers(remoteUsers);
+      setLoading(false);
     };
 
     fetchUsers();
-  }, [isOpen, activeTab, currentUserId]);
+  }, [isOpen, activeTab, currentUserId, currentUser, allAccounts, isMe]);
 
   if (!isOpen) return null;
 
@@ -92,7 +120,7 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
 
   const handleUserClick = (user: SimpleUser) => {
     onClose();
-    navigate(`/profile/${user.id}`);
+    navigate(user.username ? `/profile/@${user.username.replace(/^@+/, '')}` : `/profile/${user.id}`);
   };
 
   const tabs: { key: Tab; label: string }[] = [

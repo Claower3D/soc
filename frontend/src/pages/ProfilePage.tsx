@@ -66,31 +66,55 @@ export function ProfilePage() {
       if (Array.isArray(data)) setter(data);
     };
     api.posts.list().then(safeSet(setProfilePosts)).catch(console.warn);
-    api.stories.list().then(safeSet(setProfileStories)).catch(console.warn);
+    try {
+      const savedStories = localStorage.getItem('new_age_user_stories');
+      if (savedStories) {
+        const parsed = JSON.parse(savedStories);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProfileStories(parsed);
+        }
+      }
+    } catch { /* ignore */ }
+    api.stories.list().then((data: any) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setProfileStories(prev => {
+          const ids = new Set(prev.map(s => s.id));
+          return [...prev, ...data.filter((s: any) => !ids.has(s.id))];
+        });
+      }
+    }).catch(console.warn);
     api.videos.list().then(safeSet(setProfileVideos)).catch(console.warn);
     api.podcasts.list().then(safeSet(setProfilePodcasts)).catch(console.warn);
     api.marketplace.products().then(safeSet(setProfileProducts)).catch(console.warn);
   }, []);
 
   const handleDeleteStory = (storyId: string) => {
-    setProfileStories(prev => prev.filter(s => s.id !== storyId));
+    setProfileStories(prev => {
+      const updated = prev.filter(s => s.id !== storyId);
+      try {
+        localStorage.setItem('new_age_user_stories', JSON.stringify(updated));
+      } catch { /* ignore */ }
+      return updated;
+    });
   };
 
   // Normalize route param (e.g. '@claower' -> 'claower', 'me', or custom ID)
-  const cleanParam = userId ? userId.replace(/^@/, '').toLowerCase() : '';
+  const cleanParam = userId ? userId.replace(/^@+/, '').trim().toLowerCase() : '';
 
   // Determine if viewing own profile
+  const cleanMyUsername = currentUser?.username ? currentUser.username.replace(/^@+/, '').trim().toLowerCase() : '';
+  const cleanMyId = currentUser?.id ? String(currentUser.id).trim().toLowerCase() : '';
+
   const isMe = !userId || 
     userId === 'me' || 
-    cleanParam === currentUser.id?.toLowerCase() || 
-    (currentUser.username && cleanParam === currentUser.username.toLowerCase());
+    (cleanParam !== '' && (cleanParam === cleanMyId || cleanParam === cleanMyUsername));
 
   // Automatically rewrite /profile/me or legacy /profile to /profile/@username when logged in
   useEffect(() => {
-    if ((!userId || userId === 'me') && isAuthenticated && currentUser?.username && currentUser.username !== 'guest') {
-      navigate(`/profile/@${currentUser.username}`, { replace: true });
+    if ((!userId || userId === 'me') && isAuthenticated && cleanMyUsername && cleanMyUsername !== 'guest') {
+      navigate(`/profile/@${cleanMyUsername}`, { replace: true });
     }
-  }, [userId, isAuthenticated, currentUser?.username, navigate]);
+  }, [userId, isAuthenticated, cleanMyUsername, navigate]);
 
   // Dynamic real user lists & counts that exactly match FollowersModal
   const poolUsers = useMemo(() => {
@@ -106,7 +130,8 @@ export function ProfilePage() {
     if (isMe) return currentUser;
     if (cleanParam) {
       return poolUsers.find(
-        a => a.id.toLowerCase() === cleanParam || (a.username && a.username.toLowerCase() === cleanParam)
+        a => (a.id && a.id.toLowerCase() === cleanParam) || 
+             (a.username && a.username.replace(/^@+/, '').toLowerCase() === cleanParam)
       ) || null;
     }
     return null;
@@ -154,8 +179,20 @@ export function ProfilePage() {
 
   const activeUser: User = useMemo(() => {
     if (isMe) return currentUser;
-    return fetchedUser || initialResolvedUser || currentUser;
-  }, [isMe, currentUser, fetchedUser, initialResolvedUser]);
+    if (fetchedUser) return fetchedUser;
+    if (initialResolvedUser) return initialResolvedUser;
+    return {
+      id: cleanParam || 'unknown',
+      name: cleanParam ? `@${cleanParam}` : 'Пользователь',
+      username: cleanParam || '',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
+      bio: '',
+      followersCount: 0,
+      followingCount: 0,
+      postsCount: 0,
+      role: 'user',
+    };
+  }, [isMe, currentUser, fetchedUser, initialResolvedUser, cleanParam]);
 
   // For compatibility with legacy code expecting `user`
   const user: User = activeUser;
@@ -1042,6 +1079,7 @@ export function ProfilePage() {
         onClose={() => setIsEditProfileOpen(false)}
         onSave={(updated) => {
           updateProfile(updated);
+          setIsEditProfileOpen(false);
         }}
       />
 
@@ -1067,7 +1105,13 @@ export function ProfilePage() {
         isOpen={isCreateStoryOpen}
         onClose={() => setIsCreateStoryOpen(false)}
         onCreateStory={(newStory) => {
-          setProfileStories(prev => [newStory, ...prev]);
+          setProfileStories(prev => {
+            const updated = [newStory, ...prev];
+            try {
+              localStorage.setItem('new_age_user_stories', JSON.stringify(updated));
+            } catch { /* ignore */ }
+            return updated;
+          });
           setIsCreateStoryOpen(false);
           alert('История успешно опубликована!');
         }}

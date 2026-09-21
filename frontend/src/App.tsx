@@ -87,8 +87,9 @@ function AppContent() {
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/spiritual" element={<SpiritualPage />} />
             <Route path="/spiritual/:tab" element={<SpiritualPage />} />
-            <Route path="/profile/:userId" element={<ProfilePage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/me" element={<ProfilePage />} />
+            <Route path="/profile/:userId" element={<ProfilePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </ErrorBoundary>

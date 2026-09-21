@@ -155,8 +155,10 @@ type User struct {
 	Name           string `json:"name"`
 	Username       string `json:"username"`
 	Avatar         string `json:"avatar"`
+	CoverImage     string `json:"coverImage,omitempty"`
 	Bio            string `json:"bio,omitempty"`
 	Location       string `json:"location,omitempty"`
+	Website        string `json:"website,omitempty"`
 	Online         bool   `json:"online"`
 	IsFollowed     bool   `json:"isFollowed,omitempty"`
 	IsFriend       bool   `json:"isFriend,omitempty"`
@@ -164,6 +166,10 @@ type User struct {
 	BeliefType     string `json:"beliefType,omitempty"`
 	BeliefPrivacy  string `json:"beliefPrivacy,omitempty"`
 	Verified       bool   `json:"verified,omitempty"`
+	BirthDate      string `json:"birthDate,omitempty"`
+	Gender         string `json:"gender,omitempty"`
+	ShowBirthDate  bool   `json:"showBirthDate,omitempty"`
+	ShowZodiac     bool   `json:"showZodiac,omitempty"`
 	FollowersCount int    `json:"followersCount"`
 	FollowingCount int    `json:"followingCount"`
 	FriendsCount   int    `json:"friendsCount"`
@@ -396,12 +402,14 @@ func initDB() {
 
 // Хранилище аккаунтов (In-memory + fallback)
 type UserStore struct {
-	mu       sync.RWMutex
-	accounts map[string]AccountStoreEntry // key: userID
+	mu            sync.RWMutex
+	accounts      map[string]AccountStoreEntry // key: userID
+	relationships map[string][]string          // key: followerID -> []targetID
 }
 
 var store = &UserStore{
-	accounts: make(map[string]AccountStoreEntry),
+	accounts:      make(map[string]AccountStoreEntry),
+	relationships: make(map[string][]string),
 }
 
 var currentUser = User{
@@ -1888,13 +1896,23 @@ func handleFollow(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if targetAcc, ok := store.accounts[targetID]; ok {
-			targetAcc.User.FollowersCount++
-			store.accounts[targetID] = targetAcc
+		alreadyFollowing := false
+		for _, tid := range store.relationships[claims.UserID] {
+			if tid == targetID {
+				alreadyFollowing = true
+				break
+			}
 		}
-		if myAcc, ok := store.accounts[claims.UserID]; ok {
-			myAcc.User.FollowingCount++
-			store.accounts[claims.UserID] = myAcc
+		if !alreadyFollowing {
+			store.relationships[claims.UserID] = append(store.relationships[claims.UserID], targetID)
+			if targetAcc, ok := store.accounts[targetID]; ok {
+				targetAcc.User.FollowersCount++
+				store.accounts[targetID] = targetAcc
+			}
+			if myAcc, ok := store.accounts[claims.UserID]; ok {
+				myAcc.User.FollowingCount++
+				store.accounts[claims.UserID] = myAcc
+			}
 		}
 		store.mu.Unlock()
 	}
@@ -1942,17 +1960,30 @@ func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if targetAcc, ok := store.accounts[targetID]; ok {
-			if targetAcc.User.FollowersCount > 0 {
-				targetAcc.User.FollowersCount--
+		var updated []string
+		found := false
+		for _, tid := range store.relationships[claims.UserID] {
+			if tid == targetID {
+				found = true
+			} else {
+				updated = append(updated, tid)
 			}
-			store.accounts[targetID] = targetAcc
 		}
-		if myAcc, ok := store.accounts[claims.UserID]; ok {
-			if myAcc.User.FollowingCount > 0 {
-				myAcc.User.FollowingCount--
+		store.relationships[claims.UserID] = updated
+
+		if found {
+			if targetAcc, ok := store.accounts[targetID]; ok {
+				if targetAcc.User.FollowersCount > 0 {
+					targetAcc.User.FollowersCount--
+				}
+				store.accounts[targetID] = targetAcc
 			}
-			store.accounts[claims.UserID] = myAcc
+			if myAcc, ok := store.accounts[claims.UserID]; ok {
+				if myAcc.User.FollowingCount > 0 {
+					myAcc.User.FollowingCount--
+				}
+				store.accounts[claims.UserID] = myAcc
+			}
 		}
 		store.mu.Unlock()
 	}
@@ -1964,6 +1995,7 @@ func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 func handleFollowers(w http.ResponseWriter, r *http.Request) {
 	targetID := r.PathValue("id")
 	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
+	var followers []User
 
 	if db != nil {
 		var resolvedID string
@@ -1972,34 +2004,60 @@ func handleFollowers(w http.ResponseWriter, r *http.Request) {
 			targetID = resolvedID
 		}
 		rows, err := db.Query(`
-			SELECT u.id, u.username, u.name, u.avatar, u.bio, u.location, u.followers_count, u.following_count, u.posts_count, u.verified
+			SELECT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), 
+			       COALESCE(u.followers_count, 0), COALESCE(u.following_count, 0), COALESCE(u.posts_count, 0), COALESCE(u.verified, false)
 			FROM users u
 			JOIN user_relationships r ON u.id = r.follower_id
 			WHERE r.target_id = $1 AND r.rel_type = 'follow'
 			ORDER BY r.created_at DESC
 		`, targetID)
-		if err != nil {
-			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []User{}})
-			return
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var u User
+				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified)
+				followers = append(followers, u)
+			}
 		}
-		defer rows.Close()
-
-		var followers []User
-		for rows.Next() {
-			var u User
-			rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified)
-			followers = append(followers, u)
-		}
-		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: followers})
 	} else {
-		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []User{}})
+		store.mu.RLock()
+		realTargetID := targetID
+		for id, acc := range store.accounts {
+			if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
+				realTargetID = id
+				break
+			}
+		}
+		for followerID, targetList := range store.relationships {
+			for _, tid := range targetList {
+				if tid == realTargetID {
+					if acc, ok := store.accounts[followerID]; ok {
+						followers = append(followers, acc.User)
+					}
+					break
+				}
+			}
+		}
+		store.mu.RUnlock()
 	}
+
+	if followers == nil {
+		followers = []User{}
+	}
+
+	writeJSON(w, http.StatusOK, Response{
+		Status: "ok", 
+		Data: map[string]interface{}{
+			"users": followers,
+		},
+	})
 }
 
 // GET /api/users/{id}/following
 func handleFollowing(w http.ResponseWriter, r *http.Request) {
 	targetID := r.PathValue("id")
 	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
+	var following []User
 
 	if db != nil {
 		var resolvedID string
@@ -2008,38 +2066,66 @@ func handleFollowing(w http.ResponseWriter, r *http.Request) {
 			targetID = resolvedID
 		}
 		rows, err := db.Query(`
-			SELECT u.id, u.username, u.name, u.avatar, u.bio, u.location, u.followers_count, u.following_count, u.posts_count, u.verified
+			SELECT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), 
+			       COALESCE(u.followers_count, 0), COALESCE(u.following_count, 0), COALESCE(u.posts_count, 0), COALESCE(u.verified, false)
 			FROM users u
 			JOIN user_relationships r ON u.id = r.target_id
 			WHERE r.follower_id = $1 AND r.rel_type = 'follow'
 			ORDER BY r.created_at DESC
 		`, targetID)
-		if err != nil {
-			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []User{}})
-			return
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var u User
+				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified)
+				following = append(following, u)
+			}
 		}
-		defer rows.Close()
-
-		var following []User
-		for rows.Next() {
-			var u User
-			rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified)
-			following = append(following, u)
-		}
-		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: following})
 	} else {
-		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []User{}})
+		store.mu.RLock()
+		realTargetID := targetID
+		for id, acc := range store.accounts {
+			if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
+				realTargetID = id
+				break
+			}
+		}
+		if targets, ok := store.relationships[realTargetID]; ok {
+			for _, tid := range targets {
+				if acc, ok := store.accounts[tid]; ok {
+					following = append(following, acc.User)
+				}
+			}
+		}
+		store.mu.RUnlock()
 	}
+
+	if following == nil {
+		following = []User{}
+	}
+
+	writeJSON(w, http.StatusOK, Response{
+		Status: "ok", 
+		Data: map[string]interface{}{
+			"users": following,
+		},
+	})
 }
 
 // GET /api/users/{id}/friends — mutual follows (оба подписаны)
 func handleFriends(w http.ResponseWriter, r *http.Request) {
 	targetID := r.PathValue("id")
+	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
 	var users []User
 
 	if db != nil {
+		var resolvedID string
+		err := db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", targetID, cleanTarget).Scan(&resolvedID)
+		if err == nil {
+			targetID = resolvedID
+		}
 		rows, err := db.Query(`
-			SELECT u.id, u.username, u.name, u.avatar, u.bio, u.location, u.verified
+			SELECT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), COALESCE(u.verified, false)
 			FROM users u
 			WHERE u.id IN (
 				SELECT r1.target_id FROM user_relationships r1
@@ -2056,6 +2142,29 @@ func handleFriends(w http.ResponseWriter, r *http.Request) {
 				users = append(users, u)
 			}
 		}
+	} else {
+		store.mu.RLock()
+		realTargetID := targetID
+		for id, acc := range store.accounts {
+			if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
+				realTargetID = id
+				break
+			}
+		}
+		targets := store.relationships[realTargetID]
+		for _, tid := range targets {
+			for _, rtid := range store.relationships[tid] {
+				if rtid == realTargetID {
+					if acc, ok := store.accounts[tid]; ok {
+						u := acc.User
+						u.IsFriend = true
+						users = append(users, u)
+					}
+					break
+				}
+			}
+		}
+		store.mu.RUnlock()
 	}
 
 	if users == nil {
@@ -2083,6 +2192,24 @@ func handleRemoveFriend(w http.ResponseWriter, r *http.Request) {
 		// Decrement counters
 		db.Exec(`UPDATE users SET followers_count = GREATEST(followers_count - 1, 0), following_count = GREATEST(following_count - 1, 0) WHERE id = $1`, claims.UserID)
 		db.Exec(`UPDATE users SET followers_count = GREATEST(followers_count - 1, 0), following_count = GREATEST(following_count - 1, 0) WHERE id = $1`, friendID)
+	} else {
+		store.mu.Lock()
+		var updatedMe []string
+		for _, tid := range store.relationships[claims.UserID] {
+			if tid != friendID {
+				updatedMe = append(updatedMe, tid)
+			}
+		}
+		store.relationships[claims.UserID] = updatedMe
+
+		var updatedFriend []string
+		for _, tid := range store.relationships[friendID] {
+			if tid != claims.UserID {
+				updatedFriend = append(updatedFriend, tid)
+			}
+		}
+		store.relationships[friendID] = updatedFriend
+		store.mu.Unlock()
 	}
 
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Друг удалён"})
@@ -2099,10 +2226,19 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 
 	if db != nil {
 		err := db.QueryRow(`
-			SELECT id, username, name, avatar, bio, location, followers_count, following_count, posts_count, verified 
+			SELECT id, username, name, COALESCE(avatar, ''), COALESCE(cover_image, ''), COALESCE(bio, ''), COALESCE(location, ''), 
+			       COALESCE(website, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), 
+			       COALESCE(birth_date, ''), COALESCE(gender, 'hidden'), COALESCE(show_birth_date, true), COALESCE(show_zodiac, true),
+			       COALESCE(followers_count, 0), COALESCE(following_count, 0), COALESCE(posts_count, 0), COALESCE(verified, false)
 			FROM users WHERE id = $1 OR LOWER(username) = LOWER($1) OR LOWER(username) = LOWER($2)
-		`, targetID, cleanTarget).Scan(&user.ID, &user.Username, &user.Name, &user.Avatar, &user.Bio, &user.Location, &user.FollowersCount, &user.FollowingCount, &user.PostsCount, &user.Verified)
+		`, targetID, cleanTarget).Scan(
+			&user.ID, &user.Username, &user.Name, &user.Avatar, &user.CoverImage, &user.Bio, &user.Location,
+			&user.Website, &user.Role, &user.BeliefType, &user.BeliefPrivacy,
+			&user.BirthDate, &user.Gender, &user.ShowBirthDate, &user.ShowZodiac,
+			&user.FollowersCount, &user.FollowingCount, &user.PostsCount, &user.Verified,
+		)
 		if err != nil {
+			log.Printf("⚠️ handleUserProfile user not found or error for %s (%s): %v", targetID, cleanTarget, err)
 			writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден"})
 			return
 		}
@@ -2144,17 +2280,37 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		store.mu.RUnlock()
 		if foundAcc == nil {
+			for _, mu := range mockUsers {
+				if strings.ToLower(mu.ID) == cleanTarget || strings.ToLower(mu.Username) == cleanTarget {
+					user = mu
+					foundAcc = &AccountStoreEntry{User: mu}
+					break
+				}
+			}
+		}
+		if foundAcc == nil {
 			writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден"})
 			return
 		}
 		user = foundAcc.User
 
 		if claims != nil {
-			// In-memory follow check
-			user.IsFollowed = false
-			if myAcc, ok := store.accounts[claims.UserID]; ok {
-				_ = myAcc
+			store.mu.RLock()
+			for _, tid := range store.relationships[claims.UserID] {
+				if tid == user.ID {
+					user.IsFollowed = true
+					break
+				}
 			}
+			if user.IsFollowed {
+				for _, tid := range store.relationships[user.ID] {
+					if tid == claims.UserID {
+						user.IsFriend = true
+						break
+					}
+				}
+			}
+			store.mu.RUnlock()
 		}
 	}
 
@@ -2174,9 +2330,13 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		Name          string `json:"name"`
 		Bio           string `json:"bio"`
 		Avatar        string `json:"avatar"`
+		CoverImage    string `json:"cover_image"`
 		Location      string `json:"location"`
+		Website       string `json:"website"`
 		BeliefType    string `json:"belief_type"`
 		BeliefPrivacy string `json:"belief_privacy"`
+		BirthDate     string `json:"birth_date"`
+		Gender        string `json:"gender"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
@@ -2185,10 +2345,21 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 	if db != nil {
 		_, err := db.Exec(`
-			UPDATE users SET name = $1, bio = $2, avatar = $3, location = $4, belief_type = $5, belief_privacy = $6
-			WHERE id = $7
-		`, req.Name, req.Bio, req.Avatar, req.Location, req.BeliefType, req.BeliefPrivacy, claims.UserID)
+			UPDATE users SET 
+				name = COALESCE(NULLIF($1, ''), name), 
+				bio = $2, 
+				avatar = COALESCE(NULLIF($3, ''), avatar), 
+				cover_image = COALESCE(NULLIF($4, ''), cover_image),
+				location = $5, 
+				website = $6,
+				belief_type = $7, 
+				belief_privacy = $8,
+				birth_date = $9,
+				gender = $10
+			WHERE id = $11
+		`, req.Name, req.Bio, req.Avatar, req.CoverImage, req.Location, req.Website, req.BeliefType, req.BeliefPrivacy, req.BirthDate, req.Gender, claims.UserID)
 		if err != nil {
+			log.Printf("⚠️ Ошибка обновления профиля в DB: %v", err)
 			writeJSON(w, http.StatusInternalServerError, Response{Status: "error", Message: "Ошибка обновления профиля"})
 			return
 		}
@@ -2197,11 +2368,15 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		acc, ok := store.accounts[claims.UserID]
 		if ok {
 			if req.Name != "" { acc.User.Name = req.Name }
-			if req.Bio != "" { acc.User.Bio = req.Bio }
+			acc.User.Bio = req.Bio
 			if req.Avatar != "" { acc.User.Avatar = req.Avatar }
-			if req.Location != "" { acc.User.Location = req.Location }
+			if req.CoverImage != "" { acc.User.CoverImage = req.CoverImage }
+			acc.User.Location = req.Location
+			acc.User.Website = req.Website
 			if req.BeliefType != "" { acc.User.BeliefType = req.BeliefType }
 			if req.BeliefPrivacy != "" { acc.User.BeliefPrivacy = req.BeliefPrivacy }
+			acc.User.BirthDate = req.BirthDate
+			acc.User.Gender = req.Gender
 			store.accounts[claims.UserID] = acc
 		}
 		store.mu.Unlock()
@@ -3010,22 +3185,16 @@ func handleCreateStory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	storyID := uuid.New().String()
+
 	dbMu.RLock()
 	dbConn := db
 	dbMu.RUnlock()
-	if dbConn == nil {
-		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
-		return
-	}
-
-	storyID := uuid.New().String()
-	_, err = dbConn.Exec(`
-		INSERT INTO stories (id, user_id, media_url, media_type, text_overlay, bg_color, expires_at, created_at) 
-		VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours', NOW())
-	`, storyID, claims.UserID, req.MediaUrl, req.MediaType, req.TextOverlay, req.BgColor)
-	if err != nil {
-		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
-		return
+	if dbConn != nil {
+		_, _ = dbConn.Exec(`
+			INSERT INTO stories (id, user_id, media_url, media_type, text_overlay, bg_color, expires_at, created_at) 
+			VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours', NOW())
+		`, storyID, claims.UserID, req.MediaUrl, req.MediaType, req.TextOverlay, req.BgColor)
 	}
 
 	writeJSON(w, 200, Response{Status: "ok", Data: map[string]string{"id": storyID}})
