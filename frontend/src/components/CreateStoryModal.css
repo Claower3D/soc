@@ -53,6 +53,50 @@
     border-radius: 0;
     border: none;
   }
+  .story-camera-top-bar {
+    padding: 0.5rem 0.6rem 0.3rem;
+    gap: 0.35rem;
+  }
+  .story-top-title-block {
+    flex-shrink: 0;
+  }
+  .story-top-title {
+    font-size: 0.82rem;
+  }
+  .story-top-brand {
+    font-size: 0.68rem;
+  }
+  .story-top-mode-pills {
+    padding: 2px;
+    gap: 1px;
+  }
+  .story-mode-pill {
+    padding: 3px 6px;
+    font-size: 0.68rem;
+    gap: 3px;
+  }
+  .story-stage-row {
+    min-height: 320px;
+    padding: 0.2rem 0.6rem 0;
+  }
+  .story-category-tabs-row {
+    padding: 0.35rem 0.6rem 0;
+    gap: 4px;
+  }
+  .story-cat-pill {
+    padding: 4px 8px;
+    font-size: 0.68rem;
+  }
+  .story-bottom-drawer {
+    padding: 0.3rem 0.6rem 0;
+  }
+  .story-bottom-action-bar {
+    padding: 0.4rem 0.6rem 0.6rem;
+  }
+  .action-publish-btn {
+    padding: 6px 10px;
+    font-size: 0.74rem;
+  }
 }
 
 /* ========================================================================= */
@@ -161,6 +205,28 @@
 .story-mode-pill.live-pill.active {
   background: #ef4444;
   color: #ffffff;
+}
+
+.story-top-confirm-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.story-top-confirm-btn:hover {
+  background: rgba(99, 102, 241, 0.9);
+  border-color: #818cf8;
+  transform: scale(1.08);
 }
 
 /* ========================================================================= */
@@ -911,6 +977,122 @@
 
 .story-caption-field::placeholder {
   color: #64748b;
+}
+
+/* ========================================================================= */
+/* INSTAGRAM AR EFFECT WHEEL (Screenshot: media_1789991567406.jpg)           */
+/* ========================================================================= */
+
+.story-effect-wheel-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0 0.8rem;
+  width: 100%;
+  position: relative;
+  animation: fadeInEffectWheel 0.2s ease-out;
+}
+
+@keyframes fadeInEffectWheel {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.effect-wheel-track {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  overflow-x: auto;
+  width: 100%;
+  padding: 6px calc(50% - 31px);
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+}
+
+.effect-wheel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.effect-wheel-lens {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  scroll-snap-align: center;
+  transition: all 0.22s cubic-bezier(0.25, 1, 0.5, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wheel-lens-inner {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: #1e293b;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  transition: all 0.22s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.effect-wheel-lens.lens-center-active .wheel-lens-inner {
+  width: 62px;
+  height: 62px;
+  border: 3.5px solid #ffffff;
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.5), 0 6px 18px rgba(0, 0, 0, 0.7);
+  transform: scale(1.06);
+}
+
+.lens-none-graphic {
+  width: 100%;
+  height: 100%;
+  background: #374151;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lens-ban-icon {
+  font-size: 1.85rem;
+  color: #f1f5f9;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.lens-thumb-graphic {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lens-emoji-tag {
+  font-size: 1.3rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
+}
+
+.lens-emoji-only {
+  font-size: 1.5rem;
+}
+
+.effect-wheel-name-badge {
+  margin-top: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  letter-spacing: -0.1px;
 }
 
 /* ========================================================================= */

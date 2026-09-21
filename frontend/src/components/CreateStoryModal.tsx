@@ -55,6 +55,25 @@ export const STORY_MASKS: StoryMask[] = [
   { id: 'angel_halo', name: 'Нимб ангела', icon: '😇', overlayType: 'angel_halo' },
 ];
 
+export interface StoryLens {
+  id: string;
+  name: string;
+  icon: string;
+  overlayType: StoryMask['overlayType'] | 'none';
+  thumb?: string;
+  filterCss?: string;
+}
+
+export const STORY_LENSES: StoryLens[] = [
+  { id: 'none', name: 'Без эффекта', icon: '🚫', overlayType: 'none' },
+  { id: 'sparkles', name: 'Блестки / Сияние', icon: '✨', overlayType: 'sparkles', thumb: 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=150&q=80' },
+  { id: 'crown', name: 'Золотая корона', icon: '👑', overlayType: 'crown', thumb: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=150&q=80' },
+  { id: 'glasses', name: 'Крутые очки', icon: '🕶️', overlayType: 'glasses', thumb: 'https://images.unsplash.com/photo-1511447333015-45b65e60f6d5?auto=format&fit=crop&w=150&q=80' },
+  { id: 'cat_ears', name: 'Кошачьи ушки', icon: '🐱', overlayType: 'cat_ears', thumb: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=150&q=80' },
+  { id: 'cyber_visor', name: 'Кибер-визор', icon: '🥽', overlayType: 'cyber_visor', thumb: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=150&q=80' },
+  { id: 'angel_halo', name: 'Нимб ангела', icon: '😇', overlayType: 'angel_halo', thumb: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=150&q=80' },
+];
+
 const STORY_PRESETS = [
   'https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=800&q=80',
   'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
@@ -103,6 +122,19 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
   const [activeMask, setActiveMask] = useState<StoryMask>(STORY_MASKS[0]);
   const [activeTab, setActiveTab] = useState<'effects' | 'backgrounds' | 'text'>('effects');
   const [selectedMusic, setSelectedMusic] = useState<string | null>(null);
+
+  // Instagram AR Effect Wheel mode state
+  const [isEffectWheelOpen, setIsEffectWheelOpen] = useState(false);
+  const wheelTrackRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isEffectWheelOpen && wheelTrackRef.current) {
+      const activeEl = wheelTrackRef.current.querySelector('.lens-center-active');
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    }
+  }, [isEffectWheelOpen, activeMask.id]);
 
   // Right sidebar expanded state
   const [isToolsExpanded, setIsToolsExpanded] = useState(false);
@@ -487,7 +519,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
               </button>
 
               <div className="story-top-title-block">
-                <span className="story-top-title">Камера историй</span>
+                <span className="story-top-title">историй</span>
                 <span className="story-top-brand">New Age</span>
               </div>
 
@@ -515,6 +547,18 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                   <Radio size={13} /> LIVE Эфир
                 </button>
               </div>
+
+              {/* Confirm Checkmark Button when Effect Wheel is active (media_1789991567406.jpg) */}
+              {isEffectWheelOpen && (
+                <button
+                  type="button"
+                  className="story-top-confirm-btn"
+                  onClick={() => setIsEffectWheelOpen(false)}
+                  title="Готово"
+                >
+                  <Check size={22} />
+                </button>
+              )}
             </div>
 
             {/* Main Stage with Viewfinder & Right Tools Column */}
@@ -787,8 +831,11 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                 {/* 4. Эффекты */}
                 <button 
                   type="button" 
-                  className={`story-tool-item ${activeTab === 'effects' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('effects')}
+                  className={`story-tool-item ${(activeTab === 'effects' || isEffectWheelOpen) ? 'active' : ''}`}
+                  onClick={() => {
+                    setIsEffectWheelOpen(prev => !prev);
+                    setActiveTab('effects');
+                  }}
                   title="Эффекты"
                 >
                   <div className="story-tool-icon-box">
@@ -937,7 +984,10 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                         key={m.id}
                         type="button"
                         className={`drawer-mask-pill ${activeMask.id === m.id ? 'active' : ''}`}
-                        onClick={() => setActiveMask(m)}
+                        onClick={() => {
+                          setActiveMask(m);
+                          setIsEffectWheelOpen(true);
+                        }}
                       >
                         <span className="mask-emoji">{m.icon}</span>
                         <span className="mask-name">{m.name}</span>
@@ -1017,58 +1067,106 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                 </div>
               )}
 
-              {/* Caption text input row */}
-              <div className="story-caption-input-box">
-                <input
-                  type="text"
-                  placeholder="Добавьте подпись..."
-                  value={storyText}
-                  onChange={e => setStoryText(e.target.value)}
-                  maxLength={140}
-                  className="story-caption-field"
-                />
+              {/* AR Effect Wheel (media_1789991567406.jpg) OR Caption Input (media_1789991567403.jpg) */}
+              {isEffectWheelOpen ? (
+                <div className="story-effect-wheel-wrapper">
+                  <div className="effect-wheel-track" ref={wheelTrackRef}>
+                    {STORY_LENSES.map((lens) => {
+                      const isSelected = activeMask.id === lens.id;
+                      return (
+                        <button
+                          key={lens.id}
+                          type="button"
+                          className={`effect-wheel-lens ${isSelected ? 'lens-center-active' : ''}`}
+                          onClick={() => {
+                            const found = STORY_MASKS.find(m => m.id === lens.id) || STORY_MASKS[0];
+                            setActiveMask(found);
+                            if (lens.filterCss) {
+                              const matchingFilter = STORY_FILTERS.find(f => f.filterCss === lens.filterCss);
+                              if (matchingFilter) setActiveFilter(matchingFilter);
+                            }
+                          }}
+                          title={lens.name}
+                        >
+                          <div className="wheel-lens-inner">
+                            {lens.id === 'none' ? (
+                              <div className="lens-none-graphic">
+                                <span className="lens-ban-icon">⊘</span>
+                              </div>
+                            ) : lens.thumb ? (
+                              <div 
+                                className="lens-thumb-graphic" 
+                                style={{ backgroundImage: `url(${lens.thumb})` }}
+                              >
+                                <span className="lens-emoji-tag">{lens.icon}</span>
+                              </div>
+                            ) : (
+                              <span className="lens-emoji-only">{lens.icon}</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="effect-wheel-name-badge">
+                    {activeMask.id === 'none' ? 'Без эффекта' : activeMask.name}
+                  </div>
+                </div>
+              ) : (
+                <div className="story-caption-input-box">
+                  <input
+                    type="text"
+                    placeholder="Добавьте подпись..."
+                    value={storyText}
+                    onChange={e => setStoryText(e.target.value)}
+                    maxLength={140}
+                    className="story-caption-field"
+                  />
+                </div>
+              )}
+
+            </div>
+
+            {/* Bottom Publishing Action Bar (media_1789991567403.jpg) */}
+            {!isEffectWheelOpen && (
+              <div className="story-bottom-action-bar">
+                
+                {/* Button 1: Ваша история */}
+                <button
+                  type="button"
+                  className="action-publish-btn your-story-btn"
+                  onClick={() => handlePublishStory(false)}
+                >
+                  <div className="story-avatar-ring">
+                    <img src={currentUser.avatar} alt={currentUser.name} className="ring-avatar-img" />
+                  </div>
+                  <span>Ваша история</span>
+                </button>
+
+                {/* Button 2: Близкие друзья */}
+                <button
+                  type="button"
+                  className="action-publish-btn close-friends-btn"
+                  onClick={() => handlePublishStory(true)}
+                >
+                  <div className="close-friends-star-icon">
+                    <Star size={14} fill="#ffffff" color="#ffffff" />
+                  </div>
+                  <span>Близкие друзья</span>
+                </button>
+
+                {/* Button 3: Round Blue Action Button > */}
+                <button
+                  type="button"
+                  className="action-publish-circle-next"
+                  onClick={() => handlePublishStory(false)}
+                  title="Опубликовать"
+                >
+                  <ChevronRight size={22} />
+                </button>
+
               </div>
-
-            </div>
-
-            {/* Bottom Publishing Action Bar (Screenshot 1 & 3) */}
-            <div className="story-bottom-action-bar">
-              
-              {/* Button 1: Ваша история */}
-              <button
-                type="button"
-                className="action-publish-btn your-story-btn"
-                onClick={() => handlePublishStory(false)}
-              >
-                <div className="story-avatar-ring">
-                  <img src={currentUser.avatar} alt={currentUser.name} className="ring-avatar-img" />
-                </div>
-                <span>Ваша история</span>
-              </button>
-
-              {/* Button 2: Близкие друзья */}
-              <button
-                type="button"
-                className="action-publish-btn close-friends-btn"
-                onClick={() => handlePublishStory(true)}
-              >
-                <div className="close-friends-star-icon">
-                  <Star size={14} fill="#ffffff" color="#ffffff" />
-                </div>
-                <span>Близкие друзья</span>
-              </button>
-
-              {/* Button 3: Round Blue Action Button > */}
-              <button
-                type="button"
-                className="action-publish-circle-next"
-                onClick={() => handlePublishStory(false)}
-                title="Опубликовать"
-              >
-                <ChevronRight size={22} />
-              </button>
-
-            </div>
+            )}
 
           </div>
         )}
