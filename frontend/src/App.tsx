@@ -35,9 +35,13 @@ import './App.css';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AppContent() {
-  const { isAuthModalOpen, closeAuthModal, authModalMode } = useAuth();
+  const { isAuthModalOpen, closeAuthModal, authModalMode, isAuthenticated } = useAuth();
   const location = useLocation();
   const isAuthPage = location.pathname === '/register' || location.pathname === '/signup' || location.pathname === '/login';
+
+  if (!isAuthenticated && !isAuthPage) {
+    return <Navigate to="/register" replace />;
+  }
 
   if (isAuthPage) {
     return (
