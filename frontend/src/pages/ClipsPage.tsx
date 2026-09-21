@@ -8,6 +8,7 @@ import {
 import { type Clip, type ClipComment } from '../data/mock';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { UploadWaveModal } from '../components/UploadWaveModal';
 import './ClipsPage.css';
 
 type ClipTab = 'all' | 'live' | 'trending';
@@ -55,6 +56,56 @@ export function ClipsPage() {
   const [followedAuthors, setFollowedAuthors] = useState<Record<string, boolean>>({
     'u2': true,
   });
+
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
+  const [waveDescription, setWaveDescription] = useState('');
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTriggerUpload = () => {
+    if (!isAuthenticated) {
+      openAuthModal('login');
+      return;
+    }
+    uploadInputRef.current?.click();
+  };
+
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedVideoFile(file);
+      setWaveDescription('');
+      setUploadModalOpen(true);
+    }
+    e.target.value = '';
+  };
+
+  const handlePublishWave = () => {
+    if (!selectedVideoFile || !currentUser) return;
+    
+    const videoUrl = URL.createObjectURL(selectedVideoFile);
+    
+    const newClip: Clip = {
+      id: 'clip_' + Date.now(),
+      user: currentUser,
+      videoUrl,
+      poster: '',
+      caption: waveDescription,
+      likesCount: 0,
+      commentsCount: 0,
+      sharesCount: 0,
+      viewsCount: 0,
+      isLiked: false,
+      isSaved: false,
+      timeAgo: 'Только что'
+    };
+    
+    setClips(prev => [newClip, ...prev]);
+    setUploadModalOpen(false);
+    setSelectedVideoFile(null);
+    setActiveIndex(0);
+    if (feedRef.current) feedRef.current.scrollTop = 0;
+  };
 
   const feedRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
@@ -358,10 +409,10 @@ export function ClipsPage() {
                         <span>Reels • New Age</span>
                       </div>
                     )}
-                    <Link to="/editor" className="clip-create-btn" title="Снять свой ролик">
+                    <button type="button" className="clip-create-btn" title="Запустить волну" onClick={handleTriggerUpload}>
                       <Plus size={15} />
-                      <span>Создать</span>
-                    </Link>
+                      <span>Волна</span>
+                    </button>
                   </div>
 
                   {/* Video Player */}
@@ -659,6 +710,23 @@ export function ClipsPage() {
           </div>
         </div>
       )}
+
+      <input 
+        type="file" 
+        accept="video/*" 
+        style={{ display: 'none' }} 
+        ref={uploadInputRef}
+        onChange={handleVideoFileChange}
+      />
+
+      <UploadWaveModal 
+        isOpen={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        videoFile={selectedVideoFile}
+        description={waveDescription}
+        setDescription={setWaveDescription}
+        onPublish={handlePublishWave}
+      />
     </div>
   );
 }

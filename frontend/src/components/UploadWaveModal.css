@@ -1,0 +1,103 @@
+.wave-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+}
+
+.wave-modal-content {
+  background: #0f1014;
+  border: 1px solid #e9005c;
+  border-radius: 24px;
+  padding: 30px;
+  width: 90%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(233, 0, 92, 0.15);
+}
+
+.wave-modal-title {
+  color: #e9005c;
+  margin: 0 0 15px 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.wave-file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #888;
+  font-size: 13px;
+  margin-bottom: 25px;
+}
+
+.wave-desc-input {
+  background: #15161a;
+  border: 1px solid #2a2a30;
+  border-radius: 12px;
+  padding: 16px;
+  color: #ddd;
+  font-size: 15px;
+  resize: none;
+  height: 100px;
+  outline: none;
+  font-family: inherit;
+  margin-bottom: 30px;
+}
+
+.wave-desc-input:focus {
+  border-color: #444;
+}
+
+.wave-desc-input::placeholder {
+  color: #666;
+}
+
+.wave-modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.wave-btn-cancel {
+  flex: 1;
+  background: #1c1d22;
+  color: #888;
+  border: 1px solid #2a2a30;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.wave-btn-cancel:hover {
+  background: #25262c;
+  color: #aaa;
+}
+
+.wave-btn-publish {
+  flex: 1;
+  background: rgba(233, 0, 92, 0.1);
+  color: #e9005c;
+  border: 1px solid #e9005c;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: 0.2s;
+}
+
+.wave-btn-publish:hover {
+  background: rgba(233, 0, 92, 0.2);
+}

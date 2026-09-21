@@ -1,0 +1,27 @@
+n <div style={{ padding: '20px', color: '#fff' }}>Загрузка...</div>;
+  }
+
+  return (
+    <div className="clips-page-container">
+      {/* Category Tab Selector (Все / LIVE 🔴 / Тренды) */}
+      <div className="clips-category-nav-bar">
+        <button 
+          type="button" 
+          className={`clips-cat-tab ${activeTab === 'all' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('all'); setActiveIndex(0); scrollToClip(0); }}
+        >
+          <Sparkles size={14} />
+          <span>Все клипы</span>
+        </button>
+        <button 
+          type="button" 
+          className={`clips-cat-tab live-tab ${activeTab === 'live' ? 'active' : ''}`}
+          onClick={() => { setActiveTab('live'); setActiveIndex(0); scrollToClip(0); }}
+        >
+          <Radio size={14} className="clip-live-pulse-icon" />
+          <span>Прямой эфир • LIVE</span>
+          <span className="clips-live-dot" />
+        </button>
+        <button 
+          type="button" 
+          className={`clips
