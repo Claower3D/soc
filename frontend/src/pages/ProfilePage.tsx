@@ -248,7 +248,7 @@ export function ProfilePage() {
       </div>
 
       {/* Profile Header Card */}
-            <div className="profile-header-container">
+                        <div className="profile-header-container">
         <div className="profile-header-card profile-instagram-layout">
           
           <div className="profile-top-layout">
@@ -389,7 +389,7 @@ export function ProfilePage() {
                     <span className="consciousness-level-badge">{activeUser.consciousnessLevel} класс</span>
                     <span className="consciousness-title-text">
                       {activeUser.consciousnessTitle 
-                        ? activeUser.consciousnessTitle.replace(new RegExp(`^${activeUser.consciousnessLevel}\s*класс\s*[-—]*\s*`, 'i'), '')
+                        ? (activeUser.consciousnessTitle.includes('—') ? activeUser.consciousnessTitle.split('—')[1].trim() : activeUser.consciousnessTitle)
                         : 'Осознанность'}
                     </span>
                     {activeUser.cognitionVector && (
