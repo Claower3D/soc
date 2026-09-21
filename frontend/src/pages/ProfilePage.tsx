@@ -971,7 +971,7 @@ export function ProfilePage() {
                     </div>
                     <div className="overlay-stat">
                       <MessageSquare size={18} fill="white" />
-                      <span>{post.comments.length}</span>
+                      <span>{post.comments?.length || 0}</span>
                     </div>
                   </div>
                 </div>
@@ -1064,7 +1064,7 @@ export function ProfilePage() {
                   <div className="pod-card-info">
                     <h4>{pod.title}</h4>
                     <p>{pod.description}</p>
-                    <span className="pod-card-eps">{pod.episodes.length} выпусков</span>
+                    <span className="pod-card-eps">{pod.episodes?.length || 0} выпусков</span>
                   </div>
                 </div>
               ))}
@@ -1105,7 +1105,7 @@ export function ProfilePage() {
                     </div>
                     <div className="overlay-stat">
                       <MessageSquare size={18} fill="white" />
-                      <span>{post.comments.length}</span>
+                      <span>{post.comments?.length || 0}</span>
                     </div>
                   </div>
                 </div>

@@ -18,7 +18,7 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
   const [bookmarked, setBookmarked] = useState(post.saved ?? false);
   const [copied, setCopied] = useState(false);
   const [commentInput, setCommentInput] = useState('');
-  const [localComments, setLocalComments] = useState(post.comments);
+  const [localComments, setLocalComments] = useState(post.comments || []);
   const [showAllComments, setShowAllComments] = useState(false);
   const [showHeartBurst, setShowHeartBurst] = useState(false);
 
@@ -212,9 +212,9 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
         </div>
 
         {/* Comments Section */}
-        {localComments.length > 0 && (
+        {(localComments?.length || 0) > 0 && (
           <div className="post-comments">
-            {(showAllComments ? localComments : localComments.slice(0, 2)).map(comment => (
+            {(showAllComments ? localComments : (localComments || []).slice(0, 2)).map(comment => (
               <div key={comment.id} className="comment-item">
                 <div className="comment-text-wrap">
                   <span 
@@ -238,12 +238,12 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
               </div>
             ))}
 
-            {localComments.length > 2 && !showAllComments && (
+            {(localComments?.length || 0) > 2 && !showAllComments && (
               <button 
                 className="view-all-comments" 
                 onClick={() => setShowAllComments(true)}
               >
-                Посмотреть все комментарии ({localComments.length})
+                Посмотреть все комментарии ({localComments?.length || 0})
               </button>
             )}
           </div>

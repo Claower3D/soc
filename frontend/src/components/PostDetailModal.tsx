@@ -34,7 +34,7 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
 
   useEffect(() => {
     if (post) {
-      setComments(post.comments);
+      setComments(post.comments || []);
       setSaved(post.saved ?? false);
       setReplyingTo(null);
       setCommentText('');
@@ -188,20 +188,20 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
             </div>
 
             {/* Comments Divider */}
-            {comments.length > 0 && (
+            {(comments?.length || 0) > 0 && (
               <div className="comments-divider">
-                <span>Комментарии ({comments.length})</span>
+                <span>Комментарии ({comments?.length || 0})</span>
               </div>
             )}
 
             {/* Comments List */}
-            {comments.length === 0 ? (
+            {(comments?.length || 0) === 0 ? (
               <div className="no-comments-yet">
                 <p>Комментариев пока нет.</p>
                 <span>Будьте первым, кто оставит комментарий!</span>
               </div>
             ) : (
-              comments.map(c => {
+              (comments || []).map(c => {
                 const isMyComment = c.user.id === 'me' || c.user.username === currentUser.username;
                 const isPostOwner = post.user.id === 'me';
                 const canDelete = isMyComment || isPostOwner;

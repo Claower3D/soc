@@ -304,7 +304,7 @@ export function SearchPage() {
                         </div>
                         <div className="explore-hover-stat">
                           <MessageCircle size={18} fill="white" />
-                          <span>{post.comments.length}</span>
+                          <span>{post.comments?.length || 0}</span>
                         </div>
                       </div>
                     </div>
@@ -501,7 +501,7 @@ export function SearchPage() {
                       </div>
                       <div className="explore-hover-stat">
                         <MessageCircle size={18} fill="white" />
-                        <span>{post.comments.length}</span>
+                        <span>{post.comments?.length || 0}</span>
                       </div>
                     </div>
                   </div>

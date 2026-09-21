@@ -197,6 +197,17 @@ type AccountStoreEntry struct {
 	CreatedAt    time.Time
 }
 
+// Comment — комментарий к публикации.
+type Comment struct {
+	ID        string    `json:"id"`
+	User      User      `json:"user"`
+	Text      string    `json:"text"`
+	TimeAgo   string    `json:"timeAgo"`
+	Likes     int       `json:"likes,omitempty"`
+	Liked     bool      `json:"liked,omitempty"`
+	CreatedAt time.Time `json:"createdAt,omitempty"`
+}
+
 // Post — пост в ленте.
 type Post struct {
 	ID        string    `json:"id"`
@@ -208,6 +219,7 @@ type Post struct {
 	Likes     int       `json:"likes"`
 	Liked     bool      `json:"liked"`
 	Saved     bool      `json:"saved"`
+	Comments  []Comment `json:"comments"`
 	TimeAgo   string    `json:"timeAgo"`
 	CreatedAt time.Time `json:"createdAt"`
 }
@@ -1189,6 +1201,7 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 				); err == nil {
 					p.UserID = p.User.ID
 					p.TimeAgo = formatTimeAgo(p.CreatedAt)
+					p.Comments = []Comment{}
 					posts = append(posts, p)
 				}
 			}
@@ -1197,8 +1210,12 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 
 	if len(posts) == 0 {
 		store.mu.RLock()
-		posts = make([]Post, len(store.posts))
-		copy(posts, store.posts)
+		for _, p := range store.posts {
+			if p.Comments == nil {
+				p.Comments = []Comment{}
+			}
+			posts = append(posts, p)
+		}
 		store.mu.RUnlock()
 	}
 
@@ -1237,6 +1254,7 @@ func handleUserPosts(w http.ResponseWriter, r *http.Request) {
 				); err == nil {
 					p.UserID = p.User.ID
 					p.TimeAgo = formatTimeAgo(p.CreatedAt)
+					p.Comments = []Comment{}
 					userPosts = append(userPosts, p)
 				}
 			}
@@ -1246,6 +1264,9 @@ func handleUserPosts(w http.ResponseWriter, r *http.Request) {
 	if len(userPosts) == 0 {
 		store.mu.RLock()
 		for _, p := range store.posts {
+			if p.Comments == nil {
+				p.Comments = []Comment{}
+			}
 			if p.UserID == targetID || strings.ToLower(p.User.Username) == cleanTarget || strings.ToLower(p.UserID) == cleanTarget {
 				userPosts = append(userPosts, p)
 			}
@@ -2924,6 +2945,7 @@ func handleCreatePost(w http.ResponseWriter, r *http.Request) {
 		Likes:     1,
 		Liked:     true,
 		Saved:     false,
+		Comments:  []Comment{},
 		TimeAgo:   "Только что",
 		CreatedAt: time.Now(),
 	}
