@@ -120,6 +120,8 @@ export interface User {
   isFollowed?: boolean;
   followersCount: number;
   followingCount: number;
+  friendsCount?: number;
+  clipsCount?: number;
   criticsCount?: number;
   isCritic?: boolean;
   postsCount: number;

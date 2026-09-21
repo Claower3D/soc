@@ -61,7 +61,10 @@ export const api = {
     follow: (id: string) => apiFetch<any>(`/api/users/${id}/follow`, { method: 'POST' }),
     unfollow: (id: string) => apiFetch<any>(`/api/users/${id}/follow`, { method: 'DELETE' }),
     followers: (id: string) => apiFetch<any>(`/api/users/${id}/followers`),
-    following: (id: string) => apiFetch<any>(`/api/users/${id}/following`)
+    following: (id: string) => apiFetch<any>(`/api/users/${id}/following`),
+    friends: (id: string) => apiFetch<any>(`/api/users/${id}/friends`),
+    removeFriend: (id: string) => apiFetch<any>(`/api/users/${id}/friend`, { method: 'DELETE' }),
+    updateProfile: (data: any) => apiFetch<any>('/api/profile', { method: 'PUT', body: JSON.stringify(data) })
   },
   posts: {
     list: () => apiFetch<any>('/api/feed'),
@@ -85,8 +88,9 @@ export const api = {
   },
   clips: {
     list: () => apiFetch<any>('/api/clips'),
-    create: (formData: FormData) => apiFetch<any>('/api/clips', { method: 'POST', body: formData }, true),
-    like: (id: string) => apiFetch<any>(`/api/clips/${id}/like`, { method: 'POST' })
+    create: (data: any) => apiFetch<any>('/api/clips', { method: 'POST', body: JSON.stringify(data) }),
+    like: (id: string) => apiFetch<any>(`/api/clips/${id}/like`, { method: 'POST' }),
+    view: (id: string) => apiFetch<any>(`/api/clips/${id}/view`, { method: 'POST' })
   },
   chats: {
     list: () => apiFetch<any>('/api/chats'),

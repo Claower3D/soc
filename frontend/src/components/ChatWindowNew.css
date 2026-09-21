@@ -13,19 +13,42 @@
 /* Empty state */
 .cw-empty {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
-  background: #f0f2f5;
+  background: var(--color-bg-secondary, #f0f2f5);
+  gap: 0.5rem;
 }
 
-.cw-empty-text {
-  font-size: 15px;
-  color: #8e8e93;
-  background: #fff;
-  padding: 12px 24px;
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+.cw-empty-icon {
+  font-size: 4rem;
+  opacity: 0.35;
+  margin-bottom: 0.5rem;
+  animation: cwEmptyPulse 3s ease-in-out infinite;
+}
+
+@keyframes cwEmptyPulse {
+  0%, 100% { transform: scale(1); opacity: 0.35; }
+  50% { transform: scale(1.1); opacity: 0.5; }
+}
+
+.cw-empty-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-text, #1a1a2e);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.cw-empty-subtitle {
+  font-size: 0.88rem;
+  color: var(--color-text-secondary, #8e8e93);
+  max-width: 320px;
+  text-align: center;
+  line-height: 1.4;
+  margin: 0;
 }
 
 /* ---- Header ---- */

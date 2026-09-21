@@ -159,14 +159,17 @@ type User struct {
 	Location       string `json:"location,omitempty"`
 	Online         bool   `json:"online"`
 	IsFollowed     bool   `json:"isFollowed,omitempty"`
+	IsFriend       bool   `json:"isFriend,omitempty"`
 	Role           string `json:"role,omitempty"`
 	BeliefType     string `json:"beliefType,omitempty"`
 	BeliefPrivacy  string `json:"beliefPrivacy,omitempty"`
 	Verified       bool   `json:"verified,omitempty"`
 	FollowersCount int    `json:"followersCount"`
 	FollowingCount int    `json:"followingCount"`
+	FriendsCount   int    `json:"friendsCount"`
 	CriticsCount   int    `json:"criticsCount,omitempty"`
 	PostsCount     int    `json:"postsCount"`
+	ClipsCount     int    `json:"clipsCount"`
 }
 
 // AccountStoreEntry — внутренняя запись пользователя с хешем пароля.
@@ -585,6 +588,8 @@ func main() {
 	mux.HandleFunc("DELETE /api/users/{id}/follow", handleUnfollow)
 	mux.HandleFunc("GET /api/users/{id}/followers", handleFollowers)
 	mux.HandleFunc("GET /api/users/{id}/following", handleFollowing)
+	mux.HandleFunc("GET /api/users/{id}/friends", handleFriends)
+	mux.HandleFunc("DELETE /api/users/{id}/friend", handleRemoveFriend)
 	mux.HandleFunc("GET /api/users/{id}/profile", handleUserProfile)
 	mux.HandleFunc("PUT /api/profile", handleUpdateProfile)
 
@@ -1837,9 +1842,9 @@ func handleFollow(w http.ResponseWriter, r *http.Request) {
 
 	if db != nil {
 		_, err := db.Exec(`
-			INSERT INTO user_relationships (follower_id, following_id, relationship_type)
-			VALUES ($1, $2, 'follow') ON CONFLICT DO NOTHING
-		`, claims.UserID, targetID)
+			INSERT INTO user_relationships (id, follower_id, target_id, rel_type)
+			VALUES ($1, $2, $3, 'follow') ON CONFLICT DO NOTHING
+		`, uuid.New().String(), claims.UserID, targetID)
 		if err == nil {
 			db.Exec("UPDATE users SET followers_count = followers_count + 1 WHERE id = $1", targetID)
 			db.Exec("UPDATE users SET following_count = following_count + 1 WHERE id = $1", claims.UserID)
@@ -1863,7 +1868,7 @@ func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 	if db != nil {
 		res, err := db.Exec(`
 			DELETE FROM user_relationships 
-			WHERE follower_id = $1 AND following_id = $2 AND relationship_type = 'follow'
+			WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'
 		`, claims.UserID, targetID)
 		if err == nil {
 			affected, _ := res.RowsAffected()
@@ -1888,7 +1893,7 @@ func handleFollowers(w http.ResponseWriter, r *http.Request) {
 			FROM users 
 			WHERE id IN (
 				SELECT follower_id FROM user_relationships 
-				WHERE following_id = $1 AND relationship_type = 'follow'
+				WHERE target_id = $1 AND rel_type = 'follow'
 			)
 		`, targetID)
 		if err == nil {
@@ -1918,8 +1923,8 @@ func handleFollowing(w http.ResponseWriter, r *http.Request) {
 			SELECT id, username, name, avatar, bio, location, verified 
 			FROM users 
 			WHERE id IN (
-				SELECT following_id FROM user_relationships 
-				WHERE follower_id = $1 AND relationship_type = 'follow'
+				SELECT target_id FROM user_relationships 
+				WHERE follower_id = $1 AND rel_type = 'follow'
 			)
 		`, targetID)
 		if err == nil {
@@ -1937,6 +1942,62 @@ func handleFollowing(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"users": users}})
+}
+
+// GET /api/users/{id}/friends — mutual follows (оба подписаны)
+func handleFriends(w http.ResponseWriter, r *http.Request) {
+	targetID := r.PathValue("id")
+	var users []User
+
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT u.id, u.username, u.name, u.avatar, u.bio, u.location, u.verified
+			FROM users u
+			WHERE u.id IN (
+				SELECT r1.target_id FROM user_relationships r1
+				JOIN user_relationships r2 ON r1.follower_id = r2.target_id AND r1.target_id = r2.follower_id
+				WHERE r1.follower_id = $1 AND r1.rel_type = 'follow' AND r2.rel_type = 'follow'
+			)
+		`, targetID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var u User
+				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.Verified)
+				u.IsFriend = true
+				users = append(users, u)
+			}
+		}
+	}
+
+	if users == nil {
+		users = []User{}
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"users": users}})
+}
+
+// DELETE /api/users/{id}/friend — удалить из друзей (отписаться обоим)
+func handleRemoveFriend(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	friendID := r.PathValue("id")
+
+	if db != nil {
+		// Remove both directions
+		db.Exec(`DELETE FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'`, claims.UserID, friendID)
+		db.Exec(`DELETE FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'`, friendID, claims.UserID)
+		// Decrement counters
+		db.Exec(`UPDATE users SET followers_count = GREATEST(followers_count - 1, 0), following_count = GREATEST(following_count - 1, 0) WHERE id = $1`, claims.UserID)
+		db.Exec(`UPDATE users SET followers_count = GREATEST(followers_count - 1, 0), following_count = GREATEST(following_count - 1, 0) WHERE id = $1`, friendID)
+	}
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Друг удалён"})
 }
 
 // GET /api/users/{id}/profile
@@ -1957,10 +2018,27 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		
+		// Friends count = mutual follows
+		db.QueryRow(`
+			SELECT COUNT(*) FROM user_relationships r1
+			JOIN user_relationships r2 ON r1.follower_id = r2.target_id AND r1.target_id = r2.follower_id
+			WHERE r1.follower_id = $1 AND r1.rel_type = 'follow' AND r2.rel_type = 'follow'
+		`, targetID).Scan(&user.FriendsCount)
+
+		// Clips count
+		db.QueryRow(`SELECT COUNT(*) FROM clips WHERE user_id = $1`, targetID).Scan(&user.ClipsCount)
+
 		if claims != nil {
 			var count int
-			db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND following_id = $2 AND relationship_type = 'follow'", claims.UserID, targetID).Scan(&count)
+			db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'", claims.UserID, targetID).Scan(&count)
 			user.IsFollowed = count > 0
+
+			// Check if mutual friends
+			if user.IsFollowed {
+				var reverseCount int
+				db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'", targetID, claims.UserID).Scan(&reverseCount)
+				user.IsFriend = reverseCount > 0
+			}
 		}
 	} else {
 		store.mu.RLock()

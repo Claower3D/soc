@@ -121,12 +121,7 @@ export function MessengerPage() {
     return () => { mounted = false; };
   }, []);
 
-  // Auto select first chat on desktop
-  useEffect(() => {
-    if (!isLoading && !activeChatId && chatList.length > 0 && window.innerWidth > 768) {
-      setActiveChatId(chatList[0].id);
-    }
-  }, [isLoading, chatList.length]);
+  // Don't auto-select — show placeholder instead
 
   const activeChat = chatList.find(c => c.id === activeChatId) ?? null;
 

@@ -72,6 +72,7 @@ export function ClipsPage() {
       if (!vid) return;
 
       if (clipId === currentClip.id) {
+        api.clips.view(clipId).catch(console.warn);
         vid.muted = isMuted;
         if (isPlaying) {
           vid.play().catch(() => {
@@ -155,6 +156,7 @@ export function ClipsPage() {
       openAuthModal('login');
       return;
     }
+    api.clips.like(clipId).catch(console.warn);
     setClips(prev => prev.map(c => {
       if (c.id === clipId) {
         const liked = !c.isLiked;

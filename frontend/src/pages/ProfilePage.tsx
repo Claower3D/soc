@@ -138,8 +138,18 @@ export function ProfilePage() {
     return isUserCritic(user.id, currentUser.id);
   }, [user.id, currentUser?.id, socialRevision]);
 
+  const [profileData, setProfileData] = useState<Partial<User> | null>(null);
+
+  useEffect(() => {
+    if (user.id && user.id !== 'guest') {
+      api.users.profile(user.id).then((res) => {
+        if (res?.user) setProfileData(res.user);
+      }).catch(console.warn);
+    }
+  }, [user.id]);
+
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'podcasts' | 'saved' | 'shop'>('posts');
-  const [modalType, setModalType] = useState<'Подписчики' | 'Подписки' | 'Критики' | null>(null);
+  const [modalType, setModalType] = useState<'Подписчики' | 'Подписки' | 'Критики' | 'Друзья' | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -503,11 +513,16 @@ export function ProfilePage() {
             </div>
           </div>
 
-          {/* Statistics Counters: Публикации, Подписчики, Подписки, Критики */}
+          {/* Statistics Counters: Публикации, Друзья, Подписчики, Подписки, Волны, Критики */}
           <div className="profile-stats-row four-stats">
             <div className="stat-card">
               <span className="stat-number">{userPosts.length}</span>
               <span className="stat-label">публикаций</span>
+            </div>
+            <div className="stat-card clickable" onClick={() => setModalType('Друзья')}>
+              <span className="stat-number">{(profileData as any)?.friendsCount ?? 0}</span>
+              <span className="stat-label">друзей</span>
+              <ChevronRight size={14} className="stat-arrow" />
             </div>
             <div className="stat-card clickable" onClick={() => setModalType('Подписчики')}>
               <span className="stat-number">{realFollowersList.length.toLocaleString('ru-RU')}</span>
@@ -518,6 +533,10 @@ export function ProfilePage() {
               <span className="stat-number">{realFollowingList.length.toLocaleString('ru-RU')}</span>
               <span className="stat-label">подписок</span>
               <ChevronRight size={14} className="stat-arrow" />
+            </div>
+            <div className="stat-card">
+              <span className="stat-number">{(profileData as any)?.clipsCount ?? 0}</span>
+              <span className="stat-label">волны</span>
             </div>
             <div className="stat-card clickable critic-stat-card" onClick={() => setModalType('Критики')} title="Пользователи, следящие за профилем в режиме конструктивной критики">
               <span className="stat-number critic-number">

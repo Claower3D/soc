@@ -19,6 +19,8 @@ export interface RegisteredAccount {
   verified?: boolean;
   followersCount: number;
   followingCount: number;
+  friendsCount?: number;
+  clipsCount?: number;
   criticsCount: number;
   postsCount: number;
   consciousnessLevel?: number;
@@ -381,6 +383,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
       return updated;
     });
+
+    // Sync to backend DB if authenticated
+    const token = localStorage.getItem(STORAGE_KEY_TOKEN);
+    if (token) {
+      fetch('/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: data.name,
+          bio: data.bio,
+          avatar: data.avatar,
+          location: data.location,
+          belief_type: data.beliefType,
+          belief_privacy: data.beliefPrivacy
+        })
+      }).catch(err => console.warn('Failed to sync profile to server:', err));
+    }
   };
 
   return (

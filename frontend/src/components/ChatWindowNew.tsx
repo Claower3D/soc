@@ -75,7 +75,9 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   if (!chat) {
     return (
       <div className="cw-empty">
-        <div className="cw-empty-text">💬 Выберите диалог для начала общения</div>
+        <div className="cw-empty-icon">💬</div>
+        <h2 className="cw-empty-title">Выберите диалог</h2>
+        <p className="cw-empty-subtitle">Выберите чат из списка слева или создайте новый для начала общения</p>
       </div>
     );
   }
