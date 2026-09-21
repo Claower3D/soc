@@ -37,7 +37,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const handleContactSeller = () => {
     onClose();
-    navigate('/messenger');
+    if (product.seller?.username || product.seller?.id) {
+      navigate(`/messenger?user=${encodeURIComponent(product.seller.username || product.seller.id)}`);
+    } else {
+      navigate('/messenger');
+    }
   };
 
   return (

@@ -318,7 +318,8 @@ export function ProfilePage() {
       setAuthModalOpen(true);
       return;
     }
-    navigate('/messenger');
+    const target = activeUser.username || activeUser.id;
+    navigate(`/messenger?user=${encodeURIComponent(target)}`);
   };
 
   const handleStartCall = () => {

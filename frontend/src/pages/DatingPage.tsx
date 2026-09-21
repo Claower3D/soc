@@ -22,9 +22,13 @@ import './DatingPage.css';
 type DatingViewMode = 'feed' | 'grid' | 'matches' | 'my_profile';
 
 export const DatingPage: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { currentUser, isAuthenticated } = useAuth();
 
   const navigate = useNavigate();
+
+  const chatsStorageKey = (isAuthenticated && currentUser?.id && currentUser.id !== 'guest')
+    ? `newage_messenger_chats_${currentUser.id}`
+    : 'newage_messenger_chats_guest';
 
   // Mode: Лента свайпов, Каталог анкет, Мэтчи/лайки, Моя анкета
   const [viewMode, setViewMode] = useState<DatingViewMode>('feed');
@@ -222,7 +226,7 @@ export const DatingPage: React.FC = () => {
   // Создание диалога в мессенджере при взаимной симпатии
   const createOrUpdateMatchChat = (profile: DatingProfile) => {
     const matchChatId = `chat_dating_${profile.id}`;
-    const savedChatsStr = localStorage.getItem('newage_messenger_chats');
+    const savedChatsStr = localStorage.getItem(chatsStorageKey);
     let currentChats: any[] = [];
     if (savedChatsStr) {
       try { currentChats = JSON.parse(savedChatsStr); } catch { /* ignore */ }
@@ -269,7 +273,7 @@ export const DatingPage: React.FC = () => {
         ]
       };
       const updated = [newChat, ...currentChats.filter(c => c.id !== matchChatId)];
-      localStorage.setItem('newage_messenger_chats', JSON.stringify(updated));
+      localStorage.setItem(chatsStorageKey, JSON.stringify(updated));
     }
   };
 

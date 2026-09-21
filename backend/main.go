@@ -2853,6 +2853,17 @@ func handleGetMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var isMember bool
+	err = dbConn.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2)`, chatID, claims.UserID).Scan(&isMember)
+	if err != nil || !isMember {
+		var isOwner bool
+		_ = dbConn.QueryRow(`SELECT EXISTS(SELECT 1 FROM chats WHERE id = $1 AND owner_id = $2)`, chatID, claims.UserID).Scan(&isOwner)
+		if !isOwner {
+			writeJSON(w, 403, Response{Status: "error", Message: "access denied: not a chat member"})
+			return
+		}
+	}
+
 	rows, err := dbConn.Query(`
 		SELECT m.id, m.text, m.media_url, m.media_type, m.sender_id, m.created_at, m.is_read, u.name, u.avatar
 		FROM messages m 
@@ -2923,6 +2934,17 @@ func handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	if dbConn == nil {
 		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
 		return
+	}
+
+	var isMember bool
+	err = dbConn.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2)`, chatID, claims.UserID).Scan(&isMember)
+	if err != nil || !isMember {
+		var isOwner bool
+		_ = dbConn.QueryRow(`SELECT EXISTS(SELECT 1 FROM chats WHERE id = $1 AND owner_id = $2)`, chatID, claims.UserID).Scan(&isOwner)
+		if !isOwner {
+			writeJSON(w, 403, Response{Status: "error", Message: "access denied: not a chat member"})
+			return
+		}
 	}
 
 	msgID := uuid.New().String()
