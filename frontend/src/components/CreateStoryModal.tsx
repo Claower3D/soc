@@ -5,7 +5,8 @@ import {
   Square, Wand2, Eye,
   ArrowLeft, Music, Bookmark, AtSign, PenLine, 
   Download, MoreHorizontal, ChevronDown, ChevronUp, 
-  ChevronRight, Star, LayoutTemplate, Grid2X2, Plus
+  ChevronRight, Star, LayoutTemplate, Grid2X2, Plus,
+  RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { type Story } from '../data/mock';
@@ -95,6 +96,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
   const [selectedGradient, setSelectedGradient] = useState<string | null>(null);
   const [storyText, setStoryText] = useState('');
   const [textPosition, setTextPosition] = useState<'center' | 'bottom' | 'top'>('bottom');
+  const [isPhotoSnapped, setIsPhotoSnapped] = useState(false);
   
   // Effects: Filter & AR Mask
   const [activeFilter, setActiveFilter] = useState<StoryFilter>(STORY_FILTERS[0]);
@@ -107,6 +109,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
 
   // Camera & Recording states
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
@@ -141,68 +144,132 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
   // Stop camera stream helper
   const stopCamera = () => {
     if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current.getTracks().forEach(track => {
+        try { track.stop(); } catch { /* ignore */ }
+      });
       mediaStreamRef.current = null;
     }
+    if (videoPreviewRef.current) {
+      videoPreviewRef.current.srcObject = null;
+    }
     setCameraActive(false);
+    setCameraLoading(false);
+  };
+
+  // Resilient multi-tier camera getter
+  const getCameraStream = async (facing: 'user' | 'environment'): Promise<MediaStream> => {
+    if (typeof window !== 'undefined' && window.isSecureContext === false) {
+      throw new Error('Для доступа к камере требуется безопасное соединение (HTTPS или localhost).');
+    }
+
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      throw new Error('Ваш браузер не поддерживает API захвата камеры (getUserMedia).');
+    }
+
+    // 1. Попытка: идеальный facingMode с микрофоном
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facing },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: true,
+      });
+    } catch (err1) {
+      console.warn('Camera attempt 1 (video+audio) failed:', err1);
+    }
+
+    // 2. Попытка: только видео с идеальным facingMode (если микрофон занят или запрещен)
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: facing },
+        },
+        audio: false,
+      });
+    } catch (err2) {
+      console.warn('Camera attempt 2 (video-only with facingMode) failed:', err2);
+    }
+
+    // 3. Попытка: базовое видео без ограничений (для внешних веб-камер на ПК и виртуальных камер)
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
+    } catch (err3) {
+      console.warn('Camera attempt 3 (generic video:true) failed:', err3);
+      throw err3;
+    }
   };
 
   // Start webcam
   const startCamera = async () => {
     setCameraError(null);
+    setCameraLoading(true);
     stopCamera();
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Камера не поддерживается вашим браузером');
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode },
-        audio: true,
-      });
+      const stream = await getCameraStream(facingMode);
       mediaStreamRef.current = stream;
+      setCameraActive(true);
+      setCameraLoading(false);
+
       if (videoPreviewRef.current) {
         videoPreviewRef.current.srcObject = stream;
-        videoPreviewRef.current.play().catch(() => {});
+        videoPreviewRef.current.play().catch(e => console.warn('Video play error:', e));
       }
-      setCameraActive(true);
     } catch (err: any) {
-      console.warn('Camera access denied or unavailable:', err);
-      setCameraError('Не удалось подключить камеру. Используйте готовые фоны или загрузите фото.');
+      console.warn('Camera start error:', err);
+      const isDenied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
+      const errMsg = isDenied
+        ? 'Доступ к камере заблокирован в браузере. Разрешите доступ к камере в строке браузера (значок замочка) и нажмите «Повторить».'
+        : (err?.message || 'Не удалось подключить камеру. Проверьте, не занята ли она другой программой.');
+      setCameraError(errMsg);
       setCameraActive(false);
+      setCameraLoading(false);
     }
   };
+
+  // Ensure stream is attached to video element whenever camera is active
+  useEffect(() => {
+    if (cameraActive && mediaStreamRef.current && videoPreviewRef.current) {
+      if (videoPreviewRef.current.srcObject !== mediaStreamRef.current) {
+        videoPreviewRef.current.srcObject = mediaStreamRef.current;
+      }
+      videoPreviewRef.current.play().catch(e => console.warn('Video element play error:', e));
+    }
+  }, [cameraActive, screen, activeMode, facingMode, isPhotoSnapped]);
 
   const toggleFacingMode = () => {
     setFacingMode(prev => (prev === 'user' ? 'environment' : 'user'));
   };
 
+  // Automatically start camera when modal opens
   useEffect(() => {
-    if (isOpen && (activeMode === 'camera_record' || activeMode === 'live')) {
+    if (isOpen) {
+      setIsPhotoSnapped(false);
+      setRecordedVideoUrl(null);
       startCamera();
+    } else {
+      stopCamera();
+      if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
     }
     return () => {
       stopCamera();
+      if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
     };
   }, [isOpen, facingMode]);
 
   const handleModeChange = (mode: 'photo' | 'camera_record' | 'live') => {
     setActiveMode(mode);
-    if (mode === 'photo') {
-      stopCamera();
-      setIsLiveActive(false);
-      setIsRecording(false);
-    } else if (mode === 'camera_record' || mode === 'live') {
+    setRecordedVideoUrl(null);
+    setIsPhotoSnapped(false);
+    setIsLiveActive(mode === 'live');
+    if (!cameraActive) {
       startCamera();
-      setIsLiveActive(mode === 'live');
     }
   };
-
-  useEffect(() => {
-    return () => {
-      stopCamera();
-      if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
-    };
-  }, []);
 
   // Live Stream Heart animations and viewer fluctuations
   useEffect(() => {
@@ -218,10 +285,26 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
 
   // Video recording handlers
   const startRecording = () => {
-    if (!mediaStreamRef.current) return;
+    if (!mediaStreamRef.current) {
+      startCamera();
+      return;
+    }
     recordedChunksRef.current = [];
     try {
-      const recorder = new MediaRecorder(mediaStreamRef.current);
+      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+        ? 'video/webm;codecs=vp9,opus'
+        : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+        ? 'video/webm;codecs=vp8,opus'
+        : MediaRecorder.isTypeSupported('video/webm')
+        ? 'video/webm'
+        : MediaRecorder.isTypeSupported('video/mp4')
+        ? 'video/mp4'
+        : undefined;
+
+      const recorder = mime 
+        ? new MediaRecorder(mediaStreamRef.current, { mimeType: mime }) 
+        : new MediaRecorder(mediaStreamRef.current);
+
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
@@ -231,15 +314,16 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const blob = new Blob(recordedChunksRef.current, { type: mime || 'video/webm' });
         const url = URL.createObjectURL(blob);
         setRecordedVideoUrl(url);
       };
 
-      recorder.start();
+      recorder.start(500);
       setIsRecording(true);
       setRecordSeconds(0);
 
+      if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
       recordIntervalRef.current = setInterval(() => {
         setRecordSeconds(s => {
           if (s >= 30) {
@@ -256,7 +340,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+      try { mediaRecorderRef.current.stop(); } catch { /* ignore */ }
     }
     setIsRecording(false);
     if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
@@ -271,8 +355,8 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
         stopRecording();
       }
     } else if (activeMode === 'photo') {
-      // Snap frame from video if camera active, or open gallery
-      if (cameraActive && videoPreviewRef.current) {
+      // Snap frame from live video
+      if (videoPreviewRef.current && cameraActive) {
         try {
           const video = videoPreviewRef.current;
           const canvas = document.createElement('canvas');
@@ -280,20 +364,32 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
           canvas.height = video.videoHeight || 1280;
           const ctx = canvas.getContext('2d');
           if (ctx) {
+            if (facingMode === 'user') {
+              ctx.translate(canvas.width, 0);
+              ctx.scale(-1, 1);
+            }
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
             setSelectedImage(dataUrl);
             setSelectedGradient(null);
-            stopCamera();
+            setIsPhotoSnapped(true);
+            return;
           }
-        } catch {
-          setScreen('gallery');
+        } catch (e) {
+          console.warn('Snap photo error:', e);
         }
-      } else {
-        setScreen('gallery');
       }
+      // If camera wasn't active, open gallery
+      setScreen('gallery');
     } else if (activeMode === 'live') {
       setIsLiveActive(prev => !prev);
+    }
+  };
+
+  const handleRetakePhoto = () => {
+    setIsPhotoSnapped(false);
+    if (!cameraActive) {
+      startCamera();
     }
   };
 
@@ -307,7 +403,9 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
         setUserUploadedImages(prev => [res, ...prev]);
         setSelectedGradient(null);
         setRecordedVideoUrl(null);
+        setIsPhotoSnapped(true);
         setScreen('camera');
+        setActiveMode('photo');
       };
       reader.readAsDataURL(file);
     }
@@ -315,13 +413,16 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
 
   const handlePublishStory = (isCloseFriends: boolean = false) => {
     const isLive = activeMode === 'live';
+    const isRecorded = activeMode === 'camera_record' && recordedVideoUrl;
+    const isPhoto = activeMode === 'photo' || !isRecorded;
+
     const newStory: Story = {
       id: `story_${Date.now()}`,
       user: currentUser,
       viewed: false,
-      image: (activeMode === 'photo' && !selectedGradient) ? selectedImage : (selectedGradient ? undefined : selectedImage),
-      gradient: (activeMode === 'photo' && selectedGradient) ? selectedGradient : undefined,
-      videoUrl: recordedVideoUrl || undefined,
+      image: isPhoto ? (selectedGradient ? undefined : selectedImage) : undefined,
+      gradient: isPhoto && selectedGradient ? selectedGradient : undefined,
+      videoUrl: isRecorded ? recordedVideoUrl : undefined,
       isLive,
       liveViewers: isLive ? liveViewersCount : undefined,
       filter: activeFilter.id !== 'normal' ? activeFilter.name : undefined,
@@ -352,6 +453,8 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
   };
 
   if (!isOpen) return null;
+
+  const showLiveFeed = (cameraActive && !recordedVideoUrl && (!isPhotoSnapped || activeMode !== 'photo'));
 
   return (
     <div className="newage-story-camera-overlay" onClick={() => { stopCamera(); onClose(); }}>
@@ -421,55 +524,69 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
               <div 
                 className="story-viewfinder-card"
                 style={{
-                  background: activeMode === 'photo'
+                  background: (activeMode === 'photo' && (isPhotoSnapped || !cameraActive))
                     ? (selectedGradient ? selectedGradient : `url(${selectedImage}) center/cover no-repeat`)
                     : '#000000',
                 }}
               >
-                {/* Live Camera Feed or Playback */}
-                {(activeMode === 'camera_record' || activeMode === 'live') && (
-                  <div className="viewfinder-media-layer" style={{ filter: activeFilter.filterCss }}>
-                    {cameraActive ? (
-                      <video
-                        ref={videoPreviewRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="viewfinder-video-stream"
-                      />
-                    ) : (
-                      <div className="viewfinder-camera-placeholder">
-                        {cameraError ? (
-                          <div className="viewfinder-camera-error">
-                            <p>{cameraError}</p>
-                            <button type="button" className="btn-camera-retry" onClick={startCamera}>
-                              <RefreshCw size={14} /> Подключить камеру
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="viewfinder-camera-loading">
-                            <RefreshCw size={26} className="spin-icon" />
-                            <span>Инициализация камеры...</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                {/* Live Camera Feed (Always in DOM for instant ref binding) */}
+                <video
+                  ref={videoPreviewRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{
+                    display: showLiveFeed ? 'block' : 'none',
+                    filter: activeFilter.filterCss,
+                  }}
+                  className={`viewfinder-video-stream ${facingMode === 'user' ? 'mirror-camera' : ''}`}
+                />
 
-                    {/* Recorded Video Playback */}
-                    {recordedVideoUrl && !isRecording && activeMode === 'camera_record' && (
-                      <video
-                        src={recordedVideoUrl}
-                        controls
-                        autoPlay
-                        loop
-                        className="viewfinder-video-stream recorded-playback"
-                      />
+                {/* Recorded Video Playback */}
+                {recordedVideoUrl && !isRecording && activeMode === 'camera_record' && (
+                  <video
+                    src={recordedVideoUrl}
+                    controls
+                    autoPlay
+                    loop
+                    playsInline
+                    className="viewfinder-video-stream recorded-playback"
+                    style={{ filter: activeFilter.filterCss }}
+                  />
+                )}
+
+                {/* Camera Inactive / Loading / Error State */}
+                {!cameraActive && !isPhotoSnapped && !recordedVideoUrl && (
+                  <div className="viewfinder-camera-placeholder">
+                    {cameraLoading ? (
+                      <div className="viewfinder-camera-loading">
+                        <RefreshCw size={28} className="spin-icon" />
+                        <span>Подключение камеры...</span>
+                      </div>
+                    ) : cameraError ? (
+                      <div className="viewfinder-camera-error">
+                        <p>{cameraError}</p>
+                        <button type="button" className="btn-camera-retry" onClick={startCamera}>
+                          <RefreshCw size={14} /> Повторить попытку
+                        </button>
+                        <button type="button" className="btn-camera-retry gallery-btn" onClick={() => setScreen('gallery')}>
+                          <ImageIcon size={14} /> Выбрать из галереи
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="viewfinder-camera-loading">
+                        <Camera size={32} color="#6366f1" />
+                        <span>Нажмите «Включить камеру»</span>
+                        <button type="button" className="btn-camera-retry" onClick={startCamera}>
+                          Включить камеру
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
 
-                {/* Photo Mode Background Layer */}
-                {activeMode === 'photo' && !selectedGradient && (
+                {/* Photo Mode Background Layer when a photo is selected or snapped */}
+                {activeMode === 'photo' && (isPhotoSnapped || !cameraActive) && !selectedGradient && (
                   <div 
                     className="viewfinder-photo-layer" 
                     style={{ 
@@ -508,6 +625,18 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                     <Music size={12} className="music-pulse" />
                     <span>{selectedMusic}</span>
                   </div>
+                )}
+
+                {/* Retake Button if photo is snapped */}
+                {activeMode === 'photo' && isPhotoSnapped && (
+                  <button 
+                    type="button" 
+                    className="viewfinder-retake-btn"
+                    onClick={handleRetakePhoto}
+                    title="Снять заново"
+                  >
+                    <RotateCcw size={13} /> Переснять
+                  </button>
                 )}
 
                 {/* Active Filter Name Badge */}
@@ -572,7 +701,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                       type="button"
                       className="hud-action-circle-btn"
                       onClick={toggleFacingMode}
-                      title="Переключить камеру"
+                      title="Переключить камеру (передняя / задняя)"
                     >
                       <RefreshCw size={19} />
                     </button>
@@ -582,7 +711,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                       type="button"
                       className={`hud-shutter-btn ${activeMode} ${isRecording ? 'is-recording' : ''}`}
                       onClick={handleShutterClick}
-                      title={activeMode === 'camera_record' ? (isRecording ? 'Остановить' : 'Запись') : 'Сделать фото'}
+                      title={activeMode === 'camera_record' ? (isRecording ? 'Остановить' : 'Запись') : 'Сделать снимок'}
                     >
                       <div className={`hud-shutter-inner ${activeMode === 'photo' ? 'white' : 'red'}`}>
                         {isRecording && <Square size={16} fill="#ffffff" color="#ffffff" />}
@@ -848,7 +977,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                         onClick={() => {
                           setSelectedImage(img);
                           setSelectedGradient(null);
-                          setActiveMode('photo');
+                          setIsPhotoSnapped(true);
                         }}
                       />
                     ))}
@@ -966,7 +1095,11 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
               <button 
                 type="button" 
                 className="gallery-nav-btn" 
-                onClick={() => { setScreen('camera'); setActiveMode('camera_record'); }}
+                onClick={() => { 
+                  setScreen('camera'); 
+                  setIsPhotoSnapped(false);
+                  startCamera(); 
+                }}
                 title="Открыть камеру"
               >
                 <Camera size={20} />
@@ -981,6 +1114,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                 onClick={() => {
                   setSelectedImage(STORY_PRESETS[1]);
                   setStoryText('✨ Стильный шаблон New Age');
+                  setIsPhotoSnapped(true);
                   setScreen('camera');
                 }}
               >
@@ -1008,6 +1142,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                 onClick={() => {
                   setSelectedGradient(GRADIENT_PRESETS[1]);
                   setStoryText('Коллаж впечатлений');
+                  setIsPhotoSnapped(true);
                   setScreen('camera');
                 }}
               >
@@ -1061,7 +1196,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                 className="gallery-camera-tile"
                 onClick={() => {
                   setScreen('camera');
-                  setActiveMode('camera_record');
+                  setIsPhotoSnapped(false);
                   startCamera();
                 }}
                 title="Снять на камеру"
@@ -1080,6 +1215,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                   onClick={() => {
                     setSelectedImage(imgUrl);
                     setSelectedGradient(null);
+                    setIsPhotoSnapped(true);
                     setScreen('camera');
                     setActiveMode('photo');
                   }}
@@ -1096,6 +1232,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                   onClick={() => {
                     setSelectedImage(presetUrl);
                     setSelectedGradient(null);
+                    setIsPhotoSnapped(true);
                     setScreen('camera');
                     setActiveMode('photo');
                   }}
