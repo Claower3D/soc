@@ -139,7 +139,8 @@ export function detectCountryFromBrowser(): CountryInfo {
 let cachedDetectedCountry: CountryInfo | null = null;
 
 /**
- * Полное автоопределение: сначала быстрый браузерный метод, затем проверка через IP Geolocation API
+ * Полное автоопределение: быстрый и надежный браузерный метод (Timezone + Locale)
+ * Не вызывает блокировок со стороны adblock/антивирусов
  */
 export async function detectUserCountry(): Promise<CountryInfo> {
   if (cachedDetectedCountry) {
@@ -147,30 +148,6 @@ export async function detectUserCountry(): Promise<CountryInfo> {
   }
 
   const browserGuessed = detectCountryFromBrowser();
-
-  // Пытаемся уточнить через бесплатный быстрый IP Geolocation (таймаут 1.8с)
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 1800);
-
-    // Сначала пробуем встроенный бекенд или надежный сервис country.is
-    const res = await fetch('https://api.country.is', { signal: controller.signal });
-    clearTimeout(timeoutId);
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.country) {
-        const found = COUNTRIES.find(c => c.code.toUpperCase() === String(data.country).toUpperCase());
-        if (found) {
-          cachedDetectedCountry = found;
-          return found;
-        }
-      }
-    }
-  } catch {
-    // В случае оффлайна или блокировки используем браузерную таймзону
-  }
-
   cachedDetectedCountry = browserGuessed;
   return browserGuessed;
 }

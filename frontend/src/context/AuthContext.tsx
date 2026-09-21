@@ -217,9 +217,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Try Go Backend registration
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           name: data.name.trim(),
           username: cleanUsername,
@@ -232,8 +236,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           location: data.location || '',
         }),
       });
+      clearTimeout(timeoutId);
 
-      const resData = await response.json();
+      let resData: any = {};
+      try {
+        resData = await response.json();
+      } catch {
+        resData = {};
+      }
 
       if (!response.ok) {
         return { success: false, message: resData.message || resData.error || 'Ошибка при регистрации' };
@@ -323,16 +333,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Try Go Backend login
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           login: query,
           password: password || '',
         }),
       });
+      clearTimeout(timeoutId);
 
-      const resData = await response.json();
+      let resData: any = {};
+      try {
+        resData = await response.json();
+      } catch {
+        resData = {};
+      }
 
       const token = resData.data?.token || resData.token;
       let user = resData.data?.user || resData.user;

@@ -1696,19 +1696,24 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	store.mu.Lock()
-	defer store.mu.Unlock()
-
 	// Проверка на существующего пользователя в памяти
+	store.mu.RLock()
+	var duplicateFound string
 	for _, entry := range store.accounts {
 		if strings.ToLower(entry.User.Username) == cleanUsername {
-			writeJSON(w, http.StatusConflict, Response{Status: "error", Message: fmt.Sprintf("ID @%s уже занят другим пользователем", cleanUsername)})
-			return
+			duplicateFound = fmt.Sprintf("ID @%s уже занят другим пользователем", cleanUsername)
+			break
 		}
 		if strings.ToLower(entry.EmailOrPhone) == cleanEmailOrPhone {
-			writeJSON(w, http.StatusConflict, Response{Status: "error", Message: "Аккаунт с таким email или телефоном уже существует"})
-			return
+			duplicateFound = "Аккаунт с таким email или телефоном уже существует"
+			break
 		}
+	}
+	store.mu.RUnlock()
+
+	if duplicateFound != "" {
+		writeJSON(w, http.StatusConflict, Response{Status: "error", Message: duplicateFound})
+		return
 	}
 
 	newID := "u_" + time.Now().Format("20060102150405")

@@ -436,6 +436,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                         placeholder="Введите ваш пароль"
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
+                        autoComplete="current-password"
                         required 
                       />
                       <button 
@@ -564,6 +565,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                             placeholder={t('auth.modal.password_placeholder')}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
+                            autoComplete="new-password"
                             required 
                           />
                           <button 
@@ -585,6 +587,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                             placeholder={t('auth.modal.confirm_password_placeholder')}
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
+                            autoComplete="new-password"
                             required 
                           />
                         </div>
