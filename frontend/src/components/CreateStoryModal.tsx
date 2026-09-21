@@ -2,7 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   X, Camera, Image as ImageIcon, Sparkles, Type, Check, 
   Radio, Video, Mic, MicOff, RefreshCw, Smile, 
-  Palette, Square, Wand2, MessageCircle, Eye
+  Square, Wand2, Eye,
+  ArrowLeft, Music, Bookmark, AtSign, PenLine, 
+  Download, MoreHorizontal, ChevronDown, ChevronUp, 
+  ChevronRight, Star, LayoutTemplate, Grid2X2, Plus
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { type Story } from '../data/mock';
@@ -58,6 +61,9 @@ const STORY_PRESETS = [
   'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
   'https://images.unsplash.com/photo-1511447333015-45b65e60f6d5?auto=format&fit=crop&w=800&q=80',
   'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=800&q=80',
 ];
 
 const GRADIENT_PRESETS = [
@@ -68,22 +74,36 @@ const GRADIENT_PRESETS = [
   'linear-gradient(135deg, #0F172A 0%, #334155 100%)',
 ];
 
+const MUSIC_TRACKS = [
+  { id: 'track1', title: 'Одинокая звезда', artist: 'New Age Sound', duration: '0:30' },
+  { id: 'track2', title: 'Cosmic Zen Meditation', artist: 'Aura Vibes', duration: '0:30' },
+  { id: 'track3', title: 'Lo-Fi Chill & Coffee', artist: 'BeatMaster', duration: '0:30' },
+  { id: 'track4', title: 'Night Cyber City', artist: 'SynthPulse', duration: '0:30' },
+];
+
 export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStoryModalProps) {
   const { currentUser } = useAuth();
   
-  // Modes: 'photo' | 'camera_record' | 'live'
-  const [activeMode, setActiveMode] = useState<'photo' | 'camera_record' | 'live'>('photo');
+  // Screen views: 'camera' | 'gallery'
+  const [screen, setScreen] = useState<'camera' | 'gallery'>('camera');
+
+  // Camera modes: 'photo' | 'camera_record' | 'live'
+  const [activeMode, setActiveMode] = useState<'photo' | 'camera_record' | 'live'>('camera_record');
 
   // Photo & Background states
   const [selectedImage, setSelectedImage] = useState<string>(STORY_PRESETS[0]);
   const [selectedGradient, setSelectedGradient] = useState<string | null>(null);
   const [storyText, setStoryText] = useState('');
-  const [textPosition, setTextPosition] = useState<'center' | 'bottom' | 'top'>('center');
+  const [textPosition, setTextPosition] = useState<'center' | 'bottom' | 'top'>('bottom');
   
   // Effects: Filter & AR Mask
   const [activeFilter, setActiveFilter] = useState<StoryFilter>(STORY_FILTERS[0]);
   const [activeMask, setActiveMask] = useState<StoryMask>(STORY_MASKS[0]);
   const [activeTab, setActiveTab] = useState<'effects' | 'backgrounds' | 'text'>('effects');
+  const [selectedMusic, setSelectedMusic] = useState<string | null>(null);
+
+  // Right sidebar expanded state
+  const [isToolsExpanded, setIsToolsExpanded] = useState(false);
 
   // Camera & Recording states
   const [cameraActive, setCameraActive] = useState(false);
@@ -91,6 +111,10 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
   const [isRecording, setIsRecording] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
+
+  // Gallery screen states
+  const [galleryFilter, setGalleryFilter] = useState<'all' | 'recent' | 'photos' | 'videos'>('recent');
+  const [userUploadedImages, setUserUploadedImages] = useState<string[]>([]);
 
   // Live Stream broadcast states
   const [isLiveActive, setIsLiveActive] = useState(false);
@@ -143,7 +167,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       setCameraActive(true);
     } catch (err: any) {
       console.warn('Camera access denied or unavailable:', err);
-      setCameraError('Не удалось подключить камеру. Проверьте разрешения или используйте готовые фоны.');
+      setCameraError('Не удалось подключить камеру. Используйте готовые фоны или загрузите фото.');
       setCameraActive(false);
     }
   };
@@ -153,24 +177,23 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
   };
 
   useEffect(() => {
-    if (cameraActive) {
+    if (isOpen && (activeMode === 'camera_record' || activeMode === 'live')) {
       startCamera();
     }
-  }, [facingMode]);
+    return () => {
+      stopCamera();
+    };
+  }, [isOpen, facingMode]);
 
   const handleModeChange = (mode: 'photo' | 'camera_record' | 'live') => {
     setActiveMode(mode);
-    if (mode === 'camera_record' || mode === 'live') {
-      startCamera();
-      if (mode === 'live') {
-        setIsLiveActive(true);
-      } else {
-        setIsLiveActive(false);
-      }
-    } else {
+    if (mode === 'photo') {
       stopCamera();
       setIsLiveActive(false);
       setIsRecording(false);
+    } else if (mode === 'camera_record' || mode === 'live') {
+      startCamera();
+      setIsLiveActive(mode === 'live');
     }
   };
 
@@ -239,24 +262,58 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
     if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
   };
 
-  if (!isOpen) return null;
+  // Shutter action based on mode
+  const handleShutterClick = () => {
+    if (activeMode === 'camera_record') {
+      if (!isRecording) {
+        startRecording();
+      } else {
+        stopRecording();
+      }
+    } else if (activeMode === 'photo') {
+      // Snap frame from video if camera active, or open gallery
+      if (cameraActive && videoPreviewRef.current) {
+        try {
+          const video = videoPreviewRef.current;
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 720;
+          canvas.height = video.videoHeight || 1280;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+            setSelectedImage(dataUrl);
+            setSelectedGradient(null);
+            stopCamera();
+          }
+        } catch {
+          setScreen('gallery');
+        }
+      } else {
+        setScreen('gallery');
+      }
+    } else if (activeMode === 'live') {
+      setIsLiveActive(prev => !prev);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
-        setSelectedImage(reader.result as string);
+        const res = reader.result as string;
+        setSelectedImage(res);
+        setUserUploadedImages(prev => [res, ...prev]);
         setSelectedGradient(null);
         setRecordedVideoUrl(null);
+        setScreen('camera');
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handlePublish = (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handlePublishStory = (isCloseFriends: boolean = false) => {
     const isLive = activeMode === 'live';
     const newStory: Story = {
       id: `story_${Date.now()}`,
@@ -272,7 +329,12 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       text: storyText.trim() || (isLive ? '🔴 ПРЯМОЙ ЭФИР' : undefined),
       textPosition,
       timestamp: isLive ? 'В ЭФИРЕ' : 'Только что',
+      musicTrack: selectedMusic || undefined,
     };
+
+    if (isCloseFriends) {
+      (newStory as any).isCloseFriends = true;
+    }
 
     onCreateStory(newStory);
     stopCamera();
@@ -289,501 +351,764 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
     setLiveNewMsg('');
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="create-story-overlay" onClick={() => { stopCamera(); onClose(); }}>
-      <div className="create-story-modal" onClick={e => e.stopPropagation()}>
-        {/* Hidden File Input */}
+    <div className="newage-story-camera-overlay" onClick={() => { stopCamera(); onClose(); }}>
+      <div className="newage-story-camera-container" onClick={e => e.stopPropagation()}>
+        
+        {/* Hidden File Input for uploading media */}
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           style={{ display: 'none' }}
           onChange={handleFileChange}
         />
 
-        {/* Modal Header */}
-        <div className="create-story-header">
-          <div className="create-story-title-row">
-            <Camera size={20} className="story-header-icon" />
-            <h3>Камера историй New Age</h3>
-          </div>
+        {/* ========================================================================= */}
+        {/* VIEW 1: CAMERA CREATION SCREEN (Камера историй New Age)                  */}
+        {/* ========================================================================= */}
+        {screen === 'camera' && (
+          <div className="story-camera-view">
+            
+            {/* Top Navigation Bar */}
+            <div className="story-camera-top-bar">
+              <button 
+                type="button" 
+                className="story-nav-btn" 
+                onClick={() => { stopCamera(); onClose(); }}
+                title="Назад / Закрыть"
+              >
+                <ArrowLeft size={22} />
+              </button>
 
-          {/* Mode Switcher Tabs */}
-          <div className="story-mode-switcher">
-            <button
-              type="button"
-              className={`mode-btn ${activeMode === 'photo' ? 'active' : ''}`}
-              onClick={() => handleModeChange('photo')}
-            >
-              <ImageIcon size={14} /> Фото
-            </button>
-            <button
-              type="button"
-              className={`mode-btn ${activeMode === 'camera_record' ? 'active' : ''}`}
-              onClick={() => handleModeChange('camera_record')}
-            >
-              <Video size={14} /> Запись видео
-            </button>
-            <button
-              type="button"
-              className={`mode-btn live-btn ${activeMode === 'live' ? 'active' : ''}`}
-              onClick={() => handleModeChange('live')}
-            >
-              <Radio size={14} /> LIVE Эфир
-            </button>
-          </div>
+              <div className="story-top-title-block">
+                <span className="story-top-title">Камера историй</span>
+                <span className="story-top-brand">New Age</span>
+              </div>
 
-          <button className="create-story-close-btn" onClick={() => { stopCamera(); onClose(); }}>
-            <X size={20} />
-          </button>
-        </div>
+              {/* Mode Switcher Tabs */}
+              <div className="story-top-mode-pills">
+                <button
+                  type="button"
+                  className={`story-mode-pill ${activeMode === 'photo' ? 'active' : ''}`}
+                  onClick={() => handleModeChange('photo')}
+                >
+                  <ImageIcon size={13} /> Фото
+                </button>
+                <button
+                  type="button"
+                  className={`story-mode-pill ${activeMode === 'camera_record' ? 'active' : ''}`}
+                  onClick={() => handleModeChange('camera_record')}
+                >
+                  <Video size={13} /> Запись видео
+                </button>
+                <button
+                  type="button"
+                  className={`story-mode-pill live-pill ${activeMode === 'live' ? 'active' : ''}`}
+                  onClick={() => handleModeChange('live')}
+                >
+                  <Radio size={13} /> LIVE Эфир
+                </button>
+              </div>
+            </div>
 
-        {/* Story Preview & Canvas Area */}
-        <div className="create-story-body">
-          {/* Phone Canvas with Live Feed and AR Masks */}
-          <div className="story-canvas-wrapper">
-            <div 
-              className="story-preview-phone"
-              style={{
-                background: activeMode === 'photo'
-                  ? (selectedGradient ? selectedGradient : `url(${selectedImage}) center/cover no-repeat`)
-                  : '#000000',
-              }}
-            >
-              {/* WebCam Video stream with CSS Filter applied */}
-              {(activeMode === 'camera_record' || activeMode === 'live') && (
-                <div className="camera-video-container" style={{ filter: activeFilter.filterCss }}>
-                  {cameraActive ? (
-                    <video
-                      ref={videoPreviewRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="camera-live-stream"
-                    />
-                  ) : (
-                    <div className="camera-placeholder">
-                      {cameraError ? (
-                        <div className="camera-err-box">
-                          <p>{cameraError}</p>
-                          <button type="button" className="btn-retry-camera" onClick={startCamera}>
-                            <RefreshCw size={14} /> Повторить подключение
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="camera-starting">
-                          <RefreshCw size={24} className="spin-icon" />
-                          <span>Подключение камеры...</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+            {/* Main Stage with Viewfinder & Right Tools Column */}
+            <div className="story-stage-row">
+              
+              {/* Central Viewfinder Card (9:16 Aspect Ratio) */}
+              <div 
+                className="story-viewfinder-card"
+                style={{
+                  background: activeMode === 'photo'
+                    ? (selectedGradient ? selectedGradient : `url(${selectedImage}) center/cover no-repeat`)
+                    : '#000000',
+                }}
+              >
+                {/* Live Camera Feed or Playback */}
+                {(activeMode === 'camera_record' || activeMode === 'live') && (
+                  <div className="viewfinder-media-layer" style={{ filter: activeFilter.filterCss }}>
+                    {cameraActive ? (
+                      <video
+                        ref={videoPreviewRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="viewfinder-video-stream"
+                      />
+                    ) : (
+                      <div className="viewfinder-camera-placeholder">
+                        {cameraError ? (
+                          <div className="viewfinder-camera-error">
+                            <p>{cameraError}</p>
+                            <button type="button" className="btn-camera-retry" onClick={startCamera}>
+                              <RefreshCw size={14} /> Подключить камеру
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="viewfinder-camera-loading">
+                            <RefreshCw size={26} className="spin-icon" />
+                            <span>Инициализация камеры...</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                  {/* Playback for recorded video */}
-                  {recordedVideoUrl && !isRecording && activeMode === 'camera_record' && (
-                    <video
-                      src={recordedVideoUrl}
-                      controls
-                      autoPlay
-                      loop
-                      className="camera-live-stream recorded-playback"
-                    />
-                  )}
-                </div>
-              )}
+                    {/* Recorded Video Playback */}
+                    {recordedVideoUrl && !isRecording && activeMode === 'camera_record' && (
+                      <video
+                        src={recordedVideoUrl}
+                        controls
+                        autoPlay
+                        loop
+                        className="viewfinder-video-stream recorded-playback"
+                      />
+                    )}
+                  </div>
+                )}
 
-              {/* Photo Mode Filter Applied */}
-              {activeMode === 'photo' && !selectedGradient && (
-                <div 
-                  className="photo-filter-layer" 
-                  style={{ 
-                    backgroundImage: `url(${selectedImage})`,
-                    filter: activeFilter.filterCss 
-                  }} 
-                />
-              )}
+                {/* Photo Mode Background Layer */}
+                {activeMode === 'photo' && !selectedGradient && (
+                  <div 
+                    className="viewfinder-photo-layer" 
+                    style={{ 
+                      backgroundImage: `url(${selectedImage})`,
+                      filter: activeFilter.filterCss 
+                    }} 
+                  />
+                )}
 
-              {/* AR Face Masks / Fun Overlays */}
-              {activeMask.id !== 'none' && (
-                <div className={`ar-mask-overlay mask-${activeMask.overlayType}`}>
-                  {activeMask.overlayType === 'glasses' && (
-                    <div className="mask-element ar-glasses">🕶️</div>
-                  )}
-                  {activeMask.overlayType === 'crown' && (
-                    <div className="mask-element ar-crown">👑</div>
-                  )}
-                  {activeMask.overlayType === 'cat_ears' && (
-                    <div className="mask-element ar-cat-ears">🐱</div>
-                  )}
-                  {activeMask.overlayType === 'angel_halo' && (
-                    <div className="mask-element ar-halo">😇</div>
-                  )}
-                  {activeMask.overlayType === 'cyber_visor' && (
-                    <div className="mask-element ar-visor">🥽</div>
-                  )}
-                  {activeMask.overlayType === 'sparkles' && (
-                    <div className="mask-element ar-sparkles">✨</div>
-                  )}
-                </div>
-              )}
+                {/* AR Face Masks / Overlays */}
+                {activeMask.id !== 'none' && (
+                  <div className={`ar-mask-layer mask-${activeMask.overlayType}`}>
+                    {activeMask.overlayType === 'glasses' && <div className="ar-emoji">🕶️</div>}
+                    {activeMask.overlayType === 'crown' && <div className="ar-emoji">👑</div>}
+                    {activeMask.overlayType === 'cat_ears' && <div className="ar-emoji">🐱</div>}
+                    {activeMask.overlayType === 'angel_halo' && <div className="ar-emoji">😇</div>}
+                    {activeMask.overlayType === 'cyber_visor' && <div className="ar-emoji">🥽</div>}
+                    {activeMask.overlayType === 'sparkles' && <div className="ar-emoji">✨</div>}
+                  </div>
+                )}
 
-              {/* Top Author Badge & LIVE Indicators */}
-              <div className="story-preview-header">
-                <div className="story-author-info">
-                  <img src={currentUser.avatar} alt={currentUser.name} className="story-author-avatar" />
-                  <div className="story-author-text">
-                    <span className="story-author-name">{currentUser.name}</span>
-                    <span className="story-author-tag">
+                {/* Top Author Tag in Viewfinder */}
+                <div className="viewfinder-author-badge">
+                  <img src={currentUser.avatar} alt={currentUser.name} className="author-badge-avatar" />
+                  <div className="author-badge-text">
+                    <span className="author-name">{currentUser.name || 'Галимов Максим'}</span>
+                    <span className="author-tag">
                       {activeMode === 'live' ? 'Прямой эфир' : 'Ваша история'}
                     </span>
                   </div>
                 </div>
 
-                {activeMode === 'live' && (
-                  <div className="live-status-pill">
-                    <span className="live-red-dot" />
-                    <span className="live-pill-text">ПРЯМОЙ ЭФИР</span>
-                    <span className="live-viewers-count">
-                      <Eye size={12} /> {liveViewersCount}
-                    </span>
+                {/* Music Badge Overlay if Selected */}
+                {selectedMusic && (
+                  <div className="viewfinder-music-badge">
+                    <Music size={12} className="music-pulse" />
+                    <span>{selectedMusic}</span>
                   </div>
                 )}
-              </div>
 
-              {/* Live Floating Reactions (Hearts) */}
-              {activeMode === 'live' && (
-                <div className="live-hearts-stream">
-                  {liveHearts.map((heartKey) => (
-                    <span key={heartKey} className="floating-heart">❤️</span>
-                  ))}
-                </div>
-              )}
-
-              {/* Live Chat Overlay inside Video Stream */}
-              {activeMode === 'live' && (
-                <div className="live-stream-chat-box">
-                  <div className="live-messages-list">
-                    {liveChatMessages.slice(-4).map(msg => (
-                      <div key={msg.id} className="live-chat-bubble">
-                        <strong>{msg.name}:</strong> {msg.text}
-                      </div>
-                    ))}
+                {/* Active Filter Name Badge */}
+                {activeFilter.id !== 'normal' && (
+                  <div className="viewfinder-filter-badge" style={{ borderColor: activeFilter.badgeColor }}>
+                    <Wand2 size={11} /> {activeFilter.name}
                   </div>
-                  <form onSubmit={handleSendLiveComment} className="live-chat-input-row">
-                    <input
-                      type="text"
-                      placeholder="Отправить комментарий в эфир..."
-                      value={liveNewMsg}
-                      onChange={e => setLiveNewMsg(e.target.value)}
-                    />
-                    <button type="submit">
-                      <MessageCircle size={14} />
-                    </button>
-                  </form>
-                </div>
-              )}
+                )}
 
-              {/* Overlay Text */}
-              {storyText && (
-                <div className={`story-text-overlay pos-${textPosition}`}>
-                  <p>{storyText}</p>
-                </div>
-              )}
+                {/* Text Overlay on Story */}
+                {storyText && (
+                  <div className={`viewfinder-text-overlay pos-${textPosition}`}>
+                    <p>{storyText}</p>
+                  </div>
+                )}
 
-              {/* Active Filter watermark tag */}
-              {activeFilter.id !== 'normal' && (
-                <div className="active-filter-badge" style={{ borderColor: activeFilter.badgeColor }}>
-                  <Wand2 size={11} /> {activeFilter.name}
-                </div>
-              )}
+                {/* Live Stream Viewers & Hearts */}
+                {activeMode === 'live' && (
+                  <>
+                    <div className="viewfinder-live-header-pill">
+                      <span className="live-pulse-dot" />
+                      <span>LIVE</span>
+                      <span className="live-count"><Eye size={12} /> {liveViewersCount}</span>
+                    </div>
 
-              {/* Video Recording Controls Over Canvas */}
-              {activeMode === 'camera_record' && (
-                <div className="recording-hud-bar">
-                  <div className="recording-hud-timer">
-                    <span className={`rec-dot ${isRecording ? 'pulse' : ''}`} />
+                    <div className="viewfinder-live-hearts">
+                      {liveHearts.map(hk => (
+                        <span key={hk} className="floating-heart">❤️</span>
+                      ))}
+                    </div>
+
+                    <div className="viewfinder-live-chat">
+                      {liveChatMessages.slice(-3).map(m => (
+                        <div key={m.id} className="live-chat-row">
+                          <b>{m.name}:</b> {m.text}
+                        </div>
+                      ))}
+                      <form onSubmit={handleSendLiveComment} className="live-chat-input">
+                        <input
+                          type="text"
+                          placeholder="Написать в эфир..."
+                          value={liveNewMsg}
+                          onChange={e => setLiveNewMsg(e.target.value)}
+                        />
+                      </form>
+                    </div>
+                  </>
+                )}
+
+                {/* Bottom Viewfinder HUD: Timer, Flip, Record, Mic */}
+                <div className="viewfinder-bottom-hud">
+                  
+                  {/* Timer Bar */}
+                  <div className="hud-timer-badge">
+                    <span className={`hud-rec-dot ${isRecording ? 'blinking' : ''}`} />
                     <span>00:{recordSeconds < 10 ? `0${recordSeconds}` : recordSeconds} / 00:30</span>
                   </div>
 
-                  <div className="recording-buttons-row">
+                  {/* Buttons Row: Flip, Big Shutter, Mic */}
+                  <div className="hud-controls-row">
                     <button
                       type="button"
-                      className="hud-icon-btn"
+                      className="hud-action-circle-btn"
                       onClick={toggleFacingMode}
                       title="Переключить камеру"
                     >
-                      <RefreshCw size={18} />
+                      <RefreshCw size={19} />
                     </button>
 
-                    {!isRecording ? (
-                      <button
-                        type="button"
-                        className="record-shutter-btn"
-                        onClick={startRecording}
-                        title="Начать запись"
-                      >
-                        <div className="shutter-inner red" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="record-shutter-btn recording"
-                        onClick={stopRecording}
-                        title="Остановить запись"
-                      >
-                        <Square size={20} fill="#ffffff" color="#ffffff" />
-                      </button>
-                    )}
+                    {/* Central Big Shutter Button */}
+                    <button
+                      type="button"
+                      className={`hud-shutter-btn ${activeMode} ${isRecording ? 'is-recording' : ''}`}
+                      onClick={handleShutterClick}
+                      title={activeMode === 'camera_record' ? (isRecording ? 'Остановить' : 'Запись') : 'Сделать фото'}
+                    >
+                      <div className={`hud-shutter-inner ${activeMode === 'photo' ? 'white' : 'red'}`}>
+                        {isRecording && <Square size={16} fill="#ffffff" color="#ffffff" />}
+                      </div>
+                    </button>
 
                     <button
                       type="button"
-                      className={`hud-icon-btn ${isMuted ? 'muted' : ''}`}
+                      className={`hud-action-circle-btn ${isMuted ? 'muted' : ''}`}
                       onClick={() => {
                         setIsMuted(!isMuted);
                         if (mediaStreamRef.current) {
                           mediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = isMuted);
                         }
                       }}
-                      title={isMuted ? 'Включить микрофон' : 'Выключить микрофон'}
+                      title={isMuted ? 'Включить звук' : 'Выключить звук'}
                     >
-                      {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+                      {isMuted ? <MicOff size={19} /> : <Mic size={19} />}
                     </button>
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* Controls Side Column (Эффекты, Маски, Фоны, Текст) */}
-          <div className="create-story-controls">
-            {/* Control category tabs */}
-            <div className="controls-category-tabs">
+              </div>
+
+              {/* Right Vertical Floating Tools Column (Screenshot 1 & 3) */}
+              <div className={`story-vertical-tools-column ${isToolsExpanded ? 'expanded' : 'collapsed'}`}>
+                
+                {/* 1. Aa Текст */}
+                <button 
+                  type="button" 
+                  className={`story-tool-item ${activeTab === 'text' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('text')}
+                  title="Текст"
+                >
+                  <div className="story-tool-icon-box">
+                    <span className="tool-typography-icon">Aa</span>
+                  </div>
+                  {isToolsExpanded && <span className="story-tool-label">Текст</span>}
+                </button>
+
+                {/* 2. Стикеры */}
+                <button 
+                  type="button" 
+                  className="story-tool-item"
+                  onClick={() => setActiveTab('text')}
+                  title="Стикеры"
+                >
+                  <div className="story-tool-icon-box">
+                    <Smile size={20} />
+                  </div>
+                  {isToolsExpanded && <span className="story-tool-label">Стикеры</span>}
+                </button>
+
+                {/* 3. Музыка */}
+                <button 
+                  type="button" 
+                  className={`story-tool-item ${selectedMusic ? 'active' : ''}`}
+                  onClick={() => {
+                    if (selectedMusic) {
+                      setSelectedMusic(null);
+                    } else {
+                      setSelectedMusic(MUSIC_TRACKS[0].title);
+                    }
+                  }}
+                  title="Музыка"
+                >
+                  <div className="story-tool-icon-box">
+                    <Music size={20} />
+                  </div>
+                  {isToolsExpanded && <span className="story-tool-label">Музыка</span>}
+                </button>
+
+                {/* 4. Эффекты */}
+                <button 
+                  type="button" 
+                  className={`story-tool-item ${activeTab === 'effects' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('effects')}
+                  title="Эффекты"
+                >
+                  <div className="story-tool-icon-box">
+                    <Sparkles size={20} />
+                  </div>
+                  {isToolsExpanded && <span className="story-tool-label">Эффекты</span>}
+                </button>
+
+                {/* Extended tools shown when expanded */}
+                {isToolsExpanded && (
+                  <>
+                    <button 
+                      type="button" 
+                      className="story-tool-item"
+                      onClick={() => alert('История сохранена в черновики')}
+                      title="Сохранить"
+                    >
+                      <div className="story-tool-icon-box">
+                        <Bookmark size={19} />
+                      </div>
+                      <span className="story-tool-label">Сохранить</span>
+                    </button>
+
+                    <button 
+                      type="button" 
+                      className="story-tool-item"
+                      onClick={() => setStoryText(prev => `${prev} @`)}
+                      title="Упомянуть"
+                    >
+                      <div className="story-tool-icon-box">
+                        <AtSign size={19} />
+                      </div>
+                      <span className="story-tool-label">Упомянуть</span>
+                    </button>
+
+                    <button 
+                      type="button" 
+                      className="story-tool-item"
+                      onClick={() => alert('Режим рисования активирован')}
+                      title="Рисунок"
+                    >
+                      <div className="story-tool-icon-box">
+                        <PenLine size={19} />
+                      </div>
+                      <span className="story-tool-label">Рисунок</span>
+                    </button>
+
+                    <button 
+                      type="button" 
+                      className="story-tool-item"
+                      onClick={() => alert('Медиафайл скачивается на устройство')}
+                      title="Скачать"
+                    >
+                      <div className="story-tool-icon-box">
+                        <Download size={19} />
+                      </div>
+                      <span className="story-tool-label">Сохранить</span>
+                    </button>
+
+                    <button 
+                      type="button" 
+                      className="story-tool-item"
+                      onClick={() => setActiveTab('backgrounds')}
+                      title="Ещё"
+                    >
+                      <div className="story-tool-icon-box">
+                        <MoreHorizontal size={19} />
+                      </div>
+                      <span className="story-tool-label">Ещё</span>
+                    </button>
+                  </>
+                )}
+
+                {/* Expand / Collapse toggle chevron */}
+                <button
+                  type="button"
+                  className="story-tool-item story-tool-expand-btn"
+                  onClick={() => setIsToolsExpanded(!isToolsExpanded)}
+                  title={isToolsExpanded ? 'Свернуть' : 'Развернуть инструменты'}
+                >
+                  <div className="story-tool-icon-box">
+                    {isToolsExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  </div>
+                  {isToolsExpanded && <span className="story-tool-label">Свернуть</span>}
+                </button>
+
+              </div>
+
+            </div>
+
+            {/* Category Selector Tabs Under Viewfinder */}
+            <div className="story-category-tabs-row">
               <button
                 type="button"
-                className={`cat-tab-btn ${activeTab === 'effects' ? 'active' : ''}`}
+                className={`story-cat-pill ${activeTab === 'effects' ? 'active' : ''}`}
                 onClick={() => setActiveTab('effects')}
               >
-                <Palette size={15} /> Фильтры & Маски
+                <Sparkles size={14} /> Фильтры & Маски
               </button>
               <button
                 type="button"
-                className={`cat-tab-btn ${activeTab === 'backgrounds' ? 'active' : ''}`}
+                className={`story-cat-pill ${activeTab === 'backgrounds' ? 'active' : ''}`}
                 onClick={() => setActiveTab('backgrounds')}
               >
-                <ImageIcon size={15} /> Фоны & Фото
+                <ImageIcon size={14} /> Фоны & Фото
               </button>
               <button
                 type="button"
-                className={`cat-tab-btn ${activeTab === 'text' ? 'active' : ''}`}
+                className={`story-cat-pill ${activeTab === 'text' ? 'active' : ''}`}
                 onClick={() => setActiveTab('text')}
               >
-                <Type size={15} /> Текст & Стикеры
+                <Type size={14} /> Текст & Стикеры
               </button>
             </div>
 
-            {/* TAB 1: FILTERS & AR MASKS */}
-            {activeTab === 'effects' && (
-              <div className="tab-pane-content">
-                {/* 1. Instagram Filters */}
-                <div className="control-group">
-                  <label className="control-group-title">
-                    <Wand2 size={14} /> Фильтры Instagram:
-                  </label>
-                  <div className="filters-carousel">
+            {/* Active Drawer: Filters & Masks / Backgrounds / Text */}
+            <div className="story-bottom-drawer">
+              
+              {/* TAB 1: FILTERS & AR MASKS */}
+              {activeTab === 'effects' && (
+                <div className="drawer-pane">
+                  <div className="drawer-filters-row">
                     {STORY_FILTERS.map((f) => (
                       <button
                         key={f.id}
                         type="button"
-                        className={`filter-item-card ${activeFilter.id === f.id ? 'active' : ''}`}
+                        className={`drawer-filter-card ${activeFilter.id === f.id ? 'active' : ''}`}
                         onClick={() => setActiveFilter(f)}
                       >
                         <div 
-                          className="filter-sample-thumb" 
-                          style={{ filter: f.filterCss }}
+                          className="filter-thumb-box"
+                          style={{
+                            backgroundImage: `url(${selectedImage})`,
+                            filter: f.filterCss
+                          }}
                         />
-                        <span className="filter-name">{f.name}</span>
-                        {activeFilter.id === f.id && <Check size={13} className="filter-check-icon" />}
+                        <span className="filter-thumb-name">{f.name}</span>
                       </button>
                     ))}
                   </div>
-                </div>
 
-                {/* 2. AR Face Masks */}
-                <div className="control-group">
-                  <label className="control-group-title">
-                    <Smile size={14} /> AR Маски и Оверлеи:
-                  </label>
-                  <div className="masks-grid">
-                    {STORY_MASKS.map((mask) => (
+                  {/* AR Masks Carousel */}
+                  <div className="drawer-masks-row">
+                    {STORY_MASKS.map((m) => (
                       <button
-                        key={mask.id}
+                        key={m.id}
                         type="button"
-                        className={`mask-badge-btn ${activeMask.id === mask.id ? 'active' : ''}`}
-                        onClick={() => setActiveMask(mask)}
+                        className={`drawer-mask-pill ${activeMask.id === m.id ? 'active' : ''}`}
+                        onClick={() => setActiveMask(m)}
                       >
-                        <span className="mask-emoji">{mask.icon}</span>
-                        <span className="mask-name">{mask.name}</span>
+                        <span className="mask-emoji">{m.icon}</span>
+                        <span className="mask-name">{m.name}</span>
                       </button>
                     ))}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* TAB 2: BACKGROUNDS & PHOTO UPLOAD */}
-            {activeTab === 'backgrounds' && (
-              <div className="tab-pane-content">
-                <div className="control-group">
-                  <label className="control-group-title">Загрузить с устройства</label>
-                  <button 
-                    type="button" 
-                    className="upload-story-btn" 
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <ImageIcon size={18} />
-                    <span>Выбрать фото или изображение</span>
-                  </button>
-                </div>
+              {/* TAB 2: BACKGROUNDS & PHOTO (WITH LINK TO GALLERY) */}
+              {activeTab === 'backgrounds' && (
+                <div className="drawer-pane">
+                  <div className="drawer-bg-actions">
+                    <button
+                      type="button"
+                      className="btn-open-gallery-picker"
+                      onClick={() => setScreen('gallery')}
+                    >
+                      <ImageIcon size={16} /> Открыть галерею фото
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-open-gallery-picker upload"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Plus size={16} /> Загрузить файл
+                    </button>
+                  </div>
 
-                <div className="control-group">
-                  <label className="control-group-title">Готовые фоны природы и города:</label>
-                  <div className="story-presets-grid">
-                    {STORY_PRESETS.map((preset, idx) => (
+                  <div className="drawer-bg-thumbnails">
+                    {STORY_PRESETS.slice(0, 6).map((img, i) => (
                       <button
-                        key={idx}
+                        key={i}
                         type="button"
-                        className={`preset-thumb ${selectedImage === preset && !selectedGradient ? 'active' : ''}`}
+                        className={`bg-thumb-btn ${selectedImage === img && !selectedGradient ? 'active' : ''}`}
+                        style={{ backgroundImage: `url(${img})` }}
                         onClick={() => {
-                          setSelectedImage(preset);
+                          setSelectedImage(img);
                           setSelectedGradient(null);
-                          setActiveMode('photo');
-                        }}
-                      >
-                        <img src={preset} alt={`Пресет ${idx}`} />
-                        {selectedImage === preset && !selectedGradient && (
-                          <div className="preset-check"><Check size={12} /></div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="control-group">
-                  <label className="control-group-title">Градиентные фоны New Age:</label>
-                  <div className="gradient-presets-row">
-                    {GRADIENT_PRESETS.map((grad, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        className={`grad-circle ${selectedGradient === grad ? 'active' : ''}`}
-                        style={{ background: grad }}
-                        onClick={() => {
-                          setSelectedGradient(grad);
                           setActiveMode('photo');
                         }}
                       />
                     ))}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* TAB 3: TEXT & STICKERS */}
-            {activeTab === 'text' && (
-              <div className="tab-pane-content">
-                <div className="control-group">
-                  <div className="text-header-row">
-                    <label className="control-group-title">
-                      <Type size={14} /> Подпись к истории:
-                    </label>
-                    <div className="pos-buttons">
-                      <button 
-                        type="button" 
-                        className={`pos-btn ${textPosition === 'top' ? 'active' : ''}`}
-                        onClick={() => setTextPosition('top')}
-                        title="Сверху"
-                      >
-                        Вверх
-                      </button>
-                      <button 
-                        type="button" 
-                        className={`pos-btn ${textPosition === 'center' ? 'active' : ''}`}
-                        onClick={() => setTextPosition('center')}
-                        title="По центру"
-                      >
-                        Центр
-                      </button>
-                      <button 
-                        type="button" 
-                        className={`pos-btn ${textPosition === 'bottom' ? 'active' : ''}`}
-                        onClick={() => setTextPosition('bottom')}
-                        title="Внизу"
-                      >
-                        Низ
-                      </button>
-                    </div>
-                  </div>
-                  <textarea
-                    placeholder="Добавьте мысль, стикер, опрос или цитату к вашей истории..."
-                    value={storyText}
-                    onChange={e => setStoryText(e.target.value)}
-                    maxLength={140}
-                    rows={4}
-                    className="story-caption-textarea"
-                  />
-                  <span className="caption-char-count">{storyText.length}/140</span>
-                </div>
-
-                {/* Quick Sticker suggestions */}
-                <div className="control-group">
-                  <label className="control-group-title">Быстрые стикеры:</label>
-                  <div className="quick-stickers-row">
-                    {['🔥 Огонь', '✨ New Day', '🎧 В наушниках', '📍 Локация', '☕ Coffee Time', '💯 100%'].map((stk, i) => (
+              {/* TAB 3: TEXT & STICKERS */}
+              {activeTab === 'text' && (
+                <div className="drawer-pane">
+                  <div className="drawer-stickers-row">
+                    {['🔥 Огонь', '✨ New Day', '🎧 В наушниках', '📍 Локация', '☕ Coffee Time', '💯 100%', '🌟 Zen'].map((stk, i) => (
                       <button
                         key={i}
                         type="button"
-                        className="sticker-chip"
+                        className="quick-stk-chip"
                         onClick={() => setStoryText(prev => prev ? `${prev} ${stk}` : stk)}
                       >
                         {stk}
                       </button>
                     ))}
                   </div>
-                </div>
-              </div>
-            )}
 
-            {/* Bottom Action Buttons */}
-            <div className="story-actions-footer">
-              <button 
-                type="button" 
-                className="btn-cancel-story" 
-                onClick={() => { stopCamera(); onClose(); }}
+                  <div className="text-pos-switcher">
+                    <span>Положение:</span>
+                    {(['top', 'center', 'bottom'] as const).map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        className={`pos-pill ${textPosition === p ? 'active' : ''}`}
+                        onClick={() => setTextPosition(p)}
+                      >
+                        {p === 'top' ? 'Сверху' : p === 'center' ? 'По центру' : 'Внизу'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Caption text input row */}
+              <div className="story-caption-input-box">
+                <input
+                  type="text"
+                  placeholder="Добавьте подпись..."
+                  value={storyText}
+                  onChange={e => setStoryText(e.target.value)}
+                  maxLength={140}
+                  className="story-caption-field"
+                />
+              </div>
+
+            </div>
+
+            {/* Bottom Publishing Action Bar (Screenshot 1 & 3) */}
+            <div className="story-bottom-action-bar">
+              
+              {/* Button 1: Ваша история */}
+              <button
+                type="button"
+                className="action-publish-btn your-story-btn"
+                onClick={() => handlePublishStory(false)}
               >
-                Отмена
+                <div className="story-avatar-ring">
+                  <img src={currentUser.avatar} alt={currentUser.name} className="ring-avatar-img" />
+                </div>
+                <span>Ваша история</span>
               </button>
+
+              {/* Button 2: Близкие друзья */}
+              <button
+                type="button"
+                className="action-publish-btn close-friends-btn"
+                onClick={() => handlePublishStory(true)}
+              >
+                <div className="close-friends-star-icon">
+                  <Star size={14} fill="#ffffff" color="#ffffff" />
+                </div>
+                <span>Близкие друзья</span>
+              </button>
+
+              {/* Button 3: Round Blue Action Button > */}
+              <button
+                type="button"
+                className="action-publish-circle-next"
+                onClick={() => handlePublishStory(false)}
+                title="Опубликовать"
+              >
+                <ChevronRight size={22} />
+              </button>
+
+            </div>
+
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* VIEW 2: GALLERY MEDIA PICKER SCREEN (Дополнить историю - Screenshot 2)   */}
+        {/* ========================================================================= */}
+        {screen === 'gallery' && (
+          <div className="story-gallery-view">
+            
+            {/* Top Bar: Close, Title, Camera Icon */}
+            <div className="story-gallery-top-bar">
               <button 
                 type="button" 
-                className={`btn-publish-story ${activeMode === 'live' ? 'btn-publish-live' : ''}`}
-                onClick={handlePublish}
+                className="gallery-nav-btn" 
+                onClick={() => setScreen('camera')}
+                title="Назад к камере"
               >
-                {activeMode === 'live' ? (
-                  <>
-                    <Radio size={16} /> Запустить прямой эфир
-                  </>
-                ) : activeMode === 'camera_record' && recordedVideoUrl ? (
-                  <>
-                    <Sparkles size={16} /> Опубликовать видео-историю
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={16} /> Опубликовать историю
-                  </>
-                )}
+                <X size={22} />
+              </button>
+
+              <h3 className="gallery-view-title">Дополнить историю</h3>
+
+              <button 
+                type="button" 
+                className="gallery-nav-btn" 
+                onClick={() => { setScreen('camera'); setActiveMode('camera_record'); }}
+                title="Открыть камеру"
+              >
+                <Camera size={20} />
               </button>
             </div>
+
+            {/* 3 Quick Cards: Шаблоны, Музыка, Коллаж */}
+            <div className="gallery-quick-cards-row">
+              
+              <div 
+                className="gallery-quick-card"
+                onClick={() => {
+                  setSelectedImage(STORY_PRESETS[1]);
+                  setStoryText('✨ Стильный шаблон New Age');
+                  setScreen('camera');
+                }}
+              >
+                <div className="quick-card-icon-box template-bg">
+                  <LayoutTemplate size={22} color="#ffffff" />
+                </div>
+                <span className="quick-card-label">Шаблоны</span>
+              </div>
+
+              <div 
+                className="gallery-quick-card"
+                onClick={() => {
+                  setSelectedMusic(MUSIC_TRACKS[0].title);
+                  alert(`Музыкальный трек "${MUSIC_TRACKS[0].title}" добавлен к истории`);
+                }}
+              >
+                <div className="quick-card-icon-box music-bg">
+                  <Music size={22} color="#ffffff" />
+                </div>
+                <span className="quick-card-label">Музыка</span>
+              </div>
+
+              <div 
+                className="gallery-quick-card"
+                onClick={() => {
+                  setSelectedGradient(GRADIENT_PRESETS[1]);
+                  setStoryText('Коллаж впечатлений');
+                  setScreen('camera');
+                }}
+              >
+                <div className="quick-card-icon-box collage-bg">
+                  <Grid2X2 size={22} color="#ffffff" />
+                </div>
+                <span className="quick-card-label">Коллаж</span>
+              </div>
+
+            </div>
+
+            {/* Filter Row: "Недавние ▾" and "Выбрать" */}
+            <div className="gallery-filter-subbar">
+              <div className="gallery-dropdown-wrap">
+                <select 
+                  value={galleryFilter} 
+                  onChange={e => setGalleryFilter(e.target.value as any)}
+                  className="gallery-filter-select"
+                >
+                  <option value="recent">Недавние ▾</option>
+                  <option value="all">Все медиа ▾</option>
+                  <option value="photos">Фотографии ▾</option>
+                  <option value="videos">Видео ▾</option>
+                </select>
+              </div>
+
+              <div className="gallery-filter-right-actions">
+                <button
+                  type="button"
+                  className="btn-gallery-action"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Загрузить фото с устройства"
+                >
+                  <Plus size={15} /> Загрузить
+                </button>
+                <button
+                  type="button"
+                  className="btn-gallery-action outline"
+                  onClick={() => alert('Режим множественного выбора активирован')}
+                >
+                  <Check size={14} /> Выбрать
+                </button>
+              </div>
+            </div>
+
+            {/* Media Grid: 1st tile is Camera, then thumbnails */}
+            <div className="gallery-media-grid">
+              
+              {/* Tile 1: Live Camera Tile */}
+              <div 
+                className="gallery-camera-tile"
+                onClick={() => {
+                  setScreen('camera');
+                  setActiveMode('camera_record');
+                  startCamera();
+                }}
+                title="Снять на камеру"
+              >
+                <div className="camera-tile-icon-circle">
+                  <Camera size={26} color="#ffffff" />
+                </div>
+                <span>Камера</span>
+              </div>
+
+              {/* User Uploaded Photos */}
+              {userUploadedImages.map((imgUrl, idx) => (
+                <div 
+                  key={`user_${idx}`} 
+                  className={`gallery-photo-tile ${selectedImage === imgUrl ? 'selected' : ''}`}
+                  onClick={() => {
+                    setSelectedImage(imgUrl);
+                    setSelectedGradient(null);
+                    setScreen('camera');
+                    setActiveMode('photo');
+                  }}
+                >
+                  <img src={imgUrl} alt={`Upload ${idx}`} />
+                </div>
+              ))}
+
+              {/* Presets & Recent Media */}
+              {STORY_PRESETS.map((presetUrl, idx) => (
+                <div 
+                  key={`preset_${idx}`} 
+                  className={`gallery-photo-tile ${selectedImage === presetUrl ? 'selected' : ''}`}
+                  onClick={() => {
+                    setSelectedImage(presetUrl);
+                    setSelectedGradient(null);
+                    setScreen('camera');
+                    setActiveMode('photo');
+                  }}
+                >
+                  <img src={presetUrl} alt={`Preset ${idx}`} />
+                </div>
+              ))}
+
+            </div>
+
           </div>
-        </div>
+        )}
+
       </div>
     </div>
   );
