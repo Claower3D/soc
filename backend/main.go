@@ -804,6 +804,7 @@ func main() {
 
 	// Сторис
 	mux.HandleFunc("POST /api/stories", handleCreateStory)
+	mux.HandleFunc("POST /api/stories/sync", handleSyncStories)
 	mux.HandleFunc("POST /api/stories/{id}/view", handleViewStory)
 	mux.HandleFunc("DELETE /api/stories/{id}", handleDeleteStory)
 
@@ -1273,6 +1274,7 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 			       u.id, u.name, u.username, COALESCE(u.avatar, ''), COALESCE(u.verified, false)
 			FROM posts p
 			JOIN users u ON p.user_id = u.id
+			WHERE (TRIM(COALESCE(p.image, '')) != '' OR TRIM(COALESCE(p.caption, '')) != '')
 			ORDER BY p.created_at DESC LIMIT 50
 		`)
 		if err == nil {
@@ -1296,6 +1298,9 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 	if len(posts) == 0 {
 		store.mu.RLock()
 		for _, p := range store.posts {
+			if strings.TrimSpace(p.Image) == "" && strings.TrimSpace(p.Caption) == "" {
+				continue
+			}
 			if p.Comments == nil {
 				p.Comments = []Comment{}
 			}
@@ -1325,7 +1330,8 @@ func handleUserPosts(w http.ResponseWriter, r *http.Request) {
 			       u.id, u.name, u.username, COALESCE(u.avatar, ''), COALESCE(u.verified, false)
 			FROM posts p
 			JOIN users u ON p.user_id = u.id
-			WHERE u.id = $1 OR LOWER(u.username) = LOWER($1) OR LOWER(u.username) = LOWER($2)
+			WHERE (u.id = $1 OR LOWER(u.username) = LOWER($1) OR LOWER(u.username) = LOWER($2))
+			  AND (TRIM(COALESCE(p.image, '')) != '' OR TRIM(COALESCE(p.caption, '')) != '')
 			ORDER BY p.created_at DESC
 		`, targetID, cleanTarget)
 		if err == nil {
@@ -3065,6 +3071,11 @@ func handleCreatePost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if strings.TrimSpace(caption) == "" && strings.TrimSpace(image) == "" {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Публикация не может быть пустой"})
+		return
+	}
+
 	postID := "post_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
 	var author User
 	if db != nil {
@@ -3325,16 +3336,20 @@ func handleDeletePost(w http.ResponseWriter, r *http.Request) {
 func handleStories(w http.ResponseWriter, r *http.Request) {
 	var stories []Story
 
-	if db != nil {
-		rows, err := db.Query(`
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+
+	if dbConn != nil {
+		rows, err := dbConn.Query(`
 			SELECT s.id, s.media_url, COALESCE(s.is_video, false), COALESCE(s.is_live, false), COALESCE(s.live_viewers, 0),
 			       COALESCE(s.filter, ''), COALESCE(s.mask, ''), COALESCE(s.text_content, ''),
 			       COALESCE(s.text_position, 'bottom'), COALESCE(s.gradient, ''), COALESCE(s.viewers_count, 0),
 			       s.created_at, s.expires_at,
-			       u.id, u.username, u.name, COALESCE(u.avatar, '')
+			       COALESCE(u.id, s.user_id), COALESCE(u.username, s.user_id), COALESCE(u.name, s.user_id), COALESCE(u.avatar, '')
 			FROM stories s 
-			JOIN users u ON (s.user_id = u.id OR LOWER(s.user_id) = LOWER(u.username))
-			WHERE s.expires_at > NOW()
+			LEFT JOIN users u ON (s.user_id = u.id OR LOWER(REPLACE(s.user_id, '@', '')) = LOWER(REPLACE(u.username, '@', '')))
+			WHERE s.expires_at > (NOW() - INTERVAL '4 hours') OR s.created_at > (NOW() - INTERVAL '24 hours')
 			ORDER BY s.created_at DESC
 		`)
 		if err == nil {
@@ -3399,6 +3414,7 @@ func handleStories(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, s := range store.stories {
 		if !existingIDs[s.ID] {
+			ensureUserAvatar(&s.User)
 			stories = append(stories, s)
 			existingIDs[s.ID] = true
 		}
@@ -4052,6 +4068,17 @@ func handleCreateStory(w http.ResponseWriter, r *http.Request) {
 			mediaURL = req.Image
 		}
 	}
+	if mediaURL == "" {
+		if req.VideoURL != "" {
+			mediaURL = req.VideoURL
+		} else if req.Image != "" {
+			mediaURL = req.Image
+		} else if req.Gradient != "" {
+			mediaURL = req.Gradient
+		} else {
+			mediaURL = "linear-gradient(135deg, #6366f1, #a855f7)"
+		}
+	}
 	isVideo := req.IsVideo || req.VideoURL != ""
 	textContent := strings.TrimSpace(req.Text)
 	if textContent == "" {
@@ -4068,8 +4095,24 @@ func handleCreateStory(w http.ResponseWriter, r *http.Request) {
 	author.Username = claims.Username
 	author.Name = claims.Username
 
-	if db != nil {
-		_ = db.QueryRow("SELECT id, username, name, COALESCE(avatar, '') FROM users WHERE id = $1", claims.UserID).Scan(&author.ID, &author.Username, &author.Name, &author.Avatar)
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+
+	var resolvedAuthorID string
+	if dbConn != nil {
+		_ = dbConn.QueryRow(`
+			SELECT id, username, name, COALESCE(avatar, '') 
+			FROM users 
+			WHERE id = $1 
+			   OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($1, '@', '')) 
+			   OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($2, '@', ''))
+			LIMIT 1
+		`, claims.UserID, claims.Username).Scan(&resolvedAuthorID, &author.Username, &author.Name, &author.Avatar)
+	}
+	if resolvedAuthorID != "" {
+		author.ID = resolvedAuthorID
+		claims.UserID = resolvedAuthorID
 	}
 	if author.Avatar == "" {
 		store.mu.RLock()
@@ -4108,9 +4151,6 @@ func handleCreateStory(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    time.Now().Format(time.RFC3339),
 	}
 
-	dbMu.RLock()
-	dbConn := db
-	dbMu.RUnlock()
 	if dbConn != nil {
 		_, err := dbConn.Exec(`
 			INSERT INTO stories (
@@ -4122,12 +4162,13 @@ func handleCreateStory(w http.ResponseWriter, r *http.Request) {
 			ON CONFLICT (id) DO UPDATE SET
 				media_url = EXCLUDED.media_url,
 				is_video = EXCLUDED.is_video,
-				text_content = EXCLUDED.text_content
-		`, storyID, claims.UserID, mediaURL, isVideo, req.IsLive, req.LiveViewers, req.Filter, req.Mask, textContent, textPos, req.Gradient)
+				text_content = EXCLUDED.text_content,
+				gradient = EXCLUDED.gradient
+		`, storyID, author.ID, mediaURL, isVideo, req.IsLive, req.LiveViewers, req.Filter, req.Mask, textContent, textPos, req.Gradient)
 		if err != nil {
 			log.Printf("⚠️ Ошибка сохранения story в PostgreSQL: %v", err)
 		} else {
-			log.Printf("📸 История %s от пользователя %s сохранена в БД!", storyID, claims.UserID)
+			log.Printf("📸 История %s от пользователя %s (@%s) сохранена в БД!", storyID, author.ID, author.Username)
 		}
 	}
 
@@ -4141,6 +4182,177 @@ func handleCreateStory(w http.ResponseWriter, r *http.Request) {
 	store.mu.Unlock()
 
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: newStory})
+}
+
+// POST /api/stories/sync — sync batch of stories from client localStorage
+func handleSyncStories(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, _ := parseAndValidateJWT(token)
+
+	var reqStories []struct {
+		ID           string `json:"id"`
+		User         User   `json:"user"`
+		Image        string `json:"image"`
+		VideoURL     string `json:"videoUrl"`
+		MediaURL     string `json:"mediaUrl"`
+		IsVideo      bool   `json:"isVideo"`
+		IsLive       bool   `json:"isLive"`
+		LiveViewers  int    `json:"liveViewers"`
+		Filter       string `json:"filter"`
+		Mask         string `json:"mask"`
+		Text         string `json:"text"`
+		TextContent  string `json:"textContent"`
+		TextPosition string `json:"textPosition"`
+		Gradient     string `json:"gradient"`
+		MusicTrack   string `json:"musicTrack"`
+		CreatedAt    string `json:"createdAt"`
+		ExpiresAt    string `json:"expiresAt"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&reqStories); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "invalid json"})
+		return
+	}
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+
+	var synced []Story
+	for _, req := range reqStories {
+		storyID := strings.TrimSpace(req.ID)
+		if storyID == "" {
+			continue
+		}
+
+		mediaURL := req.MediaURL
+		if mediaURL == "" {
+			if req.VideoURL != "" {
+				mediaURL = req.VideoURL
+			} else if req.Image != "" {
+				mediaURL = req.Image
+			} else if req.Gradient != "" {
+				mediaURL = req.Gradient
+			} else {
+				mediaURL = "linear-gradient(135deg, #6366f1, #a855f7)"
+			}
+		}
+
+		author := req.User
+		authorID := author.ID
+		if authorID == "" && claims != nil {
+			authorID = claims.UserID
+		}
+		if author.Username == "" && claims != nil {
+			author.Username = claims.Username
+		}
+		if author.Name == "" {
+			author.Name = author.Username
+		}
+
+		// Resolve author ID in DB
+		if dbConn != nil {
+			var resolvedID, resolvedUsername, resolvedName, resolvedAvatar string
+			err := dbConn.QueryRow(`
+				SELECT id, username, name, COALESCE(avatar, '') 
+				FROM users 
+				WHERE id = $1 
+				   OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($1, '@', ''))
+				   OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($2, '@', ''))
+				LIMIT 1
+			`, authorID, author.Username).Scan(&resolvedID, &resolvedUsername, &resolvedName, &resolvedAvatar)
+			if err == nil && resolvedID != "" {
+				authorID = resolvedID
+				author.ID = resolvedID
+				author.Username = resolvedUsername
+				author.Name = resolvedName
+				author.Avatar = resolvedAvatar
+			}
+		}
+
+		if author.Avatar == "" {
+			ensureUserAvatar(&author)
+		}
+
+		isVideo := req.IsVideo || req.VideoURL != ""
+		textContent := strings.TrimSpace(req.Text)
+		if textContent == "" {
+			textContent = strings.TrimSpace(req.TextContent)
+		}
+		textPos := req.TextPosition
+		if textPos == "" {
+			textPos = "bottom"
+		}
+
+		var img, vid string
+		if isVideo {
+			vid = mediaURL
+		} else {
+			img = mediaURL
+		}
+
+		s := Story{
+			ID:           storyID,
+			User:         author,
+			Viewed:       false,
+			Image:        img,
+			VideoURL:     vid,
+			MediaURL:     mediaURL,
+			Gradient:     req.Gradient,
+			IsLive:       req.IsLive,
+			LiveViewers:  req.LiveViewers,
+			Filter:       req.Filter,
+			Mask:         req.Mask,
+			Text:         textContent,
+			TextPosition: textPos,
+			Timestamp:    "Только что",
+			MusicTrack:   req.MusicTrack,
+			ViewsCount:   0,
+			ExpiresAt:    time.Now().Add(24 * time.Hour).Format(time.RFC3339),
+			CreatedAt:    time.Now().Format(time.RFC3339),
+		}
+
+		if dbConn != nil && authorID != "" {
+			_, err := dbConn.Exec(`
+				INSERT INTO stories (
+					id, user_id, media_url, is_video, is_live, live_viewers, 
+					filter, mask, text_content, text_position, gradient, 
+					viewers_count, likes_count, expires_at, created_at
+				) 
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, NOW() + INTERVAL '24 hours', NOW())
+				ON CONFLICT (id) DO UPDATE SET
+					media_url = EXCLUDED.media_url,
+					is_video = EXCLUDED.is_video,
+					text_content = EXCLUDED.text_content,
+					gradient = EXCLUDED.gradient
+			`, storyID, authorID, mediaURL, isVideo, req.IsLive, req.LiveViewers, req.Filter, req.Mask, textContent, textPos, req.Gradient)
+			if err != nil {
+				log.Printf("⚠️ Ошибка синхронизации story %s в DB: %v", storyID, err)
+			}
+		}
+
+		synced = append(synced, s)
+	}
+
+	// Also sync in-memory store
+	store.mu.Lock()
+	existingIDs := make(map[string]bool)
+	for _, s := range store.stories {
+		existingIDs[s.ID] = true
+	}
+	for _, s := range synced {
+		if !existingIDs[s.ID] {
+			store.stories = append([]Story{s}, store.stories...)
+			existingIDs[s.ID] = true
+		}
+	}
+	if len(store.stories) > 100 {
+		store.stories = store.stories[:100]
+	}
+	store.saveToDisk()
+	store.mu.Unlock()
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Истории успешно синхронизированы", Data: synced})
 }
 
 // DELETE /api/stories/{id} — delete story

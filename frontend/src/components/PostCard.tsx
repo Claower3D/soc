@@ -140,19 +140,32 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
         </button>
       </header>
 
-      {/* Image with double click heart burst */}
-      <div 
-        className="post-image-container"
-        onClick={() => onOpenModal && onOpenModal(post)}
-        onDoubleClick={handleDoubleClick}
-      >
-        <img src={post.image} alt={post.caption} className="post-image" />
-        {showHeartBurst && (
-          <div className="heart-burst-overlay">
-            <Heart size={84} fill="#EF4444" color="#EF4444" className="heart-burst-icon" />
-          </div>
-        )}
-      </div>
+      {/* Image or Video with double click heart burst */}
+      {post.image && post.image.trim() !== '' ? (
+        <div 
+          className="post-image-container"
+          onClick={() => onOpenModal && onOpenModal(post)}
+          onDoubleClick={handleDoubleClick}
+        >
+          {post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/') ? (
+            <video src={post.image} controls className="post-image" />
+          ) : (
+            <img 
+              src={post.image} 
+              alt={post.caption} 
+              className="post-image" 
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          )}
+          {showHeartBurst && (
+            <div className="heart-burst-overlay">
+              <Heart size={84} fill="#EF4444" color="#EF4444" className="heart-burst-icon" />
+            </div>
+          )}
+        </div>
+      ) : null}
 
       {/* Content & Actions */}
       <div className="post-content">

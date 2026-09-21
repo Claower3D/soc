@@ -337,7 +337,16 @@ export function StoriesBar({
   }, [activeStats, viewerSearchQuery]);
 
   // Check if current user has active stories
-  const myStoriesGroup = userGroups.find(g => g.user.id === 'me' || g.user.id === currentUser.id);
+  const isMeUser = (user: User) => {
+    if (!currentUser) return false;
+    const uid = user.id ? String(user.id).toLowerCase() : '';
+    const username = user.username ? user.username.replace(/^@+/, '').toLowerCase() : '';
+    const myId = currentUser.id ? String(currentUser.id).toLowerCase() : '';
+    const myUsername = currentUser.username ? currentUser.username.replace(/^@+/, '').toLowerCase() : '';
+    return uid === 'me' || (myId && uid === myId) || (myUsername && (username === myUsername || uid === myUsername));
+  };
+
+  const myStoriesGroup = userGroups.find(g => isMeUser(g.user));
 
   return (
     <>
@@ -351,8 +360,8 @@ export function StoriesBar({
               className={`insta-story-item own-story-bubble ${myStoriesGroup ? (myStoriesGroup.hasUnviewed ? 'unviewed' : 'viewed') : ''}`}
               onClick={() => {
                 if (myStoriesGroup && myStoriesGroup.stories.length > 0) {
-                  const gIdx = userGroups.findIndex(g => g.user.id === myStoriesGroup.user.id);
-                  handleOpenGroup(gIdx, 0);
+                  const gIdx = userGroups.indexOf(myStoriesGroup);
+                  handleOpenGroup(gIdx >= 0 ? gIdx : 0, 0);
                 } else {
                   if (!isAuthenticated) openAuthModal('register');
                   else setIsCreateStoryOpen(true);
@@ -388,20 +397,21 @@ export function StoriesBar({
 
             {/* Other Users' Grouped Stories */}
             {userGroups
-              .filter(group => group.user.id !== 'me' && group.user.id !== currentUser.id)
+              .filter(group => !isMeUser(group.user))
               .map((group) => {
-                const groupIdx = userGroups.findIndex(g => g.user.id === group.user.id);
+                const groupIdx = userGroups.indexOf(group);
+                const displayName = (group.user.name || group.user.username || 'Пользователь').split(' ')[0];
                 return (
                   <div 
-                    key={group.user.id} 
+                    key={group.user.id || group.user.username} 
                     className={`insta-story-item ${group.isLive ? 'live-story' : (group.hasUnviewed ? 'unviewed' : 'viewed')}`}
-                    onClick={() => handleOpenGroup(groupIdx, 0)}
+                    onClick={() => handleOpenGroup(groupIdx >= 0 ? groupIdx : 0, 0)}
                   >
                     <div className={`insta-avatar-ring ${group.isLive ? 'ring-live' : (group.hasUnviewed ? 'ring-gradient' : 'ring-viewed')}`}>
                       <div className="insta-avatar-inner">
                         <img 
                           src={group.user.avatar && group.user.avatar.trim() !== '' && group.user.avatar !== 'undefined' ? group.user.avatar : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.user.username || group.user.name || group.user.id)}`} 
-                          alt={group.user.name} 
+                          alt={group.user.name || group.user.username} 
                           className="insta-avatar-img" 
                           onError={(e) => {
                             (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.user.username || group.user.name || group.user.id)}`;
@@ -413,7 +423,7 @@ export function StoriesBar({
                         <span className="insta-live-tag-badge">LIVE</span>
                       )}
                     </div>
-                    <span className="insta-story-username">{group.user.name.split(' ')[0]}</span>
+                    <span className="insta-story-username">{displayName}</span>
                   </div>
                 );
               })}

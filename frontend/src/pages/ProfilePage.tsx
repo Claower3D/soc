@@ -5,13 +5,14 @@ import {
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Users, Share2, Edit3, Heart, MessageSquare,
   CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn, Plus, Brain, Sparkles,
-  Calendar, Moon
+  Calendar, Moon, Film
 } from 'lucide-react';
 import { 
   RELIGIONS_CATALOG, type User, type Post, type Story, type Video as VideoType, 
   type Podcast, type Product 
 } from '../data/mock';
 import { api } from '../api';
+import { syncLocalStoriesWithServer } from '../utils/syncStories';
 import { calculateZodiacProfile } from '../utils/astrology';
 import { ReligionSymbol } from '../components/ReligionSymbols';
 import { useAuth } from '../context/AuthContext';
@@ -67,6 +68,15 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated, logout, updateProfile, allAccounts } = useAuth();
   const { formatPrice } = useCurrency();
+
+  // Normalize route param (e.g. '@claower' -> 'claower', 'me', or custom ID)
+  const cleanParam = userId ? userId.replace(/^@+/, '').trim().toLowerCase() : '';
+  const cleanMyUsername = currentUser?.username ? currentUser.username.replace(/^@+/, '').trim().toLowerCase() : '';
+  const cleanMyId = currentUser?.id ? String(currentUser.id).trim().toLowerCase() : '';
+  const isMe = !userId || 
+    userId === 'me' || 
+    (cleanParam !== '' && (cleanParam === cleanMyId || cleanParam === cleanMyUsername));
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false);
@@ -115,18 +125,20 @@ export function ProfilePage() {
         }
       }
     } catch { /* ignore */ }
-    api.stories.list().then((data: any) => {
-      if (Array.isArray(data) && data.length > 0) {
+    syncLocalStoriesWithServer().then((stories: any) => {
+      if (Array.isArray(stories) && stories.length > 0) {
         setProfileStories(prev => {
-          const ids = new Set(prev.map(s => s.id));
-          return [...prev, ...data.filter((s: any) => !ids.has(s.id))];
+          const map = new Map<string, Story>();
+          prev.forEach(s => map.set(s.id, s));
+          stories.forEach((s: any) => map.set(s.id, s));
+          return Array.from(map.values());
         });
       }
     }).catch(console.warn);
     api.videos.list().then(safeSet(setProfileVideos)).catch(console.warn);
     api.podcasts.list().then(safeSet(setProfilePodcasts)).catch(console.warn);
     api.marketplace.products().then(safeSet(setProfileProducts)).catch(console.warn);
-  }, []);
+  }, [cleanParam]);
 
   useEffect(() => {
     const handlePostCreated = (e: any) => {
@@ -192,16 +204,6 @@ export function ProfilePage() {
     });
   };
 
-  // Normalize route param (e.g. '@claower' -> 'claower', 'me', or custom ID)
-  const cleanParam = userId ? userId.replace(/^@+/, '').trim().toLowerCase() : '';
-
-  // Determine if viewing own profile
-  const cleanMyUsername = currentUser?.username ? currentUser.username.replace(/^@+/, '').trim().toLowerCase() : '';
-  const cleanMyId = currentUser?.id ? String(currentUser.id).trim().toLowerCase() : '';
-
-  const isMe = !userId || 
-    userId === 'me' || 
-    (cleanParam !== '' && (cleanParam === cleanMyId || cleanParam === cleanMyUsername));
 
   // Automatically rewrite /profile/me or legacy /profile to /profile/@username when logged in
   useEffect(() => {
@@ -1033,27 +1035,69 @@ export function ProfilePage() {
       <div className="profile-content-container">
         {/* POSTS TAB */}
         {activeTab === 'posts' && (
-          userPosts.length > 0 ? (
+          userPosts.filter(p => (p.image && p.image.trim() !== '') || (p.caption && p.caption.trim() !== '')).length > 0 ? (
             <div className="posts-grid">
-              {userPosts.map(post => (
-                <div
-                  key={post.id}
-                  className="grid-post-item"
-                  onClick={() => setSelectedPost(post)}
-                >
-                  <img src={post.image} alt={post.caption} className="grid-post-img" />
-                  <div className="grid-post-overlay">
-                    <div className="overlay-stat">
-                      <Heart size={18} fill="white" />
-                      <span>{post.likes}</span>
+              {userPosts
+                .filter(p => (p.image && p.image.trim() !== '') || (p.caption && p.caption.trim() !== ''))
+                .map(post => {
+                  const isVideo = post.image && (post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/'));
+                  const hasImage = post.image && post.image.trim() !== '';
+
+                  return (
+                    <div
+                      key={post.id}
+                      className="grid-post-item"
+                      onClick={() => setSelectedPost(post)}
+                    >
+                      {isVideo ? (
+                        <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+                          <video src={post.image} className="grid-post-img" muted playsInline />
+                          <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: '4px', display: 'flex' }}>
+                            <Film size={14} color="white" />
+                          </div>
+                        </div>
+                      ) : hasImage ? (
+                        <img 
+                          src={post.image} 
+                          alt={post.caption} 
+                          className="grid-post-img" 
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80';
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: '100%',
+                          height: '100%',
+                          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          padding: '1rem',
+                          textAlign: 'center',
+                          color: '#fff',
+                          boxSizing: 'border-box',
+                        }}>
+                          <Sparkles size={22} style={{ marginBottom: '8px', opacity: 0.85 }} />
+                          <p style={{ fontSize: '0.85rem', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                            {post.caption}
+                          </p>
+                        </div>
+                      )}
+                      <div className="grid-post-overlay">
+                        <div className="overlay-stat">
+                          <Heart size={18} fill="white" />
+                          <span>{post.likes}</span>
+                        </div>
+                        <div className="overlay-stat">
+                          <MessageSquare size={18} fill="white" />
+                          <span>{post.comments?.length || 0}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="overlay-stat">
-                      <MessageSquare size={18} fill="white" />
-                      <span>{post.comments?.length || 0}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
             </div>
           ) : (
             <div className="empty-tab-state">

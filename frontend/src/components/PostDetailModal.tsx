@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   X, Heart, MessageCircle, Send, Bookmark, 
-  Trash2, Reply, Smile, Check, MapPin 
+  Trash2, Reply, Smile, Check, MapPin, Sparkles 
 } from 'lucide-react';
 import { type Post, type Comment } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -42,6 +42,7 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
       post.user?.id === currentUser.id || 
       (post as any)?.userId === currentUser.id ||
       (post.user?.username && currentUser.username && post.user.username.replace(/^@+/, '').toLowerCase() === currentUser.username.replace(/^@+/, '').toLowerCase()) ||
+      (post.user?.id && currentUser.username && String(post.user.id).replace(/^@+/, '').toLowerCase() === currentUser.username.replace(/^@+/, '').toLowerCase()) ||
       currentUser.role === 'admin'
     )
   );
@@ -163,9 +164,38 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
           <X size={20} />
         </button>
 
-        {/* Left Side: Full Image */}
+        {/* Left Side: Full Image / Video / Text Card */}
         <div className="post-modal-media-col">
-          <img src={post.image} alt={post.caption} className="post-modal-photo" />
+          {post.image && (post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/')) ? (
+            <video src={post.image} controls autoPlay playsInline className="post-modal-photo" />
+          ) : post.image && post.image.trim() !== '' ? (
+            <img 
+              src={post.image} 
+              alt={post.caption} 
+              className="post-modal-photo" 
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <div style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(135deg, #18181b 0%, #27272a 50%, #09090b 100%)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: '2rem',
+              textAlign: 'center',
+              color: '#fff',
+            }}>
+              <Sparkles size={36} style={{ marginBottom: '1rem', color: '#a855f7' }} />
+              <p style={{ fontSize: '1.2rem', lineHeight: 1.6, maxWidth: '80%', fontWeight: 500 }}>
+                {post.caption || 'Публикация без изображения'}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Header, Caption, Comments, Actions, Input */}

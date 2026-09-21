@@ -10,6 +10,7 @@ import { type Post, type Story } from '../data/mock';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { cacheService } from '../utils/cacheService';
+import { syncLocalStoriesWithServer } from '../utils/syncStories';
 import './FeedPage.css';
 
 export function FeedPage() {
@@ -37,7 +38,11 @@ export function FeedPage() {
     };
     const loadStories = async () => {
       try {
-        if (api.stories && api.stories.list) {
+        const stories = await syncLocalStoriesWithServer();
+        if (Array.isArray(stories) && stories.length > 0) {
+          setFeedStories(stories);
+          cacheService.set('feed_stories_cache', stories, 3600 * 24, 'stories');
+        } else if (api.stories && api.stories.list) {
           const res = await api.stories.list();
           const data = res.data || res;
           if (Array.isArray(data)) {
@@ -45,10 +50,20 @@ export function FeedPage() {
             cacheService.set('feed_stories_cache', data, 3600 * 24, 'stories');
           }
         }
-      } catch (err) {}
+      } catch (err) {
+        console.warn('Ошибка загрузки историй:', err);
+      }
     };
     loadFeed();
     loadStories();
+
+    const handleFocus = () => {
+      loadStories();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   useEffect(() => {
