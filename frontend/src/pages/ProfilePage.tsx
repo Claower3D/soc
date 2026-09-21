@@ -104,11 +104,12 @@ export function ProfilePage() {
       if (Array.isArray(data)) setter(data);
     };
     api.posts.list().then((data: any) => {
-      if (Array.isArray(data) && data.length > 0) {
+      const postsArray = data?.data || data;
+      if (Array.isArray(postsArray) && postsArray.length > 0) {
         setProfilePosts(prev => {
-          const ids = new Set(data.map((p: any) => p.id));
+          const ids = new Set(postsArray.map((p: any) => p.id));
           const localOnly = prev.filter(p => !ids.has(p.id));
-          const merged = [...data, ...localOnly];
+          const merged = [...postsArray, ...localOnly];
           try {
             localStorage.setItem('new_age_user_posts', JSON.stringify(merged));
           } catch {}
@@ -116,6 +117,24 @@ export function ProfilePage() {
         });
       }
     }).catch(console.warn);
+
+    const targetUser = cleanParam || (currentUser?.username || currentUser?.id || '');
+    if (targetUser && targetUser !== 'guest') {
+      api.posts.userPosts(targetUser).then((data: any) => {
+        const postsArray = data?.data || data;
+        if (Array.isArray(postsArray) && postsArray.length > 0) {
+          setProfilePosts(prev => {
+            const ids = new Set(postsArray.map((p: any) => p.id));
+            const localOnly = prev.filter(p => !ids.has(p.id));
+            const merged = [...postsArray, ...localOnly];
+            try {
+              localStorage.setItem('new_age_user_posts', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
+        }
+      }).catch(console.warn);
+    }
     try {
       const savedStories = localStorage.getItem('new_age_user_stories');
       if (savedStories) {
@@ -406,21 +425,24 @@ export function ProfilePage() {
     const targetUsername = activeUser.username ? activeUser.username.replace(/^@+/, '').toLowerCase() : '';
     const myId = currentUser?.id ? String(currentUser.id).toLowerCase() : '';
     const myUsername = currentUser?.username ? currentUser.username.replace(/^@+/, '').toLowerCase() : '';
+    const cleanP = cleanParam ? cleanParam.replace(/^@+/, '').toLowerCase() : '';
 
     return profilePosts.filter(p => {
       const pUserId = p.user?.id ? String(p.user.id).toLowerCase() : '';
       const pUsername = p.user?.username ? p.user.username.replace(/^@+/, '').toLowerCase() : '';
       const fallbackUserId = (p as any).userId ? String((p as any).userId).toLowerCase() : '';
+      const pUserID = (p as any).userID ? String((p as any).userID).toLowerCase() : '';
 
-      if (targetId && (pUserId === targetId || fallbackUserId === targetId)) return true;
-      if (targetUsername && pUsername === targetUsername) return true;
+      if (targetId && (pUserId === targetId || fallbackUserId === targetId || pUserID === targetId)) return true;
+      if (targetUsername && (pUsername === targetUsername || pUserId === targetUsername || pUserID === targetUsername)) return true;
+      if (cleanP && (pUsername === cleanP || pUserId === cleanP || pUserID === cleanP)) return true;
       if (isMe) {
-        if (pUserId === 'me' || (myId && pUserId === myId) || (myId && fallbackUserId === myId)) return true;
-        if (myUsername && pUsername === myUsername) return true;
+        if (pUserId === 'me' || (myId && (pUserId === myId || fallbackUserId === myId || pUserID === myId))) return true;
+        if (myUsername && (pUsername === myUsername || pUserId === myUsername || pUserID === myUsername)) return true;
       }
       return false;
     });
-  }, [profilePosts, activeUser, isMe, currentUser]);
+  }, [profilePosts, activeUser, isMe, currentUser, cleanParam]);
 
   const savedPosts = useMemo(() => {
     return profilePosts.filter(p => p.saved);
@@ -1035,69 +1057,69 @@ export function ProfilePage() {
       <div className="profile-content-container">
         {/* POSTS TAB */}
         {activeTab === 'posts' && (
-          userPosts.filter(p => (p.image && p.image.trim() !== '') || (p.caption && p.caption.trim() !== '')).length > 0 ? (
+          userPosts.length > 0 ? (
             <div className="posts-grid">
-              {userPosts
-                .filter(p => (p.image && p.image.trim() !== '') || (p.caption && p.caption.trim() !== ''))
-                .map(post => {
-                  const isVideo = post.image && (post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/'));
-                  const hasImage = post.image && post.image.trim() !== '';
+              {userPosts.map((post, index) => {
+                const media = post.image || (post as any).mediaUrl || (post as any).media_url || (post as any).imageUrl || '';
+                const caption = post.caption || (post as any).text || (post as any).content || '';
+                const isVideo = media && (media.startsWith('data:video') || media.endsWith('.mp4') || media.includes('/videos/'));
+                const hasImage = media && media.trim() !== '' && !isVideo;
 
-                  return (
-                    <div
-                      key={post.id}
-                      className="grid-post-item"
-                      onClick={() => setSelectedPost(post)}
-                    >
-                      {isVideo ? (
-                        <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-                          <video src={post.image} className="grid-post-img" muted playsInline />
-                          <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: '4px', display: 'flex' }}>
-                            <Film size={14} color="white" />
-                          </div>
-                        </div>
-                      ) : hasImage ? (
-                        <img 
-                          src={post.image} 
-                          alt={post.caption} 
-                          className="grid-post-img" 
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80';
-                          }}
-                        />
-                      ) : (
-                        <div style={{
-                          width: '100%',
-                          height: '100%',
-                          background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          padding: '1rem',
-                          textAlign: 'center',
-                          color: '#fff',
-                          boxSizing: 'border-box',
-                        }}>
-                          <Sparkles size={22} style={{ marginBottom: '8px', opacity: 0.85 }} />
-                          <p style={{ fontSize: '0.85rem', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
-                            {post.caption}
-                          </p>
-                        </div>
-                      )}
-                      <div className="grid-post-overlay">
-                        <div className="overlay-stat">
-                          <Heart size={18} fill="white" />
-                          <span>{post.likes}</span>
-                        </div>
-                        <div className="overlay-stat">
-                          <MessageSquare size={18} fill="white" />
-                          <span>{post.comments?.length || 0}</span>
+                return (
+                  <div
+                    key={post.id || `post_${index}`}
+                    className="grid-post-item"
+                    onClick={() => setSelectedPost({ ...post, image: media, caption })}
+                  >
+                    {isVideo ? (
+                      <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+                        <video src={media} className="grid-post-img" muted playsInline />
+                        <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', borderRadius: '50%', padding: '4px', display: 'flex' }}>
+                          <Film size={14} color="white" />
                         </div>
                       </div>
+                    ) : hasImage ? (
+                      <img 
+                        src={media} 
+                        alt={caption || 'Публикация'} 
+                        className="grid-post-img" 
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80';
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '100%',
+                        height: '100%',
+                        background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: '1rem',
+                        textAlign: 'center',
+                        color: '#fff',
+                        boxSizing: 'border-box',
+                      }}>
+                        <Sparkles size={22} style={{ marginBottom: '8px', opacity: 0.85 }} />
+                        <p style={{ fontSize: '0.85rem', fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                          {caption || `Публикация #${index + 1}`}
+                        </p>
+                      </div>
+                    )}
+                    <div className="grid-post-overlay">
+                      <div className="overlay-stat">
+                        <Heart size={18} fill="white" />
+                        <span>{post.likes || 0}</span>
+                      </div>
+                      <div className="overlay-stat">
+                        <MessageSquare size={18} fill="white" />
+                        <span>{post.comments?.length || 0}</span>
+                      </div>
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="empty-tab-state">

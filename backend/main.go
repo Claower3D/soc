@@ -1274,7 +1274,6 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 			       COALESCE(u.id, p.user_id), COALESCE(u.name, p.user_id), COALESCE(u.username, p.user_id), COALESCE(u.avatar, ''), COALESCE(u.verified, false)
 			FROM posts p
 			LEFT JOIN users u ON (p.user_id = u.id OR LOWER(REPLACE(u.username, '@', '')) = LOWER(REPLACE(p.user_id, '@', '')))
-			WHERE (TRIM(COALESCE(p.image, '')) != '' OR TRIM(COALESCE(p.caption, '')) != '')
 			ORDER BY p.created_at DESC LIMIT 100
 		`)
 		if err == nil {
@@ -1298,9 +1297,6 @@ func handleFeed(w http.ResponseWriter, r *http.Request) {
 	if len(posts) == 0 {
 		store.mu.RLock()
 		for _, p := range store.posts {
-			if strings.TrimSpace(p.Image) == "" && strings.TrimSpace(p.Caption) == "" {
-				continue
-			}
 			if p.Comments == nil {
 				p.Comments = []Comment{}
 			}
@@ -1334,7 +1330,6 @@ func handleUserPosts(w http.ResponseWriter, r *http.Request) {
 			   OR LOWER(REPLACE(p.user_id, '@', '')) = LOWER($2)
 			   OR u.id = $1 
 			   OR LOWER(REPLACE(u.username, '@', '')) = LOWER($2))
-			  AND (TRIM(COALESCE(p.image, '')) != '' OR TRIM(COALESCE(p.caption, '')) != '')
 			ORDER BY p.created_at DESC
 		`, targetID, cleanTarget)
 		if err == nil {
