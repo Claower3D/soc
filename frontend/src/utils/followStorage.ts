@@ -7,13 +7,22 @@ const STORAGE_KEY_FOLLOWERS_MAP = 'new_age_custom_followers_map';
 const STORAGE_KEY_CRITICS_MAP = 'new_age_critics_map';
 const STORAGE_KEY_CACHED_USERS = 'new_age_cached_users_pool';
 
+const FAKE_USERNAMES = new Set(['alice_iv', 'max_p', 'kate_s', 'dima_k']);
+const FAKE_IDS = new Set(['1', '2', '3', '4']);
+
 // Кэш внешних пользователей (найденных через поиск/бекенд)
 export function getStoredCachedUsers(): User[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_CACHED_USERS);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        return parsed.filter(u => {
+          if (!u || !u.id || u.id === 'guest') return false;
+          const un = (u.username || '').toLowerCase().replace(/^@+/, '');
+          return !FAKE_IDS.has(String(u.id)) && !FAKE_USERNAMES.has(un);
+        });
+      }
     }
   } catch { /* ignore */ }
   return [];
@@ -21,6 +30,9 @@ export function getStoredCachedUsers(): User[] {
 
 export function cacheUser(user: User): void {
   if (!user || !user.id || user.id === 'guest') return;
+  const un = (user.username || '').toLowerCase().replace(/^@+/, '');
+  if (FAKE_IDS.has(String(user.id)) || FAKE_USERNAMES.has(un)) return;
+
   try {
     const current = getStoredCachedUsers().filter(u => u.id !== user.id && u.username !== user.username);
     current.push(user);
@@ -35,12 +47,22 @@ export function getAllUsersPool(currentUser?: User, allAccounts: RegisteredAccou
   const map = new Map<string, User>();
 
   initialUsers.forEach(u => {
-    if (u && u.id && u.id !== 'guest') map.set(u.id, u);
+    if (u && u.id && u.id !== 'guest') {
+      const un = (u.username || '').toLowerCase().replace(/^@+/, '');
+      if (!FAKE_IDS.has(String(u.id)) && !FAKE_USERNAMES.has(un)) {
+        map.set(u.id, u);
+      }
+    }
   });
 
   const cachedUsers = getStoredCachedUsers();
   cachedUsers.forEach(u => {
-    if (u && u.id && u.id !== 'guest') map.set(u.id, u);
+    if (u && u.id && u.id !== 'guest') {
+      const un = (u.username || '').toLowerCase().replace(/^@+/, '');
+      if (!FAKE_IDS.has(String(u.id)) && !FAKE_USERNAMES.has(un)) {
+        map.set(u.id, u);
+      }
+    }
   });
 
   allAccounts.forEach(a => {

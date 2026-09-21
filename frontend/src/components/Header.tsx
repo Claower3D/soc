@@ -5,7 +5,6 @@ import {
   Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
   Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Bot, Globe, ChevronDown
 } from 'lucide-react';
-import { initialUsers } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -359,28 +358,8 @@ export function Header() {
                   </div>
 
                   {notifTab === 'alerts' ? (
-                    <div className="notifications-list">
-                      <div className="notification-item unread">
-                        <img src={initialUsers[1]?.avatar || '/default-avatar.svg'} alt="Алиса" />
-                        <div className="notif-content">
-                          <p><strong>Алиса Иванова</strong> оценила вашу публикацию</p>
-                          <span className="notif-time">5 минут назад</span>
-                        </div>
-                      </div>
-                      <div className="notification-item unread">
-                        <img src={initialUsers[2]?.avatar || '/default-avatar.svg'} alt="Максим" />
-                        <div className="notif-content">
-                          <p><strong>Максим Петров</strong> пригласил вас в <strong>Конференцию</strong></p>
-                          <span className="notif-time">12 минут назад</span>
-                        </div>
-                      </div>
-                      <div className="notification-item">
-                        <img src={initialUsers[3]?.avatar || '/default-avatar.svg'} alt="Екатерина" />
-                        <div className="notif-content">
-                          <p><strong>Екатерина Смирнова</strong> подписалась на ваши обновления</p>
-                          <span className="notif-time">1 час назад</span>
-                        </div>
-                      </div>
+                    <div className="notifications-list" style={{ padding: '32px 16px', textAlign: 'center', color: '#94a3b8' }}>
+                      <p style={{ margin: 0, fontSize: '14px' }}>Уведомлений пока нет</p>
                     </div>
                   ) : (
                     <div className="push-settings-panel">

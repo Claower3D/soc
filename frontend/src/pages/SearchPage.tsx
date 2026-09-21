@@ -50,8 +50,15 @@ export function SearchPage() {
   useEffect(() => {
     const safeFn = (d: any) => {
       if (Array.isArray(d)) {
-        setPoolUsers(d);
-        d.forEach((u: any) => cacheUser(u));
+        const fakeUsernames = new Set(['alice_iv', 'max_p', 'kate_s', 'dima_k']);
+        const fakeIds = new Set(['1', '2', '3', '4']);
+        const realOnly = d.filter((u: any) => {
+          const un = (u?.username || '').toLowerCase().replace(/^@+/, '');
+          const uid = String(u?.id || '');
+          return !fakeUsernames.has(un) && !fakeIds.has(uid);
+        });
+        setPoolUsers(realOnly);
+        realOnly.forEach((u: any) => cacheUser(u));
       }
     };
     if (query.trim()) {

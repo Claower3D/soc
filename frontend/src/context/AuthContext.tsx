@@ -106,8 +106,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          // Sanitize accounts, exclude legacy me demo account
-          return parsed.filter((a) => a && a.id && a.id !== 'me' && (a.username || a.emailOrPhone));
+          // Sanitize accounts, exclude fake and legacy me demo accounts
+          const fakeUsernames = new Set(['alice_iv', 'max_p', 'kate_s', 'dima_k']);
+          const fakeIds = new Set(['1', '2', '3', '4', 'me']);
+          return parsed.filter((a) => {
+            if (!a || !a.id) return false;
+            const un = (a.username || '').toLowerCase().replace(/^@+/, '');
+            return !fakeIds.has(String(a.id)) && !fakeUsernames.has(un) && (a.username || a.emailOrPhone);
+          });
         }
       }
     } catch {

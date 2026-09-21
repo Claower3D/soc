@@ -590,12 +590,7 @@ var currentUser = User{
 	PostsCount:     0,
 }
 
-var mockUsers = []User{
-	{ID: "1", Name: "Алиса Иванова", Username: "alice_iv", Avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80", Bio: "Product Designer & Фотограф", Online: true, FollowersCount: 8420, FollowingCount: 430, PostsCount: 156},
-	{ID: "2", Name: "Максим Петров", Username: "max_p", Avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80", Bio: "Frontend Architect & Автор подкастов", Online: true, FollowersCount: 15300, FollowingCount: 290, PostsCount: 84},
-	{ID: "3", Name: "Екатерина Смирнова", Username: "kate_s", Avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80", Bio: "UX Исследования & Дизайн мышление", Online: false, FollowersCount: 6890, FollowingCount: 512, PostsCount: 62},
-	{ID: "4", Name: "Дмитрий Козлов", Username: "dima_k", Avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80", Bio: "Tech Entrepreneur & Инновации", Online: true, FollowersCount: 22400, FollowingCount: 190, PostsCount: 110},
-}
+var mockUsers = []User{}
 
 // =========================================================================
 // CRYPTO & JWT IMPLEMENTATION (RFC 7519 HMAC-SHA256)
@@ -1216,13 +1211,23 @@ func handleUsers(w http.ResponseWriter, r *http.Request) {
 					dbUsers = append(dbUsers, u)
 				}
 			}
-			if len(dbUsers) > 0 {
-				writeJSON(w, http.StatusOK, Response{Status: "ok", Data: append(dbUsers, mockUsers...)})
-				return
+			if dbUsers == nil {
+				dbUsers = []User{}
 			}
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: dbUsers})
+			return
 		}
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: mockUsers})
+	store.mu.RLock()
+	var realUsers []User
+	for _, a := range store.accounts {
+		realUsers = append(realUsers, a.User)
+	}
+	store.mu.RUnlock()
+	if realUsers == nil {
+		realUsers = []User{}
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: realUsers})
 }
 
 func handleSearch(w http.ResponseWriter, r *http.Request) {
@@ -1243,18 +1248,25 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 					results = append(results, u)
 				}
 			}
-			if len(results) > 0 {
-				writeJSON(w, http.StatusOK, Response{Status: "ok", Data: results})
-				return
+			if results == nil {
+				results = []User{}
 			}
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: results})
+			return
 		}
 	}
 
 	var results []User
-	for _, u := range mockUsers {
+	store.mu.RLock()
+	for _, entry := range store.accounts {
+		u := entry.User
 		if strings.Contains(strings.ToLower(u.Name), q) || strings.Contains(strings.ToLower(u.Username), q) {
 			results = append(results, u)
 		}
+	}
+	store.mu.RUnlock()
+	if results == nil {
+		results = []User{}
 	}
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: results})
 }

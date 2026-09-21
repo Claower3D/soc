@@ -155,10 +155,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
   const [isLiveActive, setIsLiveActive] = useState(false);
   const [liveViewersCount, setLiveViewersCount] = useState(14);
   const [liveHearts, setLiveHearts] = useState<number[]>([]);
-  const [liveChatMessages, setLiveChatMessages] = useState<Array<{ id: number; name: string; text: string }>>([
-    { id: 1, name: 'Алиса Иванова', text: 'Всем привет! 🔥 Отличный эфир' },
-    { id: 2, name: 'Михаил Рецензент', text: 'Качество картинки супер!' },
-  ]);
+  const [liveChatMessages, setLiveChatMessages] = useState<Array<{ id: number; name: string; text: string }>>([]);
   const [liveNewMsg, setLiveNewMsg] = useState('');
 
   // Device Controls
