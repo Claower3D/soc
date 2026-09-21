@@ -38,7 +38,8 @@ import {
   getCriticsForUser,
   isUserCritic,
   toggleUserCritic,
-  getAllUsersPool 
+  getAllUsersPool,
+  cacheUser 
 } from '../utils/followStorage';
 import './ProfilePage.css';
 
@@ -91,20 +92,77 @@ export function ProfilePage() {
     }
   }, [userId, isAuthenticated, currentUser?.username, navigate]);
 
-  const user: User = useMemo(() => {
+  // Dynamic real user lists & counts that exactly match FollowersModal
+  const poolUsers = useMemo(() => {
+    return getAllUsersPool(currentUser, allAccounts);
+  }, [currentUser, allAccounts]);
+
+  const [fetchedUser, setFetchedUser] = useState<User | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState<boolean>(!isMe);
+  const [userNotFound, setUserNotFound] = useState<boolean>(false);
+
+  // Find user in local state or pool
+  const initialResolvedUser = useMemo(() => {
     if (isMe) return currentUser;
     if (cleanParam) {
-      const fromRegistered = allAccounts.find(
-        a => a.id.toLowerCase() === cleanParam || a.username.toLowerCase() === cleanParam
-      );
-      if (fromRegistered) return fromRegistered as unknown as User;
+      return poolUsers.find(
+        a => a.id.toLowerCase() === cleanParam || (a.username && a.username.toLowerCase() === cleanParam)
+      ) || null;
     }
-    return currentUser;
-  }, [isMe, cleanParam, currentUser, allAccounts]);
+    return null;
+  }, [isMe, cleanParam, currentUser, poolUsers]);
+
+  // Fetch target user from backend API if not self
+  useEffect(() => {
+    if (isMe) {
+      setIsLoadingUser(false);
+      setUserNotFound(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoadingUser(!initialResolvedUser);
+    setUserNotFound(false);
+
+    api.users.profile(cleanParam)
+      .then((res: any) => {
+        if (!isMounted) return;
+        const u = res?.user || res?.data?.user;
+        if (u && (u.id || u.username)) {
+          setFetchedUser(u);
+          cacheUser(u);
+          setIsLoadingUser(false);
+          setUserNotFound(false);
+        } else if (!initialResolvedUser) {
+          setUserNotFound(true);
+          setIsLoadingUser(false);
+        }
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.warn('Could not fetch remote profile:', err);
+        if (!initialResolvedUser) {
+          setUserNotFound(true);
+        }
+        setIsLoadingUser(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [cleanParam, isMe, initialResolvedUser]);
+
+  const activeUser: User = useMemo(() => {
+    if (isMe) return currentUser;
+    return fetchedUser || initialResolvedUser || currentUser;
+  }, [isMe, currentUser, fetchedUser, initialResolvedUser]);
+
+  // For compatibility with legacy code expecting `user`
+  const user: User = activeUser;
 
   const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds());
   const [socialRevision, setSocialRevision] = useState(0);
-  const isFollowing = useMemo(() => isUserFollowed(user.id), [user.id, followingIds]);
+  const isFollowing = useMemo(() => activeUser ? isUserFollowed(activeUser.id) : false, [activeUser?.id, followingIds]);
 
   // Live sync with external follow & critic changes
   useEffect(() => {
@@ -116,37 +174,35 @@ export function ProfilePage() {
     return () => window.removeEventListener('follow_change', handleSync);
   }, []);
 
-  // Dynamic real user lists & counts that exactly match FollowersModal
-  const poolUsers = useMemo(() => {
-    return getAllUsersPool(currentUser, allAccounts);
-  }, [currentUser, allAccounts]);
-
   const realFollowersList = useMemo(() => {
-    return getFollowersForUser(user.id, poolUsers, currentUser?.id);
-  }, [user.id, poolUsers, currentUser?.id, socialRevision]);
+    if (!activeUser) return [];
+    return getFollowersForUser(activeUser.id, poolUsers, currentUser?.id);
+  }, [activeUser, poolUsers, currentUser?.id, socialRevision]);
 
   const realFollowingList = useMemo(() => {
-    return getFollowingForUser(user.id, poolUsers, !!isMe);
-  }, [user.id, poolUsers, isMe, socialRevision]);
+    if (!activeUser) return [];
+    return getFollowingForUser(activeUser.id, poolUsers, !!isMe);
+  }, [activeUser, poolUsers, isMe, socialRevision]);
 
   const realCriticsList = useMemo(() => {
-    return getCriticsForUser(user.id, poolUsers);
-  }, [user.id, poolUsers, socialRevision]);
+    if (!activeUser) return [];
+    return getCriticsForUser(activeUser.id, poolUsers);
+  }, [activeUser, poolUsers, socialRevision]);
 
   const isCritic = useMemo(() => {
-    if (!currentUser?.id) return false;
-    return isUserCritic(user.id, currentUser.id);
-  }, [user.id, currentUser?.id, socialRevision]);
+    if (!currentUser?.id || !activeUser?.id) return false;
+    return isUserCritic(activeUser.id, currentUser.id);
+  }, [activeUser?.id, currentUser?.id, socialRevision]);
 
   const [profileData, setProfileData] = useState<Partial<User> | null>(null);
 
   useEffect(() => {
-    if (user.id && user.id !== 'guest') {
-      api.users.profile(user.id).then((res) => {
+    if (activeUser?.id && activeUser.id !== 'guest') {
+      api.users.profile(activeUser.id).then((res) => {
         if (res?.user) setProfileData(res.user);
       }).catch(console.warn);
     }
-  }, [user.id]);
+  }, [activeUser?.id]);
 
   const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'podcasts' | 'saved' | 'shop'>('posts');
   const [modalType, setModalType] = useState<'Подписчики' | 'Подписки' | 'Критики' | 'Друзья' | null>(null);
@@ -155,9 +211,21 @@ export function ProfilePage() {
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isConsciousnessModalOpen, setIsConsciousnessModalOpen] = useState(false);
 
-  const activeUser = isMe ? currentUser : user;
+  const followersDisplayCount = useMemo(() => {
+    const fromApi = (profileData as any)?.followersCount ?? activeUser?.followersCount ?? 0;
+    return Math.max(fromApi, realFollowersList.length);
+  }, [profileData, activeUser?.followersCount, realFollowersList.length]);
+
+  const followingDisplayCount = useMemo(() => {
+    if (isMe) {
+      return Math.max(followingIds.length, currentUser?.followingCount || 0);
+    }
+    const fromApi = (profileData as any)?.followingCount ?? activeUser?.followingCount ?? 0;
+    return Math.max(fromApi, realFollowingList.length);
+  }, [isMe, followingIds.length, currentUser?.followingCount, activeUser?.followingCount, realFollowingList.length]);
 
   const userHasStories = useMemo(() => {
+    if (!activeUser) return false;
     return profileStories.some(s => 
       s.user.id === activeUser.id || 
       (activeUser.username && s.user.username === activeUser.username) || 
@@ -167,34 +235,45 @@ export function ProfilePage() {
 
   // Filter user's posts, videos, and podcasts
   const userPosts = useMemo(() => {
+    if (!activeUser) return [];
     return profilePosts.filter(
-      p => p.user.id === user.id || 
+      p => p.user.id === activeUser.id || 
            (isMe && (p.user.id === 'me' || p.user.id === currentUser.id || p.user.username === currentUser.username))
     );
-  }, [profilePosts, user.id, isMe, currentUser]);
+  }, [profilePosts, activeUser, isMe, currentUser]);
 
   const savedPosts = useMemo(() => {
     return profilePosts.filter(p => p.saved);
   }, [profilePosts]);
 
   const userVideos = useMemo(() => {
-    return profileVideos.filter(v => v.channel.id === user.id || (isMe && (v.channel.id === 'me' || v.channel.id === currentUser.id)));
-  }, [profileVideos, user.id, isMe, currentUser]);
+    if (!activeUser) return [];
+    return profileVideos.filter(v => v.channel.id === activeUser.id || (isMe && (v.channel.id === 'me' || v.channel.id === currentUser.id)));
+  }, [profileVideos, activeUser, isMe, currentUser]);
 
   const userPodcasts = useMemo(() => {
+    if (!activeUser) return [];
     return profilePodcasts.filter(p => 
-      p.author.toLowerCase().includes(user.name.split(' ')[0].toLowerCase()) ||
+      (activeUser.name && p.author.toLowerCase().includes(activeUser.name.split(' ')[0].toLowerCase())) ||
       (isMe && p.author.toLowerCase().includes(currentUser.name.split(' ')[0].toLowerCase()))
     );
-  }, [profilePodcasts, user.name, isMe, currentUser]);
+  }, [profilePodcasts, activeUser, isMe, currentUser]);
 
   const userProducts = useMemo(() => {
-    return profileProducts.filter(p => p.seller.id === user.id || (isMe && (p.seller.id === 'me' || p.seller.id === currentUser.id)));
-  }, [profileProducts, user.id, isMe, currentUser]);
+    if (!activeUser) return [];
+    return profileProducts.filter(p => p.seller.id === activeUser.id || (isMe && (p.seller.id === 'me' || p.seller.id === currentUser.id)));
+  }, [profileProducts, activeUser, isMe, currentUser]);
 
   const handleToggleFollow = () => {
-    toggleUserFollow(user.id);
-    setFollowingIds(getStoredFollowingIds());
+    if (!isAuthenticated) {
+      setAuthModalOpen(true);
+      return;
+    }
+    if (activeUser && activeUser.id) {
+      toggleUserFollow(activeUser.id, currentUser?.id, activeUser);
+      setFollowingIds(getStoredFollowingIds());
+      setSocialRevision(r => r + 1);
+    }
   };
 
   const handleSendMessage = () => {
@@ -214,6 +293,7 @@ export function ProfilePage() {
   };
 
   const handleShareProfile = () => {
+    if (!activeUser) return;
     const shareUrl = `${window.location.origin}/profile/@${activeUser.username}`;
     navigator.clipboard?.writeText(shareUrl);
     setCopiedLink(true);
@@ -230,6 +310,32 @@ export function ProfilePage() {
             description="Зарегистрируйтесь в New Age, чтобы создать свой профиль, установить аватар и обложку, публиковать фото, истории, видео и общаться с друзьями."
             actionText="Войти или зарегистрироваться"
           />
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoadingUser && (!activeUser || activeUser.id === currentUser.id)) {
+    return (
+      <div className="profile-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+          <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>Загрузка профиля...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (userNotFound) {
+    return (
+      <div className="profile-page" style={{ padding: '4rem 1.5rem', textAlign: 'center' }}>
+        <div style={{ maxWidth: '420px', margin: '0 auto', background: 'var(--color-bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
+          <h2 style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--color-text)' }}>Пользователь не найден</h2>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.92rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+            Профиль @{cleanParam} не существует или был удалён.
+          </p>
+          <button className="btn btn-primary" onClick={() => navigate('/search')}>
+            Перейти к поиску
+          </button>
         </div>
       </div>
     );
@@ -320,10 +426,10 @@ export function ProfilePage() {
                   <b>{(profileData as any)?.friendsCount ?? 0}</b> друзей
                 </div>
                 <div className="stat-item clickable" onClick={() => setModalType('Подписчики')}>
-                  <b>{realFollowersList.length.toLocaleString('ru-RU')}</b> подписчиков
+                  <b>{followersDisplayCount.toLocaleString('ru-RU')}</b> подписчиков
                 </div>
                 <div className="stat-item clickable" onClick={() => setModalType('Подписки')}>
-                  <b>{realFollowingList.length.toLocaleString('ru-RU')}</b> подписок
+                  <b>{followingDisplayCount.toLocaleString('ru-RU')}</b> подписок
                 </div>
                 <div className="stat-item">
                   <b>{(profileData as any)?.clipsCount ?? 0}</b> волны

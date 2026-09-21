@@ -1849,14 +1849,22 @@ func handleFollow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	targetID := r.PathValue("id")
-	if claims.UserID == targetID {
-		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Нельзя подписаться на самого себя"})
-		return
-	}
+	rawTarget := r.PathValue("id")
+	cleanTarget := strings.ToLower(strings.TrimPrefix(rawTarget, "@"))
+	var targetID string
 
 	if db != nil {
-		_, err := db.Exec(`
+		err := db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", rawTarget, cleanTarget).Scan(&targetID)
+		if err != nil {
+			targetID = rawTarget
+		}
+
+		if claims.UserID == targetID {
+			writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Нельзя подписаться на самого себя"})
+			return
+		}
+
+		_, err = db.Exec(`
 			INSERT INTO user_relationships (id, follower_id, target_id, rel_type)
 			VALUES ($1, $2, $3, 'follow') ON CONFLICT DO NOTHING
 		`, uuid.New().String(), claims.UserID, targetID)
@@ -1864,6 +1872,31 @@ func handleFollow(w http.ResponseWriter, r *http.Request) {
 			db.Exec("UPDATE users SET followers_count = followers_count + 1 WHERE id = $1", targetID)
 			db.Exec("UPDATE users SET following_count = following_count + 1 WHERE id = $1", claims.UserID)
 		}
+	} else {
+		store.mu.Lock()
+		targetID = rawTarget
+		for id, acc := range store.accounts {
+			if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
+				targetID = id
+				break
+			}
+		}
+
+		if claims.UserID == targetID {
+			store.mu.Unlock()
+			writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Нельзя подписаться на самого себя"})
+			return
+		}
+
+		if targetAcc, ok := store.accounts[targetID]; ok {
+			targetAcc.User.FollowersCount++
+			store.accounts[targetID] = targetAcc
+		}
+		if myAcc, ok := store.accounts[claims.UserID]; ok {
+			myAcc.User.FollowingCount++
+			store.accounts[claims.UserID] = myAcc
+		}
+		store.mu.Unlock()
 	}
 
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Вы подписались"})
@@ -1878,9 +1911,16 @@ func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	targetID := r.PathValue("id")
+	rawTarget := r.PathValue("id")
+	cleanTarget := strings.ToLower(strings.TrimPrefix(rawTarget, "@"))
+	var targetID string
 
 	if db != nil {
+		err := db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", rawTarget, cleanTarget).Scan(&targetID)
+		if err != nil {
+			targetID = rawTarget
+		}
+
 		res, err := db.Exec(`
 			DELETE FROM user_relationships 
 			WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'
@@ -1888,10 +1928,33 @@ func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			affected, _ := res.RowsAffected()
 			if affected > 0 {
-				db.Exec("UPDATE users SET followers_count = followers_count - 1 WHERE id = $1", targetID)
-				db.Exec("UPDATE users SET following_count = following_count - 1 WHERE id = $1", claims.UserID)
+				db.Exec("UPDATE users SET followers_count = GREATEST(0, followers_count - 1) WHERE id = $1", targetID)
+				db.Exec("UPDATE users SET following_count = GREATEST(0, following_count - 1) WHERE id = $1", claims.UserID)
 			}
 		}
+	} else {
+		store.mu.Lock()
+		targetID = rawTarget
+		for id, acc := range store.accounts {
+			if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
+				targetID = id
+				break
+			}
+		}
+
+		if targetAcc, ok := store.accounts[targetID]; ok {
+			if targetAcc.User.FollowersCount > 0 {
+				targetAcc.User.FollowersCount--
+			}
+			store.accounts[targetID] = targetAcc
+		}
+		if myAcc, ok := store.accounts[claims.UserID]; ok {
+			if myAcc.User.FollowingCount > 0 {
+				myAcc.User.FollowingCount--
+			}
+			store.accounts[claims.UserID] = myAcc
+		}
+		store.mu.Unlock()
 	}
 
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Вы отписались"})
@@ -1900,63 +1963,73 @@ func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 // GET /api/users/{id}/followers
 func handleFollowers(w http.ResponseWriter, r *http.Request) {
 	targetID := r.PathValue("id")
-	var users []User
-	
-	if db != nil {
-		rows, err := db.Query(`
-			SELECT id, username, name, avatar, bio, location, verified 
-			FROM users 
-			WHERE id IN (
-				SELECT follower_id FROM user_relationships 
-				WHERE target_id = $1 AND rel_type = 'follow'
-			)
-		`, targetID)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var u User
-				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.Verified)
-				users = append(users, u)
-			}
-		}
-	}
-	
-	if users == nil {
-		users = []User{}
-	}
+	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
 
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"users": users}})
+	if db != nil {
+		var resolvedID string
+		err := db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", targetID, cleanTarget).Scan(&resolvedID)
+		if err == nil {
+			targetID = resolvedID
+		}
+		rows, err := db.Query(`
+			SELECT u.id, u.username, u.name, u.avatar, u.bio, u.location, u.followers_count, u.following_count, u.posts_count, u.verified
+			FROM users u
+			JOIN user_relationships r ON u.id = r.follower_id
+			WHERE r.target_id = $1 AND r.rel_type = 'follow'
+			ORDER BY r.created_at DESC
+		`, targetID)
+		if err != nil {
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []User{}})
+			return
+		}
+		defer rows.Close()
+
+		var followers []User
+		for rows.Next() {
+			var u User
+			rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified)
+			followers = append(followers, u)
+		}
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: followers})
+	} else {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []User{}})
+	}
 }
 
 // GET /api/users/{id}/following
 func handleFollowing(w http.ResponseWriter, r *http.Request) {
 	targetID := r.PathValue("id")
-	var users []User
-	
-	if db != nil {
-		rows, err := db.Query(`
-			SELECT id, username, name, avatar, bio, location, verified 
-			FROM users 
-			WHERE id IN (
-				SELECT target_id FROM user_relationships 
-				WHERE follower_id = $1 AND rel_type = 'follow'
-			)
-		`, targetID)
-		if err == nil {
-			defer rows.Close()
-			for rows.Next() {
-				var u User
-				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.Verified)
-				users = append(users, u)
-			}
-		}
-	}
-	
-	if users == nil {
-		users = []User{}
-	}
+	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
 
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"users": users}})
+	if db != nil {
+		var resolvedID string
+		err := db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", targetID, cleanTarget).Scan(&resolvedID)
+		if err == nil {
+			targetID = resolvedID
+		}
+		rows, err := db.Query(`
+			SELECT u.id, u.username, u.name, u.avatar, u.bio, u.location, u.followers_count, u.following_count, u.posts_count, u.verified
+			FROM users u
+			JOIN user_relationships r ON u.id = r.target_id
+			WHERE r.follower_id = $1 AND r.rel_type = 'follow'
+			ORDER BY r.created_at DESC
+		`, targetID)
+		if err != nil {
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []User{}})
+			return
+		}
+		defer rows.Close()
+
+		var following []User
+		for rows.Next() {
+			var u User
+			rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified)
+			following = append(following, u)
+		}
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: following})
+	} else {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []User{}})
+	}
 }
 
 // GET /api/users/{id}/friends — mutual follows (оба подписаны)
@@ -2018,6 +2091,7 @@ func handleRemoveFriend(w http.ResponseWriter, r *http.Request) {
 // GET /api/users/{id}/profile
 func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 	targetID := r.PathValue("id")
+	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
 	var user User
 	
 	token := extractBearerToken(r)
@@ -2026,8 +2100,8 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 	if db != nil {
 		err := db.QueryRow(`
 			SELECT id, username, name, avatar, bio, location, followers_count, following_count, posts_count, verified 
-			FROM users WHERE id = $1
-		`, targetID).Scan(&user.ID, &user.Username, &user.Name, &user.Avatar, &user.Bio, &user.Location, &user.FollowersCount, &user.FollowingCount, &user.PostsCount, &user.Verified)
+			FROM users WHERE id = $1 OR LOWER(username) = LOWER($1) OR LOWER(username) = LOWER($2)
+		`, targetID, cleanTarget).Scan(&user.ID, &user.Username, &user.Name, &user.Avatar, &user.Bio, &user.Location, &user.FollowersCount, &user.FollowingCount, &user.PostsCount, &user.Verified)
 		if err != nil {
 			writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден"})
 			return
@@ -2038,32 +2112,50 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 			SELECT COUNT(*) FROM user_relationships r1
 			JOIN user_relationships r2 ON r1.follower_id = r2.target_id AND r1.target_id = r2.follower_id
 			WHERE r1.follower_id = $1 AND r1.rel_type = 'follow' AND r2.rel_type = 'follow'
-		`, targetID).Scan(&user.FriendsCount)
+		`, user.ID).Scan(&user.FriendsCount)
 
 		// Clips count
-		db.QueryRow(`SELECT COUNT(*) FROM clips WHERE user_id = $1`, targetID).Scan(&user.ClipsCount)
+		db.QueryRow(`SELECT COUNT(*) FROM clips WHERE user_id = $1`, user.ID).Scan(&user.ClipsCount)
 
 		if claims != nil {
 			var count int
-			db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'", claims.UserID, targetID).Scan(&count)
+			db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'", claims.UserID, user.ID).Scan(&count)
 			user.IsFollowed = count > 0
 
 			// Check if mutual friends
 			if user.IsFollowed {
 				var reverseCount int
-				db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'", targetID, claims.UserID).Scan(&reverseCount)
+				db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'", user.ID, claims.UserID).Scan(&reverseCount)
 				user.IsFriend = reverseCount > 0
 			}
 		}
 	} else {
 		store.mu.RLock()
-		acc, ok := store.accounts[targetID]
+		var foundAcc *AccountStoreEntry
+		if acc, ok := store.accounts[targetID]; ok {
+			foundAcc = &acc
+		} else {
+			for _, acc := range store.accounts {
+				if strings.ToLower(acc.User.ID) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
+					foundAcc = &acc
+					break
+				}
+			}
+		}
 		store.mu.RUnlock()
-		if !ok {
+		if foundAcc == nil {
 			writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден"})
 			return
 		}
-		user = acc.User
+		user = foundAcc.User
+
+		if claims != nil {
+			// In-memory follow check
+			user.IsFollowed = false
+			if myAcc, ok := store.accounts[claims.UserID]; ok {
+				_ = myAcc
+			}
+		}
 	}
 
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"user": user}})

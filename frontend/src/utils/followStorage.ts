@@ -5,37 +5,66 @@ import { api } from '../api';
 const STORAGE_KEY_FOLLOWING = 'new_age_following_map';
 const STORAGE_KEY_FOLLOWERS_MAP = 'new_age_custom_followers_map';
 const STORAGE_KEY_CRITICS_MAP = 'new_age_critics_map';
+const STORAGE_KEY_CACHED_USERS = 'new_age_cached_users_pool';
 
-// Получить пул всех пользователей (моки + зарегистрированные)
+// Кэш внешних пользователей (найденных через поиск/бекенд)
+export function getStoredCachedUsers(): User[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CACHED_USERS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch { /* ignore */ }
+  return [];
+}
+
+export function cacheUser(user: User): void {
+  if (!user || !user.id || user.id === 'guest') return;
+  try {
+    const current = getStoredCachedUsers().filter(u => u.id !== user.id && u.username !== user.username);
+    current.push(user);
+    // Ограничиваем кэш последними 200 пользователями
+    if (current.length > 200) current.shift();
+    localStorage.setItem(STORAGE_KEY_CACHED_USERS, JSON.stringify(current));
+  } catch { /* ignore */ }
+}
+
+// Получить пул всех пользователей (моки + зарегистрированные + кэшированные с бекенда)
 export function getAllUsersPool(currentUser?: User, allAccounts: RegisteredAccount[] = []): User[] {
-  const registeredUsers: User[] = allAccounts.map(a => ({
-    id: a.id,
-    name: a.name,
-    username: a.username,
-    avatar: a.avatar,
-    coverImage: a.coverImage,
-    bio: a.bio,
-    website: a.website,
-    location: a.location,
-    online: false,
-    followersCount: a.followersCount || 0,
-    followingCount: a.followingCount || 0,
-    criticsCount: a.criticsCount || 0,
-    postsCount: a.postsCount || 0,
-    role: a.role,
-    beliefType: a.beliefType,
-    beliefPrivacy: a.beliefPrivacy,
-    verified: a.verified,
-  }));
-
   const map = new Map<string, User>();
-  
+
   initialUsers.forEach(u => {
     if (u && u.id && u.id !== 'guest') map.set(u.id, u);
   });
 
-  registeredUsers.forEach(u => {
+  const cachedUsers = getStoredCachedUsers();
+  cachedUsers.forEach(u => {
     if (u && u.id && u.id !== 'guest') map.set(u.id, u);
+  });
+
+  allAccounts.forEach(a => {
+    if (a && a.id && a.id !== 'guest') {
+      map.set(a.id, {
+        id: a.id,
+        name: a.name,
+        username: a.username,
+        avatar: a.avatar,
+        coverImage: a.coverImage,
+        bio: a.bio,
+        website: a.website,
+        location: a.location,
+        online: false,
+        followersCount: a.followersCount || 0,
+        followingCount: a.followingCount || 0,
+        criticsCount: a.criticsCount || 0,
+        postsCount: a.postsCount || 0,
+        role: a.role,
+        beliefType: a.beliefType,
+        beliefPrivacy: a.beliefPrivacy,
+        verified: a.verified,
+      });
+    }
   });
 
   if (currentUser && currentUser.id && currentUser.id !== 'guest') {
@@ -61,25 +90,51 @@ export function setStoredFollowingIds(ids: string[]): void {
 }
 
 export function isUserFollowed(targetUserId: string): boolean {
+  if (!targetUserId) return false;
   return getStoredFollowingIds().includes(targetUserId);
 }
 
-// Подписаться/Отписаться — API + кэш
-export function toggleUserFollow(targetUserId: string): boolean {
-  const ids = getStoredFollowingIds();
-  const isCurrentlyFollowing = ids.includes(targetUserId);
+// Подписаться/Отписаться — синхронизирует и свои подписки, и чужих подписчиков!
+export function toggleUserFollow(targetUserId: string, currentUserId?: string, targetUser?: User): boolean {
+  if (!targetUserId) return false;
+
+  const followingIds = getStoredFollowingIds();
+  const isCurrentlyFollowing = followingIds.includes(targetUserId);
   let isNowFollowing: boolean;
 
+  // 1. Обновляем свой список подписок (following)
   if (isCurrentlyFollowing) {
-    setStoredFollowingIds(ids.filter(id => id !== targetUserId));
+    setStoredFollowingIds(followingIds.filter(id => id !== targetUserId));
     isNowFollowing = false;
     api.users.unfollow(targetUserId).catch(() => {});
   } else {
-    setStoredFollowingIds([...ids, targetUserId]);
+    setStoredFollowingIds([...followingIds, targetUserId]);
     isNowFollowing = true;
     api.users.follow(targetUserId).catch(() => {});
   }
 
+  // 2. Обновляем список подписчиков цели (followers map)
+  if (currentUserId && currentUserId !== 'guest') {
+    const followersMap = getStoredFollowersMap();
+    const currentFollowers = followersMap[targetUserId] ? [...followersMap[targetUserId]] : [];
+    const index = currentFollowers.indexOf(currentUserId);
+
+    if (isNowFollowing) {
+      if (index === -1) currentFollowers.push(currentUserId);
+    } else {
+      if (index >= 0) currentFollowers.splice(index, 1);
+    }
+
+    followersMap[targetUserId] = currentFollowers;
+    localStorage.setItem(STORAGE_KEY_FOLLOWERS_MAP, JSON.stringify(followersMap));
+  }
+
+  // 3. Сохраняем целевого пользователя в кэш
+  if (targetUser) {
+    cacheUser(targetUser);
+  }
+
+  window.dispatchEvent(new Event('follow_change'));
   return isNowFollowing;
 }
 
@@ -98,19 +153,27 @@ export function setStoredFollowersMap(map: Record<string, string[]>): void {
   window.dispatchEvent(new Event('follow_change'));
 }
 
-export function getFollowersForUser(targetUserId: string, allUsers: User[], _currentUserId?: string): User[] {
+export function getFollowersForUser(targetUserId: string, allUsers: User[], currentUserId?: string): User[] {
+  if (!targetUserId) return [];
   const map = getStoredFollowersMap();
   const candidates = allUsers.filter(u => u.id !== targetUserId && u.id !== 'guest');
 
   if (map[targetUserId] && Array.isArray(map[targetUserId])) {
     const idSet = new Set(map[targetUserId]);
-    return candidates.filter(u => idSet.has(u.id));
+    const list = candidates.filter(u => idSet.has(u.id));
+    // Если текущий юзер подписан, но его нет среди кандидатов пула, гарантируем его наличие
+    if (currentUserId && idSet.has(currentUserId) && !list.some(u => u.id === currentUserId)) {
+      const me = allUsers.find(u => u.id === currentUserId);
+      if (me) list.push(me);
+    }
+    return list;
   }
 
   return [];
 }
 
 export function getFollowingForUser(targetUserId: string, allUsers: User[], isMe: boolean): User[] {
+  if (!targetUserId) return [];
   const candidates = allUsers.filter(u => u.id !== targetUserId && u.id !== 'guest');
 
   if (isMe) {
@@ -137,6 +200,7 @@ export function setStoredCriticsMap(map: Record<string, string[]>): void {
 }
 
 export function getCriticsForUser(targetUserId: string, allUsers: User[]): User[] {
+  if (!targetUserId) return [];
   const map = getStoredCriticsMap();
   const candidates = allUsers.filter(u => u.id !== targetUserId && u.id !== 'guest');
 

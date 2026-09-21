@@ -11,7 +11,8 @@ import { useAuth } from '../context/AuthContext';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { 
   getStoredFollowingIds, 
-  toggleUserFollow 
+  toggleUserFollow,
+  cacheUser
 } from '../utils/followStorage';
 import './SearchPage.css';
 
@@ -47,7 +48,12 @@ export function SearchPage() {
   }, []);
 
   useEffect(() => {
-    const safeFn = (d: any) => Array.isArray(d) && setPoolUsers(d);
+    const safeFn = (d: any) => {
+      if (Array.isArray(d)) {
+        setPoolUsers(d);
+        d.forEach((u: any) => cacheUser(u));
+      }
+    };
     if (query.trim()) {
       api.users.search(query).then(safeFn).catch(console.warn);
     } else {
@@ -94,13 +100,13 @@ export function SearchPage() {
     });
   };
 
-  const handleToggleFollow = (userId: string, e: React.MouseEvent) => {
+  const handleToggleFollow = (targetUser: any, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isAuthenticated) {
       openAuthModal('register');
       return;
     }
-    toggleUserFollow(userId);
+    toggleUserFollow(targetUser.id, currentUser?.id, targetUser);
     setFollowingIds(getStoredFollowingIds());
   };
 
@@ -252,7 +258,7 @@ export function SearchPage() {
                           <button
                             type="button"
                             className={`account-card-follow-btn ${isSubscribed ? 'following' : ''}`}
-                            onClick={(e) => handleToggleFollow(user.id, e)}
+                            onClick={(e) => handleToggleFollow(user, e)}
                           >
                             {isSubscribed ? <Check size={14} /> : <UserPlus size={14} />}
                             <span>{isSubscribed ? 'Подписки' : 'Подписаться'}</span>
@@ -397,7 +403,7 @@ export function SearchPage() {
                         <button
                           type="button"
                           className={`account-row-btn ${isSubscribed ? 'active-following' : 'primary-follow'}`}
-                          onClick={(e) => handleToggleFollow(user.id, e)}
+                          onClick={(e) => handleToggleFollow(user, e)}
                         >
                           {isSubscribed ? (
                             <>
