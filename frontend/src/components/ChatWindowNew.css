@@ -1,5 +1,5 @@
-/* ============================================
-   ChatWindowNew — Light theme first (Telegram style)
+﻿/* ============================================
+   ChatWindowNew вЂ” Light theme first (Telegram style)
    ============================================ */
 
 /* Container */
@@ -7,7 +7,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #fff;
+  background: var(--color-bg-card);
 }
 
 /* Empty state */
@@ -17,7 +17,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  background: var(--color-bg-secondary, #f0f2f5);
+  background: var(--color-bg-secondary, var(--color-bg));
   gap: 0.5rem;
 }
 
@@ -36,7 +36,7 @@
 .cw-empty-title {
   font-size: 1.4rem;
   font-weight: 700;
-  color: var(--color-text, #1a1a2e);
+  color: var(--color-text, var(--color-text));
   letter-spacing: 0.03em;
   text-transform: uppercase;
   margin: 0;
@@ -44,7 +44,7 @@
 
 .cw-empty-subtitle {
   font-size: 0.88rem;
-  color: var(--color-text-secondary, #8e8e93);
+  color: var(--color-text-secondary, var(--color-text-secondary));
   max-width: 320px;
   text-align: center;
   line-height: 1.4;
@@ -57,15 +57,15 @@
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  background: #fff;
-  border-bottom: 1px solid #e5e5ea;
+  background: var(--color-bg-card);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
 .cw-back-btn {
   background: none;
   border: none;
-  color: #6C5CE7;
+  color: var(--color-accent);
   cursor: pointer;
   padding: 4px;
   display: none;
@@ -93,7 +93,7 @@
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: #6C5CE7;
+  background: var(--color-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -114,7 +114,7 @@
   height: 10px;
   border-radius: 50%;
   background: #34c759;
-  border: 2px solid #fff;
+  border: 2px solid var(--color-bg-card);
 }
 
 .cw-header-info {
@@ -125,7 +125,7 @@
 .cw-header-name {
   font-weight: 600;
   font-size: 15px;
-  color: #1c1c1e;
+  color: var(--color-text);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -143,7 +143,7 @@
 
 .cw-header-status {
   font-size: 12px;
-  color: #8e8e93;
+  color: var(--color-text-secondary);
   margin-top: 1px;
 }
 
@@ -159,7 +159,7 @@
 .cw-action-btn {
   background: none;
   border: none;
-  color: #8e8e93;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 6px;
   border-radius: 8px;
@@ -167,8 +167,8 @@
 }
 
 .cw-action-btn:hover {
-  background: #f2f2f7;
-  color: #6C5CE7;
+  background: var(--color-bg-secondary);
+  color: var(--color-accent);
 }
 
 /* ---- Messages area ---- */
@@ -179,12 +179,12 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: #efeef4;
+  background: var(--color-bg);
 }
 
 .cw-no-messages {
   text-align: center;
-  color: #8e8e93;
+  color: var(--color-text-secondary);
   margin-top: 40px;
   font-size: 14px;
 }
@@ -211,18 +211,15 @@
   line-height: 1.5;
   word-break: break-word;
   position: relative;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 2px var(--shadow-sm);
 }
 
-.cw-bubble.me {
-  background: #6C5CE7;
-  color: #fff;
+.cw-bubble.me { background: var(--color-accent); color: #fff;
   border-radius: 18px 18px 4px 18px;
 }
 
 .cw-bubble.them {
-  background: #fff;
-  color: #1c1c1e;
+  background: var(--color-bg-card); color: var(--color-text);
   border-radius: 18px 18px 18px 4px;
 }
 
@@ -244,7 +241,7 @@
 }
 
 .cw-bubble.them .cw-bubble-meta {
-  color: #8e8e93;
+  color: var(--color-text-secondary);
 }
 
 .cw-ticks {
@@ -262,15 +259,15 @@
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  background: #fff;
-  border-top: 1px solid #e5e5ea;
+  background: var(--color-bg-card);
+  border-top: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
 .cw-input-icon {
   background: none;
   border: none;
-  color: #8e8e93;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 6px;
   border-radius: 8px;
@@ -279,27 +276,27 @@
 }
 
 .cw-input-icon:hover {
-  color: #6C5CE7;
+  color: var(--color-accent);
 }
 
 .cw-input {
   flex: 1;
-  background: #f2f2f7;
-  border: 1px solid #e5e5ea;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
   border-radius: 20px;
   padding: 10px 16px;
   font-size: 14px;
-  color: #1c1c1e;
+  color: var(--color-text);
   outline: none;
   transition: border-color 0.2s;
 }
 
 .cw-input::placeholder {
-  color: #8e8e93;
+  color: var(--color-text-secondary);
 }
 
 .cw-input:focus {
-  border-color: #6C5CE7;
+  border-color: var(--color-accent);
 }
 
 .cw-send-btn {
@@ -317,14 +314,12 @@
   transition: all 0.2s;
 }
 
-.cw-send-btn.active {
-  background: #6C5CE7;
-  color: #fff;
+.cw-send-btn.active { background: var(--color-accent); color: #fff;
   cursor: pointer;
 }
 
 .cw-send-btn.active:hover {
-  background: #5a4bd6;
+  background: var(--color-accent-hover);
 }
 
 /* ---- Typing indicator ---- */
@@ -342,7 +337,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #8e8e93;
+  background: var(--color-text-secondary);
   animation: cw-typing 1.4s infinite ease-in-out;
 }
 
@@ -365,13 +360,13 @@
   }
 }
 
-/* ---- Context Menu (ПКМ) ---- */
+/* ---- Context Menu (РџРљРњ) ---- */
 .cw-ctx-menu {
   position: fixed;
   z-index: 1000;
-  background: #fff;
+  background: var(--color-bg-card);
   border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 24px var(--shadow-md);
   padding: 6px 0;
   min-width: 180px;
   animation: cw-ctx-fade 0.15s ease;
@@ -391,14 +386,14 @@
   border: none;
   background: none;
   font-size: 14px;
-  color: #1c1c1e;
+  color: var(--color-text);
   cursor: pointer;
   text-align: left;
   transition: background 0.1s;
 }
 
 .cw-ctx-item:hover {
-  background: #f2f2f7;
+  background: var(--color-bg-secondary);
 }
 
 .cw-ctx-item.danger {
@@ -411,7 +406,7 @@
 
 .cw-ctx-divider {
   height: 1px;
-  background: #e5e5ea;
+  background: var(--color-border);
   margin: 4px 0;
 }
 
@@ -421,8 +416,8 @@
   flex-wrap: wrap;
   gap: 2px;
   padding: 8px 12px;
-  background: #fff;
-  border-top: 1px solid #e5e5ea;
+  background: var(--color-bg-card);
+  border-top: 1px solid var(--color-border);
   max-height: 120px;
   overflow-y: auto;
 }
@@ -442,7 +437,7 @@
 }
 
 .cw-emoji-btn:hover {
-  background: #f2f2f7;
+  background: var(--color-bg-secondary);
 }
 
 /* ---- Reply Bar (in input area) ---- */
@@ -452,14 +447,14 @@
   gap: 8px;
   padding: 8px 12px;
   background: #f9f9fb;
-  border-top: 1px solid #e5e5ea;
+  border-top: 1px solid var(--color-border);
 }
 
 .cw-reply-bar {
   width: 3px;
   height: 100%;
   min-height: 20px;
-  background: #6C5CE7;
+  background: var(--color-accent);
   border-radius: 2px;
   flex-shrink: 0;
 }
@@ -475,12 +470,12 @@
 .cw-reply-name {
   font-size: 12px;
   font-weight: 600;
-  color: #6C5CE7;
+  color: var(--color-accent);
 }
 
 .cw-reply-preview-text {
   font-size: 13px;
-  color: #8e8e93;
+  color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -489,7 +484,7 @@
 .cw-reply-close {
   background: none;
   border: none;
-  color: #8e8e93;
+  color: var(--color-text-secondary);
   cursor: pointer;
   padding: 4px;
   border-radius: 50%;
@@ -497,8 +492,8 @@
 }
 
 .cw-reply-close:hover {
-  background: #f2f2f7;
-  color: #1c1c1e;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
 }
 
 /* ---- Reply Preview (in bubble) ---- */
@@ -510,7 +505,7 @@
   border-radius: 6px;
   background: rgba(0,0,0,0.05);
   font-size: 12px;
-  color: #8e8e93;
+  color: var(--color-text-secondary);
 }
 
 .cw-bubble.me .cw-reply-preview {
@@ -523,3 +518,5 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+
