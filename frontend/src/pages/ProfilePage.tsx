@@ -378,6 +378,20 @@ export function ProfilePage() {
                   <PremiumBadge size="lg" showText />
                 </span>
               )}
+            </div>
+
+            <div className="username-role-row">
+              <button 
+                type="button"
+                className="profile-username-pill"
+                onClick={() => {
+                  navigator.clipboard?.writeText(`@${activeUser.username}`);
+                  alert(`Уникальный ID @${activeUser.username} скопирован в буфер!`);
+                }}
+                title="Уникальный ID пользователя. Нажмите, чтобы скопировать"
+              >
+                @{activeUser.username}
+              </button>
 
               {/* Роли пользователя */}
               {activeUser.role === 'creator' && (
@@ -390,123 +404,121 @@ export function ProfilePage() {
                   <ShoppingBag size={12} /> Магазин {activeUser.businessCategory ? `• ${activeUser.businessCategory}` : ''}
                 </span>
               )}
-
-              <button 
-                type="button"
-                className="profile-username-pill"
-                onClick={() => {
-                  navigator.clipboard?.writeText(`@${activeUser.username}`);
-                  alert(`Уникальный ID @${activeUser.username} скопирован в буфер!`);
-                }}
-                title="Уникальный ID пользователя. Нажмите, чтобы скопировать"
-              >
-                @{activeUser.username}
-              </button>
             </div>
 
             {activeUser.bio && <p className="profile-bio">{activeUser.bio}</p>}
 
-            <div className="profile-meta-row">
-              {activeUser.location && (
-                <div className="meta-item">
-                  <MapPin size={15} />
-                  <span>{activeUser.location}</span>
-                </div>
-              )}
-              {activeUser.website && (
-                <a href={activeUser.website} target="_blank" rel="noreferrer" className="meta-item meta-link">
-                  <LinkIcon size={15} />
-                  <span>{activeUser.website.replace('https://', '')}</span>
-                </a>
-              )}
-              {/* Чувствительные данные (мировоззрение/вероисповедание с защитой приватности) */}
-              {activeUser.beliefType && activeUser.beliefType !== 'Не указано' && activeUser.beliefType !== 'Не указывать / Личное' && (
-                (isMe || activeUser.beliefPrivacy === 'public' || (activeUser.beliefPrivacy === 'followers' && isFollowing)) && (() => {
-                  const religion = RELIGIONS_CATALOG.find(r => r.name === activeUser.beliefType);
-                  return (
+            <div className="profile-meta-groups">
+              {/* Ряд 1: Базовая информация и Геолокация */}
+              <div className="profile-meta-row">
+                {activeUser.location && (
+                  <div className="meta-item">
+                    <MapPin size={15} />
+                    <span>{activeUser.location}</span>
+                  </div>
+                )}
+                {activeUser.website && (
+                  <a href={activeUser.website} target="_blank" rel="noreferrer" className="meta-item meta-link">
+                    <LinkIcon size={15} />
+                    <span>{activeUser.website.replace('https://', '')}</span>
+                  </a>
+                )}
+                {/* Чувствительные данные (мировоззрение/вероисповедание с защитой приватности) */}
+                {activeUser.beliefType && activeUser.beliefType !== 'Не указано' && activeUser.beliefType !== 'Не указывать / Личное' && (
+                  (isMe || activeUser.beliefPrivacy === 'public' || (activeUser.beliefPrivacy === 'followers' && isFollowing)) && (() => {
+                    const religion = RELIGIONS_CATALOG.find(r => r.name === activeUser.beliefType);
+                    return (
+                      <div 
+                        className="meta-item meta-belief" 
+                        title={isMe ? `Видимость: ${activeUser.beliefPrivacy === 'private' ? 'Только мне (Скрыто)' : activeUser.beliefPrivacy === 'followers' ? 'Только подписчикам' : 'Публично'}` : 'Мировоззрение'}
+                      >
+                        {religion ? (
+                          <ReligionSymbol id={religion.id} size={20} className="meta-belief-symbol" />
+                        ) : (
+                          <Compass size={15} />
+                        )}
+                        <span>{activeUser.beliefType}</span>
+                        {religion?.symbolTitle && (
+                          <span className="meta-belief-symbol-name">({religion.symbolTitle})</span>
+                        )}
+                        {isMe && activeUser.beliefPrivacy === 'private' && (
+                          <span className="belief-privacy-badge" title="Скрыто от других"><Shield size={11} /></span>
+                        )}
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+
+              {/* Ряд 2: Класс сознания и дата рождения */}
+              {(activeUser.consciousnessLevel || activeUser.birthDate) && (
+                <div className="profile-meta-row">
+                  {/* Класс сознания и язык общения */}
+                  {activeUser.consciousnessLevel ? (
                     <div 
-                      className="meta-item meta-belief" 
-                      title={isMe ? `Видимость: ${activeUser.beliefPrivacy === 'private' ? 'Только мне (Скрыто)' : activeUser.beliefPrivacy === 'followers' ? 'Только подписчикам' : 'Публично'}` : 'Мировоззрение'}
+                      className="meta-item meta-consciousness" 
+                      onClick={() => setIsConsciousnessModalOpen(true)}
+                      style={{ cursor: 'pointer' }}
+                      title="Класс сознания и ведущий язык восприятия человека. Нажмите для подробностей"
                     >
-                      {religion ? (
-                        <ReligionSymbol id={religion.id} size={20} className="meta-belief-symbol" />
-                      ) : (
-                        <Compass size={15} />
-                      )}
-                      <span>{activeUser.beliefType}</span>
-                      {religion?.symbolTitle && (
-                        <span className="meta-belief-symbol-name">({religion.symbolTitle})</span>
-                      )}
-                      {isMe && activeUser.beliefPrivacy === 'private' && (
-                        <span className="belief-privacy-badge" title="Скрыто от других"><Shield size={11} /></span>
+                      <Brain size={15} className="consciousness-icon" />
+                      <span className="consciousness-level-badge">{activeUser.consciousnessLevel} класс</span>
+                      <span className="consciousness-title-text">{activeUser.consciousnessTitle || 'Осознанность'}</span>
+                      {activeUser.cognitionVector && (
+                        <span className="consciousness-vector-tag">
+                          {activeUser.cognitionVector === 'visual_analogies' && '🍏 на яблоках'}
+                          {activeUser.cognitionVector === 'exact_sciences' && '📐 логика и факты'}
+                          {activeUser.cognitionVector === 'pragmatic' && '⚡ польза и действие'}
+                          {activeUser.cognitionVector === 'philosophical' && '📖 смыслы'}
+                          {activeUser.cognitionVector === 'spiritual' && '✨ паттерны и единство'}
+                        </span>
                       )}
                     </div>
-                  );
-                })()
-              )}
-
-              {/* Класс сознания и язык общения */}
-              {activeUser.consciousnessLevel ? (
-                <div 
-                  className="meta-item meta-consciousness" 
-                  onClick={() => setIsConsciousnessModalOpen(true)}
-                  style={{ cursor: 'pointer' }}
-                  title="Класс сознания и ведущий язык восприятия человека. Нажмите для подробностей"
-                >
-                  <Brain size={15} className="consciousness-icon" />
-                  <span className="consciousness-level-badge">{activeUser.consciousnessLevel} класс</span>
-                  <span className="consciousness-title-text">{activeUser.consciousnessTitle || 'Осознанность'}</span>
-                  {activeUser.cognitionVector && (
-                    <span className="consciousness-vector-tag">
-                      {activeUser.cognitionVector === 'visual_analogies' && '🍏 на яблоках'}
-                      {activeUser.cognitionVector === 'exact_sciences' && '📐 логика и факты'}
-                      {activeUser.cognitionVector === 'pragmatic' && '⚡ польза и действие'}
-                      {activeUser.cognitionVector === 'philosophical' && '📖 смыслы'}
-                      {activeUser.cognitionVector === 'spiritual' && '✨ паттерны и единство'}
-                    </span>
+                  ) : (
+                    isMe && (
+                      <button 
+                        type="button" 
+                        className="meta-item meta-consciousness-empty"
+                        onClick={() => setIsConsciousnessModalOpen(true)}
+                        title="Пройти диагностику класса сознания и определить свой язык общения"
+                      >
+                        <Brain size={15} />
+                        <span>Определить класс сознания</span>
+                        <Sparkles size={12} className="meta-sparkle" />
+                      </button>
+                    )
                   )}
+
+                  {/* Дата рождения и возраст */}
+                  {activeUser.birthDate && (isMe || activeUser.showBirthDate !== false) && (() => {
+                    const astro = calculateZodiacProfile(activeUser.birthDate);
+                    const dateObj = new Date(activeUser.birthDate);
+                    const formattedDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+                    return (
+                      <div className="meta-item meta-birthdate" title="Дата рождения и возраст">
+                        <Calendar size={15} />
+                        <span>{formattedDate} {astro ? `(${astro.age} лет)` : ''}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
-              ) : (
-                isMe && (
-                  <button 
-                    type="button" 
-                    className="meta-item meta-consciousness-empty"
-                    onClick={() => setIsConsciousnessModalOpen(true)}
-                    title="Пройти диагностику класса сознания и определить свой язык общения"
-                  >
-                    <Brain size={15} />
-                    <span>Определить класс сознания</span>
-                    <Sparkles size={12} className="meta-sparkle" />
-                  </button>
-                )
               )}
 
-              {/* Дата рождения и возраст */}
-              {activeUser.birthDate && (isMe || activeUser.showBirthDate !== false) && (() => {
-                const astro = calculateZodiacProfile(activeUser.birthDate);
-                const dateObj = new Date(activeUser.birthDate);
-                const formattedDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
-                return (
-                  <div className="meta-item meta-birthdate" title="Дата рождения и возраст">
-                    <Calendar size={15} />
-                    <span>{formattedDate} {astro ? `(${astro.age} лет)` : ''}</span>
-                  </div>
-                );
-              })()}
-
-              {/* Знак Зодиака и Восточный знак */}
+              {/* Ряд 3: Астрология (Зодиак) */}
               {activeUser.birthDate && (isMe || activeUser.showZodiac !== false) && (() => {
                 const astro = calculateZodiacProfile(activeUser.birthDate);
                 if (!astro) return null;
                 return (
-                  <div 
-                    className="meta-item meta-zodiac" 
-                    title={`Стихия: ${astro.element}, Планета: ${astro.planet}. Восточный знак: ${astro.easternElement} ${astro.easternSign}`}
-                  >
-                    <Moon size={15} className="zodiac-icon-spin" />
-                    <span className="zodiac-sign-bold">{astro.sign}</span>
-                    <span className="zodiac-element-pill">{astro.element}</span>
-                    <span className="zodiac-eastern-pill">{astro.easternSign}</span>
+                  <div className="profile-meta-row">
+                    <div 
+                      className="meta-item meta-zodiac" 
+                      title={`Стихия: ${astro.element}, Планета: ${astro.planet}. Восточный знак: ${astro.easternElement} ${astro.easternSign}`}
+                    >
+                      <Moon size={15} className="zodiac-icon-spin" />
+                      <span className="zodiac-sign-bold">{astro.sign}</span>
+                      <span className="zodiac-element-pill">{astro.element}</span>
+                      <span className="zodiac-eastern-pill">{astro.easternSign}</span>
+                    </div>
                   </div>
                 );
               })()}

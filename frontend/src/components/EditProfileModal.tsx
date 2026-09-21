@@ -169,87 +169,97 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
         <input ref={avatarInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarFile} />
         <input ref={coverInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleCoverFile} />
 
-        {/* Modal Header with Tabs */}
-        <div className="edit-modal-top-bar">
-          <div>
-            <h3 className="edit-modal-main-title">Редактировать профиль</h3>
-            <p className="edit-modal-subtitle">Настройте внешний вид, личные данные и духовный статус</p>
+        <div className="edit-modal-sidebar">
+          <div className="edit-sidebar-header">
+            <h2>NEW AGE</h2>
+            <h3>НАСТРОЙКИ</h3>
           </div>
-          <button className="edit-close-x-btn" onClick={onClose} title="Закрыть">
-            <X size={20} />
-          </button>
+          <nav className="edit-sidebar-nav">
+            <button 
+              type="button"
+              className={`edit-tab-item ${activeTab === 'general' ? 'active' : ''}`}
+              onClick={() => setActiveTab('general')}
+            >
+              <UserIcon size={16} />
+              <span>Профиль</span>
+            </button>
+
+            <button 
+              type="button"
+              className={`edit-tab-item ${activeTab === 'spiritual' ? 'active' : ''}`}
+              onClick={() => setActiveTab('spiritual')}
+            >
+              <Sparkles size={16} />
+              <span>Духовный путь</span>
+            </button>
+
+            <button 
+              type="button"
+              className={`edit-tab-item ${activeTab === 'astrology' ? 'active' : ''}`}
+              onClick={() => setActiveTab('astrology')}
+            >
+              <Moon size={16} />
+              <span>Астрология</span>
+            </button>
+
+            <button 
+              type="button"
+              className={`edit-tab-item ${activeTab === 'appearance' ? 'active' : ''}`}
+              onClick={() => setActiveTab('appearance')}
+            >
+              <ImageIcon size={16} />
+              <span>Дизайн</span>
+            </button>
+
+            <button 
+              type="button"
+              className={`edit-tab-item ${activeTab === 'privacy' ? 'active' : ''}`}
+              onClick={() => setActiveTab('privacy')}
+            >
+              <Shield size={16} />
+              <span>Безопасность</span>
+            </button>
+          </nav>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="edit-modal-nav-tabs">
-          <button 
-            type="button"
-            className={`edit-tab-item ${activeTab === 'general' ? 'active' : ''}`}
-            onClick={() => setActiveTab('general')}
-          >
-            <UserIcon size={16} />
-            <span>Основное</span>
-          </button>
+        <div className="edit-modal-content-area">
+          <div className="edit-modal-top-bar">
+            <h3 className="edit-modal-main-title">
+              {activeTab === 'general' && 'Профиль'}
+              {activeTab === 'spiritual' && 'Духовный путь'}
+              {activeTab === 'astrology' && 'Астрология'}
+              {activeTab === 'appearance' && 'Дизайн'}
+              {activeTab === 'privacy' && 'Безопасность'}
+            </h3>
+            <button className="edit-close-x-btn" onClick={onClose} title="Закрыть">
+              <X size={20} />
+            </button>
+          </div>
 
-          <button 
-            type="button"
-            className={`edit-tab-item ${activeTab === 'astrology' ? 'active' : ''}`}
-            onClick={() => setActiveTab('astrology')}
-          >
-            <Moon size={16} />
-            <span>Астрология и Данные</span>
-          </button>
-
-          <button 
-            type="button"
-            className={`edit-tab-item ${activeTab === 'appearance' ? 'active' : ''}`}
-            onClick={() => setActiveTab('appearance')}
-          >
-            <ImageIcon size={16} />
-            <span>Обложка и Аватар</span>
-          </button>
-
-          <button 
-            type="button"
-            className={`edit-tab-item ${activeTab === 'spiritual' ? 'active' : ''}`}
-            onClick={() => setActiveTab('spiritual')}
-          >
-            <Sparkles size={16} />
-            <span>Конфессия и Роль</span>
-          </button>
-
-          <button 
-            type="button"
-            className={`edit-tab-item ${activeTab === 'privacy' ? 'active' : ''}`}
-            onClick={() => setActiveTab('privacy')}
-          >
-            <Shield size={16} />
-            <span>Приватность</span>
-          </button>
-        </div>
-
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="edit-form-content">
-          {/* ========================================================================= */}
-          {/* TAB 1: ОСНОВНОЕ */}
-          {/* ========================================================================= */}
-          {activeTab === 'general' && (
-            <div className="edit-tab-pane">
-              <div className="form-two-cols">
-                <div className="edit-field-group">
-                  <label className="edit-field-label">Имя и Фамилия *</label>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="Например: Алексей Миронов"
-                    className="edit-input-ctrl"
-                  />
+          <form onSubmit={handleSubmit} className="edit-form-content">
+            {/* ========================================================================= */}
+            {/* TAB 1: ПРОФИЛЬ */}
+            {/* ========================================================================= */}
+            {activeTab === 'general' && (
+              <div className="edit-tab-pane">
+                
+                {/* Photo Upload Card */}
+                <div className="edit-photo-card">
+                  <img src={avatar} alt="Avatar" className="edit-photo-img" />
+                  <div className="edit-photo-info">
+                    <span className="edit-photo-label">Фото профиля</span>
+                    <button 
+                      type="button" 
+                      className="btn-change-photo"
+                      onClick={() => avatarInputRef.current?.click()}
+                    >
+                      Изменить фото
+                    </button>
+                  </div>
                 </div>
 
                 <div className="edit-field-group">
-                  <label className="edit-field-label">Имя пользователя (Никнейм) *</label>
+                  <label className="edit-field-label">@ НИКНЕЙМ</label>
                   <div className="input-with-prefix">
                     <span className="input-prefix">@</span>
                     <input
@@ -262,106 +272,99 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
                     />
                   </div>
                 </div>
-              </div>
 
-              {/* Bio Field with Char Counter */}
-              <div className="edit-field-group">
-                <div className="label-with-counter">
-                  <label className="edit-field-label">О себе (Био)</label>
-                  <span className={`char-counter ${bio.length > 280 ? 'warn' : ''}`}>
-                    {bio.length} / 300
-                  </span>
-                </div>
-                <textarea
-                  rows={4}
-                  maxLength={300}
-                  value={bio}
-                  onChange={e => setBio(e.target.value)}
-                  placeholder="Расскажите о себе, ваших практиках, увлечениях и философии жизни..."
-                  className="edit-input-ctrl edit-textarea-ctrl"
-                />
-
-                {/* Quick Bio Tag Pills */}
-                <div className="bio-quick-tags">
-                  <span className="tags-hint">Быстрые теги:</span>
-                  {[
-                    '🧘 Хатха-йога', 
-                    '✨ Медитации 432 Гц', 
-                    '📚 Самопознание', 
-                    '🌿 Осознанность', 
-                    '☀️ Аффирмации', 
-                    '🎵 Саундхилинг'
-                  ].map(tag => (
-                    <button
-                      key={tag}
-                      type="button"
-                      className="bio-tag-chip"
-                      onClick={() => {
-                        if (bio.length + tag.length + 1 <= 300) {
-                          setBio(prev => prev ? `${prev} ${tag}` : tag);
-                        }
-                      }}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Location & Website */}
-              <div className="form-two-cols">
                 <div className="edit-field-group">
-                  <div className="edit-field-header-flex">
-                    <label className="edit-field-label">Город / Страна</label>
-                    <button
-                      type="button"
-                      className="auto-detect-location-btn"
-                      disabled={isDetectingLocation}
-                      onClick={async () => {
-                        setIsDetectingLocation(true);
-                        try {
-                          const res = await detectUserCityAndCountry();
-                          if (res && res.fullLocation) {
-                            setLocation(res.fullLocation);
+                  <label className="edit-field-label">📞 НОМЕР ТЕЛЕФОНА</label>
+                  <input
+                    type="tel"
+                    placeholder="+7 000 000 00 00"
+                    className="edit-input-ctrl"
+                    disabled
+                    value={currentUser.phone_number || ''}
+                    title="Изменение номера телефона пока недоступно"
+                  />
+                </div>
+
+                <div className="edit-field-group">
+                  <label className="edit-field-label">👤 ИМЯ И ФАМИЛИЯ</label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Например: Алексей Миронов"
+                    className="edit-input-ctrl"
+                  />
+                </div>
+
+                {/* Bio Field */}
+                <div className="edit-field-group">
+                  <label className="edit-field-label">О СЕБЕ</label>
+                  <textarea
+                    rows={4}
+                    maxLength={300}
+                    value={bio}
+                    onChange={e => setBio(e.target.value)}
+                    placeholder="Расскажите о себе, ваших практиках, увлечениях..."
+                    className="edit-input-ctrl edit-textarea-ctrl"
+                  />
+                </div>
+
+                {/* Location & Website */}
+                <div className="form-two-cols">
+                  <div className="edit-field-group">
+                    <div className="edit-field-header-flex">
+                      <label className="edit-field-label">📍 Город / Страна</label>
+                      <button
+                        type="button"
+                        className="auto-detect-location-btn"
+                        disabled={isDetectingLocation}
+                        onClick={async () => {
+                          setIsDetectingLocation(true);
+                          try {
+                            const res = await detectUserCityAndCountry();
+                            if (res && res.fullLocation) {
+                              setLocation(res.fullLocation);
+                            }
+                          } finally {
+                            setIsDetectingLocation(false);
                           }
-                        } finally {
-                          setIsDetectingLocation(false);
-                        }
-                      }}
-                      title="Определить город и страну автоматически"
-                    >
-                      <Compass size={12} className={isDetectingLocation ? 'spin-anim' : ''} />
-                      {isDetectingLocation ? 'Определяем...' : 'Автоопределить'}
-                    </button>
+                        }}
+                        title="Определить город и страну автоматически"
+                      >
+                        <Compass size={12} className={isDetectingLocation ? 'spin-anim' : ''} />
+                        {isDetectingLocation ? 'Определяем...' : 'Автоопределить'}
+                      </button>
+                    </div>
+                    <div className="input-with-icon-left">
+                      <MapPin size={16} className="input-icon-left" />
+                      <input
+                        type="text"
+                        value={location}
+                        onChange={e => setLocation(e.target.value)}
+                        placeholder="Санкт-Петербург, Россия"
+                        className="edit-input-ctrl has-icon"
+                      />
+                    </div>
                   </div>
-                  <div className="input-with-icon-left">
-                    <MapPin size={16} className="input-icon-left" />
-                    <input
-                      type="text"
-                      value={location}
-                      onChange={e => setLocation(e.target.value)}
-                      placeholder="Санкт-Петербург, Россия"
-                      className="edit-input-ctrl has-icon"
-                    />
+
+                  <div className="edit-field-group">
+                    <label className="edit-field-label">🌐 Веб-сайт / Ссылка</label>
+                    <div className="input-with-icon-left">
+                      <Globe size={16} className="input-icon-left" />
+                      <input
+                        type="url"
+                        value={website}
+                        onChange={e => setWebsite(e.target.value)}
+                        placeholder="https://t.me/my_channel"
+                        className="edit-input-ctrl has-icon"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="edit-field-group">
-                  <label className="edit-field-label">Веб-сайт / Ссылка</label>
-                  <div className="input-with-icon-left">
-                    <Globe size={16} className="input-icon-left" />
-                    <input
-                      type="url"
-                      value={website}
-                      onChange={e => setWebsite(e.target.value)}
-                      placeholder="https://t.me/my_channel"
-                      className="edit-input-ctrl has-icon"
-                    />
-                  </div>
-                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* ========================================================================= */}
           {/* TAB: АСТРОЛОГИЯ И ДАННЫЕ (ДАТА РОЖДЕНИЯ, ЗНАК ЗОДИАКА, ПОЛ) */}
@@ -717,26 +720,14 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
 
           {/* ========================================================================= */}
           {/* MODAL FOOTER ACTION BAR */}
-          {/* ========================================================================= */}
-          <div className="edit-modal-footer">
-            <div className="footer-left-status">
-              <span className="status-dot-emerald" />
-              <span>Все изменения готовы к сохранению</span>
-            </div>
-
-            <div className="footer-actions-group">
-              <button type="button" className="btn-edit-cancel" onClick={onClose}>
-                Отмена
-              </button>
-
-              <button type="submit" className="btn-edit-save">
-                <Sparkles size={16} />
-                <span>Сохранить профиль</span>
-              </button>
-            </div>
+          <div className="edit-modal-footer-single">
+            <button type="submit" className="btn-edit-save-massive">
+              Сохранить изменения
+            </button>
           </div>
         </form>
       </div>
+    </div>
     </div>
   );
 }

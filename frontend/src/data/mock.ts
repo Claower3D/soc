@@ -144,6 +144,7 @@ export interface User {
   showZodiac?: boolean; // Показывать знак зодиака
   isPremium?: boolean; // New Age Premium подписка
   premiumSince?: string; // Дата оформления Premium
+  phone_number?: string; // Номер телефона
 }
 
 export interface Highlight {
