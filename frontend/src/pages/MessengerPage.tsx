@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChatList } from '../components/ChatList';
 import { ChatWindowNew } from '../components/ChatWindowNew';
@@ -15,7 +15,7 @@ const AI_ORACLE_CHAT: Chat = {
     id: 'ai_oracle',
     name: 'ИИ Оракул',
     username: 'ai_oracle',
-    avatar: '',
+    avatar: '/ai_avatar.jpg',
     online: true,
     verified: true,
     followersCount: 0,
@@ -53,7 +53,7 @@ function normalizeChat(c: any): Chat | null {
       id: String(c.id || ''),
       name: String(c.name || 'Чат'),
       username: '',
-      avatar: '',
+      avatar: '/ai_avatar.jpg',
       online: false,
     },
     messages: Array.isArray(c.messages) ? c.messages : [],
@@ -203,3 +203,4 @@ export function MessengerPage() {
     </div>
   );
 }
+
