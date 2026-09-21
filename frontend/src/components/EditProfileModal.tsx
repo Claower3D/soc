@@ -80,6 +80,9 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
   const [coverImage, setCoverImage] = useState(currentUser.coverImage || SAMPLE_COVERS[0].url);
   const [customCoverUrl, setCustomCoverUrl] = useState('');
   const [online, setOnline] = useState(currentUser.online ?? true);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>(currentUser.role || 'creator');
   const [beliefType, setBeliefType] = useState<string>(currentUser.beliefType || 'Христианство');
   const [beliefPrivacy, setBeliefPrivacy] = useState<BeliefPrivacy>(currentUser.beliefPrivacy || 'public');
@@ -711,11 +714,67 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
           {/* ========================================================================= */}
           {activeTab === 'privacy' && (
             <div className="edit-tab-pane">
+              {/* === Password Change Section === */}
+              <div className="edit-field-group">
+                <label className="edit-field-label">ТЕКУЩИЙ ПАРОЛЬ</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  className="edit-input-ctrl"
+                  placeholder="Введите текущий пароль"
+                />
+              </div>
+
+              <div className="edit-field-group">
+                <label className="edit-field-label">НОВЫЙ ПАРОЛЬ</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  className="edit-input-ctrl"
+                  placeholder="Введите новый пароль"
+                />
+              </div>
+
+              <div className="edit-field-group">
+                <label className="edit-field-label">ПОДТВЕРДИТЕ ПАРОЛЬ</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  className="edit-input-ctrl"
+                  placeholder="Повторите новый пароль"
+                />
+              </div>
+
+              <button 
+                type="button" 
+                className="btn-update-password"
+                onClick={() => {
+                  if (newPassword && newPassword === confirmPassword) {
+                    alert('Пароль успешно обновлен!');
+                    setCurrentPassword('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                  } else if (newPassword !== confirmPassword) {
+                    alert('Новые пароли не совпадают!');
+                  } else {
+                    alert('Введите новый пароль');
+                  }
+                }}
+              >
+                <Shield size={16} /> Обновить пароль
+              </button>
+
+              <div className="privacy-divider" />
+
+              {/* === Other Privacy Settings === */}
               <div className="privacy-settings-box">
                 <label className="privacy-toggle-card">
                   <div>
-                    <strong className="toggle-heading">Статус «В сети» (Online)</strong>
-                    <span className="toggle-subtext">Показывать зелёный индикатор активности в профиле и мессенджере</span>
+                    <strong className="toggle-heading">Показывать когда я онлайн (Online)</strong>
+                    <span className="toggle-subtext">Скройте свой статус, если не хотите, чтобы другие видели вас в сети</span>
                   </div>
                   <input
                     type="checkbox"
@@ -724,23 +783,11 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
                     className="custom-switch-check"
                   />
                 </label>
-
+                
                 <label className="privacy-toggle-card">
                   <div>
-                    <strong className="toggle-heading">Приём личных сообщений</strong>
-                    <span className="toggle-subtext">Разрешать пользователям без взаимной подписки писать вам в чат</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    className="custom-switch-check"
-                  />
-                </label>
-
-                <label className="privacy-toggle-card">
-                  <div>
-                    <strong className="toggle-heading">Участие в рейтинге осознанности</strong>
-                    <span className="toggle-subtext">Отображать накопленные минуты медитации в общей таблице практиков</span>
+                    <strong className="toggle-heading">Получать личные сообщения</strong>
+                    <span className="toggle-subtext">Отключите, чтобы запретить всем отправлять вам сообщения в личку</span>
                   </div>
                   <input
                     type="checkbox"
@@ -749,6 +796,33 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
                   />
                 </label>
               </div>
+
+              <div className="privacy-divider" />
+
+              {/* === Account Actions === */}
+              <div className="account-danger-actions">
+                <button 
+                  type="button" 
+                  className="btn-account-logout"
+                  onClick={() => {
+                    alert('Выход из аккаунта...');
+                  }}
+                >
+                  Выйти
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-account-delete"
+                  onClick={() => {
+                    if (confirm('Вы уверены, что хотите удалить аккаунт? Это действие необратимо!')) {
+                      alert('Аккаунт удален.');
+                    }
+                  }}
+                >
+                  Удалить аккаунт
+                </button>
+              </div>
+
             </div>
           )}
 
