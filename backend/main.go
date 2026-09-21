@@ -3104,17 +3104,62 @@ func handleDeletePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	postID := r.PathValue("id")
+	deleted := false
+
 	if db != nil {
-		var authorID string
-		err := db.QueryRow("SELECT user_id FROM posts WHERE id = $1", postID).Scan(&authorID)
-		if err == nil && (authorID == claims.UserID || claims.Role == "admin") {
-			db.Exec("DELETE FROM posts WHERE id = $1", postID)
-			db.Exec("UPDATE users SET posts_count = posts_count - 1 WHERE id = $1", authorID)
-			writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Пост удален"})
-			return
+		var authorID, authorUsername string
+		err := db.QueryRow(`
+			SELECT p.user_id, COALESCE(u.username, '') 
+			FROM posts p 
+			LEFT JOIN users u ON p.user_id = u.id 
+			WHERE p.id = $1
+		`, postID).Scan(&authorID, &authorUsername)
+		if err == nil {
+			isOwner := authorID == claims.UserID || 
+				strings.EqualFold(authorUsername, claims.Username) || 
+				claims.Role == "admin"
+			if isOwner {
+				db.Exec("DELETE FROM posts WHERE id = $1", postID)
+				db.Exec("UPDATE users SET posts_count = GREATEST(posts_count - 1, 0) WHERE id = $1", authorID)
+				deleted = true
+			}
 		}
 	}
-	writeJSON(w, http.StatusForbidden, Response{Status: "error", Message: "Нет прав для удаления"})
+
+	// Always sync with persistent store
+	store.mu.Lock()
+	var updatedPosts []Post
+	for _, p := range store.posts {
+		if p.ID == postID {
+			isOwner := p.UserID == claims.UserID || 
+				strings.EqualFold(p.User.Username, claims.Username) || 
+				claims.Role == "admin"
+			if isOwner {
+				deleted = true
+				if acc, ok := store.accounts[p.UserID]; ok {
+					if acc.User.PostsCount > 0 {
+						acc.User.PostsCount--
+						store.accounts[p.UserID] = acc
+					}
+				}
+				continue
+			}
+		}
+		updatedPosts = append(updatedPosts, p)
+	}
+	if deleted {
+		store.posts = updatedPosts
+		store.saveToDisk()
+	}
+	store.mu.Unlock()
+
+	if deleted {
+		globalCache.InvalidateTag("feed")
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Публикация успешно удалена"})
+		return
+	}
+
+	writeJSON(w, http.StatusForbidden, Response{Status: "error", Message: "Нет прав для удаления или публикация не найдена"})
 }
 
 func handleStories(w http.ResponseWriter, r *http.Request) {

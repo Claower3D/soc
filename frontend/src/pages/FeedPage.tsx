@@ -67,6 +67,22 @@ export function FeedPage() {
     return () => window.removeEventListener('post_created', handlePostCreated);
   }, []);
 
+  useEffect(() => {
+    const handlePostDeleted = (e: any) => {
+      const deletedId = e.detail?.postId;
+      if (deletedId) {
+        setFeedPosts(prev => {
+          const updated = prev.filter(p => p.id !== deletedId);
+          cacheService.set('feed_posts_cache', updated, 3600 * 24, 'feed');
+          return updated;
+        });
+        setSelectedPost(null);
+      }
+    };
+    window.addEventListener('post_deleted', handlePostDeleted);
+    return () => window.removeEventListener('post_deleted', handlePostDeleted);
+  }, []);
+
   const [feedStories, setFeedStories] = useState<Story[]>(() => {
     return cacheService.get<Story[]>('feed_stories_cache') || [];
   });
@@ -422,6 +438,14 @@ export function FeedPage() {
           onUpdatePost={(updated) => {
             setSelectedPost(updated);
             setFeedPosts(prev => prev.map(p => p.id === updated.id ? updated : p));
+          }}
+          onDeletePost={(postId) => {
+            setFeedPosts(prev => {
+              const updated = prev.filter(p => p.id !== postId);
+              cacheService.set('feed_posts_cache', updated, 3600 * 24, 'feed');
+              return updated;
+            });
+            setSelectedPost(null);
           }}
         />
       )}

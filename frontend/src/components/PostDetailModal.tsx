@@ -7,6 +7,7 @@ import {
 import { type Post, type Comment } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { PremiumBadge } from './PremiumBadge';
+import { api } from '../api';
 import './PostDetailModal.css';
 
 interface PostDetailModalProps {
@@ -14,11 +15,12 @@ interface PostDetailModalProps {
   onClose: () => void;
   onLikePost: (postId: string) => void;
   onUpdatePost?: (updatedPost: Post) => void;
+  onDeletePost?: (postId: string) => void;
 }
 
 const quickEmojis = ['❤️', '🔥', '👏', '😍', '☕', '✨', '🚀', '👍'];
 
-export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: PostDetailModalProps) {
+export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDeletePost }: PostDetailModalProps) {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated, openAuthModal } = useAuth();
   const [commentText, setCommentText] = useState('');
@@ -31,6 +33,36 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
 
   const inputRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
+  const [showDeletePostModal, setShowDeletePostModal] = useState(false);
+  const [isDeletingPost, setIsDeletingPost] = useState(false);
+
+  const isPostOwner = Boolean(
+    currentUser && post && (
+      post.user?.id === 'me' || 
+      post.user?.id === currentUser.id || 
+      (post as any)?.userId === currentUser.id ||
+      (post.user?.username && currentUser.username && post.user.username.replace(/^@+/, '').toLowerCase() === currentUser.username.replace(/^@+/, '').toLowerCase()) ||
+      currentUser.role === 'admin'
+    )
+  );
+
+  const handleDeletePostAction = async () => {
+    if (!post || isDeletingPost) return;
+    setIsDeletingPost(true);
+    try {
+      await api.posts.delete(post.id);
+      if (onDeletePost) {
+        onDeletePost(post.id);
+      }
+      window.dispatchEvent(new CustomEvent('post_deleted', { detail: { postId: post.id } }));
+      setShowDeletePostModal(false);
+      onClose();
+    } catch (err: any) {
+      alert(err?.message || 'Не удалось удалить публикацию');
+    } finally {
+      setIsDeletingPost(false);
+    }
+  };
 
   useEffect(() => {
     if (post) {
@@ -161,6 +193,18 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
                 </div>
               </div>
             </div>
+
+            {isPostOwner && (
+              <button 
+                type="button"
+                className="btn-modal-delete-post"
+                onClick={() => setShowDeletePostModal(true)}
+                title="Удалить публикацию"
+              >
+                <Trash2 size={15} />
+                <span>Удалить</span>
+              </button>
+            )}
           </div>
 
           {/* Comments & Caption Scroll Area */}
@@ -411,6 +455,37 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost }: Pos
                 onClick={() => handleDeleteComment(commentToDelete)}
               >
                 Удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Post Confirmation Modal */}
+      {showDeletePostModal && (
+        <div className="comment-delete-modal-overlay" onClick={() => !isDeletingPost && setShowDeletePostModal(false)}>
+          <div className="comment-delete-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="delete-badge">
+              <Trash2 size={24} />
+            </div>
+            <h4>Удалить публикацию?</h4>
+            <p>Вы уверены, что хотите удалить эту запись? Она исчезнет из вашего профиля и ленты.</p>
+            <div className="comment-delete-modal-actions">
+              <button 
+                type="button"
+                className="btn-cancel" 
+                onClick={() => setShowDeletePostModal(false)}
+                disabled={isDeletingPost}
+              >
+                Отмена
+              </button>
+              <button 
+                type="button"
+                className="btn-delete" 
+                onClick={handleDeletePostAction}
+                disabled={isDeletingPost}
+              >
+                {isDeletingPost ? 'Удаление...' : 'Да, удалить'}
               </button>
             </div>
           </div>

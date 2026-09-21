@@ -128,6 +128,24 @@ export function ProfilePage() {
     return () => window.removeEventListener('post_created', handlePostCreated);
   }, []);
 
+  useEffect(() => {
+    const handlePostDeleted = (e: any) => {
+      const deletedId = e.detail?.postId;
+      if (deletedId) {
+        setProfilePosts(prev => {
+          const updated = prev.filter(p => p.id !== deletedId);
+          try {
+            localStorage.setItem('new_age_user_posts', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+        setSelectedPost(null);
+      }
+    };
+    window.addEventListener('post_deleted', handlePostDeleted);
+    return () => window.removeEventListener('post_deleted', handlePostDeleted);
+  }, []);
+
   const handleDeleteStory = (storyId: string) => {
     setProfileStories(prev => {
       const updated = prev.filter(s => s.id !== storyId);
@@ -1198,6 +1216,16 @@ export function ProfilePage() {
           }}
           onUpdatePost={(updated) => {
             setSelectedPost(updated);
+          }}
+          onDeletePost={(postId) => {
+            setProfilePosts(prev => {
+              const updated = prev.filter(p => p.id !== postId);
+              try {
+                localStorage.setItem('new_age_user_posts', JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
+            setSelectedPost(null);
           }}
         />
       )}
