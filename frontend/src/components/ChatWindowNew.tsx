@@ -67,7 +67,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         time: formatTime(),
         status: 'sent',
         mediaUrl: reader.result as string,
-        mediaType: isVideo ? 'video_note' : 'image',
+        mediaType: isVideo ? 'video' : 'image',
       };
       const updatedMessages = [...messages, newMsg];
       setMessages(updatedMessages);
@@ -324,19 +324,28 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                     </div>
                   )}
                   
-                  {msg.mediaType === 'image' && msg.mediaUrl && (
+                                    {msg.mediaType === 'image' && msg.mediaUrl && (
                     <img src={msg.mediaUrl} alt="Attachment" style={{maxWidth: '100%', borderRadius: '8px', marginBottom: '4px'}} />
                   )}
-                  {msg.mediaType === 'video_note' && msg.mediaUrl && (
+                  {msg.mediaType === 'video' && msg.mediaUrl && (
                     <video src={msg.mediaUrl} controls style={{maxWidth: '100%', borderRadius: '8px', marginBottom: '4px'}} />
                   )}
+                  {msg.mediaType === 'video_note' && msg.mediaUrl && (
+                    <div style={{width: '240px', height: '240px', borderRadius: '50%', overflow: 'hidden', margin: '0 auto 4px auto', position: 'relative', background: '#000'}}>
+                      <video src={msg.mediaUrl} autoPlay loop muted playsInline style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                    </div>
+                  )}
                   {msg.mediaType === 'voice' && (
-                    <div style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px'}}>
-                      <div style={{width: '30px', height: '30px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                        <Mic size={16} />
+                    <div style={{display: 'flex', alignItems: 'center', gap: '12px', minWidth: '180px', marginBottom: '4px'}}>
+                      <div style={{width: '36px', height: '36px', borderRadius: '50%', background: isMe ? 'rgba(255,255,255,0.2)' : 'var(--color-accent, #6C5CE7)22', color: isMe ? '#fff' : 'var(--color-accent, #6C5CE7)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer'}}>
+                        <div style={{width: 0, height: 0, borderTop: '6px solid transparent', borderBottom: '6px solid transparent', borderLeft: '10px solid currentColor', marginLeft: '3px'}}></div>
                       </div>
-                      <div style={{height: '2px', background: 'rgba(255,255,255,0.5)', width: '100px'}}></div>
-                      <span style={{fontSize: '12px'}}>0:05</span>
+                      <div style={{flex: 1, display: 'flex', flexDirection: 'column', gap: '4px'}}>
+                        <div style={{height: '3px', background: isMe ? 'rgba(255,255,255,0.4)' : 'var(--color-border)', width: '100%', borderRadius: '2px', position: 'relative'}}>
+                           <div style={{position: 'absolute', left: 0, top: 0, height: '100%', width: '30%', background: isMe ? '#fff' : 'var(--color-accent, #6C5CE7)', borderRadius: '2px'}}></div>
+                        </div>
+                        <span style={{fontSize: '11px', opacity: 0.8}}>0:05</span>
+                      </div>
                     </div>
                   )}
                   {text && <div className="cw-bubble-text">{text}</div>}
@@ -435,7 +444,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         
         {isRecording ? (
           <div style={{flex: 1, padding: '10px 16px', color: '#ff3b30', fontWeight: 'bold', animation: 'pulse 1s infinite'}}>
-            Р—Р°РїРёСЃСЊ...
+            Запись...
           </div>
         ) : (
           <input
@@ -444,7 +453,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="РЎРѕРѕР±С‰РµРЅРёРµ..."
+            placeholder="Сообщение..."
             className="cw-input"
           />
         )}
