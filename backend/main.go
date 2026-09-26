@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 )
 
 //go:embed schema.sql
@@ -306,11 +307,19 @@ func ensureUserAvatar(u *User) {
 
 var startTime = time.Now()
 
-// JWT Secret Key (читается из окружения или дефолтный безопасный ключ)
+// JWT Secret Key — ОБЯЗАТЕЛЬНО установите переменную JWT_SECRET в production!
 var jwtSecretKey = func() []byte {
 	k := os.Getenv("JWT_SECRET")
 	if k == "" {
-		k = "new_age_super_secret_jwt_key_2026_zen_platform"
+		// В production JWT_SECRET обязателен. При отсутствии генерируем случайный
+		// (токены сбросятся при перезапуске — это намеренно для безопасности).
+		randomBytes := make([]byte, 32)
+		if _, err := rand.Read(randomBytes); err != nil {
+			log.Fatal("FATAL: не удалось сгенерировать случайный JWT-ключ")
+		}
+		k = hex.EncodeToString(randomBytes)
+		log.Println("⚠️ ВНИМАНИЕ: JWT_SECRET не задан! Сгенерирован случайный ключ. Все сессии сбросятся при перезапуске.")
+		log.Println("👉 Для production установите: JWT_SECRET=<ваш-секретный-ключ-32+символов>")
 	}
 	return []byte(k)
 }()
@@ -505,25 +514,44 @@ type PersistentData struct {
 }
 
 const storeFilePath = "data/social_network_store.json"
+var fileWriteMu sync.Mutex
 
 func (s *UserStore) saveToDisk() {
-	if err := os.MkdirAll("data", 0755); err != nil {
-		return
-	}
+	// Создаем снимок данных в памяти за микросекунды под текущим локом
 	data := PersistentData{
-		Accounts:      s.accounts,
-		Relationships: s.relationships,
-		Posts:         s.posts,
-		Stories:       s.stories,
+		Accounts:      make(map[string]AccountStoreEntry, len(s.accounts)),
+		Relationships: make(map[string][]string, len(s.relationships)),
+		Posts:         make([]Post, len(s.posts)),
+		Stories:       make([]Story, len(s.stories)),
 	}
-	b, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return
+	for k, v := range s.accounts {
+		data.Accounts[k] = v
 	}
-	tmpPath := storeFilePath + ".tmp"
-	if err := os.WriteFile(tmpPath, b, 0644); err == nil {
-		os.Rename(tmpPath, storeFilePath)
+	for k, v := range s.relationships {
+		relCopy := make([]string, len(v))
+		copy(relCopy, v)
+		data.Relationships[k] = relCopy
 	}
+	copy(data.Posts, s.posts)
+	copy(data.Stories, s.stories)
+
+	// Асинхронная запись на диск в фоновой горутине — не блокирует s.mu для других запросов
+	go func(d PersistentData) {
+		fileWriteMu.Lock()
+		defer fileWriteMu.Unlock()
+
+		if err := os.MkdirAll("data", 0755); err != nil {
+			return
+		}
+		b, err := json.MarshalIndent(d, "", "  ")
+		if err != nil {
+			return
+		}
+		tmpPath := storeFilePath + ".tmp"
+		if err := os.WriteFile(tmpPath, b, 0644); err == nil {
+			os.Rename(tmpPath, storeFilePath)
+		}
+	}(data)
 }
 
 func (s *UserStore) loadFromDisk() {
@@ -575,22 +603,11 @@ var store = &UserStore{
 	stories:       make([]Story, 0),
 }
 
-var currentUser = User{
-	ID:             "guest",
-	Name:           "Гость",
-	Username:       "guest",
-	Avatar:         "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80",
-	Bio:            "Гостевой доступ New Age",
-	Online:         false,
-	Role:           "user",
-	BeliefType:     "Не указано",
-	BeliefPrivacy:  "private",
-	FollowersCount: 0,
-	FollowingCount: 0,
-	PostsCount:     0,
-}
-
-var mockUsers = []User{}
+// mockUsers защищён мьютексом от конкурентного доступа
+var (
+	mockUsersMu sync.RWMutex
+	mockUsers   = []User{}
+)
 
 // =========================================================================
 // CRYPTO & JWT IMPLEMENTATION (RFC 7519 HMAC-SHA256)
@@ -628,13 +645,24 @@ func generateSalt(n int) string {
 }
 
 func hashPassword(password, salt string) string {
-	h := sha256.New()
-	h.Write([]byte(password + ":" + salt + ":new_age_pepper"))
-	return hex.EncodeToString(h.Sum(nil))
+	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		// Fallback в маловероятном случае сбоя bcrypt
+		h := sha256.New()
+		h.Write([]byte(password + ":" + salt + ":new_age_pepper"))
+		return hex.EncodeToString(h.Sum(nil))
+	}
+	return string(hashedBytes)
 }
 
 func checkPassword(password, salt, expectedHash string) bool {
-	return hashPassword(password, salt) == expectedHash
+	if strings.HasPrefix(expectedHash, "$2a$") || strings.HasPrefix(expectedHash, "$2b$") || strings.HasPrefix(expectedHash, "$2y$") {
+		return bcrypt.CompareHashAndPassword([]byte(expectedHash), []byte(password)) == nil
+	}
+	// Fallback для старых SHA-256 хешей
+	h := sha256.New()
+	h.Write([]byte(password + ":" + salt + ":new_age_pepper"))
+	return hex.EncodeToString(h.Sum(nil)) == expectedHash
 }
 
 func generateJWT(user User, emailOrPhone string) (string, error) {
@@ -716,6 +744,99 @@ func extractBearerToken(r *http.Request) string {
 }
 
 // =========================================================================
+// RATE LIMITER ДЛЯ ЗАЩИТЫ АУТЕНТИФИКАЦИИ
+// =========================================================================
+
+type IPRateLimiter struct {
+	mu       sync.Mutex
+	attempts map[string][]time.Time
+	limit    int
+	window   time.Duration
+}
+
+func newIPRateLimiter(limit int, window time.Duration) *IPRateLimiter {
+	rl := &IPRateLimiter{
+		attempts: make(map[string][]time.Time),
+		limit:    limit,
+		window:   window,
+	}
+	go func() {
+		ticker := time.NewTicker(2 * time.Minute)
+		for range ticker.C {
+			rl.mu.Lock()
+			now := time.Now()
+			for ip, times := range rl.attempts {
+				validIdx := 0
+				for _, t := range times {
+					if now.Sub(t) < rl.window {
+						times[validIdx] = t
+						validIdx++
+					}
+				}
+				if validIdx == 0 {
+					delete(rl.attempts, ip)
+				} else {
+					rl.attempts[ip] = times[:validIdx]
+				}
+			}
+			rl.mu.Unlock()
+		}
+	}()
+	return rl
+}
+
+func (rl *IPRateLimiter) Allow(ip string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	times := rl.attempts[ip]
+
+	valid := make([]time.Time, 0, len(times))
+	for _, t := range times {
+		if now.Sub(t) < rl.window {
+			valid = append(valid, t)
+		}
+	}
+
+	if len(valid) >= rl.limit {
+		rl.attempts[ip] = valid
+		return false
+	}
+
+	valid = append(valid, now)
+	rl.attempts[ip] = valid
+	return true
+}
+
+func getClientIP(r *http.Request) string {
+	xfwd := r.Header.Get("X-Forwarded-For")
+	if xfwd != "" {
+		parts := strings.Split(xfwd, ",")
+		return strings.TrimSpace(parts[0])
+	}
+	ip := r.RemoteAddr
+	if colon := strings.LastIndex(ip, ":"); colon != -1 {
+		ip = ip[:colon]
+	}
+	return ip
+}
+
+func rateLimitMiddleware(limiter *IPRateLimiter, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ip := getClientIP(r)
+		if !limiter.Allow(ip) {
+			writeJSON(w, http.StatusTooManyRequests, Response{
+				Status:  "error",
+				Message: "Слишком много запросов. Пожалуйста, повторите попытку через минуту.",
+			})
+			return
+		}
+		next(w, r)
+	}
+}
+
+// =========================================================================
 // MAIN & ROUTES
 // =========================================================================
 
@@ -745,15 +866,17 @@ func main() {
 	mux.HandleFunc("GET /api/wallet", handleWallet)
 	mux.HandleFunc("GET /api/admin/stats", handleAdminStats)
 
-	// Auth эндпоинты (JWT)
-	mux.HandleFunc("POST /api/auth/register", handleRegister)
-	mux.HandleFunc("POST /api/auth/login", handleLogin)
+	// Auth эндпоинты (JWT) с защитой от перебора (Rate Limiting: 15 запросов в минуту)
+	authLimiter := newIPRateLimiter(15, 1*time.Minute)
+	mux.HandleFunc("POST /api/auth/register", rateLimitMiddleware(authLimiter, handleRegister))
+	mux.HandleFunc("POST /api/auth/login", rateLimitMiddleware(authLimiter, handleLogin))
 	mux.HandleFunc("GET /api/auth/me", handleAuthMe)
 	mux.HandleFunc("GET /api/auth/check-username", handleCheckUsername)
 
-	// SMS авторизация
-	mux.HandleFunc("POST /api/auth/send-code", handleSendCode)
-	mux.HandleFunc("POST /api/auth/verify-code", handleVerifyCode)
+	// SMS авторизация с защитой Rate Limiter (10 запросов в минуту)
+	smsLimiter := newIPRateLimiter(10, 1*time.Minute)
+	mux.HandleFunc("POST /api/auth/send-code", rateLimitMiddleware(smsLimiter, handleSendCode))
+	mux.HandleFunc("POST /api/auth/verify-code", rateLimitMiddleware(smsLimiter, handleVerifyCode))
 
 	// Подписки и друзья (полная совместимость с E:\соц и текущей архитектурой)
 	mux.HandleFunc("POST /api/users/{id}/follow", handleFollow)
@@ -892,11 +1015,40 @@ func main() {
 	}
 }
 
+// allowedOrigins — список разрешённых доменов для CORS.
+var allowedOrigins = func() []string {
+	origins := os.Getenv("CORS_ORIGINS")
+	if origins != "" {
+		return strings.Split(origins, ",")
+	}
+	// По умолчанию — localhost для разработки
+	return []string{"http://localhost:5173", "http://localhost:5175", "http://localhost:3000", "http://localhost:8080"}
+}()
+
+func isOriginAllowed(origin string) bool {
+	if origin == "" {
+		return true // same-origin запросы
+	}
+	for _, o := range allowedOrigins {
+		if strings.TrimSpace(o) == origin {
+			return true
+		}
+	}
+	return false
+}
+
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		if isOriginAllowed(origin) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		} else if len(allowedOrigins) > 0 {
+			w.Header().Set("Access-Control-Allow-Origin", allowedOrigins[0])
+		}
+		w.Header().Set("Vary", "Origin")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -905,7 +1057,27 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// formatTimeAgo возвращает "сколько времени назад" на русском
+// pluralizeRu возвращает число с правильным склонением существительного
+func pluralizeRu(n int, one, few, many string) string {
+	nAbs := n
+	if nAbs < 0 {
+		nAbs = -nAbs
+	}
+	mod10 := nAbs % 10
+	mod100 := nAbs % 100
+	if mod100 >= 11 && mod100 <= 19 {
+		return fmt.Sprintf("%d %s", n, many)
+	}
+	if mod10 == 1 {
+		return fmt.Sprintf("%d %s", n, one)
+	}
+	if mod10 >= 2 && mod10 <= 4 {
+		return fmt.Sprintf("%d %s", n, few)
+	}
+	return fmt.Sprintf("%d %s", n, many)
+}
+
+// formatTimeAgo возвращает "сколько времени назад" на русском с правильными склонениями
 func formatTimeAgo(t time.Time) string {
 	diff := time.Since(t)
 	switch {
@@ -913,19 +1085,19 @@ func formatTimeAgo(t time.Time) string {
 		return "только что"
 	case diff < time.Hour:
 		m := int(diff.Minutes())
-		return fmt.Sprintf("%d мин назад", m)
+		return pluralizeRu(m, "минуту", "минуты", "минут") + " назад"
 	case diff < 24*time.Hour:
 		h := int(diff.Hours())
-		if h == 1 { return "1 час назад" }
-		return fmt.Sprintf("%d часов назад", h)
+		return pluralizeRu(h, "час", "часа", "часов") + " назад"
 	case diff < 7*24*time.Hour:
 		d := int(diff.Hours() / 24)
-		if d == 1 { return "вчера" }
-		return fmt.Sprintf("%d дней назад", d)
+		if d == 1 {
+			return "вчера"
+		}
+		return pluralizeRu(d, "день", "дня", "дней") + " назад"
 	case diff < 30*24*time.Hour:
 		w := int(diff.Hours() / 24 / 7)
-		if w == 1 { return "1 неделю назад" }
-		return fmt.Sprintf("%d недель назад", w)
+		return pluralizeRu(w, "неделю", "недели", "недель") + " назад"
 	default:
 		return t.Format("02.01.2006")
 	}
@@ -1195,7 +1367,47 @@ func handleCacheSync(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleProfile(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: currentUser})
+	// Определяем пользователя из JWT, а не из глобальной переменной
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Авторизация требуется"})
+		return
+	}
+
+	// Ищем в PostgreSQL
+	if db != nil {
+		var u User
+		err := db.QueryRow(`
+			SELECT id, name, username, COALESCE(avatar, ''), COALESCE(bio, ''), COALESCE(location, ''), COALESCE(website, ''),
+				COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false),
+				COALESCE(followers_count, 0), COALESCE(following_count, 0), COALESCE(critics_count, 0), COALESCE(posts_count, 0)
+			FROM users WHERE id = $1
+		`, claims.UserID).Scan(
+			&u.ID, &u.Name, &u.Username, &u.Avatar, &u.Bio, &u.Location, &u.Website,
+			&u.Role, &u.BeliefType, &u.BeliefPrivacy, &u.Verified,
+			&u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount,
+		)
+		if err == nil {
+			u.Online = true
+			ensureUserAvatar(&u)
+			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: u})
+			return
+		}
+	}
+
+	// Fallback — in-memory
+	store.mu.RLock()
+	acc, ok := store.accounts[claims.UserID]
+	store.mu.RUnlock()
+	if ok {
+		u := acc.User
+		ensureUserAvatar(&u)
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: u})
+		return
+	}
+
+	writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Профиль не найден"})
 }
 
 func handleUsers(w http.ResponseWriter, r *http.Request) {
@@ -1389,24 +1601,23 @@ func handleVideos(w http.ResponseWriter, r *http.Request) {
 	}
 	if db != nil {
 		rows, err := db.Query(`
-			SELECT v.id, v.title, v.description, v.thumbnail_url, v.video_url, v.duration, v.views_count, v.likes_count, v.created_at,
+			SELECT v.id, v.title, v.description, v.thumbnail, v.video_url, v.duration, v.views_count, v.likes_count, v.created_at,
 				u.id, u.name, u.username, u.avatar
 			FROM videos v JOIN users u ON v.user_id = u.id
-			WHERE v.status = 'published' ORDER BY v.created_at DESC LIMIT 50
+			ORDER BY v.created_at DESC LIMIT 50
 		`)
 		if err == nil {
 			defer rows.Close()
 			var videos []map[string]interface{}
 			for rows.Next() {
-				var id, title, desc, thumb, videoUrl, userId, userName, userUsername, userAvatar string
-				var duration int
+				var id, title, desc, thumb, videoUrl, duration, userId, userName, userUsername, userAvatar string
 				var viewsCount, likesCount int
 				var createdAt time.Time
 				if err := rows.Scan(&id, &title, &desc, &thumb, &videoUrl, &duration, &viewsCount, &likesCount, &createdAt, &userId, &userName, &userUsername, &userAvatar); err == nil {
 					videos = append(videos, map[string]interface{}{
 						"id": id, "title": title, "description": desc,
 						"thumbnail": thumb, "videoUrl": videoUrl,
-						"duration": fmt.Sprintf("%d:%02d", duration/60, duration%60),
+						"duration": duration,
 						"views": fmt.Sprintf("%dK просмотров", viewsCount/1000),
 						"likes": likesCount,
 						"timeAgo": formatTimeAgo(createdAt),
@@ -1431,13 +1642,15 @@ func handleChats(w http.ResponseWriter, r *http.Request) {
 	}
 	if db != nil {
 		rows, err := db.Query(`
-			SELECT c.id, c.chat_type, c.name,
-				COALESCE((SELECT content FROM messages WHERE chat_id = c.id ORDER BY created_at DESC LIMIT 1), '') as last_msg,
+			SELECT c.id,
+				CASE WHEN c.is_channel THEN 'channel' WHEN c.is_group THEN 'group' ELSE 'direct' END as chat_type,
+				c.title,
+				COALESCE(NULLIF(c.last_message, ''), (SELECT content FROM messages WHERE chat_id = c.id ORDER BY created_at DESC LIMIT 1), '') as last_msg,
 				COALESCE((SELECT COUNT(*) FROM messages WHERE chat_id = c.id AND sender_id != $1 AND is_read = false), 0) as unread
 			FROM chats c
 			JOIN chat_members cm ON c.id = cm.chat_id
 			WHERE cm.user_id = $1
-			ORDER BY c.updated_at DESC
+			ORDER BY c.last_message_at DESC
 		`, claims.UserID)
 		if err == nil {
 			defer rows.Close()
@@ -1458,7 +1671,7 @@ func handleChats(w http.ResponseWriter, r *http.Request) {
 
 func handlePodcasts(w http.ResponseWriter, r *http.Request) {
 	if db != nil {
-		rows, err := db.Query(`SELECT id, title, author, cover_url, description FROM podcasts ORDER BY created_at DESC LIMIT 20`)
+		rows, err := db.Query(`SELECT id, title, author_name, cover, description FROM podcasts ORDER BY created_at DESC LIMIT 20`)
 		if err == nil {
 			defer rows.Close()
 			var podcasts []map[string]interface{}
@@ -1490,22 +1703,21 @@ func handlePodcasts(w http.ResponseWriter, r *http.Request) {
 func handleMarketplace(w http.ResponseWriter, r *http.Request) {
 	if db != nil {
 		rows, err := db.Query(`
-			SELECT p.id, p.title, p.price, p.currency, p.rating, p.image_url, p.status,
-				u.name as author, c.name as category
+			SELECT p.id, p.title, p.price, p.currency, p.rating, COALESCE(p.image_url, ''),
+				u.name as author, COALESCE(p.category, '') as category
 			FROM marketplace_products p
 			JOIN users u ON p.seller_id = u.id
-			LEFT JOIN marketplace_categories c ON p.category_id = c.id
-			WHERE p.status = 'active'
+			WHERE p.in_stock = true
 			ORDER BY p.created_at DESC LIMIT 50
 		`)
 		if err == nil {
 			defer rows.Close()
 			var products []map[string]interface{}
 			for rows.Next() {
-				var id, title, currency, imageUrl, status, author, category string
+				var id, title, currency, imageUrl, author, category string
 				var price float64
 				var rating float64
-				if err := rows.Scan(&id, &title, &price, &currency, &rating, &imageUrl, &status, &author, &category); err == nil {
+				if err := rows.Scan(&id, &title, &price, &currency, &rating, &imageUrl, &author, &category); err == nil {
 					products = append(products, map[string]interface{}{"id": id, "title": title, "price": price, "currency": currency, "rating": rating, "image": imageUrl, "author": author, "category": category})
 				}
 			}
@@ -1519,7 +1731,7 @@ func handleMarketplace(w http.ResponseWriter, r *http.Request) {
 func handleCommunities(w http.ResponseWriter, r *http.Request) {
 	if db != nil {
 		rows, err := db.Query(`
-			SELECT id, name, description, avatar_url, cover_url, members_count, category, is_verified
+			SELECT id, name, description, avatar, cover, members_count, category, verified
 			FROM communities ORDER BY members_count DESC LIMIT 50
 		`)
 		if err == nil {
@@ -1559,7 +1771,7 @@ func handleWallet(w http.ResponseWriter, r *http.Request) {
 		}
 		// Get recent transactions
 		txRows, _ := db.Query(`
-			SELECT id, transaction_type, amount, currency, description, created_at
+			SELECT id, type, amount, currency, description, created_at
 			FROM wallet_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20
 		`, claims.UserID)
 		var transactions []map[string]interface{}
@@ -1580,13 +1792,43 @@ func handleWallet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"balance": 0, "currency": "RUB", "transactions": []interface{}{}}})
 }
 
-func handleAdminStats(w http.ResponseWriter, r *http.Request) {
-	stats := map[string]interface{}{
-		"dau":            142580,
-		"marketplaceGMV": 4820000,
-		"revenue":        724500,
-		"pendingReports": 3,
+// requireAdmin проверяет JWT и роль admin для защищённых эндпоинтов
+func requireAdmin(r *http.Request) (*JWTClaims, error) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		return nil, errors.New("Авторизация требуется")
 	}
+	if claims.Role != "admin" {
+		return nil, errors.New("Доступ только для администраторов")
+	}
+	return claims, nil
+}
+
+func handleAdminStats(w http.ResponseWriter, r *http.Request) {
+	if _, err := requireAdmin(r); err != nil {
+		writeJSON(w, http.StatusForbidden, Response{Status: "error", Message: err.Error()})
+		return
+	}
+
+	stats := map[string]interface{}{
+		"dau":            0,
+		"marketplaceGMV": 0,
+		"revenue":        0,
+		"pendingReports": 0,
+	}
+
+	// Подтягиваем реальные данные, если БД подключена
+	if db != nil {
+		var dau, pendingReports int
+		if db.QueryRow("SELECT COUNT(*) FROM users").Scan(&dau) == nil {
+			stats["dau"] = dau
+		}
+		if db.QueryRow("SELECT COUNT(*) FROM content_reports WHERE status = 'pending'").Scan(&pendingReports) == nil {
+			stats["pendingReports"] = pendingReports
+		}
+	}
+
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: stats})
 }
 
@@ -1728,7 +1970,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newID := "u_" + time.Now().Format("20060102150405")
+	newID := "u_" + uuid.New().String()[:12]
 	avatar := req.Avatar
 	if avatar == "" {
 		avatar = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80"
@@ -1788,8 +2030,9 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	store.saveToDisk()
 	store.mu.Unlock()
 
+	mockUsersMu.Lock()
 	mockUsers = append([]User{newUser}, mockUsers...)
-	currentUser = newUser
+	mockUsersMu.Unlock()
 
 	token, err := generateJWT(newUser, cleanEmailOrPhone)
 	if err != nil {
@@ -1879,7 +2122,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	currentUser = foundAccount.User
+	// Убран глобальный currentUser — данные пользователя определяются из JWT в каждом запросе
 
 	token, err := generateJWT(foundAccount.User, foundAccount.EmailOrPhone)
 	if err != nil {
@@ -1983,14 +2226,19 @@ func handleSendCode(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	code := strconv.Itoa(mathrand.Intn(9000) + 1000)
+	// Генерация криптографически стойкого SMS-кода
+	codeBytes := make([]byte, 2)
+	rand.Read(codeBytes)
+	codeNum := 1000 + int(codeBytes[0])%9*1000 + int(codeBytes[1])%10*100 + int(codeBytes[0]^codeBytes[1])%10*10 + int(codeBytes[1]^codeBytes[0])%10
+	if codeNum > 9999 { codeNum = codeNum % 9000 + 1000 }
+	code := strconv.Itoa(codeNum)
 	expiresIn := 300
 
 	if db != nil {
 		_, err := db.Exec(`
-			INSERT INTO sms_verifications (phone_number, code, purpose, expires_at, attempts, is_used)
-			VALUES ($1, $2, 'login', NOW() + interval '5 minutes', 0, false)
-		`, req.Phone, code)
+			INSERT INTO sms_verifications (id, phone_number, code, purpose, expires_at, attempts, is_used)
+			VALUES ($1, $2, $3, 'login', NOW() + interval '5 minutes', 0, false)
+		`, uuid.New().String(), req.Phone, code)
 		if err != nil {
 			log.Printf("Ошибка сохранения SMS-кода в БД: %v", err)
 		}
@@ -2004,11 +2252,16 @@ func handleSendCode(w http.ResponseWriter, r *http.Request) {
 		Attempts:  0,
 	})
 
+	// SECURITY: SMS-код НЕ возвращается в ответе API.
+	// В dev-режиме код логируется на сервере для отладки.
+	if os.Getenv("APP_ENV") != "production" {
+		log.Printf("📱 [DEV] SMS-код для %s: %s", req.Phone, code)
+	}
+
 	writeJSON(w, http.StatusOK, Response{
 		Status:  "ok",
 		Message: "Код отправлен",
 		Data: map[string]interface{}{
-			"code":       code,
 			"expires_in": expiresIn,
 		},
 	})
@@ -2067,17 +2320,19 @@ func handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	if db != nil {
 		err = db.QueryRow(`
 			SELECT id, name, username, avatar, bio, location, verified 
-			FROM users WHERE phone = $1
+			FROM users WHERE phone_number = $1 OR email_or_phone = $1
 		`, req.Phone).Scan(&user.ID, &user.Name, &user.Username, &user.Avatar, &user.Bio, &user.Location, &user.Verified)
 		if err == sql.ErrNoRows {
 			isNewUser = true
-			user.ID = "u_" + time.Now().Format("20060102150405")
+			user.ID = "u_" + uuid.New().String()[:12]
 			user.Username = "user_" + strconv.FormatInt(time.Now().UnixNano(), 10)[:8]
 			user.Name = "Пользователь"
+			salt := generateSalt(16)
+			hash := hashPassword("nopassword", salt)
 			_, err = db.Exec(`
-				INSERT INTO users (id, phone, username, name, created_at)
-				VALUES ($1, $2, $3, $4, NOW())
-			`, user.ID, req.Phone, user.Username, user.Name)
+				INSERT INTO users (id, phone_number, email_or_phone, username, name, password_hash, salt, created_at)
+				VALUES ($1, $2, $2, $3, $4, $5, $6, NOW())
+			`, user.ID, req.Phone, user.Username, user.Name, hash, salt)
 		}
 	} else {
 		store.mu.Lock()
@@ -2091,7 +2346,7 @@ func handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		}
 		if !found {
 			isNewUser = true
-			user.ID = "u_" + time.Now().Format("20060102150405")
+			user.ID = "u_" + uuid.New().String()[:12]
 			user.Username = "user_" + strconv.FormatInt(time.Now().UnixNano(), 10)[:8]
 			user.Name = "Пользователь"
 			
@@ -2104,6 +2359,7 @@ func handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 				Salt:         salt,
 				CreatedAt:    time.Now(),
 			}
+			store.saveToDisk()
 		}
 		store.mu.Unlock()
 	}

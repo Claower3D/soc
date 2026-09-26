@@ -133,9 +133,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id && parsed.id !== 'guest' && parsed.id !== 'me') {
           if (parsed.username) parsed.username = String(parsed.username).replace(/^@+/, '');
-          // ТЕСТ: hardcode isPremium = true (убрать после подключения бэкенда)
-          parsed.isPremium = true;
-          Object.assign(defaultCurrentUser, parsed);
           return parsed;
         }
       }
@@ -166,12 +163,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const u = data?.data?.user || data?.user;
         if (u && (u.id || u.username)) {
           if (u.username) u.username = String(u.username).replace(/^@+/, '');
-          u.isPremium = true;
           setActiveUser(u);
           setIsAuthenticated(true);
           localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(u));
           localStorage.setItem('new_age_is_auth', 'true');
-          Object.assign(defaultCurrentUser, u);
         }
       })
       .catch(() => {
@@ -266,7 +261,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           {
             ...user,
             emailOrPhone: data.emailOrPhone.trim(),
-            password: data.password,
+            // SECURITY: пароль НЕ хранится на клиенте
             location: data.location || user.location,
             createdAt: new Date().toISOString(),
           } as RegisteredAccount,
@@ -304,7 +299,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name: data.name.trim(),
       username: cleanUsername,
       emailOrPhone: data.emailOrPhone.trim(),
-      password: data.password,
+      // SECURITY: пароль НЕ хранится на клиенте
       avatar,
       coverImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
       bio: 'Новый участник экосистемы New Age ✨',
@@ -365,14 +360,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (response.ok && token && user) {
         if (user.username) user.username = String(user.username).replace(/^@+/, '');
-        user.isPremium = true;
         setJwtToken(token);
         setActiveUser(user);
         setIsAuthenticated(true);
         localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
         localStorage.setItem(STORAGE_KEY_TOKEN, token);
         localStorage.setItem('new_age_is_auth', 'true');
-        Object.assign(defaultCurrentUser, user);
 
         setAllAccounts((prev) => {
           const exists = prev.some((a) => a && (a.id === user.id || a.username === user.username));

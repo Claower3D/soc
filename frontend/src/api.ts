@@ -67,7 +67,7 @@ export const api = {
     updateProfile: (data: any) => apiFetch<any>('/api/profile', { method: 'PUT', body: JSON.stringify(data) })
   },
   posts: {
-    list: () => apiFetch<any>('/api/feed'),
+    list: (page?: number) => apiFetch<any>(page ? `/api/feed?page=${page}` : '/api/feed'),
     userPosts: (userId: string) => apiFetch<any>(`/api/users/${userId}/posts`),
     create: (data: FormData | any) => {
       if (data instanceof FormData) {

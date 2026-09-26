@@ -14,7 +14,7 @@ export function useFeed(page?: number) {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.posts.list();
+      const response = await api.posts.list(page);
       setData(response.data || response);
     } catch (err: any) {
       setError(err.message || 'Ошибка загрузки ленты');
