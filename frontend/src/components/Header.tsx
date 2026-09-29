@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Video, Headphones,
   Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
-  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Bot, Globe, ChevronDown
+  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Globe, ChevronDown
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -21,14 +21,13 @@ export function Header() {
   const { currentLang, setLanguage, languages, t } = useTranslation();
   const { currency, currencyConfig, setCurrency, allCurrencies, detectedFromCountry } = useCurrency();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
-  const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
+  const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
+  const [localeTab, setLocaleTab] = useState<'lang' | 'currency'>('lang');
   const [notifTab, setNotifTab] = useState<'alerts' | 'push_settings'>('alerts');
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const createRef = useRef<HTMLDivElement>(null);
-  const langRef = useRef<HTMLDivElement>(null);
-  const currencyRef = useRef<HTMLDivElement>(null);
+  const localeRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,11 +35,8 @@ export function Header() {
       if (createRef.current && !createRef.current.contains(event.target as Node)) {
         setCreateMenuOpen(false);
       }
-      if (langRef.current && !langRef.current.contains(event.target as Node)) {
-        setLangDropdownOpen(false);
-      }
-      if (currencyRef.current && !currencyRef.current.contains(event.target as Node)) {
-        setCurrencyDropdownOpen(false);
+      if (localeRef.current && !localeRef.current.contains(event.target as Node)) {
+        setLocaleDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -195,118 +191,95 @@ export function Header() {
           )}
         </div>
 
+        {/* Sleek AI Oracle Trigger */}
         <button
-          className="header-action-btn conference-quick-btn"
-          onClick={() => {
-            if (!isAuthenticated) {
-              openAuthModal('register');
-            } else {
-              navigate('/conferences');
-            }
-          }}
-          title="Быстрый старт конференции"
-        >
-          <Video size={16} />
-          <span className="btn-text">Встреча</span>
-        </button>
-
-        {/* Cosmic AI Oracle / AI Guru Trigger */}
-        <button
-          className="header-action-btn ai-guru-quick-btn"
+          className="header-action-btn ai-oracle-pill"
           onClick={() => navigate('/spiritual/livezen')}
-          title="Спросить ИИ-Оракула и Наставника Live Zen"
+          title="Спросить ИИ-Оракула Live Zen"
         >
-          <div className="ai-guru-btn-glow" />
-          <div className="ai-guru-icon-box">
-            <Sparkles size={11} className="ai-guru-sparkle" />
-            <Bot size={15} className="ai-guru-bot" />
-          </div>
-          <span className="ai-guru-title">ИИ Оракул</span>
-          <span className="ai-guru-live-badge">
-            <span className="ai-guru-pulse-dot" />
-            LIVE
-          </span>
+          <Sparkles size={14} className="ai-oracle-icon" />
+          <span className="ai-oracle-text">Оракул</span>
+          <span className="ai-oracle-dot" title="Онлайн" />
         </button>
 
-        <div className="header-divider" />
-
-        {/* Language Switcher Dropdown */}
-        <div className="header-lang-wrapper" ref={langRef}>
+        {/* Combined Locale (Language & Currency) Selector */}
+        <div className="header-locale-wrapper" ref={localeRef}>
           <button
-            className={`header-control-pill header-lang-btn ${langDropdownOpen ? 'active' : ''}`}
-            onClick={() => setLangDropdownOpen(!langDropdownOpen)}
-            title="Выбор языка платформы / Select Language"
+            className={`header-control-pill header-locale-btn ${localeDropdownOpen ? 'active' : ''}`}
+            onClick={() => setLocaleDropdownOpen(!localeDropdownOpen)}
+            title="Язык и валюта платформы"
           >
-            <Globe size={15} className="header-control-icon" />
-            <span className="lang-active-code">{currentLang.toUpperCase()}</span>
-            <ChevronDown size={11} className={`header-control-chevron ${langDropdownOpen ? 'open' : ''}`} />
+            <Globe size={14} className="header-control-icon" />
+            <span className="locale-btn-label">
+              {currentLang.toUpperCase()} · {currencyConfig.symbol}
+            </span>
+            <ChevronDown size={11} className={`header-control-chevron ${localeDropdownOpen ? 'open' : ''}`} />
           </button>
 
-          {langDropdownOpen && (
-            <div className="header-lang-dropdown">
-              <div className="lang-dropdown-header">
-                <Globe size={14} />
-                <span>Язык / Language</span>
+          {localeDropdownOpen && (
+            <div className="header-locale-dropdown">
+              <div className="locale-dropdown-tabs">
+                <button
+                  type="button"
+                  className={`locale-tab-btn ${localeTab === 'lang' ? 'active' : ''}`}
+                  onClick={() => setLocaleTab('lang')}
+                >
+                  <Globe size={12} />
+                  <span>Язык</span>
+                </button>
+                <button
+                  type="button"
+                  className={`locale-tab-btn ${localeTab === 'currency' ? 'active' : ''}`}
+                  onClick={() => setLocaleTab('currency')}
+                >
+                  <span>{currencyConfig.symbol}</span>
+                  <span>Валюта</span>
+                </button>
               </div>
-              <div className="lang-options-list">
-                {languages.map((lang) => (
-                  <button
-                    key={lang.code}
-                    className={`lang-option-item ${currentLang === lang.code ? 'selected' : ''}`}
-                    onClick={() => {
-                      setLanguage(lang.code);
-                      setLangDropdownOpen(false);
-                    }}
-                  >
-                    <span className="lang-code-badge">{lang.code.toUpperCase()}</span>
-                    <span className="lang-item-name">{lang.nativeName}</span>
-                    {currentLang === lang.code && <Check size={14} className="lang-check-icon" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Currency Selector */}
-        <div className="header-currency-wrapper" ref={currencyRef}>
-          <button
-            className={`header-control-pill header-currency-btn ${currencyDropdownOpen ? 'active' : ''}`}
-            onClick={() => setCurrencyDropdownOpen(!currencyDropdownOpen)}
-            title={`Валюта: ${currencyConfig.name} (${currencyConfig.symbol})`}
-          >
-            <span className="header-curr-symbol">{currencyConfig.symbol}</span>
-            <span className="header-curr-code">{currencyConfig.code}</span>
-            <ChevronDown size={11} className={`header-control-chevron ${currencyDropdownOpen ? 'open' : ''}`} />
-          </button>
-
-          {currencyDropdownOpen && (
-            <div className="currency-popover">
-              <div className="currency-popover-header">
-                <span>Валюта отображения</span>
-                {detectedFromCountry && (
-                  <span className="currency-detected-note" title="Определено по стране">
-                    📍 {detectedFromCountry}
-                  </span>
-                )}
-              </div>
-              <div className="currency-options-list">
-                {allCurrencies.map((c) => (
-                  <button
-                    key={c.code}
-                    className={`currency-option-item ${currency === c.code ? 'selected' : ''}`}
-                    onClick={() => {
-                      setCurrency(c.code);
-                      setCurrencyDropdownOpen(false);
-                    }}
-                  >
-                    <span className="curr-symbol-badge">{c.symbol}</span>
-                    <span className="curr-item-name">{c.name}</span>
-                    <span className="curr-item-code">{c.code}</span>
-                    {currency === c.code && <Check size={14} className="curr-check-icon" />}
-                  </button>
-                ))}
-              </div>
+              {localeTab === 'lang' ? (
+                <div className="lang-options-list">
+                  {languages.map((lang) => (
+                    <button
+                      key={lang.code}
+                      type="button"
+                      className={`lang-option-item ${currentLang === lang.code ? 'selected' : ''}`}
+                      onClick={() => {
+                        setLanguage(lang.code);
+                        setLocaleDropdownOpen(false);
+                      }}
+                    >
+                      <span className="lang-code-badge">{lang.code.toUpperCase()}</span>
+                      <span className="lang-item-name">{lang.nativeName}</span>
+                      {currentLang === lang.code && <Check size={14} className="lang-check-icon" />}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="currency-options-list">
+                  {detectedFromCountry && (
+                    <div className="currency-detected-note-banner">
+                      <span>Регион: <strong>{detectedFromCountry}</strong></span>
+                    </div>
+                  )}
+                  {allCurrencies.map((c) => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      className={`currency-option-item ${currency === c.code ? 'selected' : ''}`}
+                      onClick={() => {
+                        setCurrency(c.code);
+                        setLocaleDropdownOpen(false);
+                      }}
+                    >
+                      <span className="curr-symbol-badge">{c.symbol}</span>
+                      <span className="curr-item-name">{c.name}</span>
+                      <span className="curr-item-code">{c.code}</span>
+                      {currency === c.code && <Check size={14} className="curr-check-icon" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -315,9 +288,9 @@ export function Header() {
         <button
           className="header-icon-btn theme-toggle-btn"
           onClick={toggleTheme}
-          title={theme === 'dark' ? "Переключить на дневную тему" : "Переключить на ночную тему (Zen Night)"}
+          title={theme === 'dark' ? "Дневная тема" : "Ночная тема"}
         >
-          {theme === 'dark' ? <Sun size={18} className="theme-sun-icon" /> : <Moon size={18} className="theme-moon-icon" />}
+          {theme === 'dark' ? <Sun size={16} className="theme-sun-icon" /> : <Moon size={16} className="theme-moon-icon" />}
         </button>
 
         <div className="header-divider" />

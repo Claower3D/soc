@@ -841,26 +841,26 @@ export function ProfilePage() {
               isAuthenticated ? (
                 <>
                   <button className="btn btn-primary" onClick={() => setIsCreatePostOpen(true)}>
-                    <Plus size={16} /> Опубликовать
+                    <Plus size={14} /> Опубликовать
                   </button>
                   <button className="btn btn-secondary" onClick={() => setIsCreateStoryOpen(true)}>
-                    <Plus size={16} /> Добавить историю
+                    <Plus size={14} /> История
                   </button>
                   <button className="btn btn-secondary" onClick={() => setIsEditProfileOpen(true)}>
-                    <Edit3 size={16} /> Редактировать профиль
+                    <Edit3 size={14} /> Редактировать
                   </button>
                   <button className="btn btn-secondary" onClick={handleShareProfile}>
-                    <Share2 size={16} /> {copiedLink ? 'Ссылка скопирована!' : 'Поделиться'}
+                    <Share2 size={14} /> {copiedLink ? 'Скопировано!' : 'Поделиться'}
                   </button>
                   <button 
-                    className="btn btn-secondary btn-logout" 
+                    className="btn btn-logout" 
                     onClick={() => {
                       logout();
                       navigate('/');
                     }}
                     title="Выйти из аккаунта"
                   >
-                    <LogOut size={16} /> Выйти
+                    <LogOut size={14} /> Выйти
                   </button>
                 </>
               ) : (
@@ -1004,66 +1004,6 @@ export function ProfilePage() {
               </button>
             )}
           </div>
-
-          {/* Dedicated Category Add Action for Own Profile */}
-          {isMe && (
-            <div className="profile-tab-add-action-box">
-              {activeTab === 'posts' && (
-                <button 
-                  className="btn-tab-add-content"
-                  onClick={() => setIsCreatePostOpen(true)}
-                  title="Опубликовать новую запись или фото"
-                >
-                  <Plus size={16} />
-                  <span>Добавить публикацию</span>
-                </button>
-              )}
-
-              {activeTab === 'videos' && (
-                <button 
-                  className="btn-tab-add-content"
-                  onClick={() => setIsUploadVideoOpen(true)}
-                  title="Загрузить видео на свой канал"
-                >
-                  <Plus size={16} />
-                  <span>Добавить видео</span>
-                </button>
-              )}
-
-              {activeTab === 'podcasts' && (
-                <button 
-                  className="btn-tab-add-content"
-                  onClick={() => setIsUploadPodcastOpen(true)}
-                  title="Опубликовать новый подкаст или аудиовыпуск"
-                >
-                  <Plus size={16} />
-                  <span>Добавить подкаст</span>
-                </button>
-              )}
-
-              {activeTab === 'shop' && (
-                <button 
-                  className="btn-tab-add-content"
-                  onClick={() => setIsCreateProductOpen(true)}
-                  title="Выставить новый товар на продажу"
-                >
-                  <Plus size={16} />
-                  <span>Добавить товар</span>
-                </button>
-              )}
-
-              {activeTab === 'saved' && (
-                <button 
-                  className="btn-tab-add-content btn-tab-add-secondary"
-                  onClick={() => navigate('/')}
-                  title="Перейти в ленту, чтобы найти и сохранить интересные посты"
-                >
-                  <Compass size={16} />
-                  <span>Найти в ленте</span>
-                </button>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

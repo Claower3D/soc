@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { 
   Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, 
   Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send, Smile,
-  Radio, Users, Sparkles, Flame, Video
+  Radio, Users, Sparkles, Flame, Video, Activity, Hash, Disc3
 } from 'lucide-react';
 import { type Clip, type ClipComment } from '../data/mock';
 import { api } from '../api';
@@ -11,7 +11,102 @@ import { useAuth } from '../context/AuthContext';
 import { UploadWaveModal } from '../components/UploadWaveModal';
 import './ClipsPage.css';
 
-type ClipTab = 'all' | 'live' | 'trending';
+type ClipTab = 'all' | 'zen' | 'live' | 'trending' | 'my';
+
+const QUICK_HASHTAGS = ['Все', 'медитация', 'дзен', 'частота432', 'космос', 'звук', 'гармония'];
+
+export const DEFAULT_AESTHETIC_CLIPS: Clip[] = [
+  {
+    id: 'clip_zen_01',
+    user: {
+      id: 'zen_temple',
+      name: 'Храм Тишины & Медитации',
+      username: 'zen_temple',
+      avatar: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=400&q=80',
+      role: 'expert',
+      verified: true,
+      followersCount: 14200,
+      followingCount: 12,
+      criticsCount: 0,
+      postsCount: 45
+    },
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    poster: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=800&q=80',
+    caption: 'Звуковая терапия 432 Гц • Глубокое погружение в состояние осознанности и покоя. Отпустите суету дня ✨🧘 #медитация #дзен #частота432 #звук',
+    musicTitle: 'Священная Гармония • 432 Гц',
+    musicAuthor: 'Solfeggio Sound Lab',
+    audioTrackArt: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=200&q=80',
+    overlayTitle: 'Частота 432 Гц • Гармония Духа',
+    likesCount: 18420,
+    commentsCount: 342,
+    sharesCount: 1205,
+    viewsCount: 94000,
+    isLiked: false,
+    isSaved: false,
+    timeAgo: '2 ч назад',
+    tags: ['медитация', 'дзен', 'частота432', 'звук']
+  },
+  {
+    id: 'clip_zen_02',
+    user: {
+      id: 'cosmos_mind',
+      name: 'Космический Разум',
+      username: 'cosmos_flow',
+      avatar: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80',
+      role: 'creator',
+      verified: true,
+      followersCount: 28900,
+      followingCount: 45,
+      criticsCount: 0,
+      postsCount: 88
+    },
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    poster: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
+    caption: 'Синхронизация сознания с ритмами Вселенной. Практика визуализации светового потока и расширения восприятия 🌌💫 #космос #осознанность #поток',
+    musicTitle: 'Deep Space Resonance • Alpha Waves',
+    musicAuthor: 'Ambient Cosmos',
+    audioTrackArt: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=200&q=80',
+    overlayTitle: 'Поток Сознания • Практика Света',
+    likesCount: 31200,
+    commentsCount: 512,
+    sharesCount: 2480,
+    viewsCount: 148000,
+    isLiked: true,
+    isSaved: true,
+    timeAgo: '4 ч назад',
+    tags: ['космос', 'энергия', 'альфаволны', 'осознанность']
+  },
+  {
+    id: 'clip_zen_03',
+    user: {
+      id: 'sacred_geo',
+      name: 'Сакральная Геометрия',
+      username: 'sacred_art',
+      avatar: 'https://images.unsplash.com/photo-1519638399535-1b036603ac77?auto=format&fit=crop&w=400&q=80',
+      role: 'expert',
+      verified: true,
+      followersCount: 19500,
+      followingCount: 33,
+      criticsCount: 0,
+      postsCount: 62
+    },
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    poster: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
+    caption: 'Цветок Жизни и Золотое Сечение: как фундаментальные пропорции формируют гармонию живого мира 🔮 #геометрия #мудрость #гармония',
+    musicTitle: 'Sacred Spheres • Ambient Soundscape',
+    musicAuthor: 'Golden Ratio Records',
+    audioTrackArt: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=200&q=80',
+    overlayTitle: 'Цветок Жизни • Код Гармонии',
+    likesCount: 24900,
+    commentsCount: 420,
+    sharesCount: 1890,
+    viewsCount: 112000,
+    isLiked: false,
+    isSaved: false,
+    timeAgo: 'Вчера',
+    tags: ['геометрия', 'гармония', 'цветокжизни']
+  }
+];
 
 export function ClipsPage() {
   const { currentUser, isAuthenticated, openAuthModal } = useAuth();
@@ -23,28 +118,40 @@ export function ClipsPage() {
     api.clips.list().then((data) => {
       if (mounted) {
         const saved = localStorage.getItem('newage_clips_state');
-        let finalClips = data;
+        let finalClips: Clip[] = Array.isArray(data) && data.length > 0 ? data : [];
         if (saved) {
           try {
             const parsed = JSON.parse(saved);
             const ids = new Set(parsed.map((c: Clip) => c.id));
-            const missing = data.filter((c: Clip) => !ids.has(c.id));
+            const missing = finalClips.filter((c: Clip) => !ids.has(c.id));
             finalClips = [...missing, ...parsed];
           } catch (e) {
             console.error('Failed to parse saved clips', e);
           }
         }
+        
+        // Merge with DEFAULT_AESTHETIC_CLIPS so the feed is always alive with high-quality content
+        const existingIds = new Set(finalClips.map(c => c.id));
+        const additions = DEFAULT_AESTHETIC_CLIPS.filter(c => !existingIds.has(c.id));
+        finalClips = [...finalClips, ...additions];
+
         setClips(finalClips);
         setIsLoading(false);
       }
     }).catch(err => {
       console.warn('Failed to load clips', err);
-      if (mounted) setIsLoading(false);
+      if (mounted) {
+        setClips(DEFAULT_AESTHETIC_CLIPS);
+        setIsLoading(false);
+      }
     });
     return () => { mounted = false; };
   }, []);
 
   const [activeTab, setActiveTab] = useState<ClipTab>('all');
+  const [selectedTag, setSelectedTag] = useState<string>('Все');
+  const [activeClipProgress, setActiveClipProgress] = useState<number>(0);
+  const [floatingReactions, setFloatingReactions] = useState<{ id: number; emoji: string; left: number }[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -228,6 +335,40 @@ export function ClipsPage() {
     }));
   };
 
+  const triggerSacredBurst = (emoji: string, clipId: string) => {
+    const id = Date.now() + Math.random();
+    const left = 30 + Math.random() * 40; // 30% to 70%
+    setFloatingReactions(prev => [...prev.slice(-15), { id, emoji, left }]);
+    setTimeout(() => {
+      setFloatingReactions(prev => prev.filter(r => r.id !== id));
+    }, 1800);
+
+    // Give subtle like boost or feedback
+    if (isAuthenticated) {
+      handleLike(clipId);
+    }
+  };
+
+  const handleTimeUpdate = (clipId: string) => {
+    const vid = videoRefs.current[clipId];
+    if (vid && vid.duration) {
+      setActiveClipProgress((vid.currentTime / vid.duration) * 100);
+    }
+  };
+
+  const handleTimelineScrub = (e: React.MouseEvent<HTMLDivElement>, clipId: string) => {
+    e.stopPropagation();
+    const track = e.currentTarget;
+    const rect = track.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percent = Math.max(0, Math.min(1, clickX / rect.width));
+    const vid = videoRefs.current[clipId];
+    if (vid && vid.duration) {
+      vid.currentTime = percent * vid.duration;
+      setActiveClipProgress(percent * 100);
+    }
+  };
+
   const handleSave = (clipId: string) => {
     if (!isAuthenticated) {
       openAuthModal('login');
@@ -326,8 +467,26 @@ export function ClipsPage() {
   };
 
   const displayedClips = clips.filter(c => {
-    if (activeTab === 'live') return c.isLive;
-    if (activeTab === 'trending') return c.likesCount > 10000;
+    if (activeTab === 'zen') {
+      const isZen = (c.tags && c.tags.some(t => ['медитация', 'дзен', 'частота432', 'звук', 'гармония'].includes(t))) ||
+        (c.caption && /медитац|дзен|432|звук|частот|гармон|поток/i.test(c.caption));
+      if (!isZen) return false;
+    }
+    if (activeTab === 'live') {
+      if (!c.isLive) return false;
+    }
+    if (activeTab === 'trending') {
+      if (c.likesCount <= 10000) return false;
+    }
+    if (activeTab === 'my') {
+      if (c.user.id !== currentUser.id) return false;
+    }
+    if (selectedTag !== 'Все') {
+      const tagLower = selectedTag.toLowerCase();
+      const hasTag = (c.tags && c.tags.some(t => t.toLowerCase().includes(tagLower))) || 
+        (c.caption && c.caption.toLowerCase().includes(tagLower));
+      if (!hasTag) return false;
+    }
     return true;
   });
 
@@ -337,46 +496,86 @@ export function ClipsPage() {
 
   return (
     <div className="clips-page-container">
-      {/* Category Tab Selector & Upload Button (Top Bar) */}
-      <div className="clips-category-nav-bar">
-        <div className="clips-category-tabs">
+      {/* Cosmic Ambient Glow Behind Feed */}
+      <div className="clips-ambient-glow-layer" aria-hidden="true">
+        <div className="clips-glow-orb orb-purple" />
+        <div className="clips-glow-orb orb-cyan" />
+        <div className="clips-glow-orb orb-magenta" />
+      </div>
+
+      {/* Category Tab Selector & Quick Hashtag Chips (Top Bar) */}
+      <div className="clips-top-header-panel">
+        <div className="clips-category-nav-bar">
+          <div className="clips-category-tabs">
+            <button 
+              type="button" 
+              className={`clips-cat-tab ${activeTab === 'all' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('all'); setActiveIndex(0); scrollToClip(0); }}
+            >
+              <Sparkles size={14} />
+              <span>Все</span>
+            </button>
+            <button 
+              type="button" 
+              className={`clips-cat-tab ${activeTab === 'zen' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('zen'); setActiveIndex(0); scrollToClip(0); }}
+            >
+              <Activity size={14} />
+              <span>Дзен & Звук</span>
+            </button>
+            <button 
+              type="button" 
+              className={`clips-cat-tab live-tab ${activeTab === 'live' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('live'); setActiveIndex(0); scrollToClip(0); }}
+            >
+              <Radio size={14} className="clip-live-pulse-icon" />
+              <span>LIVE</span>
+              <span className="clips-live-dot" />
+            </button>
+            <button 
+              type="button" 
+              className={`clips-cat-tab ${activeTab === 'trending' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('trending'); setActiveIndex(0); scrollToClip(0); }}
+            >
+              <Flame size={14} />
+              <span>В тренде</span>
+            </button>
+            <button 
+              type="button" 
+              className={`clips-cat-tab ${activeTab === 'my' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('my'); setActiveIndex(0); scrollToClip(0); }}
+            >
+              <Users size={14} />
+              <span>Мои</span>
+            </button>
+          </div>
+
+          {/* Prominent Upload Clip Button in Top Bar */}
           <button 
             type="button" 
-            className={`clips-cat-tab ${activeTab === 'all' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('all'); setActiveIndex(0); scrollToClip(0); }}
+            className="clips-upload-btn-header"
+            onClick={handleTriggerUpload}
+            title="Загрузить свой клип"
           >
-            <Sparkles size={14} />
-            <span>Все клипы</span>
-          </button>
-          <button 
-            type="button" 
-            className={`clips-cat-tab live-tab ${activeTab === 'live' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('live'); setActiveIndex(0); scrollToClip(0); }}
-          >
-            <Radio size={14} className="clip-live-pulse-icon" />
-            <span>Прямой эфир • LIVE</span>
-            <span className="clips-live-dot" />
-          </button>
-          <button 
-            type="button" 
-            className={`clips-cat-tab ${activeTab === 'trending' ? 'active' : ''}`}
-            onClick={() => { setActiveTab('trending'); setActiveIndex(0); scrollToClip(0); }}
-          >
-            <Flame size={14} />
-            <span>В тренде</span>
+            <Plus size={16} />
+            <span>Загрузить клип</span>
           </button>
         </div>
 
-        {/* Prominent Upload Clip Button in Top Bar */}
-        <button 
-          type="button" 
-          className="clips-upload-btn-header"
-          onClick={handleTriggerUpload}
-          title="Загрузить свой клип"
-        >
-          <Plus size={16} />
-          <span>Загрузить клип</span>
-        </button>
+        {/* Quick Hashtag Chips Filter Bar */}
+        <div className="clips-hashtag-chips-bar">
+          {QUICK_HASHTAGS.map(tag => (
+            <button
+              key={tag}
+              type="button"
+              className={`clips-hashtag-chip ${selectedTag === tag ? 'active' : ''}`}
+              onClick={() => { setSelectedTag(tag); setActiveIndex(0); scrollToClip(0); }}
+            >
+              <Hash size={11} className="hashtag-hash-icon" />
+              <span>{tag}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="clips-feed-wrapper">
@@ -440,22 +639,36 @@ export function ClipsPage() {
                 <div className="clip-video-wrapper">
                   {/* Top Floating Badge */}
                   <div className="clip-top-bar">
-                    {clip.isLive ? (
-                      <div className="clip-live-brand-tag">
-                        <span className="clip-live-flashing-dot" />
-                        <span className="clip-live-text">В ЭФИРЕ • LIVE</span>
-                        {clip.viewersCount && (
-                          <span className="clip-live-viewers">
-                            <Users size={12} /> {clip.viewersCount.toLocaleString('ru-RU')}
-                          </span>
-                        )}
+                    <div className="clip-top-bar-left">
+                      {clip.isLive ? (
+                        <div className="clip-live-brand-tag">
+                          <span className="clip-live-flashing-dot" />
+                          <span className="clip-live-text">В ЭФИРЕ • LIVE</span>
+                          {clip.viewersCount && (
+                            <span className="clip-live-viewers">
+                              <Users size={12} /> {clip.viewersCount.toLocaleString('ru-RU')}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="clip-brand-tag">
+                          <span className="clip-brand-dot" />
+                          <span>Reels • New Age</span>
+                        </div>
+                      )}
+
+                      {/* Soundwave Equalizer Badge */}
+                      <div className="clip-soundwave-badge" title="Аудио резонанс 432 Гц">
+                        <div className="clip-soundwave-bars">
+                          <span className={`sw-bar sw-bar-1 ${isCurrent && isPlaying && !isMuted ? 'active' : ''}`} />
+                          <span className={`sw-bar sw-bar-2 ${isCurrent && isPlaying && !isMuted ? 'active' : ''}`} />
+                          <span className={`sw-bar sw-bar-3 ${isCurrent && isPlaying && !isMuted ? 'active' : ''}`} />
+                          <span className={`sw-bar sw-bar-4 ${isCurrent && isPlaying && !isMuted ? 'active' : ''}`} />
+                        </div>
+                        <span className="clip-soundwave-text">432 Гц</span>
                       </div>
-                    ) : (
-                      <div className="clip-brand-tag">
-                        <span className="clip-brand-dot" />
-                        <span>Reels • New Age</span>
-                      </div>
-                    )}
+                    </div>
+
                     <button type="button" className="clip-create-btn" title="Запустить волну" onClick={handleTriggerUpload}>
                       <Plus size={15} />
                       <span>Волна</span>
@@ -472,12 +685,28 @@ export function ClipsPage() {
                     playsInline
                     muted={isMuted}
                     onClick={togglePlayPause}
+                    onTimeUpdate={() => isCurrent && handleTimeUpdate(clip.id)}
                   />
 
                   {/* Big Play/Pause Center Indicator */}
                   {isCurrent && showPlayAnim && (
                     <div className="clip-center-play-indicator">
                       {isPlaying ? <Play size={36} fill="#fff" /> : <Pause size={36} fill="#fff" />}
+                    </div>
+                  )}
+
+                  {/* Floating Particles / Sacred Energy Burst */}
+                  {isCurrent && (
+                    <div className="clip-floating-particles-layer" aria-hidden="true">
+                      {floatingReactions.map(r => (
+                        <div 
+                          key={r.id} 
+                          className="clip-floating-particle"
+                          style={{ left: `${r.left}%` }}
+                        >
+                          {r.emoji}
+                        </div>
+                      ))}
                     </div>
                   )}
 
@@ -501,8 +730,26 @@ export function ClipsPage() {
                     {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                   </button>
 
-                  {/* Bottom Info inside Video (Author, Follow, AI badge, Caption, Music) */}
+                  {/* Bottom Info inside Video (Author, Follow, AI badge, Caption, Music, Sacred Reactions) */}
                   <div className="clip-bottom-info">
+                    {/* Sacred Energy Reactions Tray (Ethereal glass pill) */}
+                    <div className="clip-sacred-reactions-tray">
+                      {['✨', '🧘', '🌊', '🔥', '🪐', '🤍'].map(emoji => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          className="clip-sacred-reaction-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            triggerSacredBurst(emoji, clip.id);
+                          }}
+                          title={`Поделиться энергией ${emoji}`}
+                        >
+                          <span className="sacred-emoji">{emoji}</span>
+                        </button>
+                      ))}
+                    </div>
+
                     {/* Author Row */}
                     <div className="clip-author-row">
                       <Link to="/profile" className="clip-author-avatar-wrap">
@@ -564,6 +811,20 @@ export function ClipsPage() {
                           {clip.musicTitle || 'Оригинальный звук'} • {clip.musicAuthor || clip.user.name}
                         </span>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Glowing Neon Timeline Scrubber Progress Bar */}
+                  <div 
+                    className="clip-timeline-progress-track"
+                    onClick={(e) => handleTimelineScrub(e, clip.id)}
+                    title="Перемотка клипа"
+                  >
+                    <div 
+                      className="clip-timeline-progress-fill" 
+                      style={{ width: `${isCurrent ? activeClipProgress : 0}%` }}
+                    >
+                      <div className="clip-timeline-progress-glow-dot" />
                     </div>
                   </div>
                 </div>
@@ -633,17 +894,28 @@ export function ClipsPage() {
                     </button>
                   </div>
 
-                  {/* Audio Track Thumbnail (Spinning square or circle with album art) */}
+                  {/* Spinning Sacred Vinyl Mandala Disc */}
                   <div 
                     className="clip-sound-cover-btn"
                     onClick={toggleMute}
-                    title={clip.musicTitle || 'Аудиодорожка'}
+                    title={clip.musicTitle || 'Аудиодорожка (нажмите, чтобы включить/выключить звук)'}
                   >
-                    <img 
-                      src={clip.audioTrackArt || clip.user.avatar || clip.poster} 
-                      alt="Audio Art" 
-                      className={`clip-audio-art-thumb ${!isPlaying ? 'paused' : ''}`} 
-                    />
+                    <div className={`clip-vinyl-mandala ${isCurrent && isPlaying ? 'spinning' : 'paused'}`}>
+                      <img 
+                        src={clip.audioTrackArt || clip.user.avatar || clip.poster} 
+                        alt="Audio Art" 
+                        className="clip-audio-art-thumb" 
+                      />
+                      <div className="clip-vinyl-center-pin">
+                        <Disc3 size={10} color="#fff" />
+                      </div>
+                    </div>
+                    {isCurrent && isPlaying && !isMuted && (
+                      <div className="clip-audio-floating-notes" aria-hidden="true">
+                        <span className="clip-note-symbol note-1">♪</span>
+                        <span className="clip-note-symbol note-2">♫</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
