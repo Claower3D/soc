@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Heart, Sparkles, Search, MapPin, 
@@ -194,8 +194,20 @@ export const DatingPage: React.FC = () => {
     });
   }, [profiles, myProfile, selectedGoalFilter, genderFilter, locationMode, maxDistanceKm, selectedCountry, selectedCity, consciousnessFilter, minAgeFilter, maxAgeFilter, searchQuery]);
 
-  // Карточки для ленты свайпа
+  // Карточки для ленты свайпа (3D колода: активная, предыдущая и следующая)
   const activeSwipeCard = filteredProfiles[currentSwipeIndex] || null;
+
+  const prevCard = useMemo(() => {
+    if (filteredProfiles.length <= 1) return null;
+    const prevIdx = currentSwipeIndex > 0 ? currentSwipeIndex - 1 : filteredProfiles.length - 1;
+    return filteredProfiles[prevIdx] || null;
+  }, [filteredProfiles, currentSwipeIndex]);
+
+  const nextCard = useMemo(() => {
+    if (filteredProfiles.length <= 1) return null;
+    const nextIdx = currentSwipeIndex < filteredProfiles.length - 1 ? currentSwipeIndex + 1 : 0;
+    return filteredProfiles[nextIdx] || null;
+  }, [filteredProfiles, currentSwipeIndex]);
 
   // Обработка лайка и регистрация взаимной симпатии
   const handleLike = (profileId: string) => {
@@ -284,6 +296,34 @@ export const DatingPage: React.FC = () => {
   const handlePass = () => {
     setCurrentSwipeIndex(prev => (prev + 1 < filteredProfiles.length ? prev + 1 : 0));
   };
+
+  const handlePrev = () => {
+    setCurrentSwipeIndex(prev => (prev - 1 >= 0 ? prev - 1 : filteredProfiles.length - 1));
+  };
+
+  // Keyboard navigation for desktop (Left = pass, Right = like, Up = inspect)
+  useEffect(() => {
+    if (viewMode !== 'feed' || !activeSwipeCard || isFiltersOpen || isEditProfileOpen || inspectedProfile) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePass();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleLike(activeSwipeCard.id);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setInspectedProfile(activeSwipeCard);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, activeSwipeCard, isFiltersOpen, isEditProfileOpen, inspectedProfile, likedIds, filteredProfiles.length]);
 
   const handleSaveMyProfile = (savedProfile: DatingProfile) => {
     setMyProfile(savedProfile);
@@ -692,120 +732,225 @@ export const DatingPage: React.FC = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* MODE 1: SWIPE FEED (ЛЕНТА ОДНОЙ КАРТОЧКИ) */}
+      {/* MODE 1: SWIPE FEED (ЛЕНТА ОДНОЙ КАРТОЧКИ С 3D КОЛОДОЙ) */}
       {/* ========================================================================= */}
       {viewMode === 'feed' && (
         <div className="dating-feed-wrap">
           {activeSwipeCard ? (
-            <div className="dating-swipe-card-container">
-              <div 
-                className="dating-swipe-card"
-                onClick={() => setInspectedProfile(activeSwipeCard)}
-              >
-                <div className="swipe-card-image-wrap">
-                  <img 
-                    src={activeSwipeCard.photos[0] || activeSwipeCard.avatar} 
-                    alt={activeSwipeCard.name} 
-                    className="swipe-card-img" 
-                  />
-                  <div className="swipe-card-gradient" />
+            <div className="dating-deck-stage">
+              {/* Ethereal background ambient glow */}
+              <div className="dating-deck-ambient-glow" aria-hidden="true" />
 
-                  {/* Top badges */}
-                  <div className="swipe-top-badges">
-                    <span className="compat-chip">
-                      <Sparkles size={14} />
-                      <span>{activeSwipeCard.compatibilityScore}% Резонанс</span>
-                    </span>
-                    <span className="class-chip">
-                      <span>Класс {activeSwipeCard.consciousnessLevel}</span>
-                    </span>
-                  </div>
+              {/* Left rotated background card (Previous Profile) */}
+              {prevCard && filteredProfiles.length > 1 && (
+                <div 
+                  className="dating-side-card dating-side-card-left"
+                  onClick={handlePrev}
+                  title={`Предыдущая анкета: ${prevCard.name} (${prevCard.age} лет)`}
+                >
+                  <div className="side-card-image-wrap">
+                    <img 
+                      src={prevCard.photos[0] || prevCard.avatar} 
+                      alt={prevCard.name} 
+                      className="side-card-img" 
+                    />
+                    <div className="side-card-gradient" />
 
-                  {/* Bottom details overlay */}
-                  <div className="swipe-bottom-info">
-                    <div className="swipe-title-row">
-                      <h2 className="swipe-name">{activeSwipeCard.name}, {activeSwipeCard.age}</h2>
-                      {activeSwipeCard.verified && <ShieldCheck size={20} color="#38bdf8" />}
+                    <div className="side-card-top-badges">
+                      <span className="compat-chip side-compat-chip">
+                        <Sparkles size={12} />
+                        <span>{prevCard.compatibilityScore}%</span>
+                      </span>
+                      <span className="class-chip side-class-chip">
+                        <span>Кл. {prevCard.consciousnessLevel}</span>
+                      </span>
                     </div>
 
-                    <div className="swipe-location-line">
-                      <MapPin size={14} />
-                      <span>{activeSwipeCard.city}</span>
-                      {activeSwipeCard.distanceKm !== undefined && (
-                        <>
-                          <span>•</span>
-                          <span className="card-distance-pill">
-                            <Navigation size={12} /> {activeSwipeCard.distanceKm} км от вас
-                          </span>
-                        </>
-                      )}
-                      <span>•</span>
-                      <span>⭐ {activeSwipeCard.zodiacSign}</span>
-                      {activeSwipeCard.occupation && (
-                        <>
-                          <span>•</span>
-                          <span>{activeSwipeCard.occupation}</span>
-                        </>
+                    <div className="side-card-bottom-info">
+                      <div className="side-card-name-row">
+                        <h3 className="side-card-name">{prevCard.name}, {prevCard.age}</h3>
+                        {prevCard.verified && <ShieldCheck size={16} color="#38bdf8" />}
+                      </div>
+                      <p className="side-card-location">{prevCard.city} • ⭐ {prevCard.zodiacSign}</p>
+                      {prevCard.goals[0] && (
+                        <div className="side-card-goal-chip">
+                          {DATING_GOALS.find(x => x.id === prevCard.goals[0])?.icon}{' '}
+                          {DATING_GOALS.find(x => x.id === prevCard.goals[0])?.shortLabel}
+                        </div>
                       )}
                     </div>
 
-                    {/* Goals chips */}
-                    <div className="swipe-goals-row">
-                      {activeSwipeCard.goals.map(gId => {
-                        const g = DATING_GOALS.find(x => x.id === gId);
-                        if (!g) return null;
-                        return (
-                          <span key={gId} className={`swipe-goal-tag ${g.badgeClass}`}>
-                            {g.icon} {g.shortLabel}
-                          </span>
-                        );
-                      })}
-                    </div>
-
-                    <p className="swipe-bio-snippet">{activeSwipeCard.bio}</p>
-
-                    {/* Interests preview */}
-                    <div className="swipe-interests-row">
-                      {activeSwipeCard.interests.slice(0, 4).map((tag, i) => (
-                        <span key={i} className="swipe-interest-pill">#{tag}</span>
-                      ))}
+                    <div className="side-card-action-overlay">
+                      <span className="side-card-action-hint">‹ Назад</span>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Swipe Action Controls (Pass, Like, Inspect) */}
-              <div className="swipe-controls-bar">
-                <button 
-                  type="button" 
-                  className="swipe-btn pass" 
-                  onClick={handlePass}
-                  title="Пропустить анкету"
-                >
-                  <RotateCcw size={22} />
-                  <span>Пропустить</span>
-                </button>
-
-                <button 
-                  type="button" 
-                  className="swipe-btn inspect" 
+              {/* Main Active Card */}
+              <div className="dating-swipe-card-container">
+                <div 
+                  className="dating-swipe-card"
                   onClick={() => setInspectedProfile(activeSwipeCard)}
-                  title="Открыть полную анкету"
                 >
-                  <ChevronRight size={22} />
-                  <span>Подробнее</span>
-                </button>
+                  <div className="swipe-card-image-wrap">
+                    <img 
+                      src={activeSwipeCard.photos[0] || activeSwipeCard.avatar} 
+                      alt={activeSwipeCard.name} 
+                      className="swipe-card-img" 
+                    />
+                    <div className="swipe-card-gradient" />
 
-                <button 
-                  type="button" 
-                  className={`swipe-btn like ${likedIds.includes(activeSwipeCard.id) ? 'active' : ''}`}
-                  onClick={() => handleLike(activeSwipeCard.id)}
-                  title="Поставить лайк"
-                >
-                  <Heart size={24} className={likedIds.includes(activeSwipeCard.id) ? 'fill-current' : ''} />
-                  <span>{likedIds.includes(activeSwipeCard.id) ? 'Понравилось' : 'Лайк'}</span>
-                </button>
+                    {/* Top badges */}
+                    <div className="swipe-top-badges">
+                      <span className="compat-chip">
+                        <Sparkles size={14} />
+                        <span>{activeSwipeCard.compatibilityScore}% Резонанс</span>
+                      </span>
+                      <span className="class-chip">
+                        <span>Класс {activeSwipeCard.consciousnessLevel}</span>
+                      </span>
+                    </div>
+
+                    {/* Bottom details overlay */}
+                    <div className="swipe-bottom-info">
+                      <div className="swipe-title-row">
+                        <h2 className="swipe-name">{activeSwipeCard.name}, {activeSwipeCard.age}</h2>
+                        {activeSwipeCard.verified && <ShieldCheck size={20} color="#38bdf8" />}
+                      </div>
+
+                      <div className="swipe-location-line">
+                        <MapPin size={14} />
+                        <span>{activeSwipeCard.city}</span>
+                        {activeSwipeCard.distanceKm !== undefined && (
+                          <>
+                            <span>•</span>
+                            <span className="card-distance-pill">
+                              <Navigation size={12} /> {activeSwipeCard.distanceKm} км от вас
+                            </span>
+                          </>
+                        )}
+                        <span>•</span>
+                        <span>⭐ {activeSwipeCard.zodiacSign}</span>
+                        {activeSwipeCard.occupation && (
+                          <>
+                            <span>•</span>
+                            <span>{activeSwipeCard.occupation}</span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Goals chips */}
+                      <div className="swipe-goals-row">
+                        {activeSwipeCard.goals.map(gId => {
+                          const g = DATING_GOALS.find(x => x.id === gId);
+                          if (!g) return null;
+                          return (
+                            <span key={gId} className={`swipe-goal-tag ${g.badgeClass}`}>
+                              {g.icon} {g.shortLabel}
+                            </span>
+                          );
+                        })}
+                      </div>
+
+                      <p className="swipe-bio-snippet">{activeSwipeCard.bio}</p>
+
+                      {/* Interests preview */}
+                      <div className="swipe-interests-row">
+                        {activeSwipeCard.interests.slice(0, 4).map((tag, i) => (
+                          <span key={i} className="swipe-interest-pill">#{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Swipe Action Controls (Pass, Like, Inspect) */}
+                <div className="swipe-controls-bar">
+                  <button 
+                    type="button" 
+                    className="swipe-btn pass" 
+                    onClick={handlePass}
+                    title="Пропустить анкету (стрелка влево)"
+                  >
+                    <RotateCcw size={22} />
+                    <span>Пропустить</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className="swipe-btn inspect" 
+                    onClick={() => setInspectedProfile(activeSwipeCard)}
+                    title="Открыть полную анкету (стрелка вверх)"
+                  >
+                    <ChevronRight size={22} />
+                    <span>Подробнее</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className={`swipe-btn like ${likedIds.includes(activeSwipeCard.id) ? 'active' : ''}`}
+                    onClick={() => handleLike(activeSwipeCard.id)}
+                    title="Поставить лайк (стрелка вправо)"
+                  >
+                    <Heart size={24} className={likedIds.includes(activeSwipeCard.id) ? 'fill-current' : ''} />
+                    <span>{likedIds.includes(activeSwipeCard.id) ? 'Понравилось' : 'Лайк'}</span>
+                  </button>
+                </div>
+
+                {/* Desktop Keyboard Hints */}
+                <div className="swipe-keyboard-hints" aria-hidden="true">
+                  <span className="kb-hint"><kbd>←</kbd> Пропуск</span>
+                  <span className="kb-hint"><kbd>↑</kbd> Анкета</span>
+                  <span className="kb-hint"><kbd>→</kbd> Лайк</span>
+                </div>
               </div>
+
+              {/* Right rotated background card (Next Profile) */}
+              {nextCard && filteredProfiles.length > 1 && (
+                <div 
+                  className="dating-side-card dating-side-card-right"
+                  onClick={handlePass}
+                  title={`Следующая анкета: ${nextCard.name} (${nextCard.age} лет)`}
+                >
+                  <div className="side-card-image-wrap">
+                    <img 
+                      src={nextCard.photos[0] || nextCard.avatar} 
+                      alt={nextCard.name} 
+                      className="side-card-img" 
+                    />
+                    <div className="side-card-gradient" />
+
+                    <div className="side-card-top-badges">
+                      <span className="compat-chip side-compat-chip">
+                        <Sparkles size={12} />
+                        <span>{nextCard.compatibilityScore}%</span>
+                      </span>
+                      <span className="class-chip side-class-chip">
+                        <span>Кл. {nextCard.consciousnessLevel}</span>
+                      </span>
+                    </div>
+
+                    <div className="side-card-bottom-info">
+                      <div className="side-card-name-row">
+                        <h3 className="side-card-name">{nextCard.name}, {nextCard.age}</h3>
+                        {nextCard.verified && <ShieldCheck size={16} color="#38bdf8" />}
+                      </div>
+                      <p className="side-card-location">{nextCard.city} • ⭐ {nextCard.zodiacSign}</p>
+                      {nextCard.goals[0] && (
+                        <div className="side-card-goal-chip">
+                          {DATING_GOALS.find(x => x.id === nextCard.goals[0])?.icon}{' '}
+                          {DATING_GOALS.find(x => x.id === nextCard.goals[0])?.shortLabel}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="side-card-action-overlay">
+                      <span className="side-card-action-hint">Дальше ›</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="dating-empty-card">
