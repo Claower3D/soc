@@ -66,6 +66,10 @@ export const DatingPage: React.FC = () => {
   // Индекс активной карточки для свайп-ленты
   const [currentSwipeIndex, setCurrentSwipeIndex] = useState(0);
 
+  // Анимация свайпа и кулдаун
+  const [swipeAnim, setSwipeAnim] = useState<'like' | 'pass' | 'prev' | null>(null);
+  const [isSwiping, setIsSwiping] = useState(false);
+
   // Фильтры
   const [selectedGoalFilter, setSelectedGoalFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -293,15 +297,65 @@ export const DatingPage: React.FC = () => {
     navigate(`/messenger?datingProfile=${encodeURIComponent(profileId)}`);
   };
 
-  const handlePass = () => {
-    setCurrentSwipeIndex(prev => (prev + 1 < filteredProfiles.length ? prev + 1 : 0));
+  const triggerSwipePass = () => {
+    if (isSwiping) return;
+    setIsSwiping(true);
+    setSwipeAnim('pass');
+
+    setTimeout(() => {
+      setCurrentSwipeIndex(prev => (prev + 1 < filteredProfiles.length ? prev + 1 : 0));
+      setSwipeAnim(null);
+      setTimeout(() => {
+        setIsSwiping(false);
+      }, 100);
+    }, 350);
   };
 
-  const handlePrev = () => {
-    setCurrentSwipeIndex(prev => (prev - 1 >= 0 ? prev - 1 : filteredProfiles.length - 1));
+  const triggerSwipePrev = () => {
+    if (isSwiping) return;
+    setIsSwiping(true);
+    setSwipeAnim('prev');
+
+    setTimeout(() => {
+      setCurrentSwipeIndex(prev => (prev - 1 >= 0 ? prev - 1 : filteredProfiles.length - 1));
+      setSwipeAnim(null);
+      setTimeout(() => {
+        setIsSwiping(false);
+      }, 100);
+    }, 350);
   };
 
-  // Keyboard navigation for desktop (Left = pass, Right = like, Up = inspect)
+  const triggerSwipeLike = (profileId: string) => {
+    if (isSwiping) return;
+    setIsSwiping(true);
+    setSwipeAnim('like');
+
+    const isAlreadyLiked = likedIds.includes(profileId);
+    const targetProfile = profiles.find(p => p.id === profileId);
+
+    setLikedIds(prev => {
+      const updated = isAlreadyLiked 
+        ? prev.filter(id => id !== profileId) 
+        : [...prev, profileId];
+      localStorage.setItem('newage_dating_likes', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (!isAlreadyLiked && targetProfile) {
+      setMutualMatchProfile(targetProfile);
+      createOrUpdateMatchChat(targetProfile);
+    }
+
+    setTimeout(() => {
+      setCurrentSwipeIndex(prev => (prev + 1 < filteredProfiles.length ? prev + 1 : 0));
+      setSwipeAnim(null);
+      setTimeout(() => {
+        setIsSwiping(false);
+      }, 100);
+    }, 350);
+  };
+
+  // Keyboard navigation for desktop with cooldown protection
   useEffect(() => {
     if (viewMode !== 'feed' || !activeSwipeCard || isFiltersOpen || isEditProfileOpen || inspectedProfile) return;
 
@@ -309,12 +363,14 @@ export const DatingPage: React.FC = () => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
         return;
       }
+      if (isSwiping) return; // Cooldown protection: ignore spamming keys
+
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        handlePass();
+        triggerSwipePass();
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        handleLike(activeSwipeCard.id);
+        triggerSwipeLike(activeSwipeCard.id);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setInspectedProfile(activeSwipeCard);
@@ -323,7 +379,7 @@ export const DatingPage: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, activeSwipeCard, isFiltersOpen, isEditProfileOpen, inspectedProfile, likedIds, filteredProfiles.length]);
+  }, [viewMode, activeSwipeCard, isFiltersOpen, isEditProfileOpen, inspectedProfile, likedIds, filteredProfiles.length, isSwiping]);
 
   const handleSaveMyProfile = (savedProfile: DatingProfile) => {
     setMyProfile(savedProfile);
@@ -744,8 +800,8 @@ export const DatingPage: React.FC = () => {
               {/* Left rotated background card (Previous Profile) */}
               {prevCard && filteredProfiles.length > 1 && (
                 <div 
-                  className="dating-side-card dating-side-card-left"
-                  onClick={handlePrev}
+                  className={`dating-side-card dating-side-card-left ${swipeAnim === 'prev' ? 'anim-entering-left' : ''}`}
+                  onClick={triggerSwipePrev}
                   title={`Предыдущая анкета: ${prevCard.name} (${prevCard.age} лет)`}
                 >
                   <div className="side-card-image-wrap">
@@ -790,9 +846,23 @@ export const DatingPage: React.FC = () => {
               {/* Main Active Card */}
               <div className="dating-swipe-card-container">
                 <div 
-                  className="dating-swipe-card"
-                  onClick={() => setInspectedProfile(activeSwipeCard)}
+                  className={`dating-swipe-card ${swipeAnim === 'like' ? 'anim-swipe-right' : ''} ${swipeAnim === 'pass' ? 'anim-swipe-left' : ''} ${swipeAnim === 'prev' ? 'anim-swipe-prev' : ''}`}
+                  onClick={() => !isSwiping && setInspectedProfile(activeSwipeCard)}
                 >
+                  {/* Dynamic Swipe Reaction Stamp / Badge Overlay */}
+                  {swipeAnim === 'like' && (
+                    <div className="swipe-stamp-overlay stamp-like">
+                      <Heart size={38} className="fill-current" />
+                      <span>СИМПАТИЯ</span>
+                    </div>
+                  )}
+                  {swipeAnim === 'pass' && (
+                    <div className="swipe-stamp-overlay stamp-pass">
+                      <RotateCcw size={36} />
+                      <span>ПРОПУСК</span>
+                    </div>
+                  )}
+
                   <div className="swipe-card-image-wrap">
                     <img 
                       src={activeSwipeCard.photos[0] || activeSwipeCard.avatar} 
@@ -865,22 +935,24 @@ export const DatingPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Swipe Action Controls (Pass, Like, Inspect) */}
-                <div className="swipe-controls-bar">
+                {/* Swipe Action Controls (Pass, Like, Inspect) with Cooldown */}
+                <div className={`swipe-controls-bar ${isSwiping ? 'controls-locked' : ''}`}>
                   <button 
                     type="button" 
-                    className="swipe-btn pass" 
-                    onClick={handlePass}
+                    className={`swipe-btn pass ${isSwiping && swipeAnim === 'pass' ? 'btn-animating' : ''}`} 
+                    onClick={triggerSwipePass}
+                    disabled={isSwiping}
                     title="Пропустить анкету (стрелка влево)"
                   >
-                    <RotateCcw size={22} />
+                    <RotateCcw size={22} className={isSwiping && swipeAnim === 'pass' ? 'spin-fast' : ''} />
                     <span>Пропустить</span>
                   </button>
 
                   <button 
                     type="button" 
                     className="swipe-btn inspect" 
-                    onClick={() => setInspectedProfile(activeSwipeCard)}
+                    onClick={() => !isSwiping && setInspectedProfile(activeSwipeCard)}
+                    disabled={isSwiping}
                     title="Открыть полную анкету (стрелка вверх)"
                   >
                     <ChevronRight size={22} />
@@ -889,8 +961,9 @@ export const DatingPage: React.FC = () => {
 
                   <button 
                     type="button" 
-                    className={`swipe-btn like ${likedIds.includes(activeSwipeCard.id) ? 'active' : ''}`}
-                    onClick={() => handleLike(activeSwipeCard.id)}
+                    className={`swipe-btn like ${likedIds.includes(activeSwipeCard.id) ? 'active' : ''} ${isSwiping && swipeAnim === 'like' ? 'btn-animating' : ''}`}
+                    onClick={() => triggerSwipeLike(activeSwipeCard.id)}
+                    disabled={isSwiping}
                     title="Поставить лайк (стрелка вправо)"
                   >
                     <Heart size={24} className={likedIds.includes(activeSwipeCard.id) ? 'fill-current' : ''} />
@@ -909,8 +982,8 @@ export const DatingPage: React.FC = () => {
               {/* Right rotated background card (Next Profile) */}
               {nextCard && filteredProfiles.length > 1 && (
                 <div 
-                  className="dating-side-card dating-side-card-right"
-                  onClick={handlePass}
+                  className={`dating-side-card dating-side-card-right ${swipeAnim === 'pass' ? 'anim-entering-right' : ''}`}
+                  onClick={triggerSwipePass}
                   title={`Следующая анкета: ${nextCard.name} (${nextCard.age} лет)`}
                 >
                   <div className="side-card-image-wrap">
