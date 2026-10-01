@@ -394,28 +394,25 @@ export function ProfilePage() {
   }, [isMe, isUserOnline, profileData, activeUser?.lastSeen, activeUser?.lastSeenText]);
 
   const friendsDisplayCount = useMemo(() => {
-    return (profileData as any)?.friendsCount ?? activeUser?.friendsCount ?? 0;
+    const raw = (profileData as any)?.friendsCount ?? activeUser?.friendsCount ?? 0;
+    return typeof raw === 'number' ? raw : 0;
   }, [profileData, activeUser?.friendsCount]);
 
   const followersDisplayCount = useMemo(() => {
-    if (profileData && typeof (profileData as any).followersCount === 'number') {
-      return (profileData as any).followersCount;
-    }
-    return realFollowersList.length;
-  }, [profileData, realFollowersList.length]);
+    const raw = profileData && typeof (profileData as any).followersCount === 'number'
+      ? (profileData as any).followersCount
+      : (activeUser?.followersCount ?? 0);
+    const localCount = realFollowersList.length;
+    return Math.max(raw, localCount);
+  }, [profileData, activeUser?.followersCount, realFollowersList.length]);
 
   const followingDisplayCount = useMemo(() => {
-    if (isMe) {
-      if (profileData && typeof (profileData as any).followingCount === 'number') {
-        return (profileData as any).followingCount;
-      }
-      return realFollowingList.length;
-    }
-    if (profileData && typeof (profileData as any).followingCount === 'number') {
-      return (profileData as any).followingCount;
-    }
-    return realFollowingList.length;
-  }, [isMe, profileData, realFollowingList.length]);
+    const raw = profileData && typeof (profileData as any).followingCount === 'number'
+      ? (profileData as any).followingCount
+      : (activeUser?.followingCount ?? 0);
+    const localCount = realFollowingList.length;
+    return Math.max(raw, localCount);
+  }, [profileData, activeUser?.followingCount, realFollowingList.length]);
 
   const userHasStories = useMemo(() => {
     if (!activeUser) return false;
@@ -518,14 +515,22 @@ export function ProfilePage() {
           setFriendStatus('none');
         }
 
-        setProfileData(prev => prev ? {
-          ...prev,
-          isFriend: res.isFriend,
-          isFollowed: res.isFollowed,
-          friendsCount: res.friendsCount ?? (prev as any).friendsCount,
-          followersCount: res.followersCount ?? (prev as any).followersCount,
-          followingCount: res.followingCount ?? (prev as any).followingCount
-        } : null);
+        setProfileData(prev => {
+          if (!prev) return null;
+          const currentFollowers = (prev as any).followersCount || 0;
+          const newFollowers = typeof res.followersCount === 'number' && res.followersCount > 0
+            ? res.followersCount
+            : (res.isFollowed ? currentFollowers + 1 : Math.max(0, currentFollowers - 1));
+
+          return {
+            ...prev,
+            isFriend: res.isFriend,
+            isFollowed: res.isFollowed,
+            friendsCount: res.friendsCount ?? (prev as any).friendsCount,
+            followersCount: newFollowers,
+            followingCount: res.followingCount ?? (prev as any).followingCount
+          };
+        });
       }
     } catch (err) {
       console.error('Follow toggle error:', err);

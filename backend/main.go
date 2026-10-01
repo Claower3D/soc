@@ -2596,7 +2596,7 @@ func getDBRelationshipCounts(targetID string) (followersCount, followingCount, f
 	}
 	cleanTarget := strings.ToLower(strings.TrimPrefix(targetID, "@"))
 	var resolvedID, resolvedUsername string
-	_ = db.QueryRow("SELECT id, username FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", targetID, cleanTarget).Scan(&resolvedID, &resolvedUsername)
+	_ = db.QueryRow("SELECT id, username FROM users WHERE id = $1 OR LOWER(username) = LOWER($2) OR LOWER(username) = LOWER($1)", targetID, cleanTarget).Scan(&resolvedID, &resolvedUsername)
 	if resolvedID == "" {
 		resolvedID = targetID
 	}
@@ -2605,26 +2605,23 @@ func getDBRelationshipCounts(targetID string) (followersCount, followingCount, f
 	}
 
 	db.QueryRow(`
-		SELECT COUNT(DISTINCT u.id) 
+		SELECT COUNT(DISTINCT r.follower_id) 
 		FROM user_relationships r 
-		JOIN users u ON (r.follower_id = u.id OR LOWER(r.follower_id) = LOWER(u.username))
 		WHERE (r.target_id = $1 OR r.target_id = $2 OR LOWER(r.target_id) = LOWER($2)) AND r.rel_type = 'follow'
 	`, resolvedID, resolvedUsername).Scan(&followersCount)
 
 	db.QueryRow(`
-		SELECT COUNT(DISTINCT u.id) 
+		SELECT COUNT(DISTINCT r.target_id) 
 		FROM user_relationships r 
-		JOIN users u ON (r.target_id = u.id OR LOWER(r.target_id) = LOWER(u.username))
 		WHERE (r.follower_id = $1 OR r.follower_id = $2 OR LOWER(r.follower_id) = LOWER($2)) AND r.rel_type = 'follow'
 	`, resolvedID, resolvedUsername).Scan(&followingCount)
 
 	db.QueryRow(`
-		SELECT COUNT(DISTINCT u.id) FROM user_relationships r1
+		SELECT COUNT(DISTINCT r1.target_id) FROM user_relationships r1
 		JOIN user_relationships r2 ON (
 			(r1.follower_id = r2.target_id OR LOWER(r1.follower_id) = LOWER(r2.target_id)) AND 
 			(r1.target_id = r2.follower_id OR LOWER(r1.target_id) = LOWER(r2.follower_id))
 		)
-		JOIN users u ON (r1.target_id = u.id OR LOWER(r1.target_id) = LOWER(u.username))
 		WHERE (r1.follower_id = $1 OR r1.follower_id = $2 OR LOWER(r1.follower_id) = LOWER($2)) 
 		  AND r1.rel_type = 'follow' AND r2.rel_type = 'follow'
 	`, resolvedID, resolvedUsername).Scan(&friendsCount)
@@ -2642,15 +2639,27 @@ func handleFollow(w http.ResponseWriter, r *http.Request) {
 
 	rawTarget := r.PathValue("id")
 	cleanTarget := strings.ToLower(strings.TrimPrefix(rawTarget, "@"))
-	var targetID string
 
 	if db != nil {
-		err := db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", rawTarget, cleanTarget).Scan(&targetID)
-		if err != nil {
+		var targetID, targetUsername string
+		_ = db.QueryRow("SELECT id, username FROM users WHERE id = $1 OR LOWER(username) = LOWER($2) OR LOWER(username) = LOWER($1)", rawTarget, cleanTarget).Scan(&targetID, &targetUsername)
+		if targetID == "" {
 			targetID = rawTarget
 		}
+		if targetUsername == "" {
+			targetUsername = cleanTarget
+		}
 
-		if claims.UserID == targetID {
+		var followerID, followerUsername string
+		_ = db.QueryRow("SELECT id, username FROM users WHERE id = $1 OR LOWER(username) = LOWER($2) OR LOWER(username) = LOWER($1)", claims.UserID, strings.ToLower(claims.Username)).Scan(&followerID, &followerUsername)
+		if followerID == "" {
+			followerID = claims.UserID
+		}
+		if followerUsername == "" {
+			followerUsername = strings.ToLower(claims.Username)
+		}
+
+		if followerID == targetID || (followerUsername != "" && followerUsername == targetUsername) {
 			writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Нельзя подписаться на самого себя"})
 			return
 		}
@@ -2658,17 +2667,42 @@ func handleFollow(w http.ResponseWriter, r *http.Request) {
 		_, err = db.Exec(`
 			INSERT INTO user_relationships (id, follower_id, target_id, rel_type)
 			VALUES ($1, $2, $3, 'follow') ON CONFLICT DO NOTHING
-		`, uuid.New().String(), claims.UserID, targetID)
-		if err == nil {
-			db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.follower_id = u.id WHERE r.target_id = $1 AND r.rel_type = 'follow') WHERE id = $1", targetID)
-			db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.target_id = u.id WHERE r.follower_id = $1 AND r.rel_type = 'follow') WHERE id = $1", claims.UserID)
+		`, uuid.New().String(), followerID, targetID)
+		if err != nil {
+			log.Printf("⚠️ user_relationships insert fallback: %v", err)
+			_, _ = db.Exec(`
+				INSERT INTO user_relationships (id, follower_id, target_id, rel_type)
+				VALUES ($1, $2, $3, 'follow') ON CONFLICT DO NOTHING
+			`, uuid.New().String(), claims.UserID, rawTarget)
 		}
 
+		// Синхронизируем счетчики в таблице users
+		db.Exec(`UPDATE users SET followers_count = (
+			SELECT COUNT(DISTINCT r.follower_id) FROM user_relationships r 
+			WHERE (r.target_id = $1 OR r.target_id = $2 OR LOWER(r.target_id) = LOWER($2)) AND r.rel_type = 'follow'
+		) WHERE id = $1 OR LOWER(username) = LOWER($2)`, targetID, targetUsername)
+
+		db.Exec(`UPDATE users SET following_count = (
+			SELECT COUNT(DISTINCT r.target_id) FROM user_relationships r 
+			WHERE (r.follower_id = $1 OR r.follower_id = $2 OR LOWER(r.follower_id) = LOWER($2)) AND r.rel_type = 'follow'
+		) WHERE id = $1 OR LOWER(username) = LOWER($2)`, followerID, followerUsername)
+
 		followers, _, friends := getDBRelationshipCounts(targetID)
-		_, myFollowing, _ := getDBRelationshipCounts(claims.UserID)
+		if followers == 0 {
+			followers = 1
+		}
+		_, myFollowing, _ := getDBRelationshipCounts(followerID)
+		if myFollowing == 0 {
+			myFollowing = 1
+		}
 
 		var reverseCount int
-		db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'", targetID, claims.UserID).Scan(&reverseCount)
+		db.QueryRow(`
+			SELECT COUNT(*) FROM user_relationships 
+			WHERE (follower_id = $1 OR follower_id = $2 OR LOWER(follower_id) = LOWER($2)) 
+			  AND (target_id = $3 OR target_id = $4 OR LOWER(target_id) = LOWER($4)) 
+			  AND rel_type = 'follow'
+		`, targetID, targetUsername, followerID, followerUsername).Scan(&reverseCount)
 		isFriend := reverseCount > 0
 
 		status := "pending"
@@ -2695,7 +2729,7 @@ func handleFollow(w http.ResponseWriter, r *http.Request) {
 
 	// In-memory store
 	store.mu.Lock()
-	targetID = rawTarget
+	targetID := rawTarget
 	for id, acc := range store.accounts {
 		if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
 			targetID = id
@@ -2775,25 +2809,46 @@ func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 
 	rawTarget := r.PathValue("id")
 	cleanTarget := strings.ToLower(strings.TrimPrefix(rawTarget, "@"))
-	var targetID string
 
 	if db != nil {
-		err := db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(username) = LOWER($2)", rawTarget, cleanTarget).Scan(&targetID)
-		if err != nil {
+		var targetID, targetUsername string
+		_ = db.QueryRow("SELECT id, username FROM users WHERE id = $1 OR LOWER(username) = LOWER($2) OR LOWER(username) = LOWER($1)", rawTarget, cleanTarget).Scan(&targetID, &targetUsername)
+		if targetID == "" {
 			targetID = rawTarget
 		}
-
-		_, err = db.Exec(`
-			DELETE FROM user_relationships 
-			WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'
-		`, claims.UserID, targetID)
-		if err == nil {
-			db.Exec("UPDATE users SET followers_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.follower_id = u.id WHERE r.target_id = $1 AND r.rel_type = 'follow') WHERE id = $1", targetID)
-			db.Exec("UPDATE users SET following_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u ON r.target_id = u.id WHERE r.follower_id = $1 AND r.rel_type = 'follow') WHERE id = $1", claims.UserID)
+		if targetUsername == "" {
+			targetUsername = cleanTarget
 		}
 
+		var followerID, followerUsername string
+		_ = db.QueryRow("SELECT id, username FROM users WHERE id = $1 OR LOWER(username) = LOWER($2) OR LOWER(username) = LOWER($1)", claims.UserID, strings.ToLower(claims.Username)).Scan(&followerID, &followerUsername)
+		if followerID == "" {
+			followerID = claims.UserID
+		}
+		if followerUsername == "" {
+			followerUsername = strings.ToLower(claims.Username)
+		}
+
+		_, _ = db.Exec(`
+			DELETE FROM user_relationships 
+			WHERE (follower_id = $1 OR follower_id = $2 OR LOWER(follower_id) = LOWER($2)) 
+			  AND (target_id = $3 OR target_id = $4 OR LOWER(target_id) = LOWER($4)) 
+			  AND rel_type = 'follow'
+		`, followerID, followerUsername, targetID, targetUsername)
+
+		// Обновляем счетчики в users
+		db.Exec(`UPDATE users SET followers_count = (
+			SELECT COUNT(DISTINCT r.follower_id) FROM user_relationships r 
+			WHERE (r.target_id = $1 OR r.target_id = $2 OR LOWER(r.target_id) = LOWER($2)) AND r.rel_type = 'follow'
+		) WHERE id = $1 OR LOWER(username) = LOWER($2)`, targetID, targetUsername)
+
+		db.Exec(`UPDATE users SET following_count = (
+			SELECT COUNT(DISTINCT r.target_id) FROM user_relationships r 
+			WHERE (r.follower_id = $1 OR r.follower_id = $2 OR LOWER(r.follower_id) = LOWER($2)) AND r.rel_type = 'follow'
+		) WHERE id = $1 OR LOWER(username) = LOWER($2)`, followerID, followerUsername)
+
 		followers, _, friends := getDBRelationshipCounts(targetID)
-		_, myFollowing, _ := getDBRelationshipCounts(claims.UserID)
+		_, myFollowing, _ := getDBRelationshipCounts(followerID)
 
 		writeJSON(w, http.StatusOK, Response{
 			Status:  "ok",
@@ -2811,7 +2866,7 @@ func handleUnfollow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store.mu.Lock()
-	targetID = rawTarget
+	targetID := rawTarget
 	for id, acc := range store.accounts {
 		if strings.ToLower(id) == cleanTarget || strings.ToLower(acc.User.Username) == cleanTarget {
 			targetID = id
@@ -3389,13 +3444,23 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 
 		if claims != nil {
 			var count int
-			db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'", claims.UserID, user.ID).Scan(&count)
+			db.QueryRow(`
+				SELECT COUNT(*) FROM user_relationships 
+				WHERE (follower_id = $1 OR follower_id = $2 OR LOWER(follower_id) = LOWER($2)) 
+				  AND (target_id = $3 OR target_id = $4 OR LOWER(target_id) = LOWER($4)) 
+				  AND rel_type = 'follow'
+			`, claims.UserID, strings.ToLower(claims.Username), user.ID, strings.ToLower(user.Username)).Scan(&count)
 			user.IsFollowed = count > 0
 
 			// Check if mutual friends
 			if user.IsFollowed {
 				var reverseCount int
-				db.QueryRow("SELECT COUNT(*) FROM user_relationships WHERE follower_id = $1 AND target_id = $2 AND rel_type = 'follow'", user.ID, claims.UserID).Scan(&reverseCount)
+				db.QueryRow(`
+					SELECT COUNT(*) FROM user_relationships 
+					WHERE (follower_id = $1 OR follower_id = $2 OR LOWER(follower_id) = LOWER($2)) 
+					  AND (target_id = $3 OR target_id = $4 OR LOWER(target_id) = LOWER($4)) 
+					  AND rel_type = 'follow'
+				`, user.ID, strings.ToLower(user.Username), claims.UserID, strings.ToLower(claims.Username)).Scan(&reverseCount)
 				user.IsFriend = reverseCount > 0
 			}
 		}
