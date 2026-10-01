@@ -8,6 +8,7 @@ import { type Post, type Comment } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { PremiumBadge } from './PremiumBadge';
 import { api } from '../api';
+import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './PostDetailModal.css';
 
 interface PostDetailModalProps {
@@ -206,7 +207,12 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
               className="modal-author-block"
               onClick={(e) => handleProfileClick(post.user.id, e)}
             >
-              <img src={post.user.avatar} alt={post.user.name} className="modal-author-avatar" />
+              <img 
+                src={getAvatarUrl(post.user)} 
+                alt={post.user.name} 
+                className="modal-author-avatar" 
+                onError={handleAvatarError} 
+              />
               <div className="modal-author-names">
                 <div className="modal-author-top">
                   <span className="author-fullname">{post.user.name}</span>
@@ -242,10 +248,11 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
             {/* Original Post Caption as first comment */}
             <div className="modal-caption-entry">
               <img 
-                src={post.user.avatar} 
+                src={getAvatarUrl(post.user)} 
                 alt={post.user.name} 
                 className="comment-user-avatar"
                 onClick={(e) => handleProfileClick(post.user.id, e)}
+                onError={handleAvatarError}
               />
               <div className="comment-content-wrap">
                 <div className="comment-text-bubble">
@@ -284,10 +291,11 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
                 return (
                   <div key={c.id} className="comment-entry-row">
                     <img 
-                      src={c.user.avatar} 
+                      src={getAvatarUrl(c.user)} 
                       alt={c.user.name} 
                       className="comment-user-avatar"
                       onClick={(e) => handleProfileClick(c.user.id, e)}
+                      onError={handleAvatarError}
                     />
 
                     <div className="comment-content-wrap">

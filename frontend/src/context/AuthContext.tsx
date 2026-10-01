@@ -65,11 +65,13 @@ const STORAGE_KEY_USER = 'new_age_current_user';
 const STORAGE_KEY_ACCOUNTS = 'new_age_registered_accounts';
 const STORAGE_KEY_TOKEN = 'new_age_jwt_token';
 
+import { DEFAULT_AVATAR, isRealCustomAvatar } from '../utils/avatar';
+
 export const GUEST_USER: User = {
   id: 'guest',
   name: 'Гость',
   username: 'guest',
-  avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
+  avatar: DEFAULT_AVATAR,
   coverImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
   bio: 'Гостевой просмотр New Age. Войдите или зарегистрируйтесь, чтобы создать профиль, публиковать контент и общаться.',
   website: '',
@@ -133,6 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const parsed = JSON.parse(saved);
         if (parsed && parsed.id && parsed.id !== 'guest' && parsed.id !== 'me') {
           if (parsed.username) parsed.username = String(parsed.username).replace(/^@+/, '');
+          if (!isRealCustomAvatar(parsed.avatar)) parsed.avatar = DEFAULT_AVATAR;
           return parsed;
         }
       }
@@ -163,6 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const u = data?.data?.user || data?.user;
         if (u && (u.id || u.username)) {
           if (u.username) u.username = String(u.username).replace(/^@+/, '');
+          if (!isRealCustomAvatar(u.avatar)) u.avatar = DEFAULT_AVATAR;
           setActiveUser(u);
           setIsAuthenticated(true);
           localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(u));

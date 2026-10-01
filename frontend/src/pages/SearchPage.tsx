@@ -14,6 +14,7 @@ import {
   toggleUserFollow,
   cacheUser
 } from '../utils/followStorage';
+import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './SearchPage.css';
 
 type SearchTab = 'all' | 'accounts' | 'videos' | 'posts';
@@ -254,7 +255,12 @@ export function SearchPage() {
                         onClick={() => navigate(user.username ? `/profile/@${user.username}` : `/profile/${user.id}`)}
                       >
                         <div className="account-card-avatar-wrap">
-                          <img src={user.avatar} alt={user.name} className="account-card-avatar" />
+                          <img 
+                            src={getAvatarUrl(user)} 
+                            alt={user.name} 
+                            className="account-card-avatar" 
+                            onError={handleAvatarError}
+                          />
                           <span 
                             className={`account-online-dot ${isOnline ? 'is-online' : 'is-offline'}`}
                             title={isOnline ? 'В сети' : 'Не в сети'}
@@ -389,7 +395,12 @@ export function SearchPage() {
                       onClick={() => navigate(user.username ? `/profile/@${user.username}` : `/profile/${user.id}`)}
                     >
                       <div className="account-row-avatar-wrap">
-                        <img src={user.avatar} alt={user.name} className="account-row-avatar" />
+                        <img 
+                          src={getAvatarUrl(user)} 
+                          alt={user.name} 
+                          className="account-row-avatar" 
+                          onError={handleAvatarError}
+                        />
                         <span 
                           className={`account-row-online-badge ${isOnline ? 'is-online' : 'is-offline'}`}
                           title={isOnline ? 'В сети' : 'Не в сети'}

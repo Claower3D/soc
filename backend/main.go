@@ -290,18 +290,9 @@ func ensureUserAvatar(u *User) {
 	if u == nil {
 		return
 	}
-	if strings.TrimSpace(u.Avatar) == "" || u.Avatar == "undefined" {
-		seed := u.Username
-		if seed == "" {
-			seed = u.Name
-		}
-		if seed == "" {
-			seed = u.ID
-		}
-		if seed == "" {
-			seed = "user"
-		}
-		u.Avatar = fmt.Sprintf("https://api.dicebear.com/7.x/avataaars/svg?seed=%s", seed)
+	trimmed := strings.TrimSpace(u.Avatar)
+	if trimmed == "" || trimmed == "undefined" || trimmed == "null" || strings.Contains(trimmed, "dicebear") || strings.Contains(trimmed, "unsplash") {
+		u.Avatar = "/default-avatar.svg"
 	}
 }
 
@@ -421,11 +412,16 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 		  followers_count = (SELECT COUNT(*) FROM user_relationships r JOIN users u2 ON r.follower_id = u2.id WHERE r.target_id = u.id AND r.rel_type = 'follow');
 	`)
 
-	// Исправление пустых и битых аватарок у всех пользователей в БД
+	// Исправление пустых, битых, dicebear и unsplash аватарок у всех пользователей в БД на стандартный серый бублик
 	_, _ = conn.Exec(`
 		UPDATE users 
-		SET avatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=' || username 
-		WHERE avatar IS NULL OR avatar = '' OR avatar = 'undefined';
+		SET avatar = '/default-avatar.svg' 
+		WHERE avatar IS NULL 
+		   OR avatar = '' 
+		   OR avatar = 'undefined' 
+		   OR avatar = 'null' 
+		   OR avatar LIKE '%dicebear%' 
+		   OR avatar LIKE '%unsplash%';
 	`)
 
 	// Убеждаемся что колонки online и last_seen присутствуют в таблице users
@@ -573,6 +569,10 @@ func (s *UserStore) loadFromDisk() {
 	defer s.mu.Unlock()
 	if data.Accounts != nil {
 		s.accounts = data.Accounts
+		for id, acc := range s.accounts {
+			ensureUserAvatar(&acc.User)
+			s.accounts[id] = acc
+		}
 	}
 	if data.Relationships != nil {
 		s.relationships = make(map[string][]string)
@@ -595,6 +595,9 @@ func (s *UserStore) loadFromDisk() {
 	}
 	if data.Posts != nil {
 		s.posts = data.Posts
+		for i := range s.posts {
+			ensureUserAvatar(&s.posts[i].User)
+		}
 	}
 	if data.Stories != nil {
 		s.stories = data.Stories
@@ -2087,8 +2090,8 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	newID := "u_" + uuid.New().String()[:12]
 	avatar := req.Avatar
-	if avatar == "" {
-		avatar = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80"
+	if avatar == "" || strings.Contains(avatar, "unsplash") || strings.Contains(avatar, "dicebear") {
+		avatar = "/default-avatar.svg"
 	}
 
 	role := req.Role

@@ -12,6 +12,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { AuthModal } from './AuthModal';
 import { PremiumBadge } from './PremiumBadge';
+import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './Header.css';
 
 export function Header() {
@@ -426,7 +427,12 @@ export function Header() {
               onClick={() => navigate(currentUser.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser.id}`)}
               title={`Мой профиль: ${currentUser.name} (@${currentUser.username})`}
             >
-              <img src={currentUser.avatar} alt={currentUser.name} className="header-avatar" />
+              <img 
+                src={getAvatarUrl(currentUser)} 
+                alt={currentUser.name} 
+                className="header-avatar" 
+                onError={handleAvatarError}
+              />
               <div className="header-profile-text">
                 <span className="header-user-name">{typeof currentUser.name === 'string' ? currentUser.name.split(' ')[0] : ''}</span>
                 {currentUser.isPremium && <PremiumBadge size="sm" />}

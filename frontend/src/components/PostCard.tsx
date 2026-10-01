@@ -4,6 +4,7 @@ import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Check, MapPin, Tr
 import { type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { PremiumBadge } from './PremiumBadge';
+import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './PostCard.css';
 
 interface PostCardProps {
@@ -108,7 +109,12 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
           onClick={(e) => handleProfileClick(post.user.id, e)}
         >
           <div className="post-avatar-wrapper">
-            <img src={post.user.avatar} alt={post.user.name} className="post-avatar" />
+            <img 
+              src={getAvatarUrl(post.user)} 
+              alt={post.user.name} 
+              className="post-avatar" 
+              onError={handleAvatarError}
+            />
             <span 
               className={`post-author-online ${(post.user.id === currentUser?.id ? true : Boolean(post.user.online)) ? 'is-online' : 'is-offline'}`} 
               title={(post.user.id === currentUser?.id ? true : Boolean(post.user.online)) ? 'В сети' : 'Не в сети'} 

@@ -14,6 +14,7 @@ import {
   type ProductData, type ContactData, type ChatTheme, CHAT_THEMES, 
   initialUsers, initialProducts, chats as defaultChats 
 } from '../data/mock';
+import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './ChatWindow.css';
 
 interface ChatWindowProps {
@@ -1078,9 +1079,10 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
           <div className="tg-user-box" onClick={handleHeaderClick}>
             <div className="tg-avatar-wrap">
               <img 
-                src={chat.groupAvatar || chat.user?.avatar || ''} 
+                src={chat.isGroup ? (chat.groupAvatar || '/default-avatar.svg') : getAvatarUrl(chat.user)} 
                 alt={String(chat.groupTitle || chat.user?.name || 'Чат')} 
                 className="tg-header-avatar" 
+                onError={handleAvatarError}
               />
               {!chat.isGroup && (
                 <span 

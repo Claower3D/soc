@@ -10,6 +10,7 @@ import {
 import { type Story, type User, type StoryStats } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { CreateStoryModal, STORY_FILTERS } from './CreateStoryModal';
+import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './StoriesBar.css';
 
 export interface UserStoryGroup {
@@ -371,12 +372,10 @@ export function StoriesBar({
               <div className={`insta-avatar-ring ${myStoriesGroup && myStoriesGroup.stories.length > 0 ? (myStoriesGroup.hasUnviewed ? 'ring-gradient' : 'ring-viewed') : 'own-ring'}`}>
                 <div className="insta-avatar-inner">
                   <img 
-                    src={currentUser.avatar && currentUser.avatar.trim() !== '' && currentUser.avatar !== 'undefined' ? currentUser.avatar : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(currentUser.username || currentUser.name || 'user')}`} 
+                    src={getAvatarUrl(currentUser)} 
                     alt="Ваша история" 
                     className="insta-avatar-img" 
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(currentUser.username || currentUser.name || 'user')}`;
-                    }}
+                    onError={handleAvatarError}
                   />
                   {/* Plus badge */}
                   <div 
@@ -410,14 +409,15 @@ export function StoriesBar({
                     <div className={`insta-avatar-ring ${group.isLive ? 'ring-live' : (group.hasUnviewed ? 'ring-gradient' : 'ring-viewed')}`}>
                       <div className="insta-avatar-inner">
                         <img 
-                          src={group.user.avatar && group.user.avatar.trim() !== '' && group.user.avatar !== 'undefined' ? group.user.avatar : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.user.username || group.user.name || group.user.id)}`} 
+                          src={getAvatarUrl(group.user)} 
                           alt={group.user.name || group.user.username} 
                           className="insta-avatar-img" 
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(group.user.username || group.user.name || group.user.id)}`;
-                          }}
+                          onError={handleAvatarError}
                         />
-                        {group.user.online && !group.isLive && <span className="insta-online-indicator" />}
+                        <span 
+                          className={`insta-online-indicator ${group.user.online ? 'is-online' : 'is-offline'}`}
+                          title={group.user.online ? 'В сети' : 'Не в сети'}
+                        />
                       </div>
                       {group.isLive && (
                         <span className="insta-live-tag-badge">LIVE</span>
@@ -506,12 +506,10 @@ export function StoriesBar({
                   onClick={(e) => handleAuthorClick(activeStory.user, e)}
                 >
                   <img 
-                    src={activeStory.user.avatar && activeStory.user.avatar.trim() !== '' && activeStory.user.avatar !== 'undefined' ? activeStory.user.avatar : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(activeStory.user.username || activeStory.user.name || activeStory.user.id)}`} 
+                    src={getAvatarUrl(activeStory.user)} 
                     alt={activeStory.user.name} 
                     className="insta-header-avatar" 
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(activeStory.user.username || activeStory.user.name || activeStory.user.id)}`;
-                    }}
+                    onError={handleAvatarError}
                   />
                   <div className="insta-header-text">
                     <div className="insta-header-title-row">

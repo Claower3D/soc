@@ -55,13 +55,8 @@ const getPluralForm = (n: number, one: string, few: string, many: string) => {
   return many;
 };
 
-export const getAvatarUrl = (u?: Partial<User> | null) => {
-  if (u?.avatar && u.avatar.trim() !== '' && u.avatar !== 'undefined') {
-    return u.avatar;
-  }
-  const seed = u?.username ? u.username.replace(/^@+/, '') : (u?.name || u?.id || 'newage_user');
-  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
-};
+import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
+export { getAvatarUrl };
 
 export function ProfilePage() {
   const { userId } = useParams();
@@ -613,10 +608,7 @@ export function ProfilePage() {
                   src={getAvatarUrl(activeUser)} 
                   alt={activeUser.name} 
                   className={`profile-main-avatar ${activeUser.isPremium ? 'profile-premium-frame' : ''}`} 
-                  onError={(e) => {
-                    const seed = activeUser?.username ? activeUser.username.replace(/^@+/, '') : (activeUser?.name || 'newage_user');
-                    (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
-                  }}
+                  onError={handleAvatarError}
                 />
                 <span 
                   className={`profile-online-indicator ${(isMe ? true : Boolean(activeUser.online)) ? 'is-online' : 'is-offline'}`} 

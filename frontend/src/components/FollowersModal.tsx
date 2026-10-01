@@ -12,6 +12,7 @@ import {
   cacheUser
 } from '../utils/followStorage';
 import { api } from '../api';
+import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './FollowersModal.css';
 
 type Tab = 'friends' | 'followers' | 'following';
@@ -202,12 +203,10 @@ export function FollowersModal({ isOpen, onClose, title, currentUserId, isMe }: 
                     onClick={() => handleUserClick(user)}
                   >
                     <img
-                      src={user.avatar && user.avatar.trim() !== '' && user.avatar !== 'undefined' ? user.avatar : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.username || user.name || user.id)}`}
+                      src={getAvatarUrl(user)}
                       alt={user.name}
                       className="follower-avatar"
-                      onError={(e) => {
-                        (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.username || user.name || user.id)}`;
-                      }}
+                      onError={handleAvatarError}
                     />
                     <div className="follower-info">
                       <span className="follower-name">@{user.username || user.name}</span>

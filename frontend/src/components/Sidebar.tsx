@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { AuthModal } from './AuthModal';
 import { PremiumBadge } from './PremiumBadge';
+import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import logoImg from '../assets/logo.png';
 import './Sidebar.css';
 
@@ -525,7 +526,12 @@ export function Sidebar() {
             title="Перейти в Мой профиль"
           >
             <div className="footer-avatar-wrapper">
-              <img src={currentUser.avatar} alt={currentUser.name} className="footer-user-avatar" />
+              <img 
+                src={getAvatarUrl(currentUser)} 
+                alt={currentUser.name} 
+                className="footer-user-avatar" 
+                onError={handleAvatarError}
+              />
               <span className="footer-online-dot" />
             </div>
             <div className="footer-user-info">

@@ -6,6 +6,7 @@ import {
   Star, ChevronDown, Tag, Heart, AlertCircle
 } from 'lucide-react';
 import { initialUsers, currentUser, stories, type Chat, CHAT_TAGS } from '../data/mock';
+import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './ChatList.css';
 
 interface ChatListProps {
@@ -476,7 +477,7 @@ export function ChatList({
             const isGroup = chat.isGroup;
             const isAi = chat.id === 'ai_guru_bot' || chat.id === 'chat_ai_oracle' || chat.isSystem;
             const displayName = chat.groupTitle || chat.user.name || 'Чат';
-            const displayAvatar = chat.groupAvatar || chat.user.avatar || '';
+            const displayAvatar = isGroup ? (chat.groupAvatar || '/default-avatar.svg') : getAvatarUrl(chat.user);
 
             return (
               <div
@@ -485,7 +486,7 @@ export function ChatList({
                 onClick={() => handleChatClick(chat)}
               >
                 <div className="chat-avatar-wrapper">
-                  <img src={displayAvatar} alt={displayName} className="chat-avatar" />
+                  <img src={displayAvatar} alt={displayName} className="chat-avatar" onError={handleAvatarError} />
                   {!isGroup && !isAi && (
                     <div 
                       className={`online-indicator ${chat.user?.online ? 'is-online' : 'is-offline'}`} 
