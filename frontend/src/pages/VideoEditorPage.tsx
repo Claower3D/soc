@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Play,
   Pause,
@@ -29,20 +29,31 @@ import {
   FolderOpen,
   SlidersHorizontal,
   Layers2,
-  Crosshair
+  Crosshair,
+  Copy,
+  Undo2,
+  Redo2,
+  ZoomIn,
+  ZoomOut
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './VideoEditorPage.css';
 
-interface TrackItem {
+export interface TrackClip {
   id: string;
+  trackId: 'v2' | 'v1' | 'a1' | 'a2';
   name: string;
   start: number; // in seconds
   duration: number; // in seconds
   color: string;
-  type: 'video' | 'audio' | 'text' | 'effect';
+  type: 'video' | 'audio' | 'text' | 'music';
   thumb?: string;
+  text?: string;
+  textColor?: string;
+  textSize?: number;
+  volume?: number;
+  filter?: string;
 }
 
 const COLOR_PRESETS = [
@@ -96,45 +107,134 @@ const MUSIC_TRACKS = [
   { id: 'm4', title: 'Cinematic Ambient Strings', artist: 'Orchestra Studio', duration: '2:50' }
 ];
 
+const INITIAL_CLIPS: TrackClip[] = [
+  // V2: Text Titles
+  {
+    id: 'text_1',
+    trackId: 'v2',
+    name: 'Титр: New Age',
+    start: 0.5,
+    duration: 5.0,
+    color: '#d97706',
+    type: 'text',
+    text: 'New Age Video Studio 🔥',
+    textColor: '#FFFFFF',
+    textSize: 24
+  },
+  {
+    id: 'text_2',
+    trackId: 'v2',
+    name: 'Титр: 4K HDR',
+    start: 6.2,
+    duration: 4.5,
+    color: '#d97706',
+    type: 'text',
+    text: 'Кинематографичный 4K HDR ⚡',
+    textColor: '#FACC15',
+    textSize: 22
+  },
+  // V1: Video Tracks
+  {
+    id: 'video_1',
+    trackId: 'v1',
+    name: 'Замок на закате.mp4',
+    start: 0,
+    duration: 6.0,
+    color: '#4F46E5',
+    type: 'video',
+    thumb: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
+    filter: 'cinematic'
+  },
+  {
+    id: 'video_2',
+    trackId: 'v1',
+    name: 'Горный хребет.mp4',
+    start: 6.0,
+    duration: 9.0,
+    color: '#6366F1',
+    type: 'video',
+    thumb: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=80',
+    filter: 'warm'
+  },
+  // A1: Original Video Audio
+  {
+    id: 'audio_1',
+    trackId: 'a1',
+    name: 'Звук клипа (Замок) 48kHz',
+    start: 0,
+    duration: 6.0,
+    color: '#0d9488',
+    type: 'audio',
+    volume: 85
+  },
+  {
+    id: 'audio_2',
+    trackId: 'a1',
+    name: 'Звук клипа (Горы) 48kHz',
+    start: 6.0,
+    duration: 9.0,
+    color: '#0f766e',
+    type: 'audio',
+    volume: 80
+  },
+  // A2: Background Music
+  {
+    id: 'music_1',
+    trackId: 'a2',
+    name: 'Lo-Fi Chill Sunset',
+    start: 0,
+    duration: 15.0,
+    color: '#10b981',
+    type: 'music',
+    volume: 70
+  }
+];
+
 export const VideoEditorPage: React.FC = () => {
   const { isAuthenticated } = useAuth();
   
   // Aspect Ratio: 9:16 (Story/Shorts), 1:1 (Square Feed), 16:9 (YouTube)
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '1:1' | '16:9'>('9:16');
   
+  // Timeline clips state
+  const [clips, setClips] = useState<TrackClip[]>(INITIAL_CLIPS);
+  const [selectedClipId, setSelectedClipId] = useState<string | null>('video_1');
+  
+  // History for Undo / Redo
+  const [history, setHistory] = useState<TrackClip[][]>([INITIAL_CLIPS]);
+  const [historyIndex, setHistoryIndex] = useState<number>(0);
+
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0); // in seconds
-  const totalDuration = 15; // total demo duration in seconds
   const [speed, setSpeed] = useState<number>(1);
   const [volume, setVolume] = useState<number>(85);
   const [isLooping, setIsLooping] = useState(true);
+
+  // Dynamic Total Timeline Duration (minimum 16s, expands if clips exceed)
+  const maxClipEnd = Math.max(...clips.map((c) => c.start + c.duration), 16);
+  const totalDuration = Math.ceil(maxClipEnd);
 
   // Active Tool Mode (DaVinci toolbar)
   const [activeTool, setActiveTool] = useState<'select' | 'trim' | 'blade' | 'magnet'>('select');
   const [isSnapping, setIsSnapping] = useState(true);
   const [showSafeGuides, setShowSafeGuides] = useState(true);
 
+  // Zoom scale (1x, 1.5x, 2x, 3x)
+  const [zoomScale, setZoomScale] = useState<number>(1);
+
   // DaVinci Page Switcher
   const [activePage, setActivePage] = useState<'media' | 'cut' | 'edit' | 'color' | 'fairlight' | 'deliver'>('edit');
 
   // Inspector Panel (Toggleable)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true);
-  const [inspectorTab, setInspectorTab] = useState<'color' | 'audio' | 'text' | 'effects'>('color');
+  const [inspectorTab, setInspectorTab] = useState<'clip' | 'color' | 'audio' | 'text' | 'effects'>('clip');
 
-  // Active filter & Color Grading
+  // Master Color Grading
   const [selectedFilter, setSelectedFilter] = useState('normal');
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
   const [saturation, setSaturation] = useState(100);
-
-  // Text overlay
-  const [textOverlay, setTextOverlay] = useState('New Age Video Studio 🔥');
-  const [textColor, setTextColor] = useState('#FFFFFF');
-  const [textSize, setTextSize] = useState(24);
-
-  // Selected music
-  const [selectedMusic, setSelectedMusic] = useState<string | null>('m1');
 
   // Track state (Mute / Lock / Visibility)
   const [v2Visible, setV2Visible] = useState(true);
@@ -148,30 +248,29 @@ export const VideoEditorPage: React.FC = () => {
 
   // Selected media item in source monitor
   const [selectedSourceMedia, setSelectedSourceMedia] = useState(MEDIA_POOL_ITEMS[0]);
-
-  // Multi-track Timeline items
-  const [videoClips, setVideoClips] = useState<TrackItem[]>([
-    {
-      id: 'v1',
-      name: 'Клип 1 (Замок 4K)',
-      start: 0,
-      duration: 6,
-      color: '#4F46E5',
-      type: 'video',
-      thumb: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=300&q=80'
-    },
-    {
-      id: 'v2',
-      name: 'Клип 2 (Горы 4K)',
-      start: 6,
-      duration: 9,
-      color: '#6366F1',
-      type: 'video',
-      thumb: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=300&q=80'
-    }
-  ]);
-
   const [exportSuccessModal, setExportSuccessModal] = useState(false);
+
+  // Dragging and Trimming State
+  const [dragState, setDragState] = useState<{
+    clipId: string;
+    mode: 'move' | 'trim-start' | 'trim-end';
+    startX: number;
+    initialStart: number;
+    initialDuration: number;
+    currentStart: number;
+    currentDuration: number;
+  } | null>(null);
+
+  // Blade Cut Hover state
+  const [bladeHover, setBladeHover] = useState<{
+    clipId: string;
+    time: number;
+    percent: number;
+  } | null>(null);
+
+  // Timeline Container Ref for measuring pixel widths
+  const timelineLanesRef = useRef<HTMLDivElement>(null);
+  const timelineScrollRef = useRef<HTMLDivElement>(null);
 
   // Animation playback loop
   const timerRef = useRef<number | null>(null);
@@ -198,20 +297,46 @@ export const VideoEditorPage: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isPlaying, speed, isLooping]);
+  }, [isPlaying, speed, isLooping, totalDuration]);
 
   // Helper to format SMPTE Timecode (e.g. 01:00:03:12)
   const formatSMPTE = (seconds: number) => {
     const hrs = '01';
-    const totalSecs = Math.floor(seconds);
+    const totalSecs = Math.max(0, Math.floor(seconds));
     const mins = Math.floor(totalSecs / 60);
     const secs = totalSecs % 60;
-    const frames = Math.floor((seconds % 1) * 25);
+    const frames = Math.floor(((seconds >= 0 ? seconds : 0) % 1) * 25);
     const mm = mins < 10 ? `0${mins}` : mins;
     const ss = secs < 10 ? `0${secs}` : secs;
     const ff = frames < 10 ? `0${frames}` : frames;
     return `${hrs}:${mm}:${ss}:${ff}`;
   };
+
+  // Push new state into Undo history
+  const pushHistory = useCallback((newClips: TrackClip[]) => {
+    setHistory((prev) => {
+      const sliced = prev.slice(0, historyIndex + 1);
+      return [...sliced, newClips];
+    });
+    setHistoryIndex((prev) => prev + 1);
+  }, [historyIndex]);
+
+  // Undo / Redo
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIdx = historyIndex - 1;
+      setHistoryIndex(newIdx);
+      setClips(history[newIdx]);
+    }
+  }, [historyIndex, history]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIdx = historyIndex + 1;
+      setHistoryIndex(newIdx);
+      setClips(history[newIdx]);
+    }
+  }, [historyIndex, history]);
 
   const handleStepFrame = (deltaFrames: number) => {
     setIsPlaying(false);
@@ -219,63 +344,377 @@ export const VideoEditorPage: React.FC = () => {
     setCurrentTime((prev) => Math.max(0, Math.min(totalDuration, prev + deltaFrames * frameDuration)));
   };
 
-  const handleSplitAtPlayhead = () => {
-    if (v1Locked) return;
-    const target = videoClips.find(
-      (c) => currentTime > c.start && currentTime < c.start + c.duration
-    );
+  // Splitting / Slicing Logic
+  const splitClipAtTime = (clipId: string, splitTime: number) => {
+    const target = clips.find((c) => c.id === clipId);
     if (!target) return;
+    if (splitTime <= target.start + 0.2 || splitTime >= target.start + target.duration - 0.2) return;
 
-    const firstDuration = Math.round((currentTime - target.start) * 10) / 10;
+    const firstDuration = Math.round((splitTime - target.start) * 10) / 10;
     const secondDuration = Math.round((target.duration - firstDuration) * 10) / 10;
     if (firstDuration <= 0.2 || secondDuration <= 0.2) return;
 
-    const clip1: TrackItem = {
+    const clip1: TrackClip = {
       ...target,
-      name: `${target.name.split(' (часть')[0]} (ч. 1)`,
+      name: `${target.name.split(' (ч.')[0]} (ч. 1)`,
       duration: firstDuration
     };
-    const clip2: TrackItem = {
-      id: `v-${Date.now()}`,
-      name: `${target.name.split(' (часть')[0]} (ч. 2)`,
-      start: currentTime,
-      duration: secondDuration,
-      color: '#818CF8',
-      type: 'video',
-      thumb: target.thumb
+    const clip2: TrackClip = {
+      ...target,
+      id: `${target.type}_${Date.now()}`,
+      name: `${target.name.split(' (ч.')[0]} (ч. 2)`,
+      start: splitTime,
+      duration: secondDuration
     };
 
-    setVideoClips((prev) =>
-      prev.flatMap((c) => (c.id === target.id ? [clip1, clip2] : [c]))
+    const newClips = clips.flatMap((c) => (c.id === clipId ? [clip1, clip2] : [c]));
+    setClips(newClips);
+    setSelectedClipId(clip2.id);
+    pushHistory(newClips);
+  };
+
+  // Split at current Playhead position
+  const handleSplitAtPlayhead = () => {
+    // If selected clip is under playhead, split it
+    let target = clips.find(
+      (c) => c.id === selectedClipId && currentTime > c.start + 0.1 && currentTime < c.start + c.duration - 0.1
     );
+    // Otherwise look for video clip on V1
+    if (!target && !v1Locked) {
+      target = clips.find(
+        (c) => c.trackId === 'v1' && currentTime > c.start + 0.1 && currentTime < c.start + c.duration - 0.1
+      );
+    }
+    // Otherwise any clip under playhead
+    if (!target) {
+      target = clips.find(
+        (c) => currentTime > c.start + 0.1 && currentTime < c.start + c.duration - 0.1
+      );
+    }
+
+    if (target) {
+      splitClipAtTime(target.id, currentTime);
+    }
   };
 
+  // Delete clip
   const handleDeleteClip = (id: string) => {
-    if (videoClips.length <= 1) return;
-    setVideoClips((prev) => prev.filter((c) => c.id !== id));
+    const newClips = clips.filter((c) => c.id !== id);
+    setClips(newClips);
+    if (selectedClipId === id) {
+      setSelectedClipId(newClips[0]?.id || null);
+    }
+    pushHistory(newClips);
   };
 
+  // Duplicate clip
+  const handleDuplicateClip = (id: string) => {
+    const target = clips.find((c) => c.id === id);
+    if (!target) return;
+    const newClip: TrackClip = {
+      ...target,
+      id: `${target.type}_${Date.now()}`,
+      name: `${target.name} (Копия)`,
+      start: Math.round((target.start + target.duration + 0.2) * 10) / 10
+    };
+    const newClips = [...clips, newClip];
+    setClips(newClips);
+    setSelectedClipId(newClip.id);
+    pushHistory(newClips);
+  };
+
+  // Add Clip to V1 (from Media Pool)
   const handleAddMediaToTimeline = (item: typeof MEDIA_POOL_ITEMS[0]) => {
-    const lastClip = videoClips[videoClips.length - 1];
-    const newStart = lastClip ? lastClip.start + lastClip.duration : 0;
-    const newClip: TrackItem = {
-      id: `v-${Date.now()}`,
-      name: item.title.replace('.mp4', ''),
-      start: newStart < totalDuration ? newStart : 0,
-      duration: 4,
+    const newClip: TrackClip = {
+      id: `video_${Date.now()}`,
+      trackId: 'v1',
+      name: item.title,
+      start: currentTime,
+      duration: 5.0,
       color: '#4F46E5',
       type: 'video',
-      thumb: item.thumb
+      thumb: item.thumb,
+      filter: 'cinematic'
     };
-    setVideoClips((prev) => [...prev, newClip]);
+    const newClips = [...clips, newClip];
+    setClips(newClips);
+    setSelectedClipId(newClip.id);
+    pushHistory(newClips);
   };
+
+  // Add Text Title Clip to V2
+  const handleAddTextClip = () => {
+    const newClip: TrackClip = {
+      id: `text_${Date.now()}`,
+      trackId: 'v2',
+      name: `Титр ${clips.filter((c) => c.trackId === 'v2').length + 1}`,
+      start: currentTime,
+      duration: 4.0,
+      color: '#d97706',
+      type: 'text',
+      text: 'Новый стильный заголовок ✨',
+      textColor: '#FFFFFF',
+      textSize: 24
+    };
+    const newClips = [...clips, newClip];
+    setClips(newClips);
+    setSelectedClipId(newClip.id);
+    setInspectorTab('text');
+    setIsInspectorOpen(true);
+    pushHistory(newClips);
+  };
+
+  // Add Audio Clip to A1
+  const handleAddAudioClip = () => {
+    const newClip: TrackClip = {
+      id: `audio_${Date.now()}`,
+      trackId: 'a1',
+      name: 'Стереодорожка FX 48kHz',
+      start: currentTime,
+      duration: 5.0,
+      color: '#0d9488',
+      type: 'audio',
+      volume: 85
+    };
+    const newClips = [...clips, newClip];
+    setClips(newClips);
+    setSelectedClipId(newClip.id);
+    pushHistory(newClips);
+  };
+
+  // Add Music to A2
+  const handleAddMusicClip = (track: typeof MUSIC_TRACKS[0]) => {
+    const newClip: TrackClip = {
+      id: `music_${Date.now()}`,
+      trackId: 'a2',
+      name: track.title,
+      start: currentTime,
+      duration: 10.0,
+      color: '#10b981',
+      type: 'music',
+      volume: 75
+    };
+    const newClips = [...clips, newClip];
+    setClips(newClips);
+    setSelectedClipId(newClip.id);
+    pushHistory(newClips);
+  };
+
+  // Direct Drag & Drop: Start Dragging or Trimming
+  const handleStartDrag = (
+    e: React.MouseEvent,
+    clip: TrackClip,
+    mode: 'move' | 'trim-start' | 'trim-end'
+  ) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    // If blade tool is active and clicked on body, perform split directly!
+    if (activeTool === 'blade' && mode === 'move') {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+      const splitTime = clip.start + ratio * clip.duration;
+      splitClipAtTime(clip.id, splitTime);
+      return;
+    }
+
+    setSelectedClipId(clip.id);
+    setDragState({
+      clipId: clip.id,
+      mode,
+      startX: e.clientX,
+      initialStart: clip.start,
+      initialDuration: clip.duration,
+      currentStart: clip.start,
+      currentDuration: clip.duration
+    });
+  };
+
+  // Window mouse move & up listeners for drag & trim
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragState) return;
+
+      const lanesWidth = timelineLanesRef.current?.getBoundingClientRect().width || 1000;
+      const effectiveWidth = lanesWidth * zoomScale;
+      const pxPerSec = effectiveWidth / totalDuration;
+      const deltaSec = (e.clientX - dragState.startX) / pxPerSec;
+
+      if (dragState.mode === 'move') {
+        let newStart = Math.max(0, dragState.initialStart + deltaSec);
+
+        // Snapping (Magnet N)
+        if (isSnapping) {
+          // Snap to 0
+          if (newStart < 0.25) newStart = 0;
+          // Snap to current Playhead
+          if (Math.abs(newStart - currentTime) < 0.25) newStart = currentTime;
+          // Snap to other clips' start / end points
+          clips.forEach((other) => {
+            if (other.id !== dragState.clipId) {
+              if (Math.abs(newStart - (other.start + other.duration)) < 0.25) {
+                newStart = other.start + other.duration;
+              }
+              if (Math.abs(newStart - other.start) < 0.25) {
+                newStart = other.start;
+              }
+            }
+          });
+        }
+
+        newStart = Math.round(newStart * 10) / 10;
+
+        setDragState((prev) => (prev ? { ...prev, currentStart: newStart } : null));
+        setClips((prev) =>
+          prev.map((c) => (c.id === dragState.clipId ? { ...c, start: newStart } : c))
+        );
+      } else if (dragState.mode === 'trim-start') {
+        let newStart = dragState.initialStart + deltaSec;
+        const maxStart = dragState.initialStart + dragState.initialDuration - 0.3;
+        newStart = Math.max(0, Math.min(maxStart, newStart));
+        let newDuration = dragState.initialDuration - (newStart - dragState.initialStart);
+        newDuration = Math.max(0.3, Math.round(newDuration * 10) / 10);
+        newStart = Math.round(newStart * 10) / 10;
+
+        setDragState((prev) =>
+          prev ? { ...prev, currentStart: newStart, currentDuration: newDuration } : null
+        );
+        setClips((prev) =>
+          prev.map((c) =>
+            c.id === dragState.clipId ? { ...c, start: newStart, duration: newDuration } : c
+          )
+        );
+      } else if (dragState.mode === 'trim-end') {
+        let newDuration = Math.max(0.3, dragState.initialDuration + deltaSec);
+        newDuration = Math.round(newDuration * 10) / 10;
+
+        setDragState((prev) => (prev ? { ...prev, currentDuration: newDuration } : null));
+        setClips((prev) =>
+          prev.map((c) => (c.id === dragState.clipId ? { ...c, duration: newDuration } : c))
+        );
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (dragState) {
+        pushHistory(clips);
+        setDragState(null);
+      }
+    };
+
+    if (dragState) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragState, clips, totalDuration, zoomScale, isSnapping, currentTime, pushHistory]);
+
+  // Blade tool hover indicator on clips
+  const handleClipMouseMove = (e: React.MouseEvent, clip: TrackClip) => {
+    if (activeTool !== 'blade') {
+      if (bladeHover) setBladeHover(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+    const splitTime = clip.start + ratio * clip.duration;
+    setBladeHover({
+      clipId: clip.id,
+      time: splitTime,
+      percent: ratio * 100
+    });
+  };
+
+  const handleClipMouseLeave = () => {
+    if (bladeHover) setBladeHover(null);
+  };
+
+  // Keyboard Shortcuts (Space: Play, B: Blade, A: Select, T: Trim, N: Snapping, Del: Delete, Ctrl+Z, Ctrl+Y, Ctrl+B)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setIsPlaying((p) => !p);
+      } else if (e.key === 'a' || e.key === 'A' || e.key === 'ф' || e.key === 'Ф') {
+        setActiveTool('select');
+      } else if (e.key === 'b' || e.key === 'B' || e.key === 'и' || e.key === 'И') {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          handleSplitAtPlayhead();
+        } else {
+          setActiveTool('blade');
+        }
+      } else if (e.key === 't' || e.key === 'T' || e.key === 'е' || e.key === 'Е') {
+        setActiveTool('trim');
+      } else if (e.key === 'n' || e.key === 'N' || e.key === 'т' || e.key === 'Т') {
+        setIsSnapping((s) => !s);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedClipId) {
+          handleDeleteClip(selectedClipId);
+        }
+      } else if (e.code === 'ArrowLeft') {
+        handleStepFrame(-1);
+      } else if (e.code === 'ArrowRight') {
+        handleStepFrame(1);
+      } else if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === 'z' || e.key === 'Z' || e.key === 'я' || e.key === 'Я')
+      ) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault();
+        handleRedo();
+      } else if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === 'd' || e.key === 'D' || e.key === 'в' || e.key === 'В')
+      ) {
+        e.preventDefault();
+        if (selectedClipId) {
+          handleDuplicateClip(selectedClipId);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedClipId, handleUndo, handleRedo]);
 
   const handleExport = () => {
     setIsPlaying(false);
     setExportSuccessModal(true);
   };
 
-  const currentFilterPreset = COLOR_PRESETS.find((p) => p.id === selectedFilter);
+  // Currently Active Clips at Playhead (for Live Preview Monitor)
+  const activeVideoClip =
+    clips.find(
+      (c) => c.trackId === 'v1' && currentTime >= c.start && currentTime < c.start + c.duration
+    ) || clips.find((c) => c.trackId === 'v1') || { thumb: selectedSourceMedia.thumb, filter: 'normal', name: 'Черный экран' };
+
+  const activeTextClip = clips.find(
+    (c) => c.trackId === 'v2' && currentTime >= c.start && currentTime < c.start + c.duration
+  );
+
+  const activeMusicClip = clips.find(
+    (c) => c.trackId === 'a2' && currentTime >= c.start && currentTime < c.start + c.duration
+  );
+
+  const selectedClip = clips.find((c) => c.id === selectedClipId);
+
+  // Filters calculation
+  const currentFilterPreset = COLOR_PRESETS.find((p) => p.id === (selectedClip?.filter || selectedFilter));
   const baseFilterCss = currentFilterPreset?.filter === 'none' ? '' : currentFilterPreset?.filter || '';
   const finalFilterCss = `${baseFilterCss} brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`.trim();
 
@@ -311,25 +750,50 @@ export const VideoEditorPage: React.FC = () => {
 
           <div className="davinci-menu-bar">
             <span>Файл</span>
-            <span>Правка</span>
-            <span>Подгонка</span>
+            <span onClick={handleUndo} title="Отменить (Ctrl+Z)" className="menu-btn-action">
+              Отмена
+            </span>
+            <span onClick={handleRedo} title="Повторить (Ctrl+Y)" className="menu-btn-action">
+              Повтор
+            </span>
             <span className="menu-active">Временная шкала</span>
+            <span onClick={handleSplitAtPlayhead} title="Разрезать клип (Ctrl+B)">
+              Разрезать
+            </span>
             <span>Клип</span>
             <span>Маркеры</span>
             <span>Вид</span>
-            <span>Воспроизведение</span>
             <span>Цвет</span>
             <span>Fairlight</span>
-            <span>Справка</span>
           </div>
         </div>
 
         <div className="davinci-project-name">
           <span className="project-title">Проект: Reels_NewAge_Master</span>
-          <span className="project-status-tag">С правками</span>
+          <span className="project-status-tag">Правка дорожек</span>
         </div>
 
         <div className="davinci-top-right-actions">
+          {/* Undo / Redo Top Toolbar buttons */}
+          <div className="undo-redo-cluster">
+            <button
+              className="undo-btn"
+              onClick={handleUndo}
+              disabled={historyIndex <= 0}
+              title="Отменить действие (Ctrl+Z)"
+            >
+              <Undo2 size={13} />
+            </button>
+            <button
+              className="undo-btn"
+              onClick={handleRedo}
+              disabled={historyIndex >= history.length - 1}
+              title="Повторить действие (Ctrl+Y)"
+            >
+              <Redo2 size={13} />
+            </button>
+          </div>
+
           <button 
             className={`davinci-btn-toggle ${isInspectorOpen ? 'active' : ''}`}
             onClick={() => setIsInspectorOpen(!isInspectorOpen)}
@@ -349,6 +813,12 @@ export const VideoEditorPage: React.FC = () => {
       {/* 2. Secondary Workspace Navigation Bar */}
       <div className="davinci-sub-nav">
         <div className="sub-nav-left-tabs">
+          <button 
+            className={`sub-tab-btn ${inspectorTab === 'clip' ? 'active' : ''}`}
+            onClick={() => { setInspectorTab('clip'); setIsInspectorOpen(true); }}
+          >
+            <Sliders size={14} /> Клип ({selectedClip?.name || 'Не выбран'})
+          </button>
           <button 
             className={`sub-tab-btn ${inspectorTab === 'color' ? 'active' : ''}`}
             onClick={() => { setInspectorTab('color'); setIsInspectorOpen(true); }}
@@ -371,7 +841,7 @@ export const VideoEditorPage: React.FC = () => {
             className={`sub-tab-btn ${inspectorTab === 'effects' ? 'active' : ''}`}
             onClick={() => { setInspectorTab('effects'); setIsInspectorOpen(true); }}
           >
-            <Scissors size={14} /> Нарезка клипов
+            <Scissors size={14} /> Нарезка дорожек
           </button>
         </div>
 
@@ -399,75 +869,70 @@ export const VideoEditorPage: React.FC = () => {
           >
             <Monitor size={13} /> 16:9 Кино
           </button>
-        </div>
 
-        <div className="sub-nav-right-tools">
-          <button 
-            className={`guide-toggle-btn ${showSafeGuides ? 'active' : ''}`}
+          <button
+            className={`btn-guide-toggle ${showSafeGuides ? 'active' : ''}`}
             onClick={() => setShowSafeGuides(!showSafeGuides)}
-            title="Отображать рамки безопасных зон (Safe Areas)"
+            title="Включить рамку безопасных зон Action/Title Safe"
           >
-            <Crosshair size={14} /> Сетки кадрирования
+            <Crosshair size={13} /> Безопасные зоны
           </button>
         </div>
       </div>
 
-      {/* 3. Main Workspace Row: Dual Monitors + Collapsible Inspector */}
-      <div className={`davinci-workspace-grid ${isInspectorOpen ? 'with-inspector' : 'no-inspector'}`}>
+      {/* 3. DaVinci Dual-Monitor & Inspector Work Area */}
+      <div className="davinci-monitors-container">
         
-        {/* Left Monitor: Source / Media Pool */}
+        {/* Left Monitor: Source Monitor / Media Pool */}
         <div className="davinci-monitor-box source-monitor-panel">
           <div className="monitor-header">
             <div className="monitor-title">
               <FolderOpen size={14} />
-              <span>Медиатека / Источник (Media Pool)</span>
+              <span>Медиатека / Пул исходников (Media Pool)</span>
             </div>
-            <span className="monitor-badge">{MEDIA_POOL_ITEMS.length} клипов</span>
+            <span className="media-count-badge">{MEDIA_POOL_ITEMS.length} клипа</span>
           </div>
 
-          <div className="source-viewer-content">
-            <div className="source-media-grid">
-              {MEDIA_POOL_ITEMS.map((item) => (
-                <div 
-                  key={item.id} 
-                  className={`source-media-card ${selectedSourceMedia.id === item.id ? 'active' : ''}`}
-                  onClick={() => setSelectedSourceMedia(item)}
-                >
-                  <div className="source-thumb-wrap">
-                    <img src={item.thumb} alt={item.title} />
-                    <span className="source-duration-tag">{item.duration}</span>
-                    <span className="source-res-tag">{item.resolution}</span>
-                  </div>
-                  <div className="source-card-footer">
-                    <span className="source-filename" title={item.title}>{item.title}</span>
-                    <button 
-                      className="btn-add-to-timeline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddMediaToTimeline(item);
-                      }}
-                      title="Добавить на таймлайн"
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Quick action info */}
-            <div className="source-quick-info">
-              <div className="info-stat">
-                <Film size={13} />
-                <span>Выбран: <strong>{selectedSourceMedia.title}</strong></span>
-              </div>
-              <button 
-                className="btn-insert-timeline-main"
-                onClick={() => handleAddMediaToTimeline(selectedSourceMedia)}
+          <div className="media-pool-grid">
+            {MEDIA_POOL_ITEMS.map((item) => (
+              <div 
+                key={item.id} 
+                className={`media-card-thumb ${selectedSourceMedia.id === item.id ? 'active' : ''}`}
+                onClick={() => setSelectedSourceMedia(item)}
               >
-                <Plus size={13} /> Вставить клип на таймлайн
-              </button>
+                <div className="thumb-preview-box">
+                  <img src={item.thumb} alt={item.title} />
+                  <span className="duration-tag">{item.duration}</span>
+                  <span className="res-tag">{item.resolution}</span>
+                </div>
+                <div className="media-info-line">
+                  <span className="media-card-title">{item.title}</span>
+                  <button 
+                    className="btn-add-to-timeline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddMediaToTimeline(item);
+                    }}
+                    title="Добавить на видеодорожку V1"
+                  >
+                    <Plus size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="source-quick-info">
+            <div className="info-stat">
+              <Film size={13} />
+              <span>Выбран: <strong>{selectedSourceMedia.title}</strong></span>
             </div>
+            <button 
+              className="btn-insert-timeline-main"
+              onClick={() => handleAddMediaToTimeline(selectedSourceMedia)}
+            >
+              <Plus size={13} /> Вставить на таймлайн (V1)
+            </button>
           </div>
         </div>
 
@@ -488,15 +953,16 @@ export const VideoEditorPage: React.FC = () => {
           <div className="program-screen-area">
             <div className={`davinci-screen-bezel aspect-${aspectRatio.replace(':', '-')}`}>
               
-              {/* Video layer */}
+              {/* Video layer reflecting current playhead */}
               <div
                 className="screen-video-render"
                 style={{
                   filter: finalFilterCss,
-                  backgroundImage: `url(${videoClips[0]?.thumb || selectedSourceMedia.thumb})`
+                  backgroundImage: v1Visible && activeVideoClip.thumb ? `url(${activeVideoClip.thumb})` : 'none',
+                  backgroundColor: '#090d16'
                 }}
               >
-                {/* Safe Area Guides (DaVinci dashed lines) */}
+                {/* Safe Area Guides */}
                 {showSafeGuides && (
                   <div className="safe-area-overlay">
                     <div className="safe-action-box" />
@@ -514,24 +980,24 @@ export const VideoEditorPage: React.FC = () => {
                   style={{ left: `${(currentTime / totalDuration) * 100}%` }}
                 />
 
-                {/* Text Title Overlay */}
-                {v2Visible && textOverlay && (
+                {/* Text Title Overlay dynamically from active V2 text clip */}
+                {v2Visible && activeTextClip && (
                   <div
                     className="screen-text-overlay"
                     style={{
-                      color: textColor,
-                      fontSize: `${textSize}px`
+                      color: activeTextClip.textColor || '#FFFFFF',
+                      fontSize: `${activeTextClip.textSize || 24}px`
                     }}
                   >
-                    {textOverlay}
+                    {activeTextClip.text}
                   </div>
                 )}
 
-                {/* Music Badge Overlay */}
-                {!a2Muted && selectedMusic && (
+                {/* Music Badge Overlay from active A2 music clip */}
+                {!a2Muted && activeMusicClip && (
                   <div className="screen-music-badge">
                     <Music size={12} className={isPlaying ? 'music-playing-wave' : ''} />
-                    <span>{MUSIC_TRACKS.find((m) => m.id === selectedMusic)?.title}</span>
+                    <span>{activeMusicClip.name}</span>
                   </div>
                 )}
 
@@ -539,7 +1005,7 @@ export const VideoEditorPage: React.FC = () => {
                 <div
                   className="screen-click-target"
                   onClick={() => setIsPlaying(!isPlaying)}
-                  title={isPlaying ? 'Пауза' : 'Воспроизведение'}
+                  title={isPlaying ? 'Пауза (Space)' : 'Воспроизведение (Space)'}
                 >
                   {!isPlaying && (
                     <div className="screen-play-glyph">
@@ -570,6 +1036,159 @@ export const VideoEditorPage: React.FC = () => {
             </div>
 
             <div className="inspector-content">
+              {/* Tab: Clip Properties */}
+              {inspectorTab === 'clip' && (
+                <div className="inspector-section clip-properties-section">
+                  <h4 className="inspector-h4">Параметры выбранного клипа</h4>
+                  {selectedClip ? (
+                    <div className="clip-props-form">
+                      <div className="inspector-form-field">
+                        <label>Название клипа</label>
+                        <input
+                          type="text"
+                          value={selectedClip.name}
+                          onChange={(e) => {
+                            const newClips = clips.map((c) =>
+                              c.id === selectedClip.id ? { ...c, name: e.target.value } : c
+                            );
+                            setClips(newClips);
+                          }}
+                        />
+                      </div>
+
+                      <div className="inspector-two-cols">
+                        <div className="inspector-form-field">
+                          <label>Начало (сек)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            value={selectedClip.start}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseFloat(e.target.value) || 0);
+                              const newClips = clips.map((c) =>
+                                c.id === selectedClip.id ? { ...c, start: val } : c
+                              );
+                              setClips(newClips);
+                              pushHistory(newClips);
+                            }}
+                          />
+                        </div>
+                        <div className="inspector-form-field">
+                          <label>Длительность (сек)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0.3"
+                            value={selectedClip.duration}
+                            onChange={(e) => {
+                              const val = Math.max(0.3, parseFloat(e.target.value) || 0.3);
+                              const newClips = clips.map((c) =>
+                                c.id === selectedClip.id ? { ...c, duration: val } : c
+                              );
+                              setClips(newClips);
+                              pushHistory(newClips);
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="clip-quick-action-btns">
+                        <button
+                          className="btn-clip-action-split"
+                          onClick={() => splitClipAtTime(selectedClip.id, currentTime)}
+                          disabled={currentTime <= selectedClip.start || currentTime >= selectedClip.start + selectedClip.duration}
+                          title="Разрезать в точке Playhead"
+                        >
+                          <Scissors size={14} /> Разрезать на {formatSMPTE(currentTime)}
+                        </button>
+
+                        <div className="action-row-buttons">
+                          <button
+                            className="btn-clip-action-dup"
+                            onClick={() => handleDuplicateClip(selectedClip.id)}
+                            title="Дублировать клип (Ctrl+D)"
+                          >
+                            <Copy size={13} /> Дублировать
+                          </button>
+                          <button
+                            className="btn-clip-action-del"
+                            onClick={() => handleDeleteClip(selectedClip.id)}
+                            title="Удалить клип (Delete)"
+                          >
+                            <Trash2 size={13} /> Удалить
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* If Text Clip */}
+                      {selectedClip.type === 'text' && (
+                        <div className="text-clip-editor-sub">
+                          <label className="sub-label">Текст титра</label>
+                          <textarea
+                            rows={2}
+                            value={selectedClip.text || ''}
+                            onChange={(e) => {
+                              const newClips = clips.map((c) =>
+                                c.id === selectedClip.id ? { ...c, text: e.target.value } : c
+                              );
+                              setClips(newClips);
+                            }}
+                          />
+                          <div className="inspector-slider-row" style={{ marginTop: 8 }}>
+                            <div className="slider-label-line">
+                              <span>Кегль</span>
+                              <strong>{selectedClip.textSize || 24}px</strong>
+                            </div>
+                            <input
+                              type="range"
+                              min="14"
+                              max="48"
+                              value={selectedClip.textSize || 24}
+                              onChange={(e) => {
+                                const newClips = clips.map((c) =>
+                                  c.id === selectedClip.id ? { ...c, textSize: Number(e.target.value) } : c
+                                );
+                                setClips(newClips);
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* If Audio / Music Clip */}
+                      {(selectedClip.type === 'audio' || selectedClip.type === 'music') && (
+                        <div className="audio-clip-editor-sub">
+                          <div className="inspector-slider-row" style={{ marginTop: 8 }}>
+                            <div className="slider-label-line">
+                              <span>Громкость дорожки</span>
+                              <strong>{selectedClip.volume || 80}%</strong>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={selectedClip.volume || 80}
+                              onChange={(e) => {
+                                const newClips = clips.map((c) =>
+                                  c.id === selectedClip.id ? { ...c, volume: Number(e.target.value) } : c
+                                );
+                                setClips(newClips);
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="no-clip-selected-hint">
+                      <Film size={28} />
+                      <p>Выберите любой клип на таймлайне для редактирования его параметров, нарезки или перемещения.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Tab: Color Grading */}
               {inspectorTab === 'color' && (
                 <div className="inspector-section color-section">
@@ -580,7 +1199,14 @@ export const VideoEditorPage: React.FC = () => {
                       <button
                         key={p.id}
                         className={`lut-card ${selectedFilter === p.id ? 'active' : ''}`}
-                        onClick={() => setSelectedFilter(p.id)}
+                        onClick={() => {
+                          setSelectedFilter(p.id);
+                          if (selectedClip && selectedClip.type === 'video') {
+                            setClips((prev) =>
+                              prev.map((c) => (c.id === selectedClip.id ? { ...c, filter: p.id } : c))
+                            );
+                          }
+                        }}
                       >
                         <div className="lut-preview" style={{ filter: p.filter }} />
                         <div className="lut-name">{p.name}</div>
@@ -612,7 +1238,7 @@ export const VideoEditorPage: React.FC = () => {
                     <input 
                       type="range" 
                       min="60" 
-                      max="150" 
+                      max="140" 
                       value={contrast} 
                       onChange={(e) => setContrast(Number(e.target.value))} 
                     />
@@ -626,37 +1252,24 @@ export const VideoEditorPage: React.FC = () => {
                     <input 
                       type="range" 
                       min="0" 
-                      max="180" 
+                      max="160" 
                       value={saturation} 
                       onChange={(e) => setSaturation(Number(e.target.value))} 
                     />
                   </div>
-
-                  <button 
-                    className="btn-reset-wheels"
-                    onClick={() => {
-                      setSelectedFilter('normal');
-                      setBrightness(100);
-                      setContrast(100);
-                      setSaturation(100);
-                    }}
-                  >
-                    Сбросить коррекцию
-                  </button>
                 </div>
               )}
 
               {/* Tab: Audio & Sound */}
               {inspectorTab === 'audio' && (
                 <div className="inspector-section audio-section">
-                  <h4 className="inspector-h4">Звуковая дорожка (Fairlight Audio)</h4>
-                  
+                  <h4 className="inspector-h4">Библиотека звуков & музыки</h4>
                   <div className="audio-selector-list">
                     {MUSIC_TRACKS.map((track) => (
                       <div 
                         key={track.id}
-                        className={`audio-track-item ${selectedMusic === track.id ? 'active' : ''}`}
-                        onClick={() => setSelectedMusic(selectedMusic === track.id ? null : track.id)}
+                        className="audio-track-item"
+                        onClick={() => handleAddMusicClip(track)}
                       >
                         <div className="track-icon">
                           <Music size={14} />
@@ -666,7 +1279,7 @@ export const VideoEditorPage: React.FC = () => {
                           <div className="track-artist">{track.artist} • {track.duration}</div>
                         </div>
                         <button className="track-pick-btn">
-                          {selectedMusic === track.id ? 'Активен' : 'Выбрать'}
+                          + На таймлайн
                         </button>
                       </div>
                     ))}
@@ -674,7 +1287,7 @@ export const VideoEditorPage: React.FC = () => {
 
                   <div className="inspector-slider-row" style={{ marginTop: 14 }}>
                     <div className="slider-label-line">
-                      <span>Мастер-громкость музыки</span>
+                      <span>Мастер-громкость</span>
                       <strong>{volume}%</strong>
                     </div>
                     <input 
@@ -691,71 +1304,69 @@ export const VideoEditorPage: React.FC = () => {
               {/* Tab: Text & Titles */}
               {inspectorTab === 'text' && (
                 <div className="inspector-section text-section">
-                  <h4 className="inspector-h4">Титры & Субтитры (Fusion Titles)</h4>
-                  
-                  <div className="inspector-form-field">
-                    <label>Текст на экране</label>
-                    <input 
-                      type="text" 
-                      value={textOverlay} 
-                      onChange={(e) => setTextOverlay(e.target.value)}
-                      placeholder="Введите текст титра..."
-                    />
-                  </div>
+                  <h4 className="inspector-h4">Добавление титров (Fusion Titles)</h4>
+                  <button className="btn-inspector-blade" onClick={handleAddTextClip}>
+                    <Plus size={15} /> Вставить новый титр на {formatSMPTE(currentTime)}
+                  </button>
 
-                  <div className="inspector-slider-row">
-                    <div className="slider-label-line">
-                      <span>Кегль шрифта</span>
-                      <strong>{textSize}px</strong>
-                    </div>
-                    <input 
-                      type="range" 
-                      min="14" 
-                      max="54" 
-                      value={textSize} 
-                      onChange={(e) => setTextSize(Number(e.target.value))} 
-                    />
-                  </div>
-
-                  <div className="inspector-form-field">
-                    <label>Цвет заливки</label>
-                    <div className="text-color-swatches">
-                      {['#FFFFFF', '#FACC15', '#6366F1', '#EC4899', '#10B981', '#0F172A'].map((c) => (
+                  <h5 className="inspector-h5" style={{ marginTop: 14 }}>Список титров на V2:</h5>
+                  <div className="inspector-clips-list">
+                    {clips.filter((c) => c.trackId === 'v2').map((clip) => (
+                      <div 
+                        key={clip.id} 
+                        className={`inspector-clip-row ${selectedClipId === clip.id ? 'active' : ''}`}
+                        onClick={() => setSelectedClipId(clip.id)}
+                      >
+                        <div className="clip-row-info">
+                          <strong>{clip.text || clip.name}</strong>
+                          <span>{clip.start.toFixed(1)}с – {(clip.start + clip.duration).toFixed(1)}с</span>
+                        </div>
                         <button 
-                          key={c}
-                          className={`color-swatch ${textColor === c ? 'active' : ''}`}
-                          style={{ backgroundColor: c }}
-                          onClick={() => setTextColor(c)}
-                        />
-                      ))}
-                    </div>
+                          className="btn-trash-clip" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClip(clip.id);
+                          }}
+                          title="Удалить титр"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* Tab: Effects & Split */}
+              {/* Tab: Effects & Blade List */}
               {inspectorTab === 'effects' && (
                 <div className="inspector-section effects-section">
-                  <h4 className="inspector-h4">Инструменты лезвия (Blade & Split)</h4>
+                  <h4 className="inspector-h4">Инструменты лезвия (Blade & Cut)</h4>
                   <p className="inspector-hint">
-                    Поместите курсор на нужный кадр и нажмите кнопку ниже, чтобы разрезать клип на две части.
+                    Выберите клип на дорожке или переместите красный Playhead на нужный кадр и нажмите «Разрезать».
                   </p>
                   <button className="btn-inspector-blade" onClick={handleSplitAtPlayhead}>
                     <Scissors size={15} /> Разрезать клип на {formatSMPTE(currentTime)}
                   </button>
 
-                  <h5 className="inspector-h5" style={{ marginTop: 16 }}>Фрагменты на дорожке V1:</h5>
+                  <h5 className="inspector-h5" style={{ marginTop: 16 }}>Все фрагменты на таймлайне:</h5>
                   <div className="inspector-clips-list">
-                    {videoClips.map((clip) => (
-                      <div key={clip.id} className="inspector-clip-row">
+                    {clips.map((clip) => (
+                      <div 
+                        key={clip.id} 
+                        className={`inspector-clip-row ${selectedClipId === clip.id ? 'active' : ''}`}
+                        onClick={() => setSelectedClipId(clip.id)}
+                      >
                         <div className="clip-row-info">
-                          <strong>{clip.name}</strong>
+                          <strong>[{clip.trackId.toUpperCase()}] {clip.name}</strong>
                           <span>{clip.start.toFixed(1)}с – {(clip.start + clip.duration).toFixed(1)}с ({clip.duration.toFixed(1)}с)</span>
                         </div>
                         <button 
                           className="btn-trash-clip" 
-                          onClick={() => handleDeleteClip(clip.id)}
-                          disabled={videoClips.length <= 1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClip(clip.id);
+                          }}
+                          disabled={clips.length <= 1}
                           title="Удалить фрагмент"
                         >
                           <Trash2 size={13} />
@@ -777,7 +1388,7 @@ export const VideoEditorPage: React.FC = () => {
           <button 
             className={`tool-icon-btn ${activeTool === 'select' ? 'active' : ''}`}
             onClick={() => setActiveTool('select')}
-            title="Стрелка выбора (A)"
+            title="Стрелка выбора и перемещения (A)"
           >
             <Film size={14} />
           </button>
@@ -790,11 +1401,8 @@ export const VideoEditorPage: React.FC = () => {
           </button>
           <button 
             className={`tool-icon-btn ${activeTool === 'blade' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTool('blade');
-              handleSplitAtPlayhead();
-            }}
-            title="Лезвие / Разрезать клип (B)"
+            onClick={() => setActiveTool(activeTool === 'blade' ? 'select' : 'blade')}
+            title="Лезвие / Разрезка клипов (B)"
           >
             <Scissors size={14} />
           </button>
@@ -804,6 +1412,13 @@ export const VideoEditorPage: React.FC = () => {
             title="Магнитное прилипание клипов (N)"
           >
             <Magnet size={14} />
+          </button>
+          <button 
+            className="tool-icon-btn"
+            onClick={handleSplitAtPlayhead}
+            title="Быстрый разрез по Playhead (Ctrl+B)"
+          >
+            <Scissors size={14} style={{ color: '#ef4444' }} />
           </button>
           <button 
             className="tool-icon-btn"
@@ -860,8 +1475,27 @@ export const VideoEditorPage: React.FC = () => {
           </button>
         </div>
 
-        {/* Right: SMPTE Timecode, Speed, Audio Monitor */}
+        {/* Right: SMPTE Timecode, Zoom Scale, Speed, Audio Monitor */}
         <div className="transport-timecode-cluster">
+          {/* Zoom controls */}
+          <div className="timeline-zoom-controls">
+            <button
+              className="zoom-btn"
+              onClick={() => setZoomScale((z) => Math.max(1, z - 0.25))}
+              title="Уменьшить масштаб шкалы"
+            >
+              <ZoomOut size={13} />
+            </button>
+            <span className="zoom-label">{Math.round(zoomScale * 100)}%</span>
+            <button
+              className="zoom-btn"
+              onClick={() => setZoomScale((z) => Math.min(2.5, z + 0.25))}
+              title="Увеличить масштаб шкалы"
+            >
+              <ZoomIn size={13} />
+            </button>
+          </div>
+
           <div className="smpte-display-box" title="Точный таймкод SMPTE (Часы:Минуты:Секунды:Кадры)">
             <span className="smpte-label">TCG</span>
             <span className="smpte-value">{formatSMPTE(currentTime)}</span>
@@ -889,7 +1523,6 @@ export const VideoEditorPage: React.FC = () => {
               onChange={(e) => setVolume(Number(e.target.value))} 
               className="master-vol-slider"
             />
-            {/* Visual audio dB meter */}
             <div className="audio-db-meter">
               <span className={`db-bar ${volume > 30 ? 'lit' : ''}`} />
               <span className={`db-bar ${volume > 60 ? 'lit' : ''}`} />
@@ -900,7 +1533,7 @@ export const VideoEditorPage: React.FC = () => {
       </div>
 
       {/* 5. Professional Multi-Track Timeline */}
-      <div className="davinci-timeline-workstation">
+      <div className="davinci-timeline-workstation" ref={timelineScrollRef}>
         
         {/* Timeline Header Ruler Toolbar */}
         <div className="timeline-header-ruler-row">
@@ -911,14 +1544,15 @@ export const VideoEditorPage: React.FC = () => {
           {/* SMPTE Time Ruler */}
           <div 
             className="timeline-time-ruler"
+            style={{ width: `${zoomScale * 100}%` }}
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               const clickX = e.clientX - rect.left;
               const ratio = Math.max(0, Math.min(1, clickX / rect.width));
-              setCurrentTime(ratio * totalDuration);
+              setCurrentTime(Math.round(ratio * totalDuration * 10) / 10);
             }}
           >
-            {Array.from({ length: 16 }).map((_, i) => (
+            {Array.from({ length: totalDuration + 1 }).map((_, i) => (
               <div key={i} className="ruler-major-tick">
                 <span className="tick-label">{formatSMPTE(i)}</span>
                 <span className="micro-ticks">
@@ -932,7 +1566,7 @@ export const VideoEditorPage: React.FC = () => {
         </div>
 
         {/* Tracks Main Body with vertical Needle Playhead */}
-        <div className="timeline-tracks-body">
+        <div className="timeline-tracks-body" ref={timelineLanesRef} style={{ width: `${zoomScale * 100}%` }}>
           
           {/* DaVinci Red Playhead Needle */}
           <div
@@ -951,6 +1585,13 @@ export const VideoEditorPage: React.FC = () => {
               <div className="plate-track-id">V2</div>
               <div className="plate-track-name">Титры</div>
               <div className="plate-actions">
+                <button 
+                  className="plate-btn btn-quick-add"
+                  onClick={handleAddTextClip}
+                  title="Добавить новый титр на V2"
+                >
+                  <Plus size={11} />
+                </button>
                 <button 
                   className={`plate-btn ${!v2Visible ? 'disabled' : ''}`} 
                   onClick={() => setV2Visible(!v2Visible)}
@@ -976,22 +1617,54 @@ export const VideoEditorPage: React.FC = () => {
                 setCurrentTime(Math.max(0, Math.min(1, clickX / rect.width)) * totalDuration);
               }}
             >
-              {v2Visible && textOverlay && (
-                <div 
-                  className="timeline-clip-item text-clip"
-                  style={{ left: '10%', width: '75%' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setInspectorTab('text');
-                    setIsInspectorOpen(true);
-                  }}
-                >
-                  <Type size={12} className="clip-icon" />
-                  <span className="clip-label-text">{textOverlay}</span>
-                  <div className="trim-handle-l" />
-                  <div className="trim-handle-r" />
-                </div>
-              )}
+              {v2Visible && clips.filter((c) => c.trackId === 'v2').map((clip) => {
+                const leftPercent = (clip.start / totalDuration) * 100;
+                const widthPercent = (clip.duration / totalDuration) * 100;
+                const isSelected = selectedClipId === clip.id;
+                const isDragging = dragState?.clipId === clip.id;
+
+                return (
+                  <div 
+                    key={clip.id}
+                    className={`timeline-clip-item text-clip ${isSelected ? 'selected' : ''} ${isDragging ? 'is-dragging' : ''} ${activeTool === 'blade' ? 'blade-mode' : ''}`}
+                    style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+                    onMouseDown={(e) => !v2Locked && handleStartDrag(e, clip, 'move')}
+                    onMouseMove={(e) => handleClipMouseMove(e, clip)}
+                    onMouseLeave={handleClipMouseLeave}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedClipId(clip.id);
+                      setInspectorTab('clip');
+                    }}
+                  >
+                    <Type size={12} className="clip-icon" />
+                    <span className="clip-label-text">{clip.text || clip.name}</span>
+                    
+                    {/* Trim Handles */}
+                    {!v2Locked && (
+                      <>
+                        <div 
+                          className="trim-handle-l" 
+                          onMouseDown={(e) => handleStartDrag(e, clip, 'trim-start')}
+                          title="Трим начала"
+                        />
+                        <div 
+                          className="trim-handle-r" 
+                          onMouseDown={(e) => handleStartDrag(e, clip, 'trim-end')}
+                          title="Трим конца"
+                        />
+                      </>
+                    )}
+
+                    {/* Blade cut preview line */}
+                    {bladeHover && bladeHover.clipId === clip.id && (
+                      <div className="blade-cut-indicator" style={{ left: `${bladeHover.percent}%` }}>
+                        <span className="blade-time-tag">{formatSMPTE(bladeHover.time)}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1001,6 +1674,13 @@ export const VideoEditorPage: React.FC = () => {
               <div className="plate-track-id">V1</div>
               <div className="plate-track-name">Видео ({aspectRatio})</div>
               <div className="plate-actions">
+                <button 
+                  className="plate-btn btn-quick-add"
+                  onClick={() => handleAddMediaToTimeline(selectedSourceMedia)}
+                  title="Добавить клип из медиатеки на V1"
+                >
+                  <Plus size={11} />
+                </button>
                 <button 
                   className={`plate-btn ${!v1Visible ? 'disabled' : ''}`} 
                   onClick={() => setV1Visible(!v1Visible)}
@@ -1026,46 +1706,80 @@ export const VideoEditorPage: React.FC = () => {
                 setCurrentTime(Math.max(0, Math.min(1, clickX / rect.width)) * totalDuration);
               }}
             >
-              {v1Visible && videoClips.map((clip) => {
+              {v1Visible && clips.filter((c) => c.trackId === 'v1').map((clip) => {
                 const leftPercent = (clip.start / totalDuration) * 100;
                 const widthPercent = (clip.duration / totalDuration) * 100;
+                const isSelected = selectedClipId === clip.id;
+                const isDragging = dragState?.clipId === clip.id;
+
                 return (
                   <div
                     key={clip.id}
-                    className="timeline-clip-item video-clip"
+                    className={`timeline-clip-item video-clip ${isSelected ? 'selected' : ''} ${isDragging ? 'is-dragging' : ''} ${activeTool === 'blade' ? 'blade-mode' : ''}`}
                     style={{
                       left: `${leftPercent}%`,
                       width: `${widthPercent}%`,
                       backgroundColor: clip.color
                     }}
+                    onMouseDown={(e) => !v1Locked && handleStartDrag(e, clip, 'move')}
+                    onMouseMove={(e) => handleClipMouseMove(e, clip)}
+                    onMouseLeave={handleClipMouseLeave}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setInspectorTab('effects');
-                      setIsInspectorOpen(true);
+                      setSelectedClipId(clip.id);
+                      setInspectorTab('clip');
                     }}
                   >
                     <div className="clip-filmstrip-thumbs">
-                      <img src={clip.thumb} alt={clip.name} />
-                      <img src={clip.thumb} alt={clip.name} />
+                      {clip.thumb && <img src={clip.thumb} alt={clip.name} />}
+                      {clip.thumb && <img src={clip.thumb} alt={clip.name} />}
                     </div>
                     <div className="clip-info-strip">
                       <Film size={12} />
                       <span className="clip-label-text">{clip.name}</span>
                     </div>
-                    <div className="trim-handle-l" />
-                    <div className="trim-handle-r" />
+
+                    {/* Trim Handles */}
+                    {!v1Locked && (
+                      <>
+                        <div 
+                          className="trim-handle-l" 
+                          onMouseDown={(e) => handleStartDrag(e, clip, 'trim-start')}
+                          title="Трим начала"
+                        />
+                        <div 
+                          className="trim-handle-r" 
+                          onMouseDown={(e) => handleStartDrag(e, clip, 'trim-end')}
+                          title="Трим конца"
+                        />
+                      </>
+                    )}
+
+                    {/* Blade cut preview line */}
+                    {bladeHover && bladeHover.clipId === clip.id && (
+                      <div className="blade-cut-indicator" style={{ left: `${bladeHover.percent}%` }}>
+                        <span className="blade-time-tag">{formatSMPTE(bladeHover.time)}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {/* Track 3: A1 (Основное аудио) */}
+          {/* Track 3: A1 (Основное аудио клипов) */}
           <div className="timeline-lane-row track-a1">
             <div className="lane-header-plate">
               <div className="plate-track-id">A1</div>
-              <div className="plate-track-name">Звук клипа</div>
+              <div className="plate-track-name">Звук видео</div>
               <div className="plate-actions">
+                <button 
+                  className="plate-btn btn-quick-add"
+                  onClick={handleAddAudioClip}
+                  title="Добавить дорожку эффектов на A1"
+                >
+                  <Plus size={11} />
+                </button>
                 <button 
                   className={`plate-badge-btn ${a1Muted ? 'active-mute' : ''}`} 
                   onClick={() => setA1Muted(!a1Muted)}
@@ -1091,34 +1805,61 @@ export const VideoEditorPage: React.FC = () => {
                 setCurrentTime(Math.max(0, Math.min(1, clickX / rect.width)) * totalDuration);
               }}
             >
-              {!a1Muted && (
-                <div 
-                  className="timeline-clip-item audio-primary-clip"
-                  style={{ left: '0%', width: '100%' }}
-                >
-                  <div className="audio-waveform-svg">
-                    <span className="wave-stem h-40" />
-                    <span className="wave-stem h-70" />
-                    <span className="wave-stem h-90" />
-                    <span className="wave-stem h-50" />
-                    <span className="wave-stem h-80" />
-                    <span className="wave-stem h-60" />
-                    <span className="wave-stem h-95" />
-                    <span className="wave-stem h-75" />
-                    <span className="wave-stem h-45" />
-                    <span className="wave-stem h-85" />
-                    <span className="wave-stem h-65" />
-                    <span className="wave-stem h-90" />
-                    <span className="wave-stem h-50" />
-                    <span className="wave-stem h-80" />
-                    <span className="wave-stem h-60" />
-                    <span className="wave-stem h-95" />
-                    <span className="wave-stem h-75" />
-                    <span className="wave-stem h-40" />
+              {!a1Muted && clips.filter((c) => c.trackId === 'a1').map((clip) => {
+                const leftPercent = (clip.start / totalDuration) * 100;
+                const widthPercent = (clip.duration / totalDuration) * 100;
+                const isSelected = selectedClipId === clip.id;
+                const isDragging = dragState?.clipId === clip.id;
+
+                return (
+                  <div 
+                    key={clip.id}
+                    className={`timeline-clip-item audio-primary-clip ${isSelected ? 'selected' : ''} ${isDragging ? 'is-dragging' : ''} ${activeTool === 'blade' ? 'blade-mode' : ''}`}
+                    style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+                    onMouseDown={(e) => handleStartDrag(e, clip, 'move')}
+                    onMouseMove={(e) => handleClipMouseMove(e, clip)}
+                    onMouseLeave={handleClipMouseLeave}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedClipId(clip.id);
+                      setInspectorTab('clip');
+                    }}
+                  >
+                    <div className="audio-waveform-svg">
+                      <span className="wave-stem h-40" />
+                      <span className="wave-stem h-70" />
+                      <span className="wave-stem h-90" />
+                      <span className="wave-stem h-50" />
+                      <span className="wave-stem h-80" />
+                      <span className="wave-stem h-60" />
+                      <span className="wave-stem h-95" />
+                      <span className="wave-stem h-75" />
+                      <span className="wave-stem h-45" />
+                      <span className="wave-stem h-85" />
+                    </div>
+                    <span className="clip-label-text">{clip.name}</span>
+
+                    {/* Trim Handles */}
+                    <div 
+                      className="trim-handle-l" 
+                      onMouseDown={(e) => handleStartDrag(e, clip, 'trim-start')}
+                      title="Трим начала"
+                    />
+                    <div 
+                      className="trim-handle-r" 
+                      onMouseDown={(e) => handleStartDrag(e, clip, 'trim-end')}
+                      title="Трим конца"
+                    />
+
+                    {/* Blade cut preview line */}
+                    {bladeHover && bladeHover.clipId === clip.id && (
+                      <div className="blade-cut-indicator" style={{ left: `${bladeHover.percent}%` }}>
+                        <span className="blade-time-tag">{formatSMPTE(bladeHover.time)}</span>
+                      </div>
+                    )}
                   </div>
-                  <span className="clip-label-text">Оригинальная звуковая дорожка 48kHz Stereo</span>
-                </div>
-              )}
+                );
+              })}
             </div>
           </div>
 
@@ -1128,6 +1869,13 @@ export const VideoEditorPage: React.FC = () => {
               <div className="plate-track-id">A2</div>
               <div className="plate-track-name">Музыка</div>
               <div className="plate-actions">
+                <button 
+                  className="plate-btn btn-quick-add"
+                  onClick={() => handleAddMusicClip(MUSIC_TRACKS[0])}
+                  title="Добавить музыку на A2"
+                >
+                  <Plus size={11} />
+                </button>
                 <button 
                   className={`plate-badge-btn ${a2Muted ? 'active-mute' : ''}`} 
                   onClick={() => setA2Muted(!a2Muted)}
@@ -1153,42 +1901,59 @@ export const VideoEditorPage: React.FC = () => {
                 setCurrentTime(Math.max(0, Math.min(1, clickX / rect.width)) * totalDuration);
               }}
             >
-              {!a2Muted && selectedMusic ? (
-                <div 
-                  className="timeline-clip-item music-clip"
-                  style={{ left: '0%', width: '100%' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setInspectorTab('audio');
-                    setIsInspectorOpen(true);
-                  }}
-                >
-                  <Music size={12} className="clip-icon" />
-                  <span className="clip-label-text">
-                    ♫ {MUSIC_TRACKS.find((m) => m.id === selectedMusic)?.title} (Фоновое аудио)
-                  </span>
-                  <div className="audio-waveform-svg music-wave">
-                    <span className="wave-stem h-60" />
-                    <span className="wave-stem h-90" />
-                    <span className="wave-stem h-70" />
-                    <span className="wave-stem h-85" />
-                    <span className="wave-stem h-55" />
-                    <span className="wave-stem h-95" />
-                    <span className="wave-stem h-65" />
-                    <span className="wave-stem h-80" />
+              {!a2Muted && clips.filter((c) => c.trackId === 'a2').map((clip) => {
+                const leftPercent = (clip.start / totalDuration) * 100;
+                const widthPercent = (clip.duration / totalDuration) * 100;
+                const isSelected = selectedClipId === clip.id;
+                const isDragging = dragState?.clipId === clip.id;
+
+                return (
+                  <div 
+                    key={clip.id}
+                    className={`timeline-clip-item music-clip ${isSelected ? 'selected' : ''} ${isDragging ? 'is-dragging' : ''} ${activeTool === 'blade' ? 'blade-mode' : ''}`}
+                    style={{ left: `${leftPercent}%`, width: `${widthPercent}%` }}
+                    onMouseDown={(e) => handleStartDrag(e, clip, 'move')}
+                    onMouseMove={(e) => handleClipMouseMove(e, clip)}
+                    onMouseLeave={handleClipMouseLeave}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedClipId(clip.id);
+                      setInspectorTab('clip');
+                    }}
+                  >
+                    <Music size={12} className="clip-icon" />
+                    <span className="clip-label-text">♫ {clip.name}</span>
+                    <div className="audio-waveform-svg music-wave">
+                      <span className="wave-stem h-60" />
+                      <span className="wave-stem h-90" />
+                      <span className="wave-stem h-70" />
+                      <span className="wave-stem h-85" />
+                      <span className="wave-stem h-55" />
+                      <span className="wave-stem h-95" />
+                      <span className="wave-stem h-65" />
+                    </div>
+
+                    {/* Trim Handles */}
+                    <div 
+                      className="trim-handle-l" 
+                      onMouseDown={(e) => handleStartDrag(e, clip, 'trim-start')}
+                      title="Трим начала"
+                    />
+                    <div 
+                      className="trim-handle-r" 
+                      onMouseDown={(e) => handleStartDrag(e, clip, 'trim-end')}
+                      title="Трим конца"
+                    />
+
+                    {/* Blade cut preview line */}
+                    {bladeHover && bladeHover.clipId === clip.id && (
+                      <div className="blade-cut-indicator" style={{ left: `${bladeHover.percent}%` }}>
+                        <span className="blade-time-tag">{formatSMPTE(bladeHover.time)}</span>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : (
-                <button 
-                  className="timeline-btn-add-music"
-                  onClick={() => {
-                    setInspectorTab('audio');
-                    setIsInspectorOpen(true);
-                  }}
-                >
-                  <Plus size={12} /> Добавить фоновую музыку на A2
-                </button>
-              )}
+                );
+              })}
             </div>
           </div>
 

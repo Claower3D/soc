@@ -1828,3 +1828,316 @@
     display: none;
   }
 }
+
+/* ==========================================================================
+   ADVANCED TIMELINE EDITING, DRAG & DROP, TRIMMING & BLADE TOOL
+   ========================================================================== */
+
+/* Selected Clip Glow & Highlight */
+.timeline-clip-item.selected {
+  box-shadow: 0 0 0 2px #eab308, 0 4px 14px rgba(234, 179, 8, 0.4) !important;
+  border-color: #facc15 !important;
+  z-index: 12 !important;
+}
+
+/* Dragging state */
+.timeline-clip-item.is-dragging {
+  cursor: grabbing !important;
+  opacity: 0.92;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+  z-index: 25 !important;
+  transform: translateY(-1px);
+}
+
+/* Blade tool mode on clips */
+.timeline-clip-item.blade-mode {
+  cursor: crosshair !important;
+}
+
+/* Enhanced Trim Handles */
+.trim-handle-l, .trim-handle-r {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: rgba(255, 255, 255, 0.35);
+  cursor: col-resize;
+  z-index: 15;
+  transition: background 0.15s;
+}
+
+.trim-handle-l {
+  left: 0;
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+  border-right: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.trim-handle-r {
+  right: 0;
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
+  border-left: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.trim-handle-l:hover, .trim-handle-r:hover,
+.timeline-clip-item.selected .trim-handle-l,
+.timeline-clip-item.selected .trim-handle-r {
+  background: #eab308;
+}
+
+/* Blade Cut Hover Indicator */
+.blade-cut-indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.blade-time-tag {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: monospace;
+  white-space: nowrap;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+}
+
+/* Top Bar Undo / Redo */
+.undo-redo-cluster {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #f1f5f9;
+  padding: 2px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+}
+
+.undo-btn {
+  background: none;
+  border: none;
+  color: #475569;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.undo-btn:hover:not(:disabled) {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.undo-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Timeline Zoom Controls */
+.timeline-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.zoom-btn {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+}
+
+.zoom-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.zoom-label {
+  font-size: 10px;
+  font-family: monospace;
+  font-weight: 700;
+  color: #475569;
+  min-width: 32px;
+  text-align: center;
+}
+
+/* Inspector Clip Properties Form */
+.clip-props-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inspector-two-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.clip-quick-action-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-clip-action-split {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-clip-action-split:hover:not(:disabled) {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.btn-clip-action-split:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-row-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-clip-action-dup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  padding: 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-clip-action-dup:hover {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.btn-clip-action-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #ef4444;
+  padding: 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-clip-action-del:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #dc2626;
+}
+
+.no-clip-selected-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 30px 16px;
+  color: #94a3b8;
+  gap: 10px;
+}
+
+.no-clip-selected-hint p {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.btn-quick-add {
+  color: #10b981 !important;
+  border: 1px dashed #cbd5e1 !important;
+}
+
+.btn-quick-add:hover {
+  background: #ecfdf5 !important;
+  border-color: #10b981 !important;
+  color: #059669 !important;
+}
+
+.menu-btn-action {
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.menu-btn-action:hover {
+  color: #2563eb !important;
+}
+
+.davinci-timeline-workstation {
+  overflow-x: auto;
+}
+
+.text-clip-editor-sub textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.sub-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 4px;
+}
+
