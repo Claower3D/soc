@@ -15,6 +15,7 @@ import {
   initialUsers, initialProducts, chats as defaultChats 
 } from '../data/mock';
 import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
+import { formatLastSeen } from '../utils/onlineStatus';
 import './ChatWindow.css';
 
 interface ChatWindowProps {
@@ -1087,7 +1088,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
               {!chat.isGroup && (
                 <span 
                   className={`tg-online-pip ${chat.user?.online ? 'is-online' : 'is-offline'}`} 
-                  title={chat.user?.online ? 'В сети' : 'Не в сети'}
+                  title={chat.user?.online ? 'В сети' : formatLastSeen(chat.user?.lastSeen, false, chat.user?.lastSeenText)}
                 />
               )}
             </div>
@@ -1115,7 +1116,9 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                 ) : chat.user?.online ? (
                   <span className="online-text">в сети</span>
                 ) : (
-                  <span className="offline-text">не в сети</span>
+                  <span className="offline-text">
+                    {formatLastSeen(chat.user?.lastSeen, false, chat.user?.lastSeenText)}
+                  </span>
                 )}
               </span>
             </div>

@@ -145,6 +145,8 @@ export interface User {
   showZodiac?: boolean; // Показывать знак зодиака
   isPremium?: boolean; // New Age Premium подписка
   premiumSince?: string; // Дата оформления Premium
+  lastSeen?: string; // ISO дата последней активности
+  lastSeenText?: string; // Человекочитаемый статус активности ("В сети", "Был(а) в сети 5 минут назад")
 }
 
 export interface Highlight {

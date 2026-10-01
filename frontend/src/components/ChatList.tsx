@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { initialUsers, currentUser, stories, type Chat, CHAT_TAGS } from '../data/mock';
 import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
+import { formatLastSeen } from '../utils/onlineStatus';
 import './ChatList.css';
 
 interface ChatListProps {
@@ -490,7 +491,7 @@ export function ChatList({
                   {!isGroup && !isAi && (
                     <div 
                       className={`online-indicator ${chat.user?.online ? 'is-online' : 'is-offline'}`} 
-                      title={chat.user?.online ? 'В сети' : 'Не в сети'}
+                      title={chat.user?.online ? 'В сети' : formatLastSeen(chat.user?.lastSeen, false, chat.user?.lastSeenText)}
                     />
                   )}
                   {isGroup && (

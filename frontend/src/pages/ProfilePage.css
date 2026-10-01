@@ -517,6 +517,53 @@
   transform: translateY(-1px);
 }
 
+/* User Online / Last Seen Activity Pill */
+.profile-activity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.2;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.profile-activity-pill.online {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.profile-activity-pill.offline {
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+.profile-activity-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.profile-activity-pill.online .profile-activity-dot {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.7);
+}
+
+.profile-activity-pill.offline .profile-activity-dot {
+  background: #94a3b8;
+  box-shadow: none;
+}
+
+.profile-activity-text {
+  white-space: nowrap;
+}
+
 .profile-bio {
   font-size: 0.92rem;
   color: var(--color-text-secondary);
@@ -1829,6 +1876,11 @@
   .profile-username-pill {
     padding: 0.15rem 0.55rem !important;
     font-size: 0.78rem !important;
+  }
+
+  .profile-activity-pill {
+    padding: 0.15rem 0.5rem !important;
+    font-size: 0.74rem !important;
   }
 
   .profile-role-badge {

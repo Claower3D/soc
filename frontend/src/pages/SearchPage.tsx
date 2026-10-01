@@ -15,6 +15,7 @@ import {
   cacheUser
 } from '../utils/followStorage';
 import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
+import { formatLastSeen } from '../utils/onlineStatus';
 import './SearchPage.css';
 
 type SearchTab = 'all' | 'accounts' | 'videos' | 'posts';
@@ -263,7 +264,7 @@ export function SearchPage() {
                           />
                           <span 
                             className={`account-online-dot ${isOnline ? 'is-online' : 'is-offline'}`}
-                            title={isOnline ? 'В сети' : 'Не в сети'}
+                            title={isOnline ? 'В сети' : formatLastSeen(user.lastSeen, false, user.lastSeenText)}
                           />
                         </div>
                         <div className="account-card-details">
@@ -403,7 +404,7 @@ export function SearchPage() {
                         />
                         <span 
                           className={`account-row-online-badge ${isOnline ? 'is-online' : 'is-offline'}`}
-                          title={isOnline ? 'В сети' : 'Не в сети'}
+                          title={isOnline ? 'В сети' : formatLastSeen(user.lastSeen, false, user.lastSeenText)}
                         />
                       </div>
 

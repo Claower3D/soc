@@ -43,6 +43,7 @@ import {
   getAllUsersPool,
   cacheUser 
 } from '../utils/followStorage';
+import { formatLastSeen } from '../utils/onlineStatus';
 import './ProfilePage.css';
 
 const getPluralForm = (n: number, one: string, few: string, many: string) => {
@@ -371,6 +372,26 @@ export function ProfilePage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isConsciousnessModalOpen, setIsConsciousnessModalOpen] = useState(false);
+  const [, setActivityTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActivityTick(t => t + 1);
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const isUserOnline = useMemo(() => {
+    if (isMe) return true;
+    return Boolean(profileData?.online ?? activeUser?.online);
+  }, [isMe, profileData?.online, activeUser?.online]);
+
+  const userActivityText = useMemo(() => {
+    if (isMe) return 'В сети';
+    const ls = (profileData as any)?.lastSeen ?? activeUser?.lastSeen;
+    const lsText = (profileData as any)?.lastSeenText ?? activeUser?.lastSeenText;
+    return formatLastSeen(ls, isUserOnline, lsText);
+  }, [isMe, isUserOnline, profileData, activeUser?.lastSeen, activeUser?.lastSeenText]);
 
   const friendsDisplayCount = useMemo(() => {
     return (profileData as any)?.friendsCount ?? activeUser?.friendsCount ?? 0;
@@ -612,8 +633,8 @@ export function ProfilePage() {
                   onError={handleAvatarError}
                 />
                 <span 
-                  className={`profile-online-indicator ${(isMe ? true : Boolean(activeUser.online)) ? 'is-online' : 'is-offline'}`} 
-                  title={(isMe ? true : Boolean(activeUser.online)) ? 'В сети' : 'Не в сети'} 
+                  className={`profile-online-indicator ${isUserOnline ? 'is-online' : 'is-offline'}`} 
+                  title={userActivityText} 
                 />
                 {userHasStories && <span className="profile-story-badge-hint">История</span>}
               </div>
@@ -648,6 +669,11 @@ export function ProfilePage() {
                   >
                     @{activeUser.username}
                   </button>
+
+                  <div className={`profile-activity-pill ${isUserOnline ? 'online' : 'offline'}`} title={userActivityText}>
+                    <span className="profile-activity-dot" />
+                    <span className="profile-activity-text">{userActivityText}</span>
+                  </div>
 
                   {/* Роли пользователя */}
                   {activeUser.role === 'creator' && (

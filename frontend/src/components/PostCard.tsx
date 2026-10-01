@@ -5,6 +5,7 @@ import { type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { PremiumBadge } from './PremiumBadge';
 import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
+import { formatLastSeen } from '../utils/onlineStatus';
 import './PostCard.css';
 
 interface PostCardProps {
@@ -117,7 +118,7 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
             />
             <span 
               className={`post-author-online ${(post.user.id === currentUser?.id ? true : Boolean(post.user.online)) ? 'is-online' : 'is-offline'}`} 
-              title={(post.user.id === currentUser?.id ? true : Boolean(post.user.online)) ? 'В сети' : 'Не в сети'} 
+              title={(post.user.id === currentUser?.id || post.user.online) ? 'В сети' : formatLastSeen(post.user.lastSeen, false, post.user.lastSeenText)} 
             />
           </div>
           <div className="post-user-info">

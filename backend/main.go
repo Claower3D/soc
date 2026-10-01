@@ -171,6 +171,8 @@ type User struct {
 	Location       string `json:"location,omitempty"`
 	Website        string `json:"website,omitempty"`
 	Online         bool   `json:"online"`
+	LastSeen       string `json:"lastSeen,omitempty"`
+	LastSeenText   string `json:"lastSeenText,omitempty"`
 	IsFollowed     bool   `json:"isFollowed,omitempty"`
 	IsFriend       bool   `json:"isFriend,omitempty"`
 	Role           string `json:"role,omitempty"`
@@ -677,6 +679,48 @@ func isUserOnline(userID string, dbOnline bool, dbLastSeen time.Time) bool {
 		return true
 	}
 	return false
+}
+
+func formatLastSeen(lastSeen time.Time, isOnline bool) string {
+	if isOnline {
+		return "В сети"
+	}
+	if lastSeen.IsZero() {
+		return "Был(а) в сети недавно"
+	}
+	diff := time.Since(lastSeen)
+	if diff < 0 {
+		return "В сети"
+	}
+	if diff < 1*time.Minute {
+		return "Был(а) в сети только что"
+	}
+	if diff < 60*time.Minute {
+		mins := int(diff.Minutes())
+		if mins < 1 {
+			mins = 1
+		}
+		return fmt.Sprintf("Был(а) в сети %s назад", pluralizeRu(mins, "минуту", "минуты", "минут"))
+	}
+	if diff < 24*time.Hour {
+		hours := int(diff.Hours())
+		if hours < 1 {
+			hours = 1
+		}
+		return fmt.Sprintf("Был(а) в сети %s назад", pluralizeRu(hours, "час", "часа", "часов"))
+	}
+	days := int(diff.Hours() / 24)
+	if days == 1 {
+		return "Был(а) в сети вчера"
+	}
+	if days < 7 {
+		return fmt.Sprintf("Был(а) в сети %s назад", pluralizeRu(days, "день", "дня", "дней"))
+	}
+	if days < 30 {
+		weeks := days / 7
+		return fmt.Sprintf("Был(а) в сети %s назад", pluralizeRu(weeks, "неделю", "недели", "недель"))
+	}
+	return "Был(а) в сети давно"
 }
 
 // =========================================================================
@@ -1522,7 +1566,17 @@ func handleUsers(w http.ResponseWriter, r *http.Request) {
 				var dbOnline bool
 				var dbLastSeen time.Time
 				if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Avatar, &u.Bio, &u.Role, &u.BeliefType, &u.BeliefPrivacy, &u.Verified, &u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount, &dbOnline, &dbLastSeen); err == nil {
+					userLastActiveMu.RLock()
+					if memT, exists := userLastActive[u.ID]; exists && (dbLastSeen.IsZero() || memT.After(dbLastSeen)) {
+						dbLastSeen = memT
+					}
+					userLastActiveMu.RUnlock()
+
 					u.Online = isUserOnline(u.ID, dbOnline, dbLastSeen)
+					if !dbLastSeen.IsZero() {
+						u.LastSeen = dbLastSeen.Format(time.RFC3339)
+						u.LastSeenText = formatLastSeen(dbLastSeen, u.Online)
+					}
 					ensureUserAvatar(&u)
 					dbUsers = append(dbUsers, u)
 				}
@@ -2831,7 +2885,17 @@ func handleFollowers(w http.ResponseWriter, r *http.Request) {
 				var dbOnline bool
 				var dbLastSeen time.Time
 				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified, &dbOnline, &dbLastSeen)
+				userLastActiveMu.RLock()
+				if memT, exists := userLastActive[u.ID]; exists && (dbLastSeen.IsZero() || memT.After(dbLastSeen)) {
+					dbLastSeen = memT
+				}
+				userLastActiveMu.RUnlock()
+
 				u.Online = isUserOnline(u.ID, dbOnline, dbLastSeen)
+				if !dbLastSeen.IsZero() {
+					u.LastSeen = dbLastSeen.Format(time.RFC3339)
+					u.LastSeenText = formatLastSeen(dbLastSeen, u.Online)
+				}
 				ensureUserAvatar(&u)
 				followers = append(followers, u)
 			}
@@ -2921,7 +2985,17 @@ func handleFollowing(w http.ResponseWriter, r *http.Request) {
 				var dbOnline bool
 				var dbLastSeen time.Time
 				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified, &dbOnline, &dbLastSeen)
+				userLastActiveMu.RLock()
+				if memT, exists := userLastActive[u.ID]; exists && (dbLastSeen.IsZero() || memT.After(dbLastSeen)) {
+					dbLastSeen = memT
+				}
+				userLastActiveMu.RUnlock()
+
 				u.Online = isUserOnline(u.ID, dbOnline, dbLastSeen)
+				if !dbLastSeen.IsZero() {
+					u.LastSeen = dbLastSeen.Format(time.RFC3339)
+					u.LastSeenText = formatLastSeen(dbLastSeen, u.Online)
+				}
 				ensureUserAvatar(&u)
 				following = append(following, u)
 			}
@@ -3014,7 +3088,17 @@ func handleFriends(w http.ResponseWriter, r *http.Request) {
 				var dbOnline bool
 				var dbLastSeen time.Time
 				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.Verified, &dbOnline, &dbLastSeen)
+				userLastActiveMu.RLock()
+				if memT, exists := userLastActive[u.ID]; exists && (dbLastSeen.IsZero() || memT.After(dbLastSeen)) {
+					dbLastSeen = memT
+				}
+				userLastActiveMu.RUnlock()
+
 				u.Online = isUserOnline(u.ID, dbOnline, dbLastSeen)
+				if !dbLastSeen.IsZero() {
+					u.LastSeen = dbLastSeen.Format(time.RFC3339)
+					u.LastSeenText = formatLastSeen(dbLastSeen, u.Online)
+				}
 				ensureUserAvatar(&u)
 				u.IsFriend = true
 				users = append(users, u)
@@ -3280,7 +3364,19 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден"})
 			return
 		}
+		userLastActiveMu.RLock()
+		if memT, exists := userLastActive[user.ID]; exists && (dbLastSeen.IsZero() || memT.After(dbLastSeen)) {
+			dbLastSeen = memT
+		}
+		userLastActiveMu.RUnlock()
+
 		user.Online = isUserOnline(user.ID, dbOnline, dbLastSeen)
+		if !dbLastSeen.IsZero() {
+			user.LastSeen = dbLastSeen.Format(time.RFC3339)
+			user.LastSeenText = formatLastSeen(dbLastSeen, user.Online)
+		} else {
+			user.LastSeenText = "Был(а) в сети недавно"
+		}
 		ensureUserAvatar(&user)
 		
 		// Accurate dynamic relationship counts
