@@ -49,12 +49,59 @@ export interface TrackClip {
   color: string;
   type: 'video' | 'audio' | 'text' | 'music';
   thumb?: string;
+  // Typography properties:
   text?: string;
   textColor?: string;
   textSize?: number;
+  fontWeight?: string;
+  fontFamily?: string;
+  textAlign?: 'left' | 'center' | 'right';
+  posX?: number;
+  posY?: number;
+  bgColor?: string;
+  hasShadow?: boolean;
+  hasStroke?: boolean;
+  // Audio properties:
   volume?: number;
   filter?: string;
 }
+
+const FONT_FAMILIES = [
+  { id: 'sans-serif', name: 'Inter (Современный без засечек)' },
+  { id: "'Montserrat', sans-serif", name: 'Montserrat (Геометричный)' },
+  { id: "'Impact', 'Arial Black', sans-serif", name: 'Impact / Viral (Reels / Shorts)' },
+  { id: "'Oswald', sans-serif", name: 'Oswald (Узкий киношный)' },
+  { id: "'Playfair Display', serif", name: 'Playfair Display (Премиум Serif)' },
+  { id: "'Courier New', monospace", name: 'Courier New (Ретро машинка)' },
+  { id: "'Pacifico', cursive", name: 'Pacifico (Рукописный)' },
+  { id: "'Rubik', sans-serif", name: 'Rubik (Скругленный)' }
+];
+
+const FONT_WEIGHTS = [
+  { id: '400', name: 'Обычный' },
+  { id: '600', name: 'Полужирный' },
+  { id: '700', name: 'Жирный' },
+  { id: '900', name: 'Black' }
+];
+
+const TEXT_COLORS = [
+  '#FFFFFF',
+  '#FACC15',
+  '#EF4444',
+  '#3B82F6',
+  '#10B981',
+  '#EC4899',
+  '#8B5CF6',
+  '#0F172A'
+];
+
+const BG_PRESETS = [
+  { id: 'transparent', name: 'Без фона' },
+  { id: 'rgba(0, 0, 0, 0.7)', name: 'Тёмная' },
+  { id: 'rgba(255, 255, 255, 0.9)', name: 'Светлая' },
+  { id: 'rgba(239, 68, 68, 0.85)', name: 'Красная' },
+  { id: 'rgba(234, 179, 8, 0.9)', name: 'Жёлтая' }
+];
 
 const COLOR_PRESETS = [
   { id: 'normal', name: 'Оригинал', filter: 'none', desc: 'Естественные цвета' },
@@ -119,7 +166,15 @@ const INITIAL_CLIPS: TrackClip[] = [
     type: 'text',
     text: 'New Age Video Studio 🔥',
     textColor: '#FFFFFF',
-    textSize: 24
+    textSize: 26,
+    fontWeight: '800',
+    fontFamily: "'Montserrat', sans-serif",
+    textAlign: 'center',
+    posX: 50,
+    posY: 75,
+    bgColor: 'rgba(0, 0, 0, 0.65)',
+    hasShadow: true,
+    hasStroke: false
   },
   {
     id: 'text_2',
@@ -131,7 +186,15 @@ const INITIAL_CLIPS: TrackClip[] = [
     type: 'text',
     text: 'Кинематографичный 4K HDR ⚡',
     textColor: '#FACC15',
-    textSize: 22
+    textSize: 24,
+    fontWeight: '900',
+    fontFamily: "'Impact', 'Arial Black', sans-serif",
+    textAlign: 'center',
+    posX: 50,
+    posY: 80,
+    bgColor: 'transparent',
+    hasShadow: true,
+    hasStroke: true
   },
   // V1: Video Tracks
   {
@@ -271,6 +334,10 @@ export const VideoEditorPage: React.FC = () => {
   // Timeline Container Ref for measuring pixel widths
   const timelineLanesRef = useRef<HTMLDivElement>(null);
   const timelineScrollRef = useRef<HTMLDivElement>(null);
+
+  // Monitor preview text dragging
+  const [isDraggingTextOnScreen, setIsDraggingTextOnScreen] = useState(false);
+  const screenRenderRef = useRef<HTMLDivElement>(null);
 
   // Animation playback loop
   const timerRef = useRef<number | null>(null);
@@ -452,14 +519,22 @@ export const VideoEditorPage: React.FC = () => {
       duration: 4.0,
       color: '#d97706',
       type: 'text',
-      text: 'Новый стильный заголовок ✨',
+      text: 'Новый заголовок ✨',
       textColor: '#FFFFFF',
-      textSize: 24
+      textSize: 26,
+      fontWeight: '700',
+      fontFamily: "'Montserrat', sans-serif",
+      textAlign: 'center',
+      posX: 50,
+      posY: 75,
+      bgColor: 'transparent',
+      hasShadow: true,
+      hasStroke: false
     };
     const newClips = [...clips, newClip];
     setClips(newClips);
     setSelectedClipId(newClip.id);
-    setInspectorTab('text');
+    setInspectorTab('clip');
     setIsInspectorOpen(true);
     pushHistory(newClips);
   };
@@ -614,6 +689,64 @@ export const VideoEditorPage: React.FC = () => {
     };
   }, [dragState, clips, totalDuration, zoomScale, isSnapping, currentTime, pushHistory]);
 
+  // Currently Active Clips at Playhead (for Live Preview Monitor)
+  const activeVideoClip =
+    clips.find(
+      (c) => c.trackId === 'v1' && currentTime >= c.start && currentTime < c.start + c.duration
+    ) || clips.find((c) => c.trackId === 'v1') || { thumb: selectedSourceMedia.thumb, filter: 'normal', name: 'Черный экран' };
+
+  const activeTextClip = clips.find(
+    (c) => c.trackId === 'v2' && currentTime >= c.start && currentTime < c.start + c.duration
+  );
+
+  const activeMusicClip = clips.find(
+    (c) => c.trackId === 'a2' && currentTime >= c.start && currentTime < c.start + c.duration
+  );
+
+  const selectedClip = clips.find((c) => c.id === selectedClipId);
+
+  // Monitor preview text dragging
+  const handleStartTextDragOnScreen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!activeTextClip) return;
+    setSelectedClipId(activeTextClip.id);
+    setInspectorTab('clip');
+    setIsInspectorOpen(true);
+    setIsDraggingTextOnScreen(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingTextOnScreen || !activeTextClip || !screenRenderRef.current) return;
+      const rect = screenRenderRef.current.getBoundingClientRect();
+      const rawX = ((e.clientX - rect.left) / rect.width) * 100;
+      const rawY = ((e.clientY - rect.top) / rect.height) * 100;
+      const x = Math.max(5, Math.min(95, Math.round(rawX)));
+      const y = Math.max(5, Math.min(95, Math.round(rawY)));
+
+      setClips((prev) =>
+        prev.map((c) => (c.id === activeTextClip.id ? { ...c, posX: x, posY: y } : c))
+      );
+    };
+
+    const handleMouseUp = () => {
+      if (isDraggingTextOnScreen) {
+        setIsDraggingTextOnScreen(false);
+        pushHistory(clips);
+      }
+    };
+
+    if (isDraggingTextOnScreen) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingTextOnScreen, activeTextClip, clips, pushHistory]);
+
   // Blade tool hover indicator on clips
   const handleClipMouseMove = (e: React.MouseEvent, clip: TrackClip) => {
     if (activeTool !== 'blade') {
@@ -696,22 +829,6 @@ export const VideoEditorPage: React.FC = () => {
     setIsPlaying(false);
     setExportSuccessModal(true);
   };
-
-  // Currently Active Clips at Playhead (for Live Preview Monitor)
-  const activeVideoClip =
-    clips.find(
-      (c) => c.trackId === 'v1' && currentTime >= c.start && currentTime < c.start + c.duration
-    ) || clips.find((c) => c.trackId === 'v1') || { thumb: selectedSourceMedia.thumb, filter: 'normal', name: 'Черный экран' };
-
-  const activeTextClip = clips.find(
-    (c) => c.trackId === 'v2' && currentTime >= c.start && currentTime < c.start + c.duration
-  );
-
-  const activeMusicClip = clips.find(
-    (c) => c.trackId === 'a2' && currentTime >= c.start && currentTime < c.start + c.duration
-  );
-
-  const selectedClip = clips.find((c) => c.id === selectedClipId);
 
   // Filters calculation
   const currentFilterPreset = COLOR_PRESETS.find((p) => p.id === (selectedClip?.filter || selectedFilter));
@@ -957,6 +1074,7 @@ export const VideoEditorPage: React.FC = () => {
               
               {/* Video layer reflecting current playhead */}
               <div
+                ref={screenRenderRef}
                 className="screen-video-render"
                 style={{
                   filter: finalFilterCss,
@@ -985,12 +1103,29 @@ export const VideoEditorPage: React.FC = () => {
                 {/* Text Title Overlay dynamically from active V2 text clip */}
                 {v2Visible && activeTextClip && (
                   <div
-                    className="screen-text-overlay"
+                    className={`screen-text-overlay ${isDraggingTextOnScreen ? 'dragging' : ''} ${selectedClipId === activeTextClip.id ? 'selected' : ''}`}
                     style={{
+                      left: `${activeTextClip.posX ?? 50}%`,
+                      top: `${activeTextClip.posY ?? 75}%`,
                       color: activeTextClip.textColor || '#FFFFFF',
-                      fontSize: `${activeTextClip.textSize || 24}px`
+                      fontSize: `${activeTextClip.textSize || 26}px`,
+                      fontWeight: activeTextClip.fontWeight || '700',
+                      fontFamily: activeTextClip.fontFamily || "'Montserrat', sans-serif",
+                      textAlign: activeTextClip.textAlign || 'center',
+                      backgroundColor: activeTextClip.bgColor && activeTextClip.bgColor !== 'transparent' ? activeTextClip.bgColor : 'transparent',
+                      padding: activeTextClip.bgColor && activeTextClip.bgColor !== 'transparent' ? '6px 14px' : '2px 6px',
+                      borderRadius: activeTextClip.bgColor && activeTextClip.bgColor !== 'transparent' ? '8px' : '4px',
+                      textShadow: activeTextClip.hasShadow !== false ? '0 2px 10px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.9)' : 'none',
+                      WebkitTextStroke: activeTextClip.hasStroke ? '1.5px #000000' : 'none'
                     }}
+                    onMouseDown={handleStartTextDragOnScreen}
+                    title="Зажмите и перетаскивайте для перемещения текста по экрану"
                   >
+                    {isDraggingTextOnScreen && (
+                      <span className="text-position-badge">
+                        X: {Math.round(activeTextClip.posX ?? 50)}% | Y: {Math.round(activeTextClip.posY ?? 75)}%
+                      </span>
+                    )}
                     {activeTextClip.text}
                   </div>
                 )}
@@ -1123,38 +1258,306 @@ export const VideoEditorPage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* If Text Clip */}
+                      {/* If Text Clip: Full Typography & Layout Editor */}
                       {selectedClip.type === 'text' && (
                         <div className="text-clip-editor-sub">
-                          <label className="sub-label">Текст титра</label>
-                          <textarea
-                            rows={2}
-                            value={selectedClip.text || ''}
-                            onChange={(e) => {
-                              const newClips = clips.map((c) =>
-                                c.id === selectedClip.id ? { ...c, text: e.target.value } : c
-                              );
-                              setClips(newClips);
-                            }}
-                          />
-                          <div className="inspector-slider-row" style={{ marginTop: 8 }}>
-                            <div className="slider-label-line">
-                              <span>Кегль</span>
-                              <strong>{selectedClip.textSize || 24}px</strong>
-                            </div>
-                            <input
-                              type="range"
-                              min="14"
-                              max="48"
-                              value={selectedClip.textSize || 24}
+                          {/* 1. Text Content */}
+                          <div className="inspector-form-field">
+                            <label className="sub-label">Текст титра</label>
+                            <textarea
+                              rows={2}
+                              value={selectedClip.text || ''}
+                              placeholder="Введите текст титра..."
                               onChange={(e) => {
+                                const val = e.target.value;
                                 const newClips = clips.map((c) =>
-                                  c.id === selectedClip.id ? { ...c, textSize: Number(e.target.value) } : c
+                                  c.id === selectedClip.id ? { ...c, text: val } : c
                                 );
                                 setClips(newClips);
                               }}
                             />
                           </div>
+
+                          {/* 2. Font Family */}
+                          <div className="inspector-form-field">
+                            <label className="sub-label">Шрифт (Гарнитура)</label>
+                            <select
+                              className="davinci-select-input"
+                              value={selectedClip.fontFamily || "'Montserrat', sans-serif"}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                const newClips = clips.map((c) =>
+                                  c.id === selectedClip.id ? { ...c, fontFamily: val } : c
+                                );
+                                setClips(newClips);
+                                pushHistory(newClips);
+                              }}
+                            >
+                              {FONT_FAMILIES.map((f) => (
+                                <option key={f.id} value={f.id}>
+                                  {f.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* 3. Font Weight / Thickness */}
+                          <div className="inspector-form-field">
+                            <label className="sub-label">Начертание / Толщина</label>
+                            <div className="font-weight-pills">
+                              {FONT_WEIGHTS.map((w) => (
+                                <button
+                                  key={w.id}
+                                  type="button"
+                                  className={`weight-pill ${(selectedClip.fontWeight || '700') === w.id ? 'active' : ''}`}
+                                  onClick={() => {
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, fontWeight: w.id } : c
+                                    );
+                                    setClips(newClips);
+                                    pushHistory(newClips);
+                                  }}
+                                >
+                                  {w.name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* 4. Text Size (Кегль) */}
+                          <div className="inspector-slider-row">
+                            <div className="slider-label-line">
+                              <span>Кегль шрифта (Размер)</span>
+                              <strong>{selectedClip.textSize || 24}px</strong>
+                            </div>
+                            <input
+                              type="range"
+                              min="14"
+                              max="68"
+                              value={selectedClip.textSize || 24}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                const newClips = clips.map((c) =>
+                                  c.id === selectedClip.id ? { ...c, textSize: val } : c
+                                );
+                                setClips(newClips);
+                              }}
+                            />
+                          </div>
+
+                          {/* 5. Text Alignment */}
+                          <div className="inspector-form-field">
+                            <label className="sub-label">Выравнивание текста</label>
+                            <div className="text-align-cluster">
+                              {[
+                                { id: 'left', label: 'По левому' },
+                                { id: 'center', label: 'По центру' },
+                                { id: 'right', label: 'По правому' }
+                              ].map((a) => (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  className={`align-btn ${(selectedClip.textAlign || 'center') === a.id ? 'active' : ''}`}
+                                  onClick={() => {
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, textAlign: a.id as 'left' | 'center' | 'right' } : c
+                                    );
+                                    setClips(newClips);
+                                    pushHistory(newClips);
+                                  }}
+                                >
+                                  {a.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* 6. Position (X / Y) */}
+                          <div className="inspector-form-field">
+                            <div className="slider-label-line">
+                              <label className="sub-label">Позиция на кадре</label>
+                              <span className="pos-coords-tag">X: {selectedClip.posX ?? 50}% | Y: {selectedClip.posY ?? 75}%</span>
+                            </div>
+                            
+                            {/* Quick position presets */}
+                            <div className="pos-presets-row">
+                              <button
+                                type="button"
+                                className="pos-preset-btn"
+                                onClick={() => {
+                                  const newClips = clips.map((c) =>
+                                    c.id === selectedClip.id ? { ...c, posX: 50, posY: 18 } : c
+                                  );
+                                  setClips(newClips);
+                                  pushHistory(newClips);
+                                }}
+                                title="Вверху кадра"
+                              >
+                                ⬆️ Вверху
+                              </button>
+                              <button
+                                type="button"
+                                className="pos-preset-btn"
+                                onClick={() => {
+                                  const newClips = clips.map((c) =>
+                                    c.id === selectedClip.id ? { ...c, posX: 50, posY: 50 } : c
+                                  );
+                                  setClips(newClips);
+                                  pushHistory(newClips);
+                                }}
+                                title="По центру кадра"
+                              >
+                                ⏺️ Центр
+                              </button>
+                              <button
+                                type="button"
+                                className="pos-preset-btn"
+                                onClick={() => {
+                                  const newClips = clips.map((c) =>
+                                    c.id === selectedClip.id ? { ...c, posX: 50, posY: 80 } : c
+                                  );
+                                  setClips(newClips);
+                                  pushHistory(newClips);
+                                }}
+                                title="Внизу кадра (Субтитры)"
+                              >
+                                ⬇️ Внизу (Субтитры)
+                              </button>
+                            </div>
+
+                            <div className="inspector-two-cols" style={{ marginTop: 8 }}>
+                              <div className="pos-slider-group">
+                                <span className="tiny-label">По вертикали Y ({selectedClip.posY ?? 75}%)</span>
+                                <input
+                                  type="range"
+                                  min="10"
+                                  max="90"
+                                  value={selectedClip.posY ?? 75}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, posY: val } : c
+                                    );
+                                    setClips(newClips);
+                                  }}
+                                />
+                              </div>
+                              <div className="pos-slider-group">
+                                <span className="tiny-label">По горизонтали X ({selectedClip.posX ?? 50}%)</span>
+                                <input
+                                  type="range"
+                                  min="10"
+                                  max="90"
+                                  value={selectedClip.posX ?? 50}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, posX: val } : c
+                                    );
+                                    setClips(newClips);
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <p className="interactive-move-hint">💡 Можно также зажать и перетаскивать текст прямо на мониторе просмотра!</p>
+                          </div>
+
+                          {/* 7. Text Color */}
+                          <div className="inspector-form-field">
+                            <label className="sub-label">Цвет текста</label>
+                            <div className="text-color-swatches">
+                              {TEXT_COLORS.map((c) => (
+                                <button
+                                  key={c}
+                                  type="button"
+                                  className={`color-swatch ${(selectedClip.textColor || '#FFFFFF') === c ? 'active' : ''}`}
+                                  style={{ backgroundColor: c }}
+                                  onClick={() => {
+                                    const newClips = clips.map((cl) =>
+                                      cl.id === selectedClip.id ? { ...cl, textColor: c } : cl
+                                    );
+                                    setClips(newClips);
+                                    pushHistory(newClips);
+                                  }}
+                                />
+                              ))}
+                              <input
+                                type="color"
+                                className="custom-color-picker"
+                                value={selectedClip.textColor || '#FFFFFF'}
+                                title="Свой цвет"
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  const newClips = clips.map((cl) =>
+                                    cl.id === selectedClip.id ? { ...cl, textColor: val } : cl
+                                  );
+                                  setClips(newClips);
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* 8. Background Plaque / Pill */}
+                          <div className="inspector-form-field">
+                            <label className="sub-label">Подложка (Фоновая плашка)</label>
+                            <div className="bg-preset-pills">
+                              {BG_PRESETS.map((b) => (
+                                <button
+                                  key={b.id}
+                                  type="button"
+                                  className={`bg-pill ${(selectedClip.bgColor || 'transparent') === b.id ? 'active' : ''}`}
+                                  onClick={() => {
+                                    const newClips = clips.map((cl) =>
+                                      cl.id === selectedClip.id ? { ...cl, bgColor: b.id } : cl
+                                    );
+                                    setClips(newClips);
+                                    pushHistory(newClips);
+                                  }}
+                                >
+                                  {b.name}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* 9. Effects: Shadow & Stroke */}
+                          <div className="inspector-form-field">
+                            <label className="sub-label">Эффекты оформления</label>
+                            <div className="effects-checkbox-row">
+                              <label className="effect-checkbox-label">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedClip.hasShadow !== false}
+                                  onChange={(e) => {
+                                    const val = e.target.checked;
+                                    const newClips = clips.map((cl) =>
+                                      cl.id === selectedClip.id ? { ...cl, hasShadow: val } : cl
+                                    );
+                                    setClips(newClips);
+                                    pushHistory(newClips);
+                                  }}
+                                />
+                                <span>Тень (Drop Shadow)</span>
+                              </label>
+
+                              <label className="effect-checkbox-label">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(selectedClip.hasStroke)}
+                                  onChange={(e) => {
+                                    const val = e.target.checked;
+                                    const newClips = clips.map((cl) =>
+                                      cl.id === selectedClip.id ? { ...cl, hasStroke: val } : cl
+                                    );
+                                    setClips(newClips);
+                                    pushHistory(newClips);
+                                  }}
+                                />
+                                <span>Чёрная обводка (Outline)</span>
+                              </label>
+                            </div>
+                          </div>
+
                         </div>
                       )}
 
