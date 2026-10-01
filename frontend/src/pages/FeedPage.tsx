@@ -10,7 +10,7 @@ import { type Post, type Story } from '../data/mock';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { cacheService } from '../utils/cacheService';
-import { syncLocalStoriesWithServer } from '../utils/syncStories';
+import { syncLocalStoriesWithServer, isStoryExpired } from '../utils/syncStories';
 import { getStoredFollowingIds, isUserFollowed, toggleUserFollow, getAllUsersPool } from '../utils/followStorage';
 import './FeedPage.css';
 
@@ -19,6 +19,10 @@ export function FeedPage() {
   const { currentUser, isAuthenticated, allAccounts } = useAuth();
   const [feedPosts, setFeedPosts] = useState<Post[]>(() => {
     return cacheService.get<Post[]>('feed_posts_cache') || [];
+  });
+  const [feedStories, setFeedStories] = useState<Story[]>(() => {
+    const cached = cacheService.get<Story[]>('feed_stories_cache');
+    return Array.isArray(cached) ? cached.filter(s => !isStoryExpired(s)) : [];
   });
   const [feedLoading, setFeedLoading] = useState(true);
 
@@ -40,17 +44,9 @@ export function FeedPage() {
     const loadStories = async () => {
       try {
         const stories = await syncLocalStoriesWithServer();
-        if (Array.isArray(stories) && stories.length > 0) {
-          setFeedStories(stories);
-          cacheService.set('feed_stories_cache', stories, 3600 * 24, 'stories');
-        } else if (api.stories && api.stories.list) {
-          const res = await api.stories.list();
-          const data = res.data || res;
-          if (Array.isArray(data)) {
-            setFeedStories(data);
-            cacheService.set('feed_stories_cache', data, 3600 * 24, 'stories');
-          }
-        }
+        const valid = (Array.isArray(stories) ? stories : []).filter(s => !isStoryExpired(s));
+        setFeedStories(valid);
+        cacheService.set('feed_stories_cache', valid, 3600 * 24, 'stories');
       } catch (err) {
         console.warn('Ошибка загрузки историй:', err);
       }
@@ -115,9 +111,6 @@ export function FeedPage() {
     return () => window.removeEventListener('story_created', handleStoryCreated);
   }, []);
 
-  const [feedStories, setFeedStories] = useState<Story[]>(() => {
-    return cacheService.get<Story[]>('feed_stories_cache') || [];
-  });
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);

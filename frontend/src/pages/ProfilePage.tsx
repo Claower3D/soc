@@ -12,7 +12,7 @@ import {
   type Podcast, type Product 
 } from '../data/mock';
 import { api } from '../api';
-import { syncLocalStoriesWithServer } from '../utils/syncStories';
+import { syncLocalStoriesWithServer, isStoryExpired } from '../utils/syncStories';
 import { calculateZodiacProfile } from '../utils/astrology';
 import { ReligionSymbol } from '../components/ReligionSymbols';
 import { useAuth } from '../context/AuthContext';
@@ -135,7 +135,8 @@ export function ProfilePage() {
       if (savedStories) {
         const parsed = JSON.parse(savedStories);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setProfileStories(parsed);
+          const valid = parsed.filter(s => !isStoryExpired(s));
+          setProfileStories(valid);
         }
       }
     } catch { /* ignore */ }
@@ -143,8 +144,8 @@ export function ProfilePage() {
       if (Array.isArray(stories) && stories.length > 0) {
         setProfileStories(prev => {
           const map = new Map<string, Story>();
-          prev.forEach(s => map.set(s.id, s));
-          stories.forEach((s: any) => map.set(s.id, s));
+          prev.filter(s => !isStoryExpired(s)).forEach(s => map.set(s.id, s));
+          stories.filter((s: any) => !isStoryExpired(s)).forEach((s: any) => map.set(s.id, s));
           return Array.from(map.values());
         });
       }

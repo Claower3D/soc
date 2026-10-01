@@ -11,6 +11,7 @@ import { type Story, type User, type StoryStats } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { CreateStoryModal, STORY_FILTERS } from './CreateStoryModal';
 import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
+import { isStoryExpired } from '../utils/syncStories';
 import './StoriesBar.css';
 
 export interface UserStoryGroup {
@@ -54,8 +55,9 @@ export function StoriesBar({
   // Group stories by author (UserStoryGroup)
   const userGroups = useMemo<UserStoryGroup[]>(() => {
     const groupsMap = new Map<string, Story[]>();
+    const activeStories = (Array.isArray(stories) ? stories : []).filter(s => !isStoryExpired(s));
 
-    stories.forEach(s => {
+    activeStories.forEach(s => {
       const uid = (s.user?.username ? s.user.username.replace(/^@+/, '').toLowerCase() : (s.user?.id || 'unknown'));
       if (!groupsMap.has(uid)) {
         groupsMap.set(uid, []);

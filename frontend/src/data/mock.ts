@@ -204,6 +204,8 @@ export interface Story {
   viewsCount?: number;
   musicTrack?: string;
   reelsSourceTitle?: string;
+  createdAt?: string;
+  expiresAt?: string;
 }
 
 export interface Post {

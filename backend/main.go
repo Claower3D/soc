@@ -3791,6 +3791,9 @@ func handleStories(w http.ResponseWriter, r *http.Request) {
 	dbMu.RUnlock()
 
 	if dbConn != nil {
+		// Clean up expired stories (> 24 hours) from PostgreSQL
+		_, _ = dbConn.Exec(`DELETE FROM stories WHERE (expires_at IS NOT NULL AND expires_at <= NOW()) OR (expires_at IS NULL AND created_at < NOW() - INTERVAL '24 hours')`)
+
 		rows, err := dbConn.Query(`
 			SELECT s.id, s.media_url, COALESCE(s.is_video, false), COALESCE(s.is_live, false), COALESCE(s.live_viewers, 0),
 			       COALESCE(s.filter, ''), COALESCE(s.mask, ''), COALESCE(s.text_content, ''),
@@ -3799,7 +3802,8 @@ func handleStories(w http.ResponseWriter, r *http.Request) {
 			       COALESCE(u.id, s.user_id), COALESCE(u.username, s.user_id), COALESCE(u.name, s.user_id), COALESCE(u.avatar, '')
 			FROM stories s 
 			LEFT JOIN users u ON (s.user_id = u.id OR LOWER(REPLACE(s.user_id, '@', '')) = LOWER(REPLACE(u.username, '@', '')))
-			WHERE s.expires_at > (NOW() - INTERVAL '4 hours') OR s.created_at > (NOW() - INTERVAL '24 hours')
+			WHERE (s.expires_at IS NOT NULL AND s.expires_at > NOW())
+			   OR (s.expires_at IS NULL AND s.created_at > (NOW() - INTERVAL '24 hours'))
 			ORDER BY s.created_at DESC
 		`)
 		if err == nil {
@@ -3856,7 +3860,29 @@ func handleStories(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Также объединяем со сторис в памяти (если есть созданные локально или в in-memory режиме)
+	// Filter and clean expired in-memory stories (> 24 hours)
+	now := time.Now()
+	store.mu.Lock()
+	validMemStories := make([]Story, 0, len(store.stories))
+	for _, s := range store.stories {
+		isExpired := false
+		if s.ExpiresAt != "" {
+			if exp, err := time.Parse(time.RFC3339, s.ExpiresAt); err == nil && !now.Before(exp) {
+				isExpired = true
+			}
+		} else if s.CreatedAt != "" {
+			if cr, err := time.Parse(time.RFC3339, s.CreatedAt); err == nil && now.Sub(cr) >= 24*time.Hour {
+				isExpired = true
+			}
+		}
+		if !isExpired {
+			validMemStories = append(validMemStories, s)
+		}
+	}
+	store.stories = validMemStories
+	store.mu.Unlock()
+
+	// Объединяем с активными сторис в памяти
 	store.mu.RLock()
 	existingIDs := make(map[string]bool)
 	for _, s := range stories {
@@ -4615,6 +4641,9 @@ func handleCreateStory(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    time.Now().Format(time.RFC3339),
 	}
 
+	storyCreatedAt := time.Now()
+	storyExpiresAt := storyCreatedAt.Add(24 * time.Hour)
+
 	if dbConn != nil {
 		_, err := dbConn.Exec(`
 			INSERT INTO stories (
@@ -4622,13 +4651,15 @@ func handleCreateStory(w http.ResponseWriter, r *http.Request) {
 				filter, mask, text_content, text_position, gradient, 
 				viewers_count, likes_count, expires_at, created_at
 			) 
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, NOW() + INTERVAL '24 hours', NOW())
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, $12, $13)
 			ON CONFLICT (id) DO UPDATE SET
 				media_url = EXCLUDED.media_url,
 				is_video = EXCLUDED.is_video,
 				text_content = EXCLUDED.text_content,
-				gradient = EXCLUDED.gradient
-		`, storyID, author.ID, mediaURL, isVideo, req.IsLive, req.LiveViewers, req.Filter, req.Mask, textContent, textPos, req.Gradient)
+				gradient = EXCLUDED.gradient,
+				expires_at = EXCLUDED.expires_at,
+				created_at = EXCLUDED.created_at
+		`, storyID, author.ID, mediaURL, isVideo, req.IsLive, req.LiveViewers, req.Filter, req.Mask, textContent, textPos, req.Gradient, storyExpiresAt, storyCreatedAt)
 		if err != nil {
 			log.Printf("⚠️ Ошибка сохранения story в PostgreSQL: %v", err)
 		} else {
@@ -4755,6 +4786,38 @@ func handleSyncStories(w http.ResponseWriter, r *http.Request) {
 			img = mediaURL
 		}
 
+		now := time.Now()
+		var storyCreatedAt, storyExpiresAt time.Time
+		if req.CreatedAt != "" {
+			if parsed, err := time.Parse(time.RFC3339, req.CreatedAt); err == nil {
+				storyCreatedAt = parsed
+			}
+		}
+		if storyCreatedAt.IsZero() {
+			if strings.HasPrefix(storyID, "story_") {
+				if ms, err := strconv.ParseInt(strings.TrimPrefix(storyID, "story_"), 10, 64); err == nil && ms > 1000000000000 {
+					storyCreatedAt = time.UnixMilli(ms)
+				}
+			}
+		}
+		if storyCreatedAt.IsZero() {
+			storyCreatedAt = now
+		}
+
+		if req.ExpiresAt != "" {
+			if parsed, err := time.Parse(time.RFC3339, req.ExpiresAt); err == nil {
+				storyExpiresAt = parsed
+			}
+		}
+		if storyExpiresAt.IsZero() {
+			storyExpiresAt = storyCreatedAt.Add(24 * time.Hour)
+		}
+
+		// Skip stories that are already older than 24 hours (expired)
+		if now.After(storyExpiresAt) || now.Sub(storyCreatedAt) >= 24*time.Hour {
+			continue
+		}
+
 		s := Story{
 			ID:           storyID,
 			User:         author,
@@ -4769,11 +4832,11 @@ func handleSyncStories(w http.ResponseWriter, r *http.Request) {
 			Mask:         req.Mask,
 			Text:         textContent,
 			TextPosition: textPos,
-			Timestamp:    "Только что",
+			Timestamp:    formatTimeAgo(storyCreatedAt),
 			MusicTrack:   req.MusicTrack,
 			ViewsCount:   0,
-			ExpiresAt:    time.Now().Add(24 * time.Hour).Format(time.RFC3339),
-			CreatedAt:    time.Now().Format(time.RFC3339),
+			ExpiresAt:    storyExpiresAt.Format(time.RFC3339),
+			CreatedAt:    storyCreatedAt.Format(time.RFC3339),
 		}
 
 		if dbConn != nil && authorID != "" {
@@ -4783,13 +4846,15 @@ func handleSyncStories(w http.ResponseWriter, r *http.Request) {
 					filter, mask, text_content, text_position, gradient, 
 					viewers_count, likes_count, expires_at, created_at
 				) 
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, NOW() + INTERVAL '24 hours', NOW())
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0, 0, $12, $13)
 				ON CONFLICT (id) DO UPDATE SET
 					media_url = EXCLUDED.media_url,
 					is_video = EXCLUDED.is_video,
 					text_content = EXCLUDED.text_content,
-					gradient = EXCLUDED.gradient
-			`, storyID, authorID, mediaURL, isVideo, req.IsLive, req.LiveViewers, req.Filter, req.Mask, textContent, textPos, req.Gradient)
+					gradient = EXCLUDED.gradient,
+					expires_at = EXCLUDED.expires_at,
+					created_at = EXCLUDED.created_at
+			`, storyID, authorID, mediaURL, isVideo, req.IsLive, req.LiveViewers, req.Filter, req.Mask, textContent, textPos, req.Gradient, storyExpiresAt, storyCreatedAt)
 			if err != nil {
 				log.Printf("⚠️ Ошибка синхронизации story %s в DB: %v", storyID, err)
 			}

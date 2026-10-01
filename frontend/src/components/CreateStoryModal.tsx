@@ -445,6 +445,9 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
     const isRecorded = activeMode === 'camera_record' && recordedVideoUrl;
     const isPhoto = activeMode === 'photo' || !isRecorded;
 
+    const createdAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
     const newStory: Story = {
       id: `story_${Date.now()}`,
       user: currentUser,
@@ -460,6 +463,8 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       textPosition,
       timestamp: isLive ? 'В ЭФИРЕ' : 'Только что',
       musicTrack: selectedMusic || undefined,
+      createdAt,
+      expiresAt,
     };
 
     if (isCloseFriends) {
@@ -481,6 +486,8 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       textPosition: newStory.textPosition,
       gradient: newStory.gradient,
       musicTrack: newStory.musicTrack,
+      createdAt: newStory.createdAt,
+      expiresAt: newStory.expiresAt,
     };
 
     const apiUrl = (import.meta.env.VITE_API_URL || '') + '/api/stories';
