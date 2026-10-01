@@ -246,6 +246,7 @@ export function SearchPage() {
                   {filteredUsers.slice(0, 4).map(user => {
                     const isSubscribed = followingIds.includes(user.id);
                     const isMe = user.id === currentUser?.id;
+                    const isOnline = isMe ? true : Boolean(user.online);
                     return (
                       <div 
                         key={user.id} 
@@ -254,7 +255,10 @@ export function SearchPage() {
                       >
                         <div className="account-card-avatar-wrap">
                           <img src={user.avatar} alt={user.name} className="account-card-avatar" />
-                          {user.online && <span className="account-online-dot" />}
+                          <span 
+                            className={`account-online-dot ${isOnline ? 'is-online' : 'is-offline'}`}
+                            title={isOnline ? 'В сети' : 'Не в сети'}
+                          />
                         </div>
                         <div className="account-card-details">
                           <span className="account-card-name">{user.name}</span>
@@ -377,6 +381,7 @@ export function SearchPage() {
                 {filteredUsers.map(user => {
                   const isSubscribed = followingIds.includes(user.id);
                   const isMe = user.id === currentUser?.id;
+                  const isOnline = isMe ? true : Boolean(user.online);
                   return (
                     <div 
                       key={user.id} 
@@ -385,7 +390,10 @@ export function SearchPage() {
                     >
                       <div className="account-row-avatar-wrap">
                         <img src={user.avatar} alt={user.name} className="account-row-avatar" />
-                        {user.online && <span className="account-row-online-badge" />}
+                        <span 
+                          className={`account-row-online-badge ${isOnline ? 'is-online' : 'is-offline'}`}
+                          title={isOnline ? 'В сети' : 'Не в сети'}
+                        />
                       </div>
 
                       <div className="account-row-main-info">

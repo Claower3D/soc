@@ -428,6 +428,12 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 		WHERE avatar IS NULL OR avatar = '' OR avatar = 'undefined';
 	`)
 
+	// Убеждаемся что колонки online и last_seen присутствуют в таблице users
+	_, _ = conn.Exec(`
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS online BOOLEAN DEFAULT FALSE;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+	`)
+
 	return conn, nil
 }
 
@@ -609,6 +615,67 @@ var (
 	mockUsers   = []User{}
 )
 
+// Трекинг реальной активности пользователей (онлайн статус)
+var (
+	userLastActiveMu sync.RWMutex
+	userLastActive   = make(map[string]time.Time)
+)
+
+func markUserActive(userID string) {
+	if userID == "" {
+		return
+	}
+	now := time.Now()
+	userLastActiveMu.Lock()
+	userLastActive[userID] = now
+	userLastActiveMu.Unlock()
+
+	dbMu.RLock()
+	currentDB := db
+	dbMu.RUnlock()
+
+	if currentDB != nil {
+		go func(uid string) {
+			_, _ = currentDB.Exec("UPDATE users SET online = true, last_seen = NOW() WHERE id = $1", uid)
+		}(userID)
+	}
+}
+
+func markUserOffline(userID string) {
+	if userID == "" {
+		return
+	}
+	userLastActiveMu.Lock()
+	delete(userLastActive, userID)
+	userLastActiveMu.Unlock()
+
+	dbMu.RLock()
+	currentDB := db
+	dbMu.RUnlock()
+
+	if currentDB != nil {
+		go func(uid string) {
+			_, _ = currentDB.Exec("UPDATE users SET online = false, last_seen = NOW() WHERE id = $1", uid)
+		}(userID)
+	}
+}
+
+func isUserOnline(userID string, dbOnline bool, dbLastSeen time.Time) bool {
+	if userID == "" {
+		return false
+	}
+	userLastActiveMu.RLock()
+	t, exists := userLastActive[userID]
+	userLastActiveMu.RUnlock()
+	if exists && time.Since(t) < 3*time.Minute {
+		return true
+	}
+	if dbOnline && !dbLastSeen.IsZero() && time.Since(dbLastSeen) < 3*time.Minute {
+		return true
+	}
+	return false
+}
+
 // =========================================================================
 // CRYPTO & JWT IMPLEMENTATION (RFC 7519 HMAC-SHA256)
 // =========================================================================
@@ -726,6 +793,10 @@ func parseAndValidateJWT(tokenStr string) (*JWTClaims, error) {
 
 	if claims.Exp < time.Now().Unix() {
 		return nil, errors.New("срок действия токена истек")
+	}
+
+	if claims.UserID != "" {
+		markUserActive(claims.UserID)
 	}
 
 	return &claims, nil
@@ -861,6 +932,8 @@ func main() {
 	mux.HandleFunc("GET /api/profile", handleProfile)
 	mux.HandleFunc("GET /api/users", handleUsers)
 	mux.HandleFunc("GET /api/search", handleSearch)
+	mux.HandleFunc("POST /api/users/heartbeat", handleHeartbeat)
+	mux.HandleFunc("POST /api/users/offline", handleOffline)
 	mux.HandleFunc("GET /api/marketplace", handleMarketplace)
 	mux.HandleFunc("GET /api/communities", handleCommunities)
 	mux.HandleFunc("GET /api/wallet", handleWallet)
@@ -1410,16 +1483,44 @@ func handleProfile(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Профиль не найден"})
 }
 
+func handleHeartbeat(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil || claims == nil || claims.UserID == "" {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "guest"})
+		return
+	}
+	markUserActive(claims.UserID)
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "active"})
+}
+
+func handleOffline(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err == nil && claims != nil && claims.UserID != "" {
+		markUserOffline(claims.UserID)
+	}
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "offline"})
+}
+
 func handleUsers(w http.ResponseWriter, r *http.Request) {
 	if db != nil {
-		rows, err := db.Query("SELECT id, name, username, avatar, COALESCE(bio, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false), followers_count, following_count, critics_count, posts_count FROM users ORDER BY created_at DESC LIMIT 50")
+		rows, err := db.Query(`
+			SELECT id, name, username, avatar, COALESCE(bio, ''), COALESCE(role, 'user'), 
+			       COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false), 
+			       followers_count, following_count, critics_count, posts_count,
+			       COALESCE(online, false), COALESCE(last_seen, NOW() - INTERVAL '1 day')
+			FROM users ORDER BY created_at DESC LIMIT 50`)
 		if err == nil {
 			defer rows.Close()
 			var dbUsers []User
 			for rows.Next() {
 				var u User
-				if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Avatar, &u.Bio, &u.Role, &u.BeliefType, &u.BeliefPrivacy, &u.Verified, &u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount); err == nil {
-					u.Online = true
+				var dbOnline bool
+				var dbLastSeen time.Time
+				if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Avatar, &u.Bio, &u.Role, &u.BeliefType, &u.BeliefPrivacy, &u.Verified, &u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount, &dbOnline, &dbLastSeen); err == nil {
+					u.Online = isUserOnline(u.ID, dbOnline, dbLastSeen)
+					ensureUserAvatar(&u)
 					dbUsers = append(dbUsers, u)
 				}
 			}
@@ -1433,7 +1534,10 @@ func handleUsers(w http.ResponseWriter, r *http.Request) {
 	store.mu.RLock()
 	var realUsers []User
 	for _, a := range store.accounts {
-		realUsers = append(realUsers, a.User)
+		u := a.User
+		u.Online = isUserOnline(u.ID, false, time.Time{})
+		ensureUserAvatar(&u)
+		realUsers = append(realUsers, u)
 	}
 	store.mu.RUnlock()
 	if realUsers == nil {
@@ -1450,13 +1554,22 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if db != nil {
-		rows, err := db.Query("SELECT id, name, username, avatar, COALESCE(bio, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false), followers_count, following_count, critics_count, posts_count FROM users WHERE LOWER(name) LIKE $1 OR LOWER(username) LIKE $1 LIMIT 20", "%"+q+"%")
+		rows, err := db.Query(`
+			SELECT id, name, username, avatar, COALESCE(bio, ''), COALESCE(role, 'user'), 
+			       COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false), 
+			       followers_count, following_count, critics_count, posts_count,
+			       COALESCE(online, false), COALESCE(last_seen, NOW() - INTERVAL '1 day')
+			FROM users WHERE LOWER(name) LIKE $1 OR LOWER(username) LIKE $1 LIMIT 20`, "%"+q+"%")
 		if err == nil {
 			defer rows.Close()
 			var results []User
 			for rows.Next() {
 				var u User
-				if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Avatar, &u.Bio, &u.Role, &u.BeliefType, &u.BeliefPrivacy, &u.Verified, &u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount); err == nil {
+				var dbOnline bool
+				var dbLastSeen time.Time
+				if err := rows.Scan(&u.ID, &u.Name, &u.Username, &u.Avatar, &u.Bio, &u.Role, &u.BeliefType, &u.BeliefPrivacy, &u.Verified, &u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount, &dbOnline, &dbLastSeen); err == nil {
+					u.Online = isUserOnline(u.ID, dbOnline, dbLastSeen)
+					ensureUserAvatar(&u)
 					results = append(results, u)
 				}
 			}
@@ -1473,6 +1586,8 @@ func handleSearch(w http.ResponseWriter, r *http.Request) {
 	for _, entry := range store.accounts {
 		u := entry.User
 		if strings.Contains(strings.ToLower(u.Name), q) || strings.Contains(strings.ToLower(u.Username), q) {
+			u.Online = isUserOnline(u.ID, false, time.Time{})
+			ensureUserAvatar(&u)
 			results = append(results, u)
 		}
 	}
@@ -2699,7 +2814,8 @@ func handleFollowers(w http.ResponseWriter, r *http.Request) {
 		}
 		rows, err := db.Query(`
 			SELECT DISTINCT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), 
-			       COALESCE(u.followers_count, 0), COALESCE(u.following_count, 0), COALESCE(u.posts_count, 0), COALESCE(u.verified, false)
+			       COALESCE(u.followers_count, 0), COALESCE(u.following_count, 0), COALESCE(u.posts_count, 0), COALESCE(u.verified, false),
+			       COALESCE(u.online, false), COALESCE(u.last_seen, NOW() - INTERVAL '1 day')
 			FROM users u
 			JOIN user_relationships r ON (u.id = r.follower_id OR LOWER(u.username) = LOWER(r.follower_id))
 			WHERE (r.target_id = $1 OR r.target_id = $2 OR LOWER(r.target_id) = LOWER($2)) AND r.rel_type = 'follow'
@@ -2709,7 +2825,10 @@ func handleFollowers(w http.ResponseWriter, r *http.Request) {
 			defer rows.Close()
 			for rows.Next() {
 				var u User
-				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified)
+				var dbOnline bool
+				var dbLastSeen time.Time
+				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified, &dbOnline, &dbLastSeen)
+				u.Online = isUserOnline(u.ID, dbOnline, dbLastSeen)
 				ensureUserAvatar(&u)
 				followers = append(followers, u)
 			}
@@ -2785,7 +2904,8 @@ func handleFollowing(w http.ResponseWriter, r *http.Request) {
 		}
 		rows, err := db.Query(`
 			SELECT DISTINCT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), 
-			       COALESCE(u.followers_count, 0), COALESCE(u.following_count, 0), COALESCE(u.posts_count, 0), COALESCE(u.verified, false)
+			       COALESCE(u.followers_count, 0), COALESCE(u.following_count, 0), COALESCE(u.posts_count, 0), COALESCE(u.verified, false),
+			       COALESCE(u.online, false), COALESCE(u.last_seen, NOW() - INTERVAL '1 day')
 			FROM users u
 			JOIN user_relationships r ON (u.id = r.target_id OR LOWER(u.username) = LOWER(r.target_id))
 			WHERE (r.follower_id = $1 OR r.follower_id = $2 OR LOWER(r.follower_id) = LOWER($2)) AND r.rel_type = 'follow'
@@ -2795,7 +2915,10 @@ func handleFollowing(w http.ResponseWriter, r *http.Request) {
 			defer rows.Close()
 			for rows.Next() {
 				var u User
-				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified)
+				var dbOnline bool
+				var dbLastSeen time.Time
+				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.FollowersCount, &u.FollowingCount, &u.PostsCount, &u.Verified, &dbOnline, &dbLastSeen)
+				u.Online = isUserOnline(u.ID, dbOnline, dbLastSeen)
 				ensureUserAvatar(&u)
 				following = append(following, u)
 			}
@@ -2867,7 +2990,8 @@ func handleFriends(w http.ResponseWriter, r *http.Request) {
 			resolvedUsername = cleanTarget
 		}
 		rows, err := db.Query(`
-			SELECT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), COALESCE(u.verified, false)
+			SELECT u.id, u.username, u.name, COALESCE(u.avatar, ''), COALESCE(u.bio, ''), COALESCE(u.location, ''), COALESCE(u.verified, false),
+			       COALESCE(u.online, false), COALESCE(u.last_seen, NOW() - INTERVAL '1 day')
 			FROM users u
 			WHERE u.id IN (
 				SELECT r1.target_id FROM user_relationships r1
@@ -2884,7 +3008,10 @@ func handleFriends(w http.ResponseWriter, r *http.Request) {
 			defer rows.Close()
 			for rows.Next() {
 				var u User
-				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.Verified)
+				var dbOnline bool
+				var dbLastSeen time.Time
+				rows.Scan(&u.ID, &u.Username, &u.Name, &u.Avatar, &u.Bio, &u.Location, &u.Verified, &dbOnline, &dbLastSeen)
+				u.Online = isUserOnline(u.ID, dbOnline, dbLastSeen)
 				ensureUserAvatar(&u)
 				u.IsFriend = true
 				users = append(users, u)
@@ -3129,23 +3256,29 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 	claims, _ := parseAndValidateJWT(token)
 
 	if db != nil {
+		var dbOnline bool
+		var dbLastSeen time.Time
 		err := db.QueryRow(`
 			SELECT id, username, name, COALESCE(avatar, ''), COALESCE(cover_image, ''), COALESCE(bio, ''), COALESCE(location, ''), 
 			       COALESCE(website, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), 
 			       COALESCE(birth_date, ''), COALESCE(gender, 'hidden'), COALESCE(show_birth_date, true), COALESCE(show_zodiac, true),
-			       COALESCE(followers_count, 0), COALESCE(following_count, 0), COALESCE(posts_count, 0), COALESCE(verified, false)
+			       COALESCE(followers_count, 0), COALESCE(following_count, 0), COALESCE(posts_count, 0), COALESCE(verified, false),
+			       COALESCE(online, false), COALESCE(last_seen, NOW() - INTERVAL '1 day')
 			FROM users WHERE id = $1 OR LOWER(username) = LOWER($1) OR LOWER(username) = LOWER($2)
 		`, targetID, cleanTarget).Scan(
 			&user.ID, &user.Username, &user.Name, &user.Avatar, &user.CoverImage, &user.Bio, &user.Location,
 			&user.Website, &user.Role, &user.BeliefType, &user.BeliefPrivacy,
 			&user.BirthDate, &user.Gender, &user.ShowBirthDate, &user.ShowZodiac,
 			&user.FollowersCount, &user.FollowingCount, &user.PostsCount, &user.Verified,
+			&dbOnline, &dbLastSeen,
 		)
 		if err != nil {
 			log.Printf("⚠️ handleUserProfile user not found or error for %s (%s): %v", targetID, cleanTarget, err)
 			writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден"})
 			return
 		}
+		user.Online = isUserOnline(user.ID, dbOnline, dbLastSeen)
+		ensureUserAvatar(&user)
 		
 		// Accurate dynamic relationship counts
 		user.FollowersCount, user.FollowingCount, user.FriendsCount = getDBRelationshipCounts(user.ID)

@@ -1082,7 +1082,12 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                 alt={String(chat.groupTitle || chat.user?.name || 'Чат')} 
                 className="tg-header-avatar" 
               />
-              {!chat.isGroup && chat.user?.online && <span className="tg-online-pip" />}
+              {!chat.isGroup && (
+                <span 
+                  className={`tg-online-pip ${chat.user?.online ? 'is-online' : 'is-offline'}`} 
+                  title={chat.user?.online ? 'В сети' : 'Не в сети'}
+                />
+              )}
             </div>
             <div className="tg-user-titles">
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1108,7 +1113,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                 ) : chat.user?.online ? (
                   <span className="online-text">в сети</span>
                 ) : (
-                  'был(а) недавно'
+                  <span className="offline-text">не в сети</span>
                 )}
               </span>
             </div>

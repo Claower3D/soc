@@ -486,7 +486,12 @@ export function ChatList({
               >
                 <div className="chat-avatar-wrapper">
                   <img src={displayAvatar} alt={displayName} className="chat-avatar" />
-                  {!isGroup && chat.user.online && <div className="online-indicator" />}
+                  {!isGroup && !isAi && (
+                    <div 
+                      className={`online-indicator ${chat.user?.online ? 'is-online' : 'is-offline'}`} 
+                      title={chat.user?.online ? 'В сети' : 'Не в сети'}
+                    />
+                  )}
                   {isGroup && (
                     <div className="group-badge-circle" title="Групповая беседа">
                       <Users size={10} />

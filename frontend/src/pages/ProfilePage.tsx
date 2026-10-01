@@ -618,7 +618,10 @@ export function ProfilePage() {
                     (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(seed)}`;
                   }}
                 />
-                {activeUser.online && <span className="profile-online-indicator" title="В сети" />}
+                <span 
+                  className={`profile-online-indicator ${(isMe ? true : Boolean(activeUser.online)) ? 'is-online' : 'is-offline'}`} 
+                  title={(isMe ? true : Boolean(activeUser.online)) ? 'В сети' : 'Не в сети'} 
+                />
                 {userHasStories && <span className="profile-story-badge-hint">История</span>}
               </div>
             </div>

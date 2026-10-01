@@ -174,6 +174,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
   }, []);
 
+  // Periodic user online heartbeat
+  useEffect(() => {
+    if (!isAuthenticated || !jwtToken) return;
+
+    const ping = () => {
+      api.users.heartbeat().catch(() => {});
+    };
+
+    ping();
+    const interval = setInterval(ping, 45000);
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        ping();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [isAuthenticated, jwtToken]);
+
   const openAuthModal = (mode: 'login' | 'register' = 'login') => {
     setAuthModalMode(mode);
     setIsAuthModalOpen(true);
@@ -421,6 +445,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    api.users.offline().catch(() => {});
     setJwtToken(null);
     setActiveUser(GUEST_USER);
     setIsAuthenticated(false);

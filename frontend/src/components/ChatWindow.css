@@ -63,9 +63,25 @@
   right: 1px;
   width: 10px;
   height: 10px;
-  background: var(--color-success);
   border: 2px solid white;
   border-radius: 50%;
+  box-sizing: border-box;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tg-online-pip.is-online {
+  background: #10b981;
+  box-shadow: 0 0 5px rgba(16, 185, 129, 0.6);
+}
+
+.tg-online-pip.is-offline {
+  background: #71717a;
+  box-shadow: none;
+}
+
+.offline-text {
+  font-size: 12px;
+  color: var(--color-text-muted, #94a3b8);
 }
 
 .tg-user-titles {

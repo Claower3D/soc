@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Check, MapPin, Trash2 } from 'lucide-react';
-import { currentUser, type Post } from '../data/mock';
+import { type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { PremiumBadge } from './PremiumBadge';
 import './PostCard.css';
@@ -14,7 +14,7 @@ interface PostCardProps {
 
 export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
   const navigate = useNavigate();
-  const { isAuthenticated, openAuthModal } = useAuth();
+  const { isAuthenticated, openAuthModal, currentUser } = useAuth();
   const [bookmarked, setBookmarked] = useState(post.saved ?? false);
   const [copied, setCopied] = useState(false);
   const [commentInput, setCommentInput] = useState('');
@@ -109,7 +109,10 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
         >
           <div className="post-avatar-wrapper">
             <img src={post.user.avatar} alt={post.user.name} className="post-avatar" />
-            {post.user.online && <span className="post-author-online" />}
+            <span 
+              className={`post-author-online ${(post.user.id === currentUser?.id ? true : Boolean(post.user.online)) ? 'is-online' : 'is-offline'}`} 
+              title={(post.user.id === currentUser?.id ? true : Boolean(post.user.online)) ? 'В сети' : 'Не в сети'} 
+            />
           </div>
           <div className="post-user-info">
             <div className="user-name-line">

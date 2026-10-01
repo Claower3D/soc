@@ -64,7 +64,9 @@ export const api = {
     following: (id: string) => apiFetch<any>(`/api/users/${id}/following`),
     friends: (id: string) => apiFetch<any>(`/api/users/${id}/friends`),
     removeFriend: (id: string) => apiFetch<any>(`/api/users/${id}/friend`, { method: 'DELETE' }),
-    updateProfile: (data: any) => apiFetch<any>('/api/profile', { method: 'PUT', body: JSON.stringify(data) })
+    updateProfile: (data: any) => apiFetch<any>('/api/profile', { method: 'PUT', body: JSON.stringify(data) }),
+    heartbeat: () => apiFetch<any>('/api/users/heartbeat', { method: 'POST' }),
+    offline: () => apiFetch<any>('/api/users/offline', { method: 'POST' })
   },
   posts: {
     list: (page?: number) => apiFetch<any>(page ? `/api/feed?page=${page}` : '/api/feed'),

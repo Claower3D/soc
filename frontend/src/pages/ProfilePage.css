@@ -104,9 +104,20 @@
   right: 8px;
   width: 18px;
   height: 18px;
-  background: var(--color-success);
   border: 3px solid var(--color-bg);
   border-radius: 50%;
+  box-sizing: border-box;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.profile-online-indicator.is-online {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.profile-online-indicator.is-offline {
+  background: #71717a;
+  box-shadow: none;
 }
 
 .profile-actions-bar {
