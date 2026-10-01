@@ -881,7 +881,7 @@ export const VideoEditorPage: React.FC = () => {
       </div>
 
       {/* 3. DaVinci Dual-Monitor & Inspector Work Area */}
-      <div className="davinci-monitors-container">
+      <div className={`davinci-workspace-grid ${isInspectorOpen ? 'with-inspector' : 'no-inspector'}`}>
         
         {/* Left Monitor: Source Monitor / Media Pool */}
         <div className="davinci-monitor-box source-monitor-panel">
@@ -890,49 +890,51 @@ export const VideoEditorPage: React.FC = () => {
               <FolderOpen size={14} />
               <span>Медиатека / Пул исходников (Media Pool)</span>
             </div>
-            <span className="media-count-badge">{MEDIA_POOL_ITEMS.length} клипа</span>
+            <span className="monitor-badge">{MEDIA_POOL_ITEMS.length} клипа</span>
           </div>
 
-          <div className="media-pool-grid">
-            {MEDIA_POOL_ITEMS.map((item) => (
-              <div 
-                key={item.id} 
-                className={`media-card-thumb ${selectedSourceMedia.id === item.id ? 'active' : ''}`}
-                onClick={() => setSelectedSourceMedia(item)}
-              >
-                <div className="thumb-preview-box">
-                  <img src={item.thumb} alt={item.title} />
-                  <span className="duration-tag">{item.duration}</span>
-                  <span className="res-tag">{item.resolution}</span>
+          <div className="source-viewer-content">
+            <div className="source-media-grid">
+              {MEDIA_POOL_ITEMS.map((item) => (
+                <div 
+                  key={item.id} 
+                  className={`source-media-card ${selectedSourceMedia.id === item.id ? 'active' : ''}`}
+                  onClick={() => setSelectedSourceMedia(item)}
+                >
+                  <div className="source-thumb-wrap">
+                    <img src={item.thumb} alt={item.title} />
+                    <span className="source-duration-tag">{item.duration}</span>
+                    <span className="source-res-tag">{item.resolution}</span>
+                  </div>
+                  <div className="source-card-footer">
+                    <span className="source-filename">{item.title}</span>
+                    <button 
+                      className="btn-add-to-timeline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddMediaToTimeline(item);
+                      }}
+                      title="Добавить на таймлайн (V1)"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
                 </div>
-                <div className="media-info-line">
-                  <span className="media-card-title">{item.title}</span>
-                  <button 
-                    className="btn-add-to-timeline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAddMediaToTimeline(item);
-                    }}
-                    title="Добавить на видеодорожку V1"
-                  >
-                    <Plus size={12} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="source-quick-info">
-            <div className="info-stat">
-              <Film size={13} />
-              <span>Выбран: <strong>{selectedSourceMedia.title}</strong></span>
+              ))}
             </div>
-            <button 
-              className="btn-insert-timeline-main"
-              onClick={() => handleAddMediaToTimeline(selectedSourceMedia)}
-            >
-              <Plus size={13} /> Вставить на таймлайн (V1)
-            </button>
+
+            <div className="source-quick-info">
+              <div className="info-stat">
+                <Film size={13} />
+                <span>Выбран: <strong>{selectedSourceMedia.title}</strong></span>
+              </div>
+              <button 
+                className="btn-insert-timeline-main"
+                onClick={() => handleAddMediaToTimeline(selectedSourceMedia)}
+              >
+                <Plus size={13} /> Вставить на V1
+              </button>
+            </div>
           </div>
         </div>
 
