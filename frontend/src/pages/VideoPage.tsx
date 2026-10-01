@@ -13,21 +13,142 @@ import './VideoPage.css';
 
 type VideoCategoryTab = 'all' | 'streams' | 'videos' | 'movies' | 'series' | 'kids' | 'dev' | 'gaming' | 'music';
 
+export const DEFAULT_VIDEOS: Video[] = [
+  {
+    id: 'vid_1',
+    title: 'Архитектура современных высоконагруженных веб-систем',
+    channel: {
+      id: 'chan_tech',
+      name: 'Tech & Architecture',
+      username: 'tech_arch',
+      avatar: '/default-avatar.svg',
+      followersCount: 15400,
+      followingCount: 10,
+      postsCount: 30,
+      role: 'creator',
+      verified: true
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+    views: '42K просмотров',
+    duration: '18:45',
+    timeAgo: '2 дня назад',
+    description: 'Разбор паттернов микросервисов, кэширования и построения отказоустойчивых бэкендов.',
+    likesCount: 3200,
+    category: 'Разработка',
+    type: 'video',
+    rating: 9.2,
+    ageRating: '12+',
+    isFromSubscription: true
+  },
+  {
+    id: 'vid_2',
+    title: 'Прямой эфир: Музыка для глубокой концентрации и кодинга 432Hz',
+    channel: {
+      id: 'chan_zen',
+      name: 'Zen Sound Lab',
+      username: 'zen_sound',
+      avatar: '/default-avatar.svg',
+      followersCount: 38200,
+      followingCount: 5,
+      postsCount: 52,
+      role: 'expert',
+      verified: true
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+    views: '128K просмотров',
+    duration: 'LIVE',
+    timeAgo: 'Прямо сейчас',
+    description: 'Атмосферный эмбиент и бинауральные ритмы для работы и творчества в прямом эфире.',
+    likesCount: 12400,
+    category: 'Музыка',
+    type: 'stream',
+    isStream: true,
+    viewersCount: 1420,
+    rating: 9.8,
+    ageRating: '0+'
+  },
+  {
+    id: 'vid_3',
+    title: 'Путешествие сквозь Неизведанное: Фильм о Вселенной',
+    channel: {
+      id: 'chan_space',
+      name: 'Cosmos Discovery',
+      username: 'cosmos_doc',
+      avatar: '/default-avatar.svg',
+      followersCount: 95000,
+      followingCount: 3,
+      postsCount: 120,
+      role: 'creator',
+      verified: true
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+    views: '350K просмотров',
+    duration: '1:12:30',
+    timeAgo: '1 неделю назад',
+    description: 'Масштабный документальный проект об устройстве галактик, черных дыр и квантового мира.',
+    likesCount: 29500,
+    category: 'Фильмы',
+    type: 'movie',
+    isMovie: true,
+    rating: 9.5,
+    ageRating: '6+'
+  },
+  {
+    id: 'vid_4',
+    title: 'Анимация: Приключения Маленького Спутника',
+    channel: {
+      id: 'chan_kids',
+      name: 'Kids Planet',
+      username: 'kids_planet',
+      avatar: '/default-avatar.svg',
+      followersCount: 64000,
+      followingCount: 8,
+      postsCount: 85,
+      role: 'creator',
+      verified: true
+    },
+    thumbnail: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=800&q=80',
+    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    views: '89K просмотров',
+    duration: '12:20',
+    timeAgo: '3 дня назад',
+    description: 'Добрый мультфильм для детей о дружбе и исследовании космоса.',
+    likesCount: 7800,
+    category: 'Мультфильмы',
+    type: 'cartoon',
+    isKids: true,
+    rating: 9.0,
+    ageRating: '0+'
+  }
+];
+
 export function VideoPage() {
   const { isAuthenticated, openAuthModal } = useAuth();
-  const [videoList, setVideoList] = useState<Video[]>([]);
+  const [videoList, setVideoList] = useState<Video[]>(DEFAULT_VIDEOS);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     api.videos.list().then((data) => {
       if (mounted) {
-        setVideoList(data);
+        if (Array.isArray(data) && data.length > 0) {
+          const existingIds = new Set(data.map((v: Video) => v.id));
+          const additions = DEFAULT_VIDEOS.filter(v => !existingIds.has(v.id));
+          setVideoList([...data, ...additions]);
+        } else {
+          setVideoList(DEFAULT_VIDEOS);
+        }
         setIsLoading(false);
       }
     }).catch((err) => {
       console.warn('Failed to load videos', err);
-      if (mounted) setIsLoading(false);
+      if (mounted) {
+        setVideoList(DEFAULT_VIDEOS);
+        setIsLoading(false);
+      }
     });
     return () => { mounted = false; };
   }, []);
@@ -48,7 +169,7 @@ export function VideoPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const handleUploadVideo = (newVideo: Video) => {
-    setVideoList(prev => [newVideo, ...prev]);
+    setVideoList(prev => [newVideo, ...(Array.isArray(prev) ? prev : [])]);
     setSelectedVideo(newVideo);
   };
 
@@ -69,9 +190,11 @@ export function VideoPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const safeVideos = useMemo(() => Array.isArray(videoList) ? videoList : [], [videoList]);
+
   // Фильтрованный список видео
   const filteredVideos = useMemo(() => {
-    return videoList.filter(v => {
+    return safeVideos.filter(v => {
       // Детский режим изолирует мультики 0+ / 6+
       if (isKidsModeActive || activeCategory === 'kids') {
         if (!v.isKids && v.category !== 'Мультфильмы') return false;
@@ -100,8 +223,8 @@ export function VideoPage() {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = v.title.toLowerCase().includes(q);
-        const matchChannel = v.channel.name.toLowerCase().includes(q);
-        const matchDesc = v.description.toLowerCase().includes(q);
+        const matchChannel = v.channel?.name?.toLowerCase().includes(q) ?? false;
+        const matchDesc = (v.description || '').toLowerCase().includes(q);
         const matchGenre = (v.genre || '').toLowerCase().includes(q);
         const matchGame = (v.streamGameOrTopic || '').toLowerCase().includes(q);
         if (!matchTitle && !matchChannel && !matchDesc && !matchGenre && !matchGame) return false;
@@ -114,17 +237,17 @@ export function VideoPage() {
       }
       return 0;
     });
-  }, [videoList, isKidsModeActive, activeCategory, ageFilter, searchQuery, sortBy]);
+  }, [safeVideos, isKidsModeActive, activeCategory, ageFilter, searchQuery, sortBy]);
 
   // Подборки для витрины в стиле YouTube (когда activeCategory === 'all' и нет поиска)
   const isBrowseHome = activeCategory === 'all' && !searchQuery.trim() && !isKidsModeActive;
 
-  const liveStreams = useMemo(() => videoList.filter(v => v.isStream), [videoList]);
-  const recommendedVideos = useMemo(() => videoList.filter(v => !v.isStream && !v.isMovie && !v.isSeries && !v.isKids), [videoList]);
-  const subscriptionVideos = useMemo(() => videoList.filter(v => v.isFromSubscription), [videoList]);
-  const moviesList = useMemo(() => videoList.filter(v => v.isMovie), [videoList]);
-  const seriesList = useMemo(() => videoList.filter(v => v.isSeries), [videoList]);
-  const kidsList = useMemo(() => videoList.filter(v => v.isKids), [videoList]);
+  const liveStreams = useMemo(() => safeVideos.filter(v => v.isStream), [safeVideos]);
+  const recommendedVideos = useMemo(() => safeVideos.filter(v => !v.isStream && !v.isMovie && !v.isSeries && !v.isKids), [safeVideos]);
+  const subscriptionVideos = useMemo(() => safeVideos.filter(v => v.isFromSubscription), [safeVideos]);
+  const moviesList = useMemo(() => safeVideos.filter(v => v.isMovie), [safeVideos]);
+  const seriesList = useMemo(() => safeVideos.filter(v => v.isSeries), [safeVideos]);
+  const kidsList = useMemo(() => safeVideos.filter(v => v.isKids), [safeVideos]);
 
   // =========================================================================
   // RENDER: РЕЖИМ ПРОСМОТРА РОЛИКА (WATCH VIEW)
@@ -134,7 +257,7 @@ export function VideoPage() {
   }
 
   if (selectedVideo) {
-    const queueVideos = videoList.filter(v => v.id !== selectedVideo.id);
+    const queueVideos = safeVideos.filter(v => v.id !== selectedVideo.id);
 
     return (
       <div className={`video-watch-page ${isKidsModeActive ? 'kids-environment' : ''}`}>

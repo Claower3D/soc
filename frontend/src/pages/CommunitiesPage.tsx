@@ -39,38 +39,44 @@ export const CommunitiesPage: React.FC = () => {
 
   useEffect(() => {
     api.communities.list().then(data => {
-      setCommunities(data);
+      setCommunities(Array.isArray(data) ? data : []);
     }).catch(err => {
       console.warn('Failed to load communities:', err);
+      setCommunities([]);
     });
   }, []);
 
   const handleToggleJoin = (e: React.MouseEvent, communityId: string) => {
     e.stopPropagation();
-    setCommunities((prev) =>
-      prev.map((c) => {
+    setCommunities((prev) => {
+      const current = Array.isArray(prev) ? prev : [];
+      return current.map((c) => {
         if (c.id === communityId) {
           const joined = !c.isJoined;
           return {
             ...c,
             isJoined: joined,
-            membersCount: joined ? c.membersCount + 1 : c.membersCount - 1
+            membersCount: joined ? (c.membersCount || 0) + 1 : Math.max(0, (c.membersCount || 0) - 1)
           };
         }
         return c;
-      })
-    );
+      });
+    });
   };
 
   const handleCreateCommunity = (newCommunity: Community) => {
-    setCommunities([newCommunity, ...communities]);
+    setCommunities(prev => [newCommunity, ...(Array.isArray(prev) ? prev : [])]);
   };
 
-  const filteredCommunities = communities.filter((comm) => {
+  const safeCommunities = Array.isArray(communities) ? communities : [];
+
+  const filteredCommunities = safeCommunities.filter((comm) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      comm.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      comm.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      comm.handle.toLowerCase().includes(searchQuery.toLowerCase());
+      !searchQuery.trim() ||
+      (comm.name || '').toLowerCase().includes(q) ||
+      (comm.description || '').toLowerCase().includes(q) ||
+      (comm.handle || '').toLowerCase().includes(q);
 
     const matchesCategory =
       selectedCategory === 'Все направления' || comm.category === selectedCategory;

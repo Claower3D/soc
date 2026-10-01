@@ -1713,10 +1713,11 @@ func handleUserPosts(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleVideos(w http.ResponseWriter, r *http.Request) {
-	if cached, ok := globalCache.Get("api:videos"); ok {
+	if cached, ok := globalCache.Get("api:videos"); ok && cached != nil {
 		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: cached})
 		return
 	}
+	videos := make([]map[string]interface{}, 0)
 	if db != nil {
 		rows, err := db.Query(`
 			SELECT v.id, v.title, v.description, v.thumbnail, v.video_url, v.duration, v.views_count, v.likes_count, v.created_at,
@@ -1726,7 +1727,6 @@ func handleVideos(w http.ResponseWriter, r *http.Request) {
 		`)
 		if err == nil {
 			defer rows.Close()
-			var videos []map[string]interface{}
 			for rows.Next() {
 				var id, title, desc, thumb, videoUrl, duration, userId, userName, userUsername, userAvatar string
 				var viewsCount, likesCount int
@@ -1748,7 +1748,7 @@ func handleVideos(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: videos})
 }
 
 func handleChats(w http.ResponseWriter, r *http.Request) {
@@ -1758,6 +1758,7 @@ func handleChats(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Авторизация требуется"})
 		return
 	}
+	chats := make([]map[string]interface{}, 0)
 	if db != nil {
 		rows, err := db.Query(`
 			SELECT c.id,
@@ -1772,7 +1773,6 @@ func handleChats(w http.ResponseWriter, r *http.Request) {
 		`, claims.UserID)
 		if err == nil {
 			defer rows.Close()
-			var chats []map[string]interface{}
 			for rows.Next() {
 				var id, chatType, name, lastMsg string
 				var unread int
@@ -1784,21 +1784,21 @@ func handleChats(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: chats})
 }
 
 func handlePodcasts(w http.ResponseWriter, r *http.Request) {
+	podcasts := make([]map[string]interface{}, 0)
 	if db != nil {
 		rows, err := db.Query(`SELECT id, title, author_name, cover, description FROM podcasts ORDER BY created_at DESC LIMIT 20`)
 		if err == nil {
 			defer rows.Close()
-			var podcasts []map[string]interface{}
 			for rows.Next() {
 				var id, title, author, cover, desc string
 				if err := rows.Scan(&id, &title, &author, &cover, &desc); err == nil {
 					// Get episodes
+					episodes := make([]map[string]interface{}, 0)
 					epRows, _ := db.Query(`SELECT id, title, duration, TO_CHAR(created_at, 'DD Mon') FROM podcast_episodes WHERE podcast_id = $1 ORDER BY episode_number DESC`, id)
-					var episodes []map[string]interface{}
 					if epRows != nil {
 						for epRows.Next() {
 							var eid, etitle, edur, edate string
@@ -1815,10 +1815,11 @@ func handlePodcasts(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: podcasts})
 }
 
 func handleMarketplace(w http.ResponseWriter, r *http.Request) {
+	products := make([]map[string]interface{}, 0)
 	if db != nil {
 		rows, err := db.Query(`
 			SELECT p.id, p.title, p.price, p.currency, p.rating, COALESCE(p.image_url, ''),
@@ -1830,7 +1831,6 @@ func handleMarketplace(w http.ResponseWriter, r *http.Request) {
 		`)
 		if err == nil {
 			defer rows.Close()
-			var products []map[string]interface{}
 			for rows.Next() {
 				var id, title, currency, imageUrl, author, category string
 				var price float64
@@ -1843,10 +1843,11 @@ func handleMarketplace(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: products})
 }
 
 func handleCommunities(w http.ResponseWriter, r *http.Request) {
+	communities := make([]map[string]interface{}, 0)
 	if db != nil {
 		rows, err := db.Query(`
 			SELECT id, name, description, avatar, cover, members_count, category, verified
@@ -1854,7 +1855,6 @@ func handleCommunities(w http.ResponseWriter, r *http.Request) {
 		`)
 		if err == nil {
 			defer rows.Close()
-			var communities []map[string]interface{}
 			for rows.Next() {
 				var id, name, desc, avatar, cover, category string
 				var membersCount int
@@ -1867,7 +1867,7 @@ func handleCommunities(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: []interface{}{}})
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: communities})
 }
 
 func handleWallet(w http.ResponseWriter, r *http.Request) {
@@ -4178,7 +4178,7 @@ func handleGetMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var messages []map[string]interface{}
+	messages := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var (
 			id, text, mediaUrl, mediaType, senderId, name, avatarUrl sql.NullString
@@ -4472,7 +4472,7 @@ func handleCommunityMembers(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var members []map[string]interface{}
+	members := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var id, name, avatarUrl, role sql.NullString
 		if err := rows.Scan(&id, &name, &avatarUrl, &role); err != nil {

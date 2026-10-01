@@ -35,10 +35,14 @@ export function MarketplacePage() {
   useEffect(() => {
     if (productsList.length === 0) {
       api.marketplace.products().then(data => {
-        setProductsList(data);
-        cacheService.set('market_products_cache', data, 3600 * 24 * 7, 'marketplace');
+        const list = Array.isArray(data) ? data : [];
+        setProductsList(list);
+        if (list.length > 0) {
+          cacheService.set('market_products_cache', list, 3600 * 24 * 7, 'marketplace');
+        }
       }).catch(err => {
         console.warn('Failed to load marketplace products:', err);
+        setProductsList([]);
       });
     }
   }, []);
@@ -47,14 +51,16 @@ export function MarketplacePage() {
   const [sortBy, setSortBy] = useState<'popular' | 'price_asc' | 'price_desc' | 'rating'>('popular');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
-    return cacheService.get<CartItem[]>('market_cart_cache') || [];
+    const cached = cacheService.get<CartItem[]>('market_cart_cache');
+    return Array.isArray(cached) ? cached : [];
   });
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
 
   const handleAddProduct = (newProd: Product) => {
     setProductsList(prev => {
-      const updated = [newProd, ...prev];
+      const current = Array.isArray(prev) ? prev : [];
+      const updated = [newProd, ...current];
       cacheService.set('market_products_cache', updated, 3600 * 24 * 7, 'marketplace');
       return updated;
     });
@@ -63,16 +69,17 @@ export function MarketplacePage() {
   // Cart operations with cache
   const handleAddToCart = (product: Product, quantity = 1) => {
     setCartItems(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
+      const current = Array.isArray(prev) ? prev : [];
+      const existing = current.find(item => item.product.id === product.id);
       let updated: CartItem[];
       if (existing) {
-        updated = prev.map(item =>
+        updated = current.map(item =>
           item.product.id === product.id
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       } else {
-        updated = [...prev, { product, quantity }];
+        updated = [...current, { product, quantity }];
       }
       cacheService.set('market_cart_cache', updated, 3600 * 24 * 14, 'marketplace');
       return updated;
@@ -81,7 +88,8 @@ export function MarketplacePage() {
 
   const handleUpdateQuantity = (productId: string, delta: number) => {
     setCartItems(prev => {
-      const updated = prev
+      const current = Array.isArray(prev) ? prev : [];
+      const updated = current
         .map(item =>
           item.product.id === productId
             ? { ...item, quantity: item.quantity + delta }
@@ -95,7 +103,8 @@ export function MarketplacePage() {
 
   const handleRemoveFromCart = (productId: string) => {
     setCartItems(prev => {
-      const updated = prev.filter(item => item.product.id !== productId);
+      const current = Array.isArray(prev) ? prev : [];
+      const updated = current.filter(item => item.product.id !== productId);
       cacheService.set('market_cart_cache', updated, 3600 * 24 * 14, 'marketplace');
       return updated;
     });
@@ -107,20 +116,24 @@ export function MarketplacePage() {
   };
 
   // Filtered and sorted products
+  const safeProducts = useMemo(() => Array.isArray(productsList) ? productsList : [], [productsList]);
+
   const filteredProducts = useMemo(() => {
-    return productsList.filter(p => {
-      const matchesQuery = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+    return safeProducts.filter(p => {
+      const q = searchQuery.toLowerCase();
+      const matchesTitle = (p.title || '').toLowerCase().includes(q);
+      const matchesDesc = (p.description || '').toLowerCase().includes(q);
+      const matchesTags = Array.isArray(p.tags) && p.tags.some(t => t.toLowerCase().includes(q));
+      const matchesQuery = !searchQuery.trim() || matchesTitle || matchesDesc || matchesTags;
       const matchesCat = selectedCategory === 'Все товары' || p.category === selectedCategory;
       return matchesQuery && matchesCat;
     }).sort((a, b) => {
-      if (sortBy === 'price_asc') return a.price - b.price;
-      if (sortBy === 'price_desc') return b.price - a.price;
-      if (sortBy === 'rating') return b.rating - a.rating;
-      return b.reviewsCount - a.reviewsCount; // popular
+      if (sortBy === 'price_asc') return (a.price || 0) - (b.price || 0);
+      if (sortBy === 'price_desc') return (b.price || 0) - (a.price || 0);
+      if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
+      return (b.reviewsCount || 0) - (a.reviewsCount || 0); // popular
     });
-  }, [productsList, searchQuery, selectedCategory, sortBy]);
+  }, [safeProducts, searchQuery, selectedCategory, sortBy]);
 
   const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
