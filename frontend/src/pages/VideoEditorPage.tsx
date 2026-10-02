@@ -34,7 +34,11 @@ import {
   Undo2,
   Redo2,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Sparkles,
+  ArrowRightLeft,
+  FlipHorizontal,
+  Palette
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
@@ -63,7 +67,26 @@ export interface TrackClip {
   hasStroke?: boolean;
   // Audio properties:
   volume?: number;
+
+  // Video Color & LUT properties:
   filter?: string;
+  brightness?: number; // 60 - 140
+  contrast?: number; // 60 - 140
+  saturation?: number; // 0 - 180
+  temperature?: number; // -50 to +50
+  vignette?: number; // 0 to 100
+  blur?: number; // 0 to 12
+
+  // Transitions:
+  transitionIn?: 'none' | 'fade-in' | 'zoom-in' | 'slide-left' | 'glitch' | 'wipe';
+  transitionOut?: 'none' | 'fade-out' | 'zoom-out' | 'slide-right' | 'dissolve';
+  transitionDuration?: number; // 0.3 to 2.0s
+
+  // Video FX:
+  effectType?: 'none' | 'grain' | 'vhs' | 'glitch' | 'cinema-bars';
+  clipSpeed?: number; // 0.5, 1, 1.5, 2
+  scale?: number; // 100 - 160
+  flipH?: boolean;
 }
 
 const FONT_FAMILIES = [
@@ -104,12 +127,40 @@ const BG_PRESETS = [
 ];
 
 const COLOR_PRESETS = [
-  { id: 'normal', name: 'Оригинал', filter: 'none', desc: 'Естественные цвета' },
-  { id: 'cinematic', name: 'Cinematic', filter: 'contrast(1.2) saturate(1.1) brightness(0.95)', desc: 'Киношный контраст' },
-  { id: 'warm', name: 'Тёплый', filter: 'sepia(0.25) saturate(1.2) hue-rotate(-10deg)', desc: 'Золотой час' },
-  { id: 'bw', name: 'Черно-белый', filter: 'grayscale(1) contrast(1.15)', desc: 'Классический ч/б' },
-  { id: 'cyber', name: 'Cyberpunk', filter: 'hue-rotate(180deg) saturate(1.6) contrast(1.1)', desc: 'Неоновый стиль' },
-  { id: 'vintage', name: 'Винтаж', filter: 'sepia(0.5) contrast(0.9) brightness(1.05)', desc: 'Плёночный ретро' }
+  { id: 'normal', name: 'Оригинал (Rec.709)', filter: 'none', desc: 'Естественные чистые цвета' },
+  { id: 'cinematic', name: 'Cinematic 709', filter: 'contrast(1.2) saturate(1.1) brightness(0.95)', desc: 'Киношный контраст и глубина' },
+  { id: 'teal-orange', name: 'Teal & Orange', filter: 'contrast(1.25) saturate(1.3) hue-rotate(-12deg)', desc: 'Голливудский блокбастер' },
+  { id: 'warm', name: 'Тёплый закат', filter: 'sepia(0.25) saturate(1.2) hue-rotate(-10deg)', desc: 'Мягкий золотой час' },
+  { id: 'bw', name: 'Черно-белый нуар', filter: 'grayscale(1) contrast(1.2)', desc: 'Классический ч/б контраст' },
+  { id: 'cyber', name: 'Cyberpunk Neo', filter: 'hue-rotate(180deg) saturate(1.6) contrast(1.1)', desc: 'Неоновый ночной город' },
+  { id: 'vintage', name: 'Винтаж 80-х', filter: 'sepia(0.5) contrast(0.9) brightness(1.05)', desc: 'Плёночный ретро Kodachrome' },
+  { id: 'moody-blue', name: 'Moody Blue', filter: 'hue-rotate(190deg) saturate(0.85) contrast(1.15) brightness(0.92)', desc: 'Холодная кинематографичная драма' },
+  { id: 'hdr', name: 'Vibrant HDR', filter: 'saturate(1.45) contrast(1.25) brightness(1.04)', desc: 'Сверхсочные цвета и глянец' }
+];
+
+export const TRANSITION_IN_PRESETS = [
+  { id: 'none', name: 'Без перехода', icon: 'Off', desc: 'Мгновенный стык' },
+  { id: 'fade-in', name: 'Плавное появление', icon: 'Fade', desc: 'Fade In из чёрного' },
+  { id: 'zoom-in', name: 'Наезд (Zoom In)', icon: 'Zoom', desc: 'Динамичный зум из центра' },
+  { id: 'slide-left', name: 'Наплыв слева', icon: 'Slide', desc: 'Горизонтальный наплыв' },
+  { id: 'glitch', name: 'Глитч-вспышка', icon: 'Glitch', desc: 'Цифровой глитч-эффект' },
+  { id: 'wipe', name: 'Шторка (Wipe)', icon: 'Wipe', desc: 'Кинематографичная шторка' }
+];
+
+export const TRANSITION_OUT_PRESETS = [
+  { id: 'none', name: 'Без перехода', icon: 'Off', desc: 'Мгновенный стык' },
+  { id: 'fade-out', name: 'Плавное затухание', icon: 'Fade', desc: 'Fade Out в чёрный' },
+  { id: 'zoom-out', name: 'Отдаление (Zoom Out)', icon: 'Zoom', desc: 'Удаление в глубину' },
+  { id: 'slide-right', name: 'Сдвиг вправо', icon: 'Slide', desc: 'Горизонтальный уход' },
+  { id: 'dissolve', name: 'Растворение', icon: 'Dissolve', desc: 'Cross Dissolve переход' }
+];
+
+export const VIDEO_FX_PRESETS = [
+  { id: 'none', name: 'Чистый', desc: 'Без видеоэффектов' },
+  { id: 'grain', name: '🎞 Зернистость 35mm', desc: 'Плёночный шум Kodak' },
+  { id: 'vhs', name: '📼 Ретро VHS 90-х', desc: 'Scanlines, шум и дата' },
+  { id: 'glitch', name: '⚡ RGB Glitch', desc: 'Хроматическая аберрация' },
+  { id: 'cinema-bars', name: '🎬 Полосы 2.39:1', desc: 'Широкоэкранный Cinemascope' }
 ];
 
 const MEDIA_POOL_ITEMS = [
@@ -206,7 +257,20 @@ const INITIAL_CLIPS: TrackClip[] = [
     color: '#4F46E5',
     type: 'video',
     thumb: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=400&q=80',
-    filter: 'cinematic'
+    filter: 'cinematic',
+    brightness: 100,
+    contrast: 105,
+    saturation: 110,
+    temperature: 10,
+    vignette: 25,
+    blur: 0,
+    transitionIn: 'fade-in',
+    transitionOut: 'dissolve',
+    transitionDuration: 0.8,
+    effectType: 'grain',
+    clipSpeed: 1,
+    scale: 100,
+    flipH: false
   },
   {
     id: 'video_2',
@@ -217,7 +281,20 @@ const INITIAL_CLIPS: TrackClip[] = [
     color: '#6366F1',
     type: 'video',
     thumb: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=80',
-    filter: 'warm'
+    filter: 'warm',
+    brightness: 100,
+    contrast: 100,
+    saturation: 115,
+    temperature: 20,
+    vignette: 15,
+    blur: 0,
+    transitionIn: 'zoom-in',
+    transitionOut: 'fade-out',
+    transitionDuration: 0.8,
+    effectType: 'none',
+    clipSpeed: 1,
+    scale: 100,
+    flipH: false
   },
   // A1: Original Video Audio
   {
@@ -291,7 +368,7 @@ export const VideoEditorPage: React.FC = () => {
 
   // Inspector Panel (Toggleable)
   const [isInspectorOpen, setIsInspectorOpen] = useState(true);
-  const [inspectorTab, setInspectorTab] = useState<'clip' | 'color' | 'audio' | 'text' | 'effects'>('clip');
+  const [inspectorTab, setInspectorTab] = useState<'clip' | 'transitions' | 'fx' | 'color' | 'audio' | 'text' | 'effects'>('clip');
 
   // Master Color Grading
   const [selectedFilter, setSelectedFilter] = useState('normal');
@@ -690,10 +767,21 @@ export const VideoEditorPage: React.FC = () => {
   }, [dragState, clips, totalDuration, zoomScale, isSnapping, currentTime, pushHistory]);
 
   // Currently Active Clips at Playhead (for Live Preview Monitor)
-  const activeVideoClip =
+  const activeVideoClip: Partial<TrackClip> =
     clips.find(
       (c) => c.trackId === 'v1' && currentTime >= c.start && currentTime < c.start + c.duration
-    ) || clips.find((c) => c.trackId === 'v1') || { thumb: selectedSourceMedia.thumb, filter: 'normal', name: 'Черный экран' };
+    ) ||
+    clips.find((c) => c.trackId === 'v1') || {
+      id: 'blank',
+      trackId: 'v1',
+      thumb: selectedSourceMedia.thumb,
+      filter: 'normal',
+      name: 'Клип',
+      start: 0,
+      duration: 10,
+      color: '#4F46E5',
+      type: 'video'
+    };
 
   const activeTextClip = clips.find(
     (c) => c.trackId === 'v2' && currentTime >= c.start && currentTime < c.start + c.duration
@@ -830,10 +918,86 @@ export const VideoEditorPage: React.FC = () => {
     setExportSuccessModal(true);
   };
 
-  // Filters calculation
-  const currentFilterPreset = COLOR_PRESETS.find((p) => p.id === (selectedClip?.filter || selectedFilter));
+  // Filters & grading calculation for active video clip (reflecting selectedClip or active video)
+  const targetGradingClip = selectedClip && selectedClip.type === 'video' ? selectedClip : activeVideoClip;
+  const currentFilterPreset =
+    COLOR_PRESETS.find((p) => p.id === (targetGradingClip?.filter || selectedFilter)) || COLOR_PRESETS[0];
   const baseFilterCss = currentFilterPreset?.filter === 'none' ? '' : currentFilterPreset?.filter || '';
-  const finalFilterCss = `${baseFilterCss} brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`.trim();
+
+  const curBrightness = targetGradingClip?.brightness ?? brightness;
+  const curContrast = targetGradingClip?.contrast ?? contrast;
+  const curSaturation = targetGradingClip?.saturation ?? saturation;
+  const curTemp = targetGradingClip?.temperature ?? 0;
+  const curBlur = targetGradingClip?.blur ?? 0;
+  const curVignette = targetGradingClip?.vignette ?? 0;
+  const curScale = (targetGradingClip?.scale ?? 100) / 100;
+  const curFlipH = Boolean(targetGradingClip?.flipH);
+  const curEffect = targetGradingClip?.effectType || 'none';
+
+  // White balance / Temperature CSS
+  let tempFilterCss = '';
+  if (curTemp > 0) {
+    tempFilterCss = ` sepia(${curTemp * 0.005}) hue-rotate(-${curTemp * 0.2}deg)`;
+  } else if (curTemp < 0) {
+    tempFilterCss = ` hue-rotate(${Math.abs(curTemp) * 0.25}deg) saturate(${1 + Math.abs(curTemp) * 0.003})`;
+  }
+  const blurFilterCss = curBlur > 0 ? ` blur(${curBlur}px)` : '';
+
+  // Transitions calculation at currentTime
+  const transDur = activeVideoClip?.transitionDuration || 0.8;
+  const clipStart = activeVideoClip?.start ?? 0;
+  const clipDur = activeVideoClip?.duration ?? 6;
+  const clipEnd = clipStart + clipDur;
+
+  let transitionOpacity = 1;
+  let transitionTransform = `scale(${curScale}) ${curFlipH ? 'scaleX(-1)' : ''}`.trim();
+  let transitionClipPath = 'none';
+
+  // Transition In
+  if (
+    activeVideoClip?.transitionIn &&
+    activeVideoClip.transitionIn !== 'none' &&
+    currentTime >= clipStart &&
+    currentTime < clipStart + transDur
+  ) {
+    const inProgress = Math.min(1, Math.max(0, (currentTime - clipStart) / transDur));
+    if (activeVideoClip.transitionIn === 'fade-in') {
+      transitionOpacity = inProgress;
+    } else if (activeVideoClip.transitionIn === 'zoom-in') {
+      const z = 0.65 + 0.35 * inProgress;
+      transitionTransform = `scale(${curScale * z}) ${curFlipH ? 'scaleX(-1)' : ''}`.trim();
+    } else if (activeVideoClip.transitionIn === 'slide-left') {
+      const shift = (1 - inProgress) * -40;
+      transitionTransform = `translateX(${shift}%) scale(${curScale}) ${curFlipH ? 'scaleX(-1)' : ''}`.trim();
+    } else if (activeVideoClip.transitionIn === 'glitch') {
+      tempFilterCss += ` hue-rotate(${Math.sin(inProgress * 25) * 60}deg) contrast(1.3)`;
+    } else if (activeVideoClip.transitionIn === 'wipe') {
+      transitionClipPath = `inset(0 ${(1 - inProgress) * 100}% 0 0)`;
+    }
+  }
+
+  // Transition Out
+  if (
+    activeVideoClip?.transitionOut &&
+    activeVideoClip.transitionOut !== 'none' &&
+    currentTime > clipEnd - transDur &&
+    currentTime <= clipEnd
+  ) {
+    const outProgress = Math.min(1, Math.max(0, (currentTime - (clipEnd - transDur)) / transDur));
+    if (activeVideoClip.transitionOut === 'fade-out') {
+      transitionOpacity = 1 - outProgress;
+    } else if (activeVideoClip.transitionOut === 'dissolve') {
+      transitionOpacity = 1 - outProgress * 0.85;
+    } else if (activeVideoClip.transitionOut === 'zoom-out') {
+      const z = 1 + 0.35 * outProgress;
+      transitionTransform = `scale(${curScale * z}) ${curFlipH ? 'scaleX(-1)' : ''}`.trim();
+    } else if (activeVideoClip.transitionOut === 'slide-right') {
+      const shift = outProgress * 40;
+      transitionTransform = `translateX(${shift}%) scale(${curScale}) ${curFlipH ? 'scaleX(-1)' : ''}`.trim();
+    }
+  }
+
+  const finalFilterCss = `${baseFilterCss} brightness(${curBrightness}%) contrast(${curContrast}%) saturate(${curSaturation}%)${tempFilterCss}${blurFilterCss}`.trim();
 
   if (!isAuthenticated) {
     return (
@@ -933,30 +1097,49 @@ export const VideoEditorPage: React.FC = () => {
           <button 
             className={`sub-tab-btn ${inspectorTab === 'clip' ? 'active' : ''}`}
             onClick={() => { setInspectorTab('clip'); setIsInspectorOpen(true); }}
+            title="Свойства выбранного клипа"
           >
-            <Sliders size={14} /> Клип ({selectedClip?.name || 'Не выбран'})
+            <Sliders size={14} /> Клип ({selectedClip?.name ? (selectedClip.name.length > 16 ? selectedClip.name.slice(0, 14) + '...' : selectedClip.name) : 'Не выбран'})
+          </button>
+          <button 
+            className={`sub-tab-btn ${inspectorTab === 'transitions' ? 'active' : ''}`}
+            onClick={() => { setInspectorTab('transitions'); setIsInspectorOpen(true); }}
+            title="Видеопереходы (Fade In/Out, Zoom, Slide, Glitch, Wipe)"
+          >
+            <ArrowRightLeft size={14} /> Переходы
+          </button>
+          <button 
+            className={`sub-tab-btn ${inspectorTab === 'fx' ? 'active' : ''}`}
+            onClick={() => { setInspectorTab('fx'); setIsInspectorOpen(true); }}
+            title="Спецэффекты (Зерно 35mm, Ретро VHS, Glitch, Каше 2.39:1)"
+          >
+            <Sparkles size={14} /> Эффекты FX
           </button>
           <button 
             className={`sub-tab-btn ${inspectorTab === 'color' ? 'active' : ''}`}
             onClick={() => { setInspectorTab('color'); setIsInspectorOpen(true); }}
+            title="Цветокоррекция и кинематографичные LUT-фильтры"
           >
             <Wand2 size={14} /> Цветокор (Color)
           </button>
           <button 
             className={`sub-tab-btn ${inspectorTab === 'audio' ? 'active' : ''}`}
             onClick={() => { setInspectorTab('audio'); setIsInspectorOpen(true); }}
+            title="Аудиодорожки и библиотека звуков"
           >
             <Music size={14} /> Музыка & Звук
           </button>
           <button 
             className={`sub-tab-btn ${inspectorTab === 'text' ? 'active' : ''}`}
             onClick={() => { setInspectorTab('text'); setIsInspectorOpen(true); }}
+            title="Титры и текст на V2"
           >
             <Type size={14} /> Титры & Текст
           </button>
           <button 
             className={`sub-tab-btn ${inspectorTab === 'effects' ? 'active' : ''}`}
             onClick={() => { setInspectorTab('effects'); setIsInspectorOpen(true); }}
+            title="Нарезка дорожек (Blade)"
           >
             <Scissors size={14} /> Нарезка дорожек
           </button>
@@ -1075,13 +1258,55 @@ export const VideoEditorPage: React.FC = () => {
               {/* Video layer reflecting current playhead */}
               <div
                 ref={screenRenderRef}
-                className="screen-video-render"
+                className={`screen-video-render ${curEffect === 'glitch' ? 'screen-glitch-active' : ''}`}
                 style={{
                   filter: finalFilterCss,
+                  opacity: transitionOpacity,
+                  transform: transitionTransform,
+                  clipPath: transitionClipPath,
+                  transition: 'opacity 0.08s ease, transform 0.08s ease',
                   backgroundImage: v1Visible && activeVideoClip.thumb ? `url(${activeVideoClip.thumb})` : 'none',
                   backgroundColor: '#090d16'
                 }}
               >
+                {/* Vignette Overlay */}
+                {curVignette > 0 && (
+                  <div
+                    className="viewer-vignette-overlay"
+                    style={{ opacity: curVignette / 100 }}
+                  />
+                )}
+
+                {/* Film Grain 35mm Overlay */}
+                {curEffect === 'grain' && (
+                  <div className="viewer-grain-overlay" />
+                )}
+
+                {/* Retro VHS 90s Overlay */}
+                {curEffect === 'vhs' && (
+                  <div className="viewer-vhs-overlay">
+                    <div className="vhs-scanlines" />
+                    <div className="vhs-hud">
+                      <span className="vhs-rec-dot">● REC</span>
+                      <span className="vhs-sp">SP 0:00:{Math.floor(currentTime).toString().padStart(2, '0')}</span>
+                      <span className="vhs-date">OCT 1994</span>
+                    </div>
+                    <div className="vhs-noise-band" />
+                  </div>
+                )}
+
+                {/* Cinemascope 2.39:1 Letterbox Bars Overlay */}
+                {curEffect === 'cinema-bars' && (
+                  <div className="viewer-cinemascope-bars">
+                    <div className="cinema-bar cinema-bar-top" />
+                    <div className="cinema-bar cinema-bar-bottom" />
+                  </div>
+                )}
+
+                {/* Glitch Overlay */}
+                {curEffect === 'glitch' && (
+                  <div className="viewer-glitch-overlay" />
+                )}
                 {/* Safe Area Guides */}
                 {showSafeGuides && (
                   <div className="safe-area-overlay">
@@ -1257,6 +1482,353 @@ export const VideoEditorPage: React.FC = () => {
                           </button>
                         </div>
                       </div>
+
+                      {/* If Video Clip: Transitions, FX, and Color Grading Controls */}
+                      {selectedClip.type === 'video' && (
+                        <div className="video-clip-editor-sub">
+                          
+                          {/* 1. Transitions Section */}
+                          <div className="inspector-sub-group">
+                            <div className="sub-group-header">
+                              <ArrowRightLeft size={13} />
+                              <span>Видеопереходы клипа (Transitions)</span>
+                            </div>
+
+                            <div className="inspector-two-cols">
+                              <div className="inspector-form-field">
+                                <label className="sub-label">Вход (In)</label>
+                                <select
+                                  className="davinci-select-input"
+                                  value={selectedClip.transitionIn || 'none'}
+                                  onChange={(e) => {
+                                    const val = e.target.value as any;
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, transitionIn: val } : c
+                                    );
+                                    setClips(newClips);
+                                    pushHistory(newClips);
+                                  }}
+                                >
+                                  {TRANSITION_IN_PRESETS.map((t) => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="inspector-form-field">
+                                <label className="sub-label">Выход (Out)</label>
+                                <select
+                                  className="davinci-select-input"
+                                  value={selectedClip.transitionOut || 'none'}
+                                  onChange={(e) => {
+                                    const val = e.target.value as any;
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, transitionOut: val } : c
+                                    );
+                                    setClips(newClips);
+                                    pushHistory(newClips);
+                                  }}
+                                >
+                                  {TRANSITION_OUT_PRESETS.map((t) => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="inspector-slider-row" style={{ marginTop: 4 }}>
+                              <div className="slider-label-line">
+                                <span>Длительность перехода</span>
+                                <strong>{selectedClip.transitionDuration ?? 0.8}с</strong>
+                              </div>
+                              <input
+                                type="range"
+                                min="0.3"
+                                max="2.0"
+                                step="0.1"
+                                value={selectedClip.transitionDuration ?? 0.8}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value);
+                                  const newClips = clips.map((c) =>
+                                    c.id === selectedClip.id ? { ...c, transitionDuration: val } : c
+                                  );
+                                  setClips(newClips);
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* 2. Video FX Section */}
+                          <div className="inspector-sub-group">
+                            <div className="sub-group-header">
+                              <Sparkles size={13} />
+                              <span>Видеоэффекты (Video FX)</span>
+                            </div>
+
+                            <div className="fx-preset-pills">
+                              {VIDEO_FX_PRESETS.map((fx) => (
+                                <button
+                                  key={fx.id}
+                                  type="button"
+                                  className={`fx-pill ${(selectedClip.effectType || 'none') === fx.id ? 'active' : ''}`}
+                                  onClick={() => {
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, effectType: fx.id as any } : c
+                                    );
+                                    setClips(newClips);
+                                    pushHistory(newClips);
+                                  }}
+                                  title={fx.desc}
+                                >
+                                  {fx.name}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Speed & Flip Controls */}
+                            <div className="inspector-two-cols" style={{ marginTop: 10 }}>
+                              <div className="inspector-form-field">
+                                <label className="sub-label">Скорость</label>
+                                <div className="speed-pills-row">
+                                  {[0.5, 1, 1.5, 2].map((sp) => (
+                                    <button
+                                      key={sp}
+                                      type="button"
+                                      className={`speed-pill ${(selectedClip.clipSpeed || 1) === sp ? 'active' : ''}`}
+                                      onClick={() => {
+                                        const newClips = clips.map((c) =>
+                                          c.id === selectedClip.id ? { ...c, clipSpeed: sp } : c
+                                        );
+                                        setClips(newClips);
+                                        pushHistory(newClips);
+                                      }}
+                                    >
+                                      {sp}x
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="inspector-form-field">
+                                <label className="sub-label">Отражение</label>
+                                <button
+                                  type="button"
+                                  className={`flip-btn ${selectedClip.flipH ? 'active' : ''}`}
+                                  onClick={() => {
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, flipH: !c.flipH } : c
+                                    );
+                                    setClips(newClips);
+                                    pushHistory(newClips);
+                                  }}
+                                >
+                                  <FlipHorizontal size={13} /> {selectedClip.flipH ? 'Отражено' : 'По гориз.'}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Zoom / Scale Slider */}
+                            <div className="inspector-slider-row" style={{ marginTop: 6 }}>
+                              <div className="slider-label-line">
+                                <span>Масштабирование (Zoom)</span>
+                                <strong>{selectedClip.scale || 100}%</strong>
+                              </div>
+                              <input
+                                type="range"
+                                min="100"
+                                max="160"
+                                value={selectedClip.scale || 100}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  const newClips = clips.map((c) =>
+                                    c.id === selectedClip.id ? { ...c, scale: val } : c
+                                  );
+                                  setClips(newClips);
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* 3. Color Grading & LUT Filters */}
+                          <div className="inspector-sub-group">
+                            <div className="sub-group-header">
+                              <Palette size={13} />
+                              <span>Цветокоррекция & LUT-фильтры клипа</span>
+                            </div>
+
+                            {/* LUT preset tiles */}
+                            <div className="lut-presets-mini-grid">
+                              {COLOR_PRESETS.map((p) => (
+                                <button
+                                  key={p.id}
+                                  type="button"
+                                  className={`lut-mini-card ${(selectedClip.filter || 'normal') === p.id ? 'active' : ''}`}
+                                  onClick={() => {
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, filter: p.id } : c
+                                    );
+                                    setClips(newClips);
+                                    pushHistory(newClips);
+                                  }}
+                                  title={p.desc}
+                                >
+                                  <div className="lut-mini-preview" style={{ filter: p.filter }} />
+                                  <span className="lut-mini-name">{p.name.split(' ')[0]}</span>
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Detailed sliders */}
+                            <div className="clip-grading-sliders">
+                              <div className="inspector-slider-row">
+                                <div className="slider-label-line">
+                                  <span>Яркость (Exposure)</span>
+                                  <strong>{selectedClip.brightness ?? 100}%</strong>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="60"
+                                  max="140"
+                                  value={selectedClip.brightness ?? 100}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, brightness: val } : c
+                                    );
+                                    setClips(newClips);
+                                  }}
+                                />
+                              </div>
+
+                              <div className="inspector-slider-row">
+                                <div className="slider-label-line">
+                                  <span>Контраст (Contrast)</span>
+                                  <strong>{selectedClip.contrast ?? 100}%</strong>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="60"
+                                  max="140"
+                                  value={selectedClip.contrast ?? 100}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, contrast: val } : c
+                                    );
+                                    setClips(newClips);
+                                  }}
+                                />
+                              </div>
+
+                              <div className="inspector-slider-row">
+                                <div className="slider-label-line">
+                                  <span>Насыщенность (Saturation)</span>
+                                  <strong>{selectedClip.saturation ?? 100}%</strong>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="180"
+                                  value={selectedClip.saturation ?? 100}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, saturation: val } : c
+                                    );
+                                    setClips(newClips);
+                                  }}
+                                />
+                              </div>
+
+                              <div className="inspector-slider-row">
+                                <div className="slider-label-line">
+                                  <span>Баланс тепла (Temp)</span>
+                                  <strong>{(selectedClip.temperature ?? 0) > 0 ? `+${selectedClip.temperature}` : selectedClip.temperature ?? 0}</strong>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="-50"
+                                  max="50"
+                                  value={selectedClip.temperature ?? 0}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, temperature: val } : c
+                                    );
+                                    setClips(newClips);
+                                  }}
+                                />
+                              </div>
+
+                              <div className="inspector-slider-row">
+                                <div className="slider-label-line">
+                                  <span>Виньетка (Vignette)</span>
+                                  <strong>{selectedClip.vignette ?? 0}%</strong>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="100"
+                                  value={selectedClip.vignette ?? 0}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, vignette: val } : c
+                                    );
+                                    setClips(newClips);
+                                  }}
+                                />
+                              </div>
+
+                              <div className="inspector-slider-row">
+                                <div className="slider-label-line">
+                                  <span>Размытие (Blur / Soft Focus)</span>
+                                  <strong>{selectedClip.blur ?? 0}px</strong>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="12"
+                                  value={selectedClip.blur ?? 0}
+                                  onChange={(e) => {
+                                    const val = Number(e.target.value);
+                                    const newClips = clips.map((c) =>
+                                      c.id === selectedClip.id ? { ...c, blur: val } : c
+                                    );
+                                    setClips(newClips);
+                                  }}
+                                />
+                              </div>
+
+                              <button
+                                type="button"
+                                className="btn-reset-grading"
+                                onClick={() => {
+                                  const newClips = clips.map((c) =>
+                                    c.id === selectedClip.id
+                                      ? {
+                                          ...c,
+                                          filter: 'normal',
+                                          brightness: 100,
+                                          contrast: 100,
+                                          saturation: 100,
+                                          temperature: 0,
+                                          vignette: 0,
+                                          blur: 0
+                                        }
+                                      : c
+                                  );
+                                  setClips(newClips);
+                                  pushHistory(newClips);
+                                }}
+                              >
+                                ↺ Сбросить цвет клипа к исходному
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+                      )}
 
                       {/* If Text Clip: Full Typography & Layout Editor */}
                       {selectedClip.type === 'text' && (
@@ -1594,6 +2166,229 @@ export const VideoEditorPage: React.FC = () => {
                 </div>
               )}
 
+              {/* Tab: Transitions Library */}
+              {inspectorTab === 'transitions' && (
+                <div className="inspector-section transitions-library-section">
+                  <h4 className="inspector-h4">Библиотека видеопереходов (Resolve Transitions)</h4>
+                  <p className="inspector-hint">
+                    Выберите переход для плавного или динамичного переключения между сценами на таймлайне.
+                  </p>
+
+                  {/* Target Clip Indicator */}
+                  <div className="target-clip-box">
+                    <Film size={13} />
+                    <span>
+                      Целевой клип:{' '}
+                      <strong>{selectedClip?.type === 'video' ? selectedClip.name : 'Первый видеоклип (V1)'}</strong>
+                    </span>
+                  </div>
+
+                  <h5 className="inspector-h5" style={{ marginTop: 12 }}>Переходы входа (Transition In)</h5>
+                  <div className="transitions-grid">
+                    {TRANSITION_IN_PRESETS.map((t) => {
+                      const isActive =
+                        selectedClip?.type === 'video'
+                          ? (selectedClip.transitionIn || 'none') === t.id
+                          : (clips.find((c) => c.trackId === 'v1')?.transitionIn || 'none') === t.id;
+                      return (
+                        <div
+                          key={t.id}
+                          className={`transition-card ${isActive ? 'active' : ''}`}
+                          onClick={() => {
+                            const targetId = selectedClip?.type === 'video' ? selectedClip.id : clips.find((c) => c.trackId === 'v1')?.id;
+                            if (!targetId) return;
+                            const newClips = clips.map((c) => (c.id === targetId ? { ...c, transitionIn: t.id as any } : c));
+                            setClips(newClips);
+                            setSelectedClipId(targetId);
+                            pushHistory(newClips);
+                          }}
+                        >
+                          <div className="transition-icon-wrap">
+                            <ArrowRightLeft size={14} />
+                          </div>
+                          <div className="transition-meta">
+                            <span className="trans-title">{t.name}</span>
+                            <span className="trans-desc">{t.desc}</span>
+                          </div>
+                          {isActive && <Check size={14} className="trans-check" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <h5 className="inspector-h5" style={{ marginTop: 16 }}>Переходы выхода (Transition Out)</h5>
+                  <div className="transitions-grid">
+                    {TRANSITION_OUT_PRESETS.map((t) => {
+                      const isActive =
+                        selectedClip?.type === 'video'
+                          ? (selectedClip.transitionOut || 'none') === t.id
+                          : (clips.find((c) => c.trackId === 'v1')?.transitionOut || 'none') === t.id;
+                      return (
+                        <div
+                          key={t.id}
+                          className={`transition-card ${isActive ? 'active' : ''}`}
+                          onClick={() => {
+                            const targetId = selectedClip?.type === 'video' ? selectedClip.id : clips.find((c) => c.trackId === 'v1')?.id;
+                            if (!targetId) return;
+                            const newClips = clips.map((c) => (c.id === targetId ? { ...c, transitionOut: t.id as any } : c));
+                            setClips(newClips);
+                            setSelectedClipId(targetId);
+                            pushHistory(newClips);
+                          }}
+                        >
+                          <div className="transition-icon-wrap">
+                            <ArrowRightLeft size={14} />
+                          </div>
+                          <div className="transition-meta">
+                            <span className="trans-title">{t.name}</span>
+                            <span className="trans-desc">{t.desc}</span>
+                          </div>
+                          {isActive && <Check size={14} className="trans-check" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="inspector-slider-row" style={{ marginTop: 16 }}>
+                    <div className="slider-label-line">
+                      <span>Длительность перехода</span>
+                      <strong>
+                        {selectedClip?.type === 'video'
+                          ? selectedClip.transitionDuration ?? 0.8
+                          : clips.find((c) => c.trackId === 'v1')?.transitionDuration ?? 0.8}
+                        с
+                      </strong>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.3"
+                      max="2.0"
+                      step="0.1"
+                      value={
+                        selectedClip?.type === 'video'
+                          ? selectedClip.transitionDuration ?? 0.8
+                          : clips.find((c) => c.trackId === 'v1')?.transitionDuration ?? 0.8
+                      }
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        const targetId = selectedClip?.type === 'video' ? selectedClip.id : clips.find((c) => c.trackId === 'v1')?.id;
+                        if (!targetId) return;
+                        const newClips = clips.map((c) => (c.id === targetId ? { ...c, transitionDuration: val } : c));
+                        setClips(newClips);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Tab: Video FX Library */}
+              {inspectorTab === 'fx' && (
+                <div className="inspector-section fx-library-section">
+                  <h4 className="inspector-h4">Библиотека спецэффектов (Resolve FX)</h4>
+                  <p className="inspector-hint">
+                    Кинематографичные плёночные оверлеи, ретро-стили и оптические эффекты.
+                  </p>
+
+                  <div className="target-clip-box">
+                    <Film size={13} />
+                    <span>
+                      Целевой клип:{' '}
+                      <strong>{selectedClip?.type === 'video' ? selectedClip.name : 'Первый видеоклип (V1)'}</strong>
+                    </span>
+                  </div>
+
+                  <div className="fx-cards-grid">
+                    {VIDEO_FX_PRESETS.map((fx) => {
+                      const targetClip = selectedClip?.type === 'video' ? selectedClip : clips.find((c) => c.trackId === 'v1');
+                      const isActive = (targetClip?.effectType || 'none') === fx.id;
+                      return (
+                        <div
+                          key={fx.id}
+                          className={`fx-feature-card ${isActive ? 'active' : ''}`}
+                          onClick={() => {
+                            if (!targetClip) return;
+                            const newClips = clips.map((c) => (c.id === targetClip.id ? { ...c, effectType: fx.id as any } : c));
+                            setClips(newClips);
+                            setSelectedClipId(targetClip.id);
+                            pushHistory(newClips);
+                          }}
+                        >
+                          <div className="fx-feature-title">{fx.name}</div>
+                          <div className="fx-feature-desc">{fx.desc}</div>
+                          {isActive && <Check size={14} className="fx-check" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Transformation Controls */}
+                  <h5 className="inspector-h5" style={{ marginTop: 16 }}>Трансформация и скорость</h5>
+                  <div className="inspector-two-cols">
+                    <div className="inspector-form-field">
+                      <label className="sub-label">Скорость дорожки</label>
+                      <div className="speed-pills-row">
+                        {[0.5, 1, 1.5, 2].map((sp) => {
+                          const targetClip = selectedClip?.type === 'video' ? selectedClip : clips.find((c) => c.trackId === 'v1');
+                          const isActive = (targetClip?.clipSpeed || 1) === sp;
+                          return (
+                            <button
+                              key={sp}
+                              type="button"
+                              className={`speed-pill ${isActive ? 'active' : ''}`}
+                              onClick={() => {
+                                if (!targetClip) return;
+                                const newClips = clips.map((c) => (c.id === targetClip.id ? { ...c, clipSpeed: sp } : c));
+                                setClips(newClips);
+                                pushHistory(newClips);
+                              }}
+                            >
+                              {sp}x
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="inspector-form-field">
+                      <label className="sub-label">Отражение</label>
+                      <button
+                        type="button"
+                        className={`flip-btn ${selectedClip?.flipH ? 'active' : ''}`}
+                        onClick={() => {
+                          const targetClip = selectedClip?.type === 'video' ? selectedClip : clips.find((c) => c.trackId === 'v1');
+                          if (!targetClip) return;
+                          const newClips = clips.map((c) => (c.id === targetClip.id ? { ...c, flipH: !c.flipH } : c));
+                          setClips(newClips);
+                          pushHistory(newClips);
+                        }}
+                      >
+                        <FlipHorizontal size={13} /> {selectedClip?.flipH ? 'Отражено' : 'По гориз.'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="inspector-slider-row" style={{ marginTop: 10 }}>
+                    <div className="slider-label-line">
+                      <span>Масштаб кадра (Zoom)</span>
+                      <strong>{selectedClip?.scale || 100}%</strong>
+                    </div>
+                    <input
+                      type="range"
+                      min="100"
+                      max="160"
+                      value={selectedClip?.scale || 100}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        const targetClip = selectedClip?.type === 'video' ? selectedClip : clips.find((c) => c.trackId === 'v1');
+                        if (!targetClip) return;
+                        const newClips = clips.map((c) => (c.id === targetClip.id ? { ...c, scale: val } : c));
+                        setClips(newClips);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Tab: Color Grading */}
               {inspectorTab === 'color' && (
                 <div className="inspector-section color-section">
@@ -1620,7 +2415,7 @@ export const VideoEditorPage: React.FC = () => {
                     ))}
                   </div>
 
-                  <h5 className="inspector-h5">Баланс экспозиции (Primary Wheels)</h5>
+                  <h5 className="inspector-h5" style={{ marginTop: 14 }}>Баланс экспозиции (Primary Wheels)</h5>
                   <div className="inspector-slider-row">
                     <div className="slider-label-line">
                       <span>Яркость (Exposure)</span>
@@ -1631,7 +2426,13 @@ export const VideoEditorPage: React.FC = () => {
                       min="60" 
                       max="140" 
                       value={brightness} 
-                      onChange={(e) => setBrightness(Number(e.target.value))} 
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setBrightness(val);
+                        if (selectedClip && selectedClip.type === 'video') {
+                          setClips((prev) => prev.map((c) => (c.id === selectedClip.id ? { ...c, brightness: val } : c)));
+                        }
+                      }} 
                     />
                   </div>
 
@@ -1645,7 +2446,13 @@ export const VideoEditorPage: React.FC = () => {
                       min="60" 
                       max="140" 
                       value={contrast} 
-                      onChange={(e) => setContrast(Number(e.target.value))} 
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setContrast(val);
+                        if (selectedClip && selectedClip.type === 'video') {
+                          setClips((prev) => prev.map((c) => (c.id === selectedClip.id ? { ...c, contrast: val } : c)));
+                        }
+                      }} 
                     />
                   </div>
 
@@ -1657,11 +2464,105 @@ export const VideoEditorPage: React.FC = () => {
                     <input 
                       type="range" 
                       min="0" 
-                      max="160" 
+                      max="180" 
                       value={saturation} 
-                      onChange={(e) => setSaturation(Number(e.target.value))} 
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setSaturation(val);
+                        if (selectedClip && selectedClip.type === 'video') {
+                          setClips((prev) => prev.map((c) => (c.id === selectedClip.id ? { ...c, saturation: val } : c)));
+                        }
+                      }} 
                     />
                   </div>
+
+                  <div className="inspector-slider-row">
+                    <div className="slider-label-line">
+                      <span>Баланс тепла (Temp)</span>
+                      <strong>{(selectedClip?.temperature ?? 0) > 0 ? `+${selectedClip?.temperature}` : selectedClip?.temperature ?? 0}</strong>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="-50" 
+                      max="50" 
+                      value={selectedClip?.temperature ?? 0} 
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (selectedClip && selectedClip.type === 'video') {
+                          setClips((prev) => prev.map((c) => (c.id === selectedClip.id ? { ...c, temperature: val } : c)));
+                        }
+                      }} 
+                    />
+                  </div>
+
+                  <div className="inspector-slider-row">
+                    <div className="slider-label-line">
+                      <span>Виньетка (Vignette)</span>
+                      <strong>{selectedClip?.vignette ?? 0}%</strong>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="100" 
+                      value={selectedClip?.vignette ?? 0} 
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (selectedClip && selectedClip.type === 'video') {
+                          setClips((prev) => prev.map((c) => (c.id === selectedClip.id ? { ...c, vignette: val } : c)));
+                        }
+                      }} 
+                    />
+                  </div>
+
+                  <div className="inspector-slider-row">
+                    <div className="slider-label-line">
+                      <span>Размытие (Blur / Soft Focus)</span>
+                      <strong>{selectedClip?.blur ?? 0}px</strong>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" 
+                      max="12" 
+                      value={selectedClip?.blur ?? 0} 
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (selectedClip && selectedClip.type === 'video') {
+                          setClips((prev) => prev.map((c) => (c.id === selectedClip.id ? { ...c, blur: val } : c)));
+                        }
+                      }} 
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn-reset-grading"
+                    onClick={() => {
+                      setSelectedFilter('normal');
+                      setBrightness(100);
+                      setContrast(100);
+                      setSaturation(100);
+                      if (selectedClip && selectedClip.type === 'video') {
+                        setClips((prev) =>
+                          prev.map((c) =>
+                            c.id === selectedClip.id
+                              ? {
+                                  ...c,
+                                  filter: 'normal',
+                                  brightness: 100,
+                                  contrast: 100,
+                                  saturation: 100,
+                                  temperature: 0,
+                                  vignette: 0,
+                                  blur: 0
+                                }
+                              : c
+                          )
+                        );
+                      }
+                    }}
+                  >
+                    ↺ Сбросить параметры цвета к исходным
+                  </button>
                 </div>
               )}
 
@@ -2142,6 +3043,28 @@ export const VideoEditorPage: React.FC = () => {
                     <div className="clip-info-strip">
                       <Film size={12} />
                       <span className="clip-label-text">{clip.name}</span>
+                      <div className="clip-tags-cluster">
+                        {clip.transitionIn && clip.transitionIn !== 'none' && (
+                          <span className="clip-badge badge-trans-in" title={`Переход входа: ${clip.transitionIn}`}>
+                            ▶ {clip.transitionIn}
+                          </span>
+                        )}
+                        {clip.filter && clip.filter !== 'normal' && (
+                          <span className="clip-badge badge-lut" title={`LUT: ${clip.filter}`}>
+                            LUT: {clip.filter}
+                          </span>
+                        )}
+                        {clip.effectType && clip.effectType !== 'none' && (
+                          <span className="clip-badge badge-fx" title={`FX: ${clip.effectType}`}>
+                            FX: {clip.effectType}
+                          </span>
+                        )}
+                        {clip.transitionOut && clip.transitionOut !== 'none' && (
+                          <span className="clip-badge badge-trans-out" title={`Переход выхода: ${clip.transitionOut}`}>
+                            {clip.transitionOut} ◀
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Trim Handles */}

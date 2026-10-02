@@ -2408,4 +2408,527 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
+/* ==========================================================================
+   VIDEO CLIP INSPECTOR & EFFECTS STYLES
+   ========================================================================== */
+
+.video-clip-editor-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 12px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 12px;
+}
+
+.inspector-sub-group {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.sub-group-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.sub-group-header svg {
+  color: #3b82f6;
+}
+
+/* Select input in inspector */
+.davinci-select-input {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #0f172a;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.davinci-select-input:focus {
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+/* Video FX Pills */
+.fx-preset-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.fx-pill {
+  padding: 5px 9px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fx-pill:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.fx-pill.active {
+  background: #2563eb;
+  border-color: #1d4ed8;
+  color: #ffffff;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.3);
+}
+
+/* Speed Pills */
+.speed-pills-row {
+  display: flex;
+  gap: 4px;
+}
+
+.speed-pill {
+  flex: 1;
+  padding: 4px 6px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+
+.speed-pill:hover {
+  background: #e2e8f0;
+}
+
+.speed-pill.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+/* Flip Horizontal Button */
+.flip-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 8px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.flip-btn:hover {
+  background: #e2e8f0;
+}
+
+.flip-btn.active {
+  background: #3b82f6;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+/* LUT Mini Grid in Clip Tab */
+.lut-presets-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.lut-mini-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lut-mini-card:hover {
+  border-color: #94a3b8;
+  background: #ffffff;
+}
+
+.lut-mini-card.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1.5px #2563eb;
+}
+
+.lut-mini-preview {
+  width: 100%;
+  height: 28px;
+  border-radius: 4px;
+  background-image: url('https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=150&q=70');
+  background-size: cover;
+  background-position: center;
+}
+
+.lut-mini-name {
+  font-size: 9px;
+  font-weight: 600;
+  color: #334155;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.btn-reset-grading {
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px 10px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-reset-grading:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* ==========================================================================
+   TRANSITIONS & FX SECTIONS IN INSPECTOR
+   ========================================================================== */
+
+.transitions-library-section,
+.fx-library-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.target-clip-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #1e40af;
+  margin-bottom: 10px;
+}
+
+.transitions-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.transition-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.transition-card:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.transition-card.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+
+.transition-icon-wrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+}
+
+.transition-card.active .transition-icon-wrap {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.transition-meta {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.trans-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.trans-desc {
+  font-size: 9.5px;
+  color: #64748b;
+}
+
+.trans-check,
+.fx-check {
+  color: #2563eb;
+}
+
+/* FX Feature Cards Grid */
+.fx-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.fx-feature-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.fx-feature-card:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.fx-feature-card.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1.5px #2563eb;
+}
+
+.fx-feature-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.fx-feature-desc {
+  font-size: 9.5px;
+  color: #64748b;
+}
+
+.fx-feature-card .fx-check {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+}
+
+/* ==========================================================================
+   PROGRAM MONITOR VIDEO FX OVERLAYS
+   ========================================================================== */
+
+/* Vignette Overlay */
+.viewer-vignette-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0) 45%, rgba(0, 0, 0, 0.95) 100%);
+  z-index: 5;
+}
+
+/* Film Grain 35mm Overlay */
+.viewer-grain-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 0);
+  background-size: 3px 3px;
+  opacity: 0.75;
+  mix-blend-mode: overlay;
+  z-index: 6;
+  animation: grainJitter 0.2s steps(2) infinite;
+}
+
+@keyframes grainJitter {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(1px, -1px); }
+  100% { transform: translate(-1px, 1px); }
+}
+
+/* Retro VHS 90s Overlay */
+.viewer-vhs-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 7;
+  overflow: hidden;
+}
+
+.vhs-scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.05) 0px,
+    rgba(255, 255, 255, 0.05) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: overlay;
+}
+
+.vhs-hud {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: "Courier New", monospace;
+  font-size: 11px;
+  font-weight: 800;
+  color: #22c55e;
+  text-shadow: 0 0 4px rgba(34, 197, 94, 0.8), 0 2px 2px #000;
+}
+
+.vhs-rec-dot {
+  color: #ef4444;
+  animation: blinkRec 1s step-end infinite;
+}
+
+@keyframes blinkRec {
+  50% { opacity: 0; }
+}
+
+.vhs-noise-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  bottom: 12%;
+  background: rgba(255, 255, 255, 0.18);
+  filter: blur(1px);
+  animation: vhsBand 4s linear infinite;
+}
+
+@keyframes vhsBand {
+  0% { bottom: -10px; }
+  100% { bottom: 105%; }
+}
+
+/* Cinemascope 2.39:1 Letterbox Bars */
+.viewer-cinemascope-bars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cinema-bar {
+  width: 100%;
+  height: 12%;
+  background: #000000;
+}
+
+/* Glitch Chromatic Effect */
+.screen-glitch-active {
+  animation: chromaticGlitch 0.4s infinite alternate;
+}
+
+@keyframes chromaticGlitch {
+  0% { filter: drop-shadow(-2px 0 0 rgba(255, 0, 0, 0.8)) drop-shadow(2px 0 0 rgba(0, 255, 255, 0.8)); }
+  100% { filter: drop-shadow(2px 0 0 rgba(255, 0, 0, 0.8)) drop-shadow(-2px 0 0 rgba(0, 255, 255, 0.8)); }
+}
+
+/* ==========================================================================
+   TIMELINE CLIP TAGS & BADGES
+   ========================================================================== */
+
+.clip-tags-cluster {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding-right: 4px;
+}
+
+.clip-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  letter-spacing: -0.2px;
+}
+
+.badge-trans-in {
+  background: rgba(16, 185, 129, 0.85);
+  color: #ffffff;
+}
+
+.badge-trans-out {
+  background: rgba(245, 158, 11, 0.85);
+  color: #ffffff;
+}
+
+.badge-lut {
+  background: rgba(99, 102, 241, 0.85);
+  color: #ffffff;
+}
+
+.badge-fx {
+  background: rgba(236, 72, 153, 0.85);
+  color: #ffffff;
+}
+
+
 
