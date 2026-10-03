@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plus, X, Heart, Send, ChevronLeft, ChevronRight, 
@@ -7,11 +7,12 @@ import {
   Search, Info, CheckCircle2, Music, Film,
   Share2, ArrowLeft
 } from 'lucide-react';
-import { type Story, type User, type StoryStats } from '../data/mock';
+import { type Story, type User, type StoryStats, type StoryViewerUser } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { CreateStoryModal, STORY_FILTERS } from './CreateStoryModal';
 import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import { isStoryExpired } from '../utils/syncStories';
+import { api } from '../api';
 import './StoriesBar.css';
 
 export interface UserStoryGroup {
@@ -122,15 +123,69 @@ export function StoriesBar({
   const currentGroup = activeGroupIndex !== null ? userGroups[activeGroupIndex] : null;
   const activeStory = currentGroup ? currentGroup.stories[activeStoryIdxInGroup] : null;
 
-  // Mark story as viewed
-  const markStoryViewed = (storyId: string) => {
+  // Check if user is current logged-in user
+  const isMeUser = (user: User) => {
+    if (!currentUser) return false;
+    const uid = user.id ? String(user.id).toLowerCase() : '';
+    const username = user.username ? user.username.replace(/^@+/, '').toLowerCase() : '';
+    const myId = currentUser.id ? String(currentUser.id).toLowerCase() : '';
+    const myUsername = currentUser.username ? currentUser.username.replace(/^@+/, '').toLowerCase() : '';
+    return uid === 'me' || (myId && uid === myId) || (myUsername && (username === myUsername || uid === myUsername));
+  };
+
+  const [realViewersMap, setRealViewersMap] = useState<Record<string, StoryViewerUser[]>>({});
+  const [isLoadingViewers, setIsLoadingViewers] = useState(false);
+  const recordedViewsRef = useRef<Set<string>>(new Set());
+
+  // Mark story as viewed both locally and on the server
+  const markStoryViewed = (storyId: string, author?: User) => {
     setViewedStoryIds(prev => {
       const next = new Set(prev);
       next.add(storyId);
-      localStorage.setItem('new_age_viewed_stories', JSON.stringify(Array.from(next)));
+      try {
+        localStorage.setItem('new_age_viewed_stories', JSON.stringify(Array.from(next)));
+      } catch {}
       return next;
     });
+
+    if (storyId && !recordedViewsRef.current.has(storyId)) {
+      const isOwner = author ? isMeUser(author) : (activeStory?.user ? isMeUser(activeStory.user) : false);
+      if (!isOwner) {
+        recordedViewsRef.current.add(storyId);
+        api.stories.view(storyId).catch(err => {
+          console.warn('Failed to record real story view:', err);
+        });
+      }
+    }
   };
+
+  // Automatically trigger markStoryViewed when activeStory opens/changes
+  useEffect(() => {
+    if (!activeStory || !activeStory.id) return;
+    markStoryViewed(activeStory.id, activeStory.user);
+  }, [activeStory?.id]);
+
+  // Load real viewers from server for owner's story
+  useEffect(() => {
+    if (!activeStory || !isMeUser(activeStory.user)) return;
+    const storyId = activeStory.id;
+    if (!storyId) return;
+
+    setIsLoadingViewers(true);
+    api.stories.viewers(storyId).then((res: any) => {
+      const list = res?.data || (Array.isArray(res) ? res : []);
+      if (Array.isArray(list)) {
+        setRealViewersMap(prev => ({
+          ...prev,
+          [storyId]: list
+        }));
+      }
+    }).catch(err => {
+      console.warn('Failed to fetch real viewers:', err);
+    }).finally(() => {
+      setIsLoadingViewers(false);
+    });
+  }, [activeStory?.id, isStatsOpen, statsTab]);
 
   const handleOpenGroup = (groupIndex: number, storyIndex = 0) => {
     setActiveGroupIndex(groupIndex);
@@ -301,10 +356,20 @@ export function StoriesBar({
     }
   };
 
-  // Get active story stats fallback
+  // Get active story stats (with real viewers & real viewsCount)
   const activeStats: StoryStats = useMemo(() => {
-    if (activeStory?.stats) return activeStory.stats;
-    const viewsCount = activeStory?.viewsCount || 0;
+    const storyId = activeStory?.id || '';
+    const realViewers = (storyId && realViewersMap[storyId]) || activeStory?.stats?.viewers || [];
+    const viewsCount = Math.max(activeStory?.viewsCount || 0, realViewers.length);
+
+    if (activeStory?.stats) {
+      return {
+        ...activeStory.stats,
+        viewsCount,
+        uniqueViewersCount: viewsCount,
+        viewers: realViewers,
+      };
+    }
     return {
       viewsCount,
       followersPercent: 0,
@@ -324,9 +389,9 @@ export function StoriesBar({
       linkClicks: 0,
       companyAddressClicks: 0,
       followsCount: 0,
-      viewers: [],
+      viewers: realViewers,
     };
-  }, [activeStory]);
+  }, [activeStory, realViewersMap]);
 
   // Filtered viewers list in statistics tab
   const filteredViewers = useMemo(() => {
@@ -338,16 +403,6 @@ export function StoriesBar({
       v.username.toLowerCase().includes(q)
     );
   }, [activeStats, viewerSearchQuery]);
-
-  // Check if current user has active stories
-  const isMeUser = (user: User) => {
-    if (!currentUser) return false;
-    const uid = user.id ? String(user.id).toLowerCase() : '';
-    const username = user.username ? user.username.replace(/^@+/, '').toLowerCase() : '';
-    const myId = currentUser.id ? String(currentUser.id).toLowerCase() : '';
-    const myUsername = currentUser.username ? currentUser.username.replace(/^@+/, '').toLowerCase() : '';
-    return uid === 'me' || (myId && uid === myId) || (myUsername && (username === myUsername || uid === myUsername));
-  };
 
   const myStoriesGroup = userGroups.find(g => isMeUser(g.user));
 
@@ -672,70 +727,77 @@ export function StoriesBar({
                 );
               })()}
 
-              {/* Bottom Left Viewers Counter & Avatars Stack (Screenshot 2) */}
-              <div 
-                className="insta-story-viewers-pill"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsPaused(true);
-                  setIsStatsOpen(true);
-                  setStatsTab('overview');
-                }}
-                title="Посмотреть статистику и зрителей истории"
-              >
-                <div className="viewers-avatar-stack">
-                  {(activeStats.viewers || []).slice(0, 3).map((v, i) => (
-                    <img 
-                      key={v.id || i}
-                      src={v.avatar} 
-                      alt={v.name} 
-                      className="viewer-stack-avatar"
-                      style={{ zIndex: 3 - i }}
-                    />
-                  ))}
+              {/* Bottom Left Viewers Counter & Avatars Stack - ONLY FOR STORY OWNER */}
+              {isMeUser(activeStory.user) && (
+                <div 
+                  className="insta-story-viewers-pill"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsPaused(true);
+                    setIsStatsOpen(true);
+                    setStatsTab('viewers');
+                  }}
+                  title="Посмотреть зрителей истории"
+                >
+                  {(activeStats.viewers && activeStats.viewers.length > 0) && (
+                    <div className="viewers-avatar-stack">
+                      {activeStats.viewers.slice(0, 3).map((v, i) => (
+                        <img 
+                          key={v.id || i}
+                          src={v.avatar || '/default-avatar.svg'} 
+                          alt={v.name} 
+                          className="viewer-stack-avatar"
+                          style={{ zIndex: 3 - i }}
+                          onError={handleAvatarError}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <span className="viewers-count-label">
+                    {activeStats.viewsCount > 0 ? `Просмотрено: ${activeStats.viewsCount}` : 'Нет просмотров'}
+                  </span>
                 </div>
-                <span className="viewers-count-label">
-                  Просмотрено: {activeStats.viewsCount || 12}
-                </span>
-              </div>
+              )}
 
               {/* Bottom Interactive Instagram Footer */}
-              <div className="insta-story-footer" onClick={e => e.stopPropagation()}>
-                <input
-                  type="text"
-                  className="insta-story-input"
-                  placeholder={`Ответить ${activeStory.user.name.split(' ')[0]}...`}
-                  value={replyText}
-                  onChange={e => setReplyText(e.target.value)}
-                  onFocus={() => setIsPaused(true)}
-                  onBlur={() => setIsPaused(false)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      handleSendReply();
-                    }
-                  }}
-                />
+              {!isMeUser(activeStory.user) && (
+                <div className="insta-story-footer" onClick={e => e.stopPropagation()}>
+                  <input
+                    type="text"
+                    className="insta-story-input"
+                    placeholder={`Ответить ${activeStory.user.name.split(' ')[0]}...`}
+                    value={replyText}
+                    onChange={e => setReplyText(e.target.value)}
+                    onFocus={() => setIsPaused(true)}
+                    onBlur={() => setIsPaused(false)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        handleSendReply();
+                      }
+                    }}
+                  />
 
-                <button 
-                  type="button" 
-                  className={`insta-story-like-btn ${isCurrentLiked ? 'liked' : ''}`}
-                  onClick={handleToggleLike}
-                  title="Нравится"
-                >
-                  <Heart size={22} fill={isCurrentLiked ? '#ef4444' : 'none'} color={isCurrentLiked ? '#ef4444' : '#ffffff'} />
-                </button>
-
-                {replyText.trim() && (
                   <button 
                     type="button" 
-                    className="insta-story-send-btn"
-                    onClick={handleSendReply}
-                    title="Отправить"
+                    className={`insta-story-like-btn ${isCurrentLiked ? 'liked' : ''}`}
+                    onClick={handleToggleLike}
+                    title="Нравится"
                   >
-                    <Send size={18} />
+                    <Heart size={22} fill={isCurrentLiked ? '#ef4444' : 'none'} color={isCurrentLiked ? '#ef4444' : '#ffffff'} />
                   </button>
-                )}
-              </div>
+
+                  {replyText.trim() && (
+                    <button 
+                      type="button" 
+                      className="insta-story-send-btn"
+                      onClick={handleSendReply}
+                      title="Отправить"
+                    >
+                      <Send size={18} />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* --- RIGHT SIDE / MODAL INSTAGRAM STORY INSIGHTS (Screenshots 4 & 5) --- */}
@@ -952,59 +1014,66 @@ export function StoriesBar({
                     </div>
 
                     <div className="viewers-list">
-                      {filteredViewers.map(viewer => (
-                        <div key={viewer.id} className="viewer-list-item">
-                          <img 
-                            src={viewer.avatar} 
-                            alt={viewer.name} 
-                            className="viewer-item-avatar"
-                            onClick={() => {
-                              navigate(`/profile/@${viewer.username}`);
-                              handleClose();
-                            }}
-                          />
-                          <div className="viewer-item-info">
-                            <span 
-                              className="viewer-item-name"
+                      {isLoadingViewers && activeStats.viewers.length === 0 ? (
+                        <div className="viewers-empty" style={{ opacity: 0.7 }}>
+                          Загрузка зрителей...
+                        </div>
+                      ) : (
+                        filteredViewers.map(viewer => (
+                          <div key={viewer.id} className="viewer-list-item">
+                            <img 
+                              src={viewer.avatar || '/default-avatar.svg'} 
+                              alt={viewer.name} 
+                              className="viewer-item-avatar"
+                              onError={handleAvatarError}
                               onClick={() => {
                                 navigate(`/profile/@${viewer.username}`);
                                 handleClose();
                               }}
-                            >
-                              {viewer.name}
-                            </span>
-                            <div className="viewer-item-meta">
-                              <span className="viewer-username">@{viewer.username}</span>
-                              {viewer.viewedAt && (
-                                <>
-                                  <span className="viewer-meta-dot">•</span>
-                                  <span className="viewer-time">{viewer.viewedAt}</span>
-                                </>
-                              )}
-                              {viewer.isFollower && (
-                                <>
-                                  <span className="viewer-meta-dot">•</span>
-                                  <span className="viewer-follower-badge">Подписчик</span>
-                                </>
-                              )}
+                            />
+                            <div className="viewer-item-info">
+                              <span 
+                                className="viewer-item-name"
+                                onClick={() => {
+                                  navigate(`/profile/@${viewer.username}`);
+                                  handleClose();
+                                }}
+                              >
+                                {viewer.name}
+                              </span>
+                              <div className="viewer-item-meta">
+                                <span className="viewer-username">@{viewer.username}</span>
+                                {viewer.viewedAt && (
+                                  <>
+                                    <span className="viewer-meta-dot">•</span>
+                                    <span className="viewer-time">{viewer.viewedAt}</span>
+                                  </>
+                                )}
+                                {viewer.isFollower && (
+                                  <>
+                                    <span className="viewer-meta-dot">•</span>
+                                    <span className="viewer-follower-badge">Подписчик</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="viewer-item-actions">
+                              <button 
+                                type="button" 
+                                className={`viewer-heart-btn ${viewer.liked ? 'active' : ''}`}
+                                title={viewer.liked ? 'Поставил отметку "Нравится"' : 'Зритель'}
+                              >
+                                <Heart size={18} fill={viewer.liked ? '#ef4444' : 'none'} color={viewer.liked ? '#ef4444' : '#6b7280'} />
+                              </button>
                             </div>
                           </div>
+                        ))
+                      )}
 
-                          <div className="viewer-item-actions">
-                            <button 
-                              type="button" 
-                              className={`viewer-heart-btn ${viewer.liked ? 'active' : ''}`}
-                              title={viewer.liked ? 'Поставил отметку "Нравится"' : 'Зритель'}
-                            >
-                              <Heart size={18} fill={viewer.liked ? '#ef4444' : 'none'} color={viewer.liked ? '#ef4444' : '#6b7280'} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-
-                      {filteredViewers.length === 0 && (
+                      {!isLoadingViewers && filteredViewers.length === 0 && (
                         <div className="viewers-empty">
-                          Зрители не найдены
+                          {viewerSearchQuery.trim() ? 'Зрители не найдены' : 'Пока никто не посмотрел эту историю'}
                         </div>
                       )}
                     </div>

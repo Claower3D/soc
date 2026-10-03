@@ -108,7 +108,8 @@ export const api = {
     create: (formData: FormData) => apiFetch<any>('/api/stories', { method: 'POST', body: formData }, true),
     sync: (stories: any[]) => apiFetch<any>('/api/stories/sync', { method: 'POST', body: JSON.stringify(stories) }),
     delete: (id: string) => apiFetch<any>(`/api/stories/${id}`, { method: 'DELETE' }),
-    view: (id: string) => apiFetch<any>(`/api/stories/${id}/view`, { method: 'POST' })
+    view: (id: string) => apiFetch<any>(`/api/stories/${id}/view`, { method: 'POST' }),
+    viewers: (id: string) => apiFetch<any>(`/api/stories/${id}/viewers`)
   },
   videos: {
     list: () => apiFetch<any>('/api/videos'),

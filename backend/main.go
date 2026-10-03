@@ -427,10 +427,18 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 		   OR avatar LIKE '%unsplash%';
 	`)
 
-	// Убеждаемся что колонки online и last_seen присутствуют в таблице users
+	// Убеждаемся что колонки online и last_seen присутствуют в таблице users, а также таблица story_views и колонка viewers_count
 	_, _ = conn.Exec(`
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS online BOOLEAN DEFAULT FALSE;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+		ALTER TABLE stories ADD COLUMN IF NOT EXISTS viewers_count INT DEFAULT 0;
+		CREATE TABLE IF NOT EXISTS story_views (
+			story_id VARCHAR(64) NOT NULL,
+			user_id VARCHAR(64) NOT NULL,
+			reaction VARCHAR(50) DEFAULT '',
+			viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			PRIMARY KEY (story_id, user_id)
+		);
 	`)
 
 	return conn, nil
@@ -625,6 +633,20 @@ var (
 var (
 	userLastActiveMu sync.RWMutex
 	userLastActive   = make(map[string]time.Time)
+)
+
+// Трекинг реальных просмотров историй (in-memory fallback + sync)
+type StoryViewerRecord struct {
+	UserID   string    `json:"userId"`
+	Username string    `json:"username"`
+	Name     string    `json:"name"`
+	Avatar   string    `json:"avatar"`
+	ViewedAt time.Time `json:"viewedAt"`
+}
+
+var (
+	storyViewersMu sync.RWMutex
+	storyViewers   = make(map[string][]StoryViewerRecord) // key: storyID
 )
 
 func markUserActive(userID string) {
@@ -1059,6 +1081,7 @@ func main() {
 	mux.HandleFunc("POST /api/stories", handleCreateStory)
 	mux.HandleFunc("POST /api/stories/sync", handleSyncStories)
 	mux.HandleFunc("POST /api/stories/{id}/view", handleViewStory)
+	mux.HandleFunc("GET /api/stories/{id}/viewers", handleStoryViewers)
 	mux.HandleFunc("DELETE /api/stories/{id}", handleDeleteStory)
 
 	// Клипы
@@ -5643,26 +5666,191 @@ func handleViewStory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	storyID := r.PathValue("id")
+	if storyID == "" {
+		writeJSON(w, 400, Response{Status: "error", Message: "story id required"})
+		return
+	}
+
+	viewerID := claims.UserID
+	viewerUsername := claims.Username
+
+	// Находим данные зрителя (имя, аватарка)
+	var viewerName, viewerAvatar string
+	store.mu.RLock()
+	if acc, ok := store.accounts[viewerID]; ok {
+		viewerName = acc.User.Name
+		viewerAvatar = acc.User.Avatar
+		if viewerUsername == "" {
+			viewerUsername = acc.User.Username
+		}
+	}
+	store.mu.RUnlock()
 
 	dbMu.RLock()
 	dbConn := db
 	dbMu.RUnlock()
-	if dbConn == nil {
-		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
-		return
+
+	if dbConn != nil {
+		if viewerName == "" || viewerAvatar == "" {
+			_ = dbConn.QueryRow(`SELECT name, avatar FROM users WHERE id = $1`, viewerID).Scan(&viewerName, &viewerAvatar)
+		}
+
+		res, err := dbConn.Exec(`
+			INSERT INTO story_views (story_id, user_id, viewed_at) 
+			VALUES ($1, $2, NOW()) 
+			ON CONFLICT (story_id, user_id) DO NOTHING
+		`, storyID, viewerID)
+		if err == nil {
+			if affected, _ := res.RowsAffected(); affected > 0 {
+				_, _ = dbConn.Exec(`UPDATE stories SET viewers_count = COALESCE(viewers_count, 0) + 1 WHERE id = $1`, storyID)
+			}
+		} else {
+			log.Printf("⚠️ Ошибка записи story_views в PostgreSQL: %v", err)
+		}
 	}
 
-	res, err := dbConn.Exec(`INSERT INTO story_views (story_id, viewer_id, viewed_at) VALUES ($1, $2, NOW()) ON CONFLICT DO NOTHING`, storyID, claims.UserID)
-	if err != nil {
-		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
-		return
+	if viewerAvatar == "" || viewerAvatar == "undefined" || viewerAvatar == "null" {
+		viewerAvatar = "/default-avatar.svg"
+	}
+	if viewerName == "" {
+		viewerName = viewerUsername
 	}
 
-	if affected, _ := res.RowsAffected(); affected > 0 {
-		dbConn.Exec(`UPDATE stories SET views_count = views_count + 1 WHERE id = $1`, storyID)
+	// Обновляем in-memory трекинг зрителей
+	storyViewersMu.Lock()
+	existing := storyViewers[storyID]
+	alreadyViewed := false
+	for _, rec := range existing {
+		if rec.UserID == viewerID || (viewerUsername != "" && rec.Username == viewerUsername) {
+			alreadyViewed = true
+			break
+		}
 	}
+	if !alreadyViewed {
+		storyViewers[storyID] = append([]StoryViewerRecord{{
+			UserID:   viewerID,
+			Username: viewerUsername,
+			Name:     viewerName,
+			Avatar:   viewerAvatar,
+			ViewedAt: time.Now(),
+		}}, existing...)
+
+		// Увеличиваем счетчик просмотров в in-memory stories
+		store.mu.Lock()
+		for i := range store.stories {
+			if store.stories[i].ID == storyID {
+				store.stories[i].ViewsCount++
+				break
+			}
+		}
+		store.mu.Unlock()
+	}
+	storyViewersMu.Unlock()
 
 	writeJSON(w, 200, Response{Status: "ok"})
+}
+
+// GET /api/stories/{id}/viewers — get list of users who viewed this story
+func handleStoryViewers(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	storyID := r.PathValue("id")
+	if storyID == "" {
+		writeJSON(w, 400, Response{Status: "error", Message: "story id required"})
+		return
+	}
+
+	type ViewerResp struct {
+		ID         string `json:"id"`
+		Username   string `json:"username"`
+		Name       string `json:"name"`
+		Avatar     string `json:"avatar"`
+		ViewedAt   string `json:"viewedAt"`
+		Liked      bool   `json:"liked"`
+		IsFollower bool   `json:"isFollower"`
+	}
+
+	viewersMap := make(map[string]ViewerResp)
+	var viewersList []ViewerResp
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+
+	if dbConn != nil {
+		rows, err := dbConn.Query(`
+			SELECT u.id, COALESCE(u.username, ''), COALESCE(u.name, ''), COALESCE(u.avatar, ''), sv.viewed_at
+			FROM story_views sv
+			JOIN users u ON (sv.user_id = u.id OR LOWER(REPLACE(sv.user_id, '@', '')) = LOWER(REPLACE(u.username, '@', '')))
+			WHERE sv.story_id = $1
+			ORDER BY sv.viewed_at DESC
+			LIMIT 200
+		`, storyID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var v ViewerResp
+				var viewedAt time.Time
+				if err := rows.Scan(&v.ID, &v.Username, &v.Name, &v.Avatar, &viewedAt); err == nil {
+					if v.Avatar == "" || v.Avatar == "undefined" || v.Avatar == "null" {
+						v.Avatar = "/default-avatar.svg"
+					}
+					v.ViewedAt = formatTimeAgo(viewedAt)
+					viewersMap[v.ID] = v
+					viewersList = append(viewersList, v)
+				}
+			}
+		}
+	}
+
+	// Дополняем данными из in-memory хранилища
+	storyViewersMu.RLock()
+	inMem := storyViewers[storyID]
+	for _, rec := range inMem {
+		if _, exists := viewersMap[rec.UserID]; !exists {
+			v := ViewerResp{
+				ID:       rec.UserID,
+				Username: rec.Username,
+				Name:     rec.Name,
+				Avatar:   rec.Avatar,
+				ViewedAt: formatTimeAgo(rec.ViewedAt),
+			}
+			viewersMap[rec.UserID] = v
+			viewersList = append(viewersList, v)
+		}
+	}
+	storyViewersMu.RUnlock()
+
+	// Проверяем подписки (isFollower) для автора истории
+	if len(viewersList) > 0 {
+		store.mu.RLock()
+		myFollowers := make(map[string]bool)
+		for followerID, targets := range store.relationships {
+			for _, targetID := range targets {
+				if targetID == claims.UserID {
+					myFollowers[followerID] = true
+				}
+			}
+		}
+		store.mu.RUnlock()
+
+		for i := range viewersList {
+			if myFollowers[viewersList[i].ID] {
+				viewersList[i].IsFollower = true
+			}
+		}
+	}
+
+	if viewersList == nil {
+		viewersList = []ViewerResp{}
+	}
+
+	writeJSON(w, 200, Response{Status: "ok", Data: viewersList})
 }
 
 // POST /api/clips — create clip
