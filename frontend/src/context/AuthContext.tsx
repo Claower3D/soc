@@ -17,6 +17,9 @@ export interface RegisteredAccount {
   beliefType: string;
   beliefPrivacy: BeliefPrivacy;
   isPremium?: boolean;
+  online?: boolean;
+  lastSeen?: string;
+  lastSeenText?: string;
   verified?: boolean;
   followersCount: number;
   followingCount: number;

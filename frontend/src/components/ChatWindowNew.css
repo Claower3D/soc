@@ -126,8 +126,18 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #34c759;
   border: 2px solid var(--color-bg-card);
+  transition: background-color 0.2s ease;
+}
+
+.cw-online-dot.is-online {
+  background: #10b981;
+  box-shadow: 0 0 5px rgba(16, 185, 129, 0.6);
+}
+
+.cw-online-dot.is-offline {
+  background: #71717a;
+  box-shadow: none;
 }
 
 .cw-header-info {

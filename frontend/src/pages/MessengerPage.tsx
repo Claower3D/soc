@@ -72,17 +72,23 @@ export function MessengerPage() {
           if (Array.isArray(parsed)) {
             userChats = parsed
               .filter((c: any) => c && c.id && c.user && typeof c.user === 'object' && typeof c.user.name === 'string')
-              .map((c: any) => ({
-                ...c,
-                lastMessage: String(c.lastMessage || ''),
-                time: String(c.time || ''),
-                user: {
-                  ...c.user,
-                  name: String(c.user.name || ''),
-                  username: String(c.user.username || ''),
-                  avatar: String(c.user.avatar || '')
-                },
-              }));
+              .map((c: any) => {
+                const isOracle = c.id === 'chat_ai_oracle' || c.id === 'ai_guru_bot';
+                return {
+                  ...c,
+                  lastMessage: String(c.lastMessage || ''),
+                  time: String(c.time || ''),
+                  user: {
+                    ...c.user,
+                    name: String(c.user.name || ''),
+                    username: String(c.user.username || ''),
+                    avatar: String(c.user.avatar || ''),
+                    online: isOracle ? true : Boolean(c.user?.online),
+                    lastSeen: c.user?.lastSeen,
+                    lastSeenText: c.user?.lastSeenText,
+                  },
+                };
+              });
           }
         } catch { /* ignore */ }
       }
@@ -289,6 +295,33 @@ export function MessengerPage() {
 
       if (existing) {
         setActiveChatId(existing.id);
+        // Актуализируем статус собеседника с сервера
+        api.users.profile(cleanTarget).then((res: any) => {
+          const u = res?.user || res?.data?.user;
+          if (u) {
+            setChatList(prev => {
+              const updated = prev.map(c => {
+                if (c.id === existing.id) {
+                  return {
+                    ...c,
+                    user: {
+                      ...c.user,
+                      name: u.name || c.user.name,
+                      username: u.username || c.user.username,
+                      avatar: u.avatar || c.user.avatar,
+                      online: Boolean(u.online),
+                      lastSeen: u.lastSeen,
+                      lastSeenText: u.lastSeenText,
+                    }
+                  };
+                }
+                return c;
+              });
+              localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updated));
+              return updated;
+            });
+          }
+        }).catch(() => {});
       } else {
         // Ищем информацию о собеседнике среди аккаунтов или сохранённых пользователей
         const matchedAccount = allAccounts.find(a =>
@@ -309,7 +342,9 @@ export function MessengerPage() {
             name: displayName,
             username: displayUsername,
             avatar: displayAvatar,
-            online: true,
+            online: Boolean(matchedAccount?.online),
+            lastSeen: matchedAccount?.lastSeen,
+            lastSeenText: matchedAccount?.lastSeenText,
             verified: matchedAccount?.verified || false,
             followersCount: matchedAccount?.followersCount || 0,
             followingCount: matchedAccount?.followingCount || 0,
@@ -327,6 +362,34 @@ export function MessengerPage() {
           return updated;
         });
         setActiveChatId(directChatId);
+
+        // Запрашиваем точный статус и данные пользователя с сервера
+        api.users.profile(cleanTarget).then((res: any) => {
+          const u = res?.user || res?.data?.user;
+          if (u) {
+            setChatList(prev => {
+              const updated = prev.map(c => {
+                if (c.id === directChatId) {
+                  return {
+                    ...c,
+                    user: {
+                      ...c.user,
+                      name: u.name || c.user.name,
+                      username: u.username || c.user.username,
+                      avatar: u.avatar || c.user.avatar,
+                      online: Boolean(u.online),
+                      lastSeen: u.lastSeen,
+                      lastSeenText: u.lastSeenText,
+                    }
+                  };
+                }
+                return c;
+              });
+              localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updated));
+              return updated;
+            });
+          }
+        }).catch(() => {});
       }
     }
   }, [requestedChatId, datingProfileId, targetUserParam, isLoading]);
@@ -395,6 +458,150 @@ export function MessengerPage() {
     window.addEventListener('chat_typing_status', handleTypingEvent);
     return () => window.removeEventListener('chat_typing_status', handleTypingEvent);
   }, []);
+
+  // Синхронизация реального онлайн-статуса и времени визита собеседников с сервером
+  useEffect(() => {
+    let isMounted = true;
+
+    const refreshStatuses = async () => {
+      try {
+        const res = await api.users.list();
+        const serverUsers: any[] = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+        if (!isMounted || !serverUsers.length) return;
+
+        const userMap = new Map<string, any>();
+        for (const u of serverUsers) {
+          if (u.id) userMap.set(String(u.id).toLowerCase(), u);
+          if (u.username) userMap.set(String(u.username).replace(/^@+/, '').toLowerCase(), u);
+        }
+
+        setChatList(prev => {
+          let hasChanges = false;
+          const updated = prev.map(chat => {
+            if (chat.isGroup || chat.id === 'chat_ai_oracle' || chat.id === 'ai_guru_bot' || !chat.user?.id) {
+              return chat;
+            }
+            const targetId = String(chat.user.id).toLowerCase();
+            const targetUsername = String(chat.user.username || '').replace(/^@+/, '').toLowerCase();
+            const liveUser = userMap.get(targetId) || userMap.get(targetUsername);
+
+            if (liveUser) {
+              const realOnline = Boolean(liveUser.online);
+              const realLastSeen = liveUser.lastSeen;
+              const realLastSeenText = liveUser.lastSeenText;
+              const realAvatar = liveUser.avatar;
+              const realName = liveUser.name;
+
+              if (
+                chat.user.online !== realOnline ||
+                chat.user.lastSeenText !== realLastSeenText ||
+                (realAvatar && chat.user.avatar !== realAvatar) ||
+                (realName && chat.user.name !== realName)
+              ) {
+                hasChanges = true;
+                return {
+                  ...chat,
+                  user: {
+                    ...chat.user,
+                    online: realOnline,
+                    lastSeen: realLastSeen,
+                    lastSeenText: realLastSeenText,
+                    avatar: realAvatar || chat.user.avatar,
+                    name: realName || chat.user.name,
+                  }
+                };
+              }
+            } else {
+              const localAcc = allAccounts.find(a =>
+                (a.id && a.id.toLowerCase() === targetId) ||
+                (a.username && a.username.replace(/^@+/, '').toLowerCase() === targetUsername)
+              );
+              if (localAcc) {
+                const localOnline = Boolean(localAcc.online);
+                if (chat.user.online !== localOnline) {
+                  hasChanges = true;
+                  return {
+                    ...chat,
+                    user: {
+                      ...chat.user,
+                      online: localOnline,
+                      lastSeen: localAcc.lastSeen,
+                      lastSeenText: localAcc.lastSeenText,
+                    }
+                  };
+                }
+              }
+            }
+            return chat;
+          });
+
+          if (hasChanges) {
+            localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updated));
+            return updated;
+          }
+          return prev;
+        });
+      } catch {
+        // ignore network error
+      }
+    };
+
+    refreshStatuses();
+    const timer = setInterval(refreshStatuses, 15000);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [currentUserId, allAccounts]);
+
+  // При открытии диалога с пользователем сразу запрашиваем его свежий профиль с сервера
+  useEffect(() => {
+    if (!activeChatId || activeChatId === 'chat_ai_oracle' || activeChatId === 'ai_guru_bot') return;
+    const currentActive = chatList.find(c => c.id === activeChatId);
+    if (!currentActive || currentActive.isGroup || !currentActive.user) return;
+    const target = currentActive.user.username || currentActive.user.id;
+    if (!target) return;
+
+    api.users.profile(target).then((res: any) => {
+      const u = res?.user || res?.data?.user;
+      if (u) {
+        setChatList(prev => {
+          let hasChanges = false;
+          const updated = prev.map(c => {
+            if (c.id === activeChatId) {
+              const liveOnline = Boolean(u.online);
+              if (
+                c.user.online !== liveOnline ||
+                c.user.lastSeenText !== u.lastSeenText ||
+                (u.avatar && c.user.avatar !== u.avatar) ||
+                (u.name && c.user.name !== u.name)
+              ) {
+                hasChanges = true;
+                return {
+                  ...c,
+                  user: {
+                    ...c.user,
+                    name: u.name || c.user.name,
+                    username: u.username || c.user.username,
+                    avatar: u.avatar || c.user.avatar,
+                    online: liveOnline,
+                    lastSeen: u.lastSeen,
+                    lastSeenText: u.lastSeenText,
+                  }
+                };
+              }
+            }
+            return c;
+          });
+          if (hasChanges) {
+            localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updated));
+            return updated;
+          }
+          return prev;
+        });
+      }
+    }).catch(() => {});
+  }, [activeChatId]);
 
   const handleUpdateChat = (chatId: string, updates: Partial<Chat>) => {
     setChatList(prev => {

@@ -2,11 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 
 
 import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic } from 'lucide-react';
-
-
 import { type Chat, type Message } from '../data/mock';
-
-
+import { formatLastSeen } from '../utils/onlineStatus';
 import './ChatWindowNew.css';
 
 
@@ -984,36 +981,23 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           )}
 
 
-          {isOnline && <div className="cw-online-dot" />}
-
+          {!chat.isGroup && (
+            <div 
+              className={`cw-online-dot ${isOnline ? 'is-online' : 'is-offline'}`} 
+              title={isOnline ? 'В сети' : (chat.user?.lastSeenText || formatLastSeen(chat.user?.lastSeen, false, chat.user?.lastSeenText))} 
+            />
+          )}
 
         </div>
 
-
         <div className="cw-header-info">
-
-
           <div className="cw-header-name">
-
-
             {chatName}
-
-
             {isAi && <span className="cw-ai-badge"></span>}
-
-
           </div>
-
-
           <div className={`cw-header-status ${isOnline ? 'online' : ''}`}>
-
-
-            {isAi ? (isAiTyping ? 'печатает...' : ' ') : isOnline ? 'в сети' : 'был(а) недавно'}
-
-
+            {isAi ? (isAiTyping ? 'печатает...' : 'на связи') : isOnline ? 'в сети' : (chat.user?.lastSeenText || formatLastSeen(chat.user?.lastSeen, false, chat.user?.lastSeenText))}
           </div>
-
-
         </div>
 
 
