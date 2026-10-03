@@ -1,7 +1,26 @@
 
 
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+const getApiBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  if (typeof window !== 'undefined') {
+    if ((window as any).__API_BASE__) {
+      return (window as any).__API_BASE__;
+    }
+    if (
+      window.location.hostname === 'appassets.androidplatform.net' ||
+      window.location.protocol === 'file:' ||
+      (window.location.hostname === 'localhost' && window.location.port !== '8080')
+    ) {
+      return 'https://soc-production-9d33.up.railway.app';
+    }
+  }
+  return '';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Базовая функция для выполнения запросов к API с обработкой ошибок и авторизацией.

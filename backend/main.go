@@ -1141,13 +1141,23 @@ var allowedOrigins = func() []string {
 	if origins != "" {
 		return strings.Split(origins, ",")
 	}
-	// По умолчанию — localhost для разработки
-	return []string{"http://localhost:5173", "http://localhost:5175", "http://localhost:3000", "http://localhost:8080"}
+	// По умолчанию — localhost для разработки и Android WebView
+	return []string{"http://localhost:5173", "http://localhost:5175", "http://localhost:3000", "http://localhost:8080", "https://appassets.androidplatform.net", "https://soc-production-9d33.up.railway.app"}
 }()
 
 func isOriginAllowed(origin string) bool {
 	if origin == "" {
 		return true // same-origin запросы
+	}
+	cleanOrigin := strings.ToLower(strings.TrimSpace(origin))
+	if cleanOrigin == "https://appassets.androidplatform.net" ||
+		cleanOrigin == "capacitor://localhost" ||
+		cleanOrigin == "http://localhost" ||
+		strings.HasPrefix(cleanOrigin, "http://localhost:") ||
+		strings.HasPrefix(cleanOrigin, "http://127.0.0.1:") ||
+		strings.HasSuffix(cleanOrigin, ".up.railway.app") ||
+		strings.HasSuffix(cleanOrigin, ".railway.app") {
+		return true
 	}
 	for _, o := range allowedOrigins {
 		if strings.TrimSpace(o) == origin {
@@ -1160,14 +1170,16 @@ func isOriginAllowed(origin string) bool {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if isOriginAllowed(origin) {
+		if origin != "" && isOriginAllowed(origin) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		} else if origin != "" {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		} else if len(allowedOrigins) > 0 {
 			w.Header().Set("Access-Control-Allow-Origin", allowedOrigins[0])
 		}
 		w.Header().Set("Vary", "Origin")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

@@ -2,17 +2,25 @@ package ru.newage.soc;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
+import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
+import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -25,6 +33,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import androidx.webkit.WebViewAssetLoader;
 
 import java.io.IOException;
@@ -34,12 +43,17 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
+    public static final String LIVE_SERVER_URL = "https://soc-production-9d33.up.railway.app";
+    public static final String LOCAL_OFFLINE_URL = "https://appassets.androidplatform.net/index.html";
+
     private static final int FILE_CHOOSER_REQUEST_CODE = 1001;
     private static final int PERMISSIONS_REQUEST_CODE = 1002;
 
+    private SwipeRefreshLayout mSwipeRefresh;
     private WebView mWebView;
     private ValueCallback<Uri[]> mFilePathCallback;
     private long mBackPressedTime = 0;
+    private boolean mIsOfflineFallback = false;
 
     @SuppressLint({"SetJavaScriptEnabled", "RequiresFeature"})
     @Override
@@ -53,10 +67,37 @@ public class MainActivity extends AppCompatActivity {
             window.setStatusBarColor(ContextCompat.getColor(this, R.color.status_bar_color));
         }
 
+        mSwipeRefresh = new SwipeRefreshLayout(this);
         mWebView = new WebView(this);
-        setContentView(mWebView);
+        mSwipeRefresh.addView(mWebView, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        setContentView(mSwipeRefresh);
+
+        mSwipeRefresh.setColorSchemeResources(R.color.status_bar_color, android.R.color.holo_blue_dark);
+        mSwipeRefresh.setOnRefreshListener(() -> {
+            if (isNetworkAvailable()) {
+                if (mIsOfflineFallback) {
+                    mIsOfflineFallback = false;
+                    mWebView.loadUrl(LIVE_SERVER_URL);
+                } else {
+                    mWebView.reload();
+                }
+            } else {
+                mWebView.reload();
+                mSwipeRefresh.setRefreshing(false);
+            }
+        });
+
+        mSwipeRefresh.setOnChildScrollUpCallback((parent, child) -> mWebView != null && mWebView.getScrollY() > 0);
 
         checkAndRequestPermissions();
+
+        // Enable cookies and third-party cookies for persistent PostgreSQL sessions
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptCookie(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            cookieManager.setAcceptThirdPartyCookies(mWebView, true);
+        }
 
         WebSettings settings = mWebView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -70,6 +111,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setLoadWithOverviewMode(true);
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
+        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -77,12 +119,12 @@ public class MainActivity extends AppCompatActivity {
 
         // Add custom UA identifier
         String defaultUa = settings.getUserAgentString();
-        settings.setUserAgentString(defaultUa + " NewAgeApp/1.0.0 (Android)");
+        settings.setUserAgentString(defaultUa + " NewAgeApp/1.0.0 (Android; LiveDBSync)");
 
         // Add native bridge
         mWebView.addJavascriptInterface(new WebAppInterface(this), "Android");
 
-        // Set up WebViewAssetLoader for secure origin
+        // Set up WebViewAssetLoader for secure local origin fallback
         final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
                 .setDomain("appassets.androidplatform.net")
                 .addPathHandler("/", new WebViewAssetLoader.AssetsPathHandler(this))
@@ -110,6 +152,36 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
                 return super.shouldInterceptRequest(view, request);
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                injectBridgeScripts(view);
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (mSwipeRefresh != null) {
+                    mSwipeRefresh.setRefreshing(false);
+                }
+                injectBridgeScripts(view);
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                if (request.isForMainFrame()) {
+                    if (mSwipeRefresh != null) {
+                        mSwipeRefresh.setRefreshing(false);
+                    }
+                    if (!mIsOfflineFallback) {
+                        mIsOfflineFallback = true;
+                        view.loadUrl(LOCAL_OFFLINE_URL);
+                        Toast.makeText(MainActivity.this, "Сервер временно недоступен. Запущен автономный режим.", Toast.LENGTH_SHORT).show();
+                    }
+                }
             }
 
             @Override
@@ -152,17 +224,51 @@ public class MainActivity extends AppCompatActivity {
             // WebRTC Camera & Microphone permission support
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        request.grant(request.getResources());
-                    }
-                });
+                runOnUiThread(() -> request.grant(request.getResources()));
             }
         });
 
-        // Load the entry point
-        mWebView.loadUrl("https://appassets.androidplatform.net/index.html");
+        // Initialize smart sync: live server with PostgreSQL by default, offline fallback if disconnected
+        if (isNetworkAvailable()) {
+            mIsOfflineFallback = false;
+            mWebView.loadUrl(LIVE_SERVER_URL);
+        } else {
+            mIsOfflineFallback = true;
+            mWebView.loadUrl(LOCAL_OFFLINE_URL);
+            Toast.makeText(this, "Автономный режим (нет сети). Данные синхронизируются при подключении.", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void injectBridgeScripts(WebView view) {
+        if (view == null) return;
+        view.evaluateJavascript(
+                "try {" +
+                "  window.__NATIVE_ANDROID__ = true;" +
+                "  if (!window.__API_BASE__) window.__API_BASE__ = '" + LIVE_SERVER_URL + "';" +
+                "} catch(e) {}",
+                null
+        );
+    }
+
+    private boolean isNetworkAvailable() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Network activeNetwork = cm.getActiveNetwork();
+                if (activeNetwork != null) {
+                    NetworkCapabilities capabilities = cm.getNetworkCapabilities(activeNetwork);
+                    return capabilities != null && (
+                            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                    );
+                }
+            } else {
+                NetworkInfo activeNetworkInfo = cm.getActiveNetworkInfo();
+                return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+            }
+        }
+        return false;
     }
 
     private void checkAndRequestPermissions() {
