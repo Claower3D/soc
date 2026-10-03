@@ -3,7 +3,7 @@ import {
   X, Camera, MapPin, Globe, Sparkles, Shield, ShoppingBag, 
   Video, User as UserIcon, Check, Image as ImageIcon,
   Flame, Award, Eye, Calendar, Moon, Sun, Compass,
-  QrCode, LogOut
+  QrCode, LogOut, Upload, Link as LinkIcon
 } from 'lucide-react';
 import { 
   type User, type UserRole, type BeliefPrivacy, 
@@ -102,8 +102,10 @@ export function EditProfileModal({
   const [website, setWebsite] = useState(currentUser?.website || '');
   const [avatar, setAvatar] = useState(currentUser?.avatar || '');
   const [customAvatarUrl, setCustomAvatarUrl] = useState('');
+  const [showAvatarUrlInput, setShowAvatarUrlInput] = useState(false);
   const [coverImage, setCoverImage] = useState(currentUser?.coverImage || SAMPLE_COVERS[0].url);
   const [customCoverUrl, setCustomCoverUrl] = useState('');
+  const [showCoverUrlInput, setShowCoverUrlInput] = useState(false);
   const [online, setOnline] = useState(currentUser?.online ?? true);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -619,58 +621,113 @@ export function EditProfileModal({
                   ))}
                 </div>
 
-                {/* Custom URL Input for Cover */}
-                <div className="custom-url-row">
-                  <input
-                    type="url"
-                    value={customCoverUrl}
-                    onChange={e => setCustomCoverUrl(e.target.value)}
-                    placeholder="Вставьте прямую ссылку на любую картинку в интернете..."
-                    className="edit-input-ctrl"
-                  />
+                {/* Upload Custom Cover from Device */}
+                <div className="custom-upload-card">
+                  <div className="custom-upload-info">
+                    <div className="custom-upload-icon-box">
+                      <ImageIcon size={20} />
+                    </div>
+                    <div className="custom-upload-text">
+                      <strong className="custom-upload-title">Своя обложка профиля</strong>
+                      <span className="custom-upload-subtitle">Загрузите любое фото или изображение с вашего устройства</span>
+                    </div>
+                  </div>
                   <button 
                     type="button" 
-                    className="apply-url-btn"
-                    onClick={handleApplyCustomCover}
+                    className="btn-select-device-file"
+                    onClick={() => coverInputRef.current?.click()}
                   >
-                    Применить
+                    <Upload size={14} /> Выбрать файл
                   </button>
+                </div>
+
+                {/* Optional link toggle for Cover */}
+                <div className="custom-link-collapsible">
+                  <button 
+                    type="button" 
+                    className="link-toggle-btn"
+                    onClick={() => setShowCoverUrlInput(!showCoverUrlInput)}
+                  >
+                    <LinkIcon size={12} />
+                    <span>{showCoverUrlInput ? 'Скрыть ввод ссылки' : 'Или указать прямую ссылку на обложку'}</span>
+                  </button>
+                  {showCoverUrlInput && (
+                    <div className="custom-url-row" style={{ marginTop: '0.45rem' }}>
+                      <input
+                        type="url"
+                        value={customCoverUrl}
+                        onChange={e => setCustomCoverUrl(e.target.value)}
+                        placeholder="Вставьте прямую ссылку https://..."
+                        className="edit-input-ctrl"
+                      />
+                      <button 
+                        type="button" 
+                        className="apply-url-btn"
+                        onClick={handleApplyCustomCover}
+                      >
+                        Применить
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Custom URL Input for Avatar */}
+              {/* Upload Custom Avatar from Device */}
               <div className="gallery-section">
-                <label className="edit-field-label">Прямая ссылка на аватар (опционально)</label>
-                <div className="custom-url-row">
-                  <input
-                    type="url"
-                    value={customAvatarUrl}
-                    onChange={e => setCustomAvatarUrl(e.target.value)}
-                    placeholder="Вставьте прямую ссылку на аватар..."
-                    className="edit-input-ctrl"
-                  />
+                <label className="edit-field-label">Свой аватар</label>
+                <div className="custom-upload-card">
+                  <div className="custom-upload-info">
+                    <div className="custom-upload-icon-box avatar-accent">
+                      <Camera size={20} />
+                    </div>
+                    <div className="custom-upload-text">
+                      <strong className="custom-upload-title">Своё фото профиля</strong>
+                      <span className="custom-upload-subtitle">Загрузите фото с камеры или из галереи с удобной обрезкой</span>
+                    </div>
+                  </div>
                   <button 
                     type="button" 
-                    className="apply-url-btn"
-                    onClick={() => {
-                      if (customAvatarUrl.trim()) {
-                        setAvatar(customAvatarUrl.trim());
-                        setCustomAvatarUrl('');
-                        spiritualAudio.playCrystalChime();
-                      }
-                    }}
-                  >
-                    Применить
-                  </button>
-                  <button 
-                    type="button" 
-                    className="apply-url-btn"
-                    style={{ background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                    className="btn-select-device-file"
                     onClick={() => avatarInputRef.current?.click()}
                   >
-                    <Camera size={14} style={{ marginRight: '4px' }}/>
-                    С устройства
+                    <Upload size={14} /> Выбрать фото
                   </button>
+                </div>
+
+                {/* Optional link toggle for Avatar */}
+                <div className="custom-link-collapsible">
+                  <button 
+                    type="button" 
+                    className="link-toggle-btn"
+                    onClick={() => setShowAvatarUrlInput(!showAvatarUrlInput)}
+                  >
+                    <LinkIcon size={12} />
+                    <span>{showAvatarUrlInput ? 'Скрыть ввод ссылки' : 'Или указать прямую ссылку на аватар'}</span>
+                  </button>
+                  {showAvatarUrlInput && (
+                    <div className="custom-url-row" style={{ marginTop: '0.45rem' }}>
+                      <input
+                        type="url"
+                        value={customAvatarUrl}
+                        onChange={e => setCustomAvatarUrl(e.target.value)}
+                        placeholder="Вставьте прямую ссылку https://..."
+                        className="edit-input-ctrl"
+                      />
+                      <button 
+                        type="button" 
+                        className="apply-url-btn"
+                        onClick={() => {
+                          if (customAvatarUrl.trim()) {
+                            setAvatar(customAvatarUrl.trim());
+                            setCustomAvatarUrl('');
+                            spiritualAudio.playCrystalChime();
+                          }
+                        }}
+                      >
+                        Применить
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
