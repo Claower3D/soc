@@ -1005,6 +1005,14 @@ func main() {
 	mux.HandleFunc("POST /api/auth/qr/confirm", handleQRConfirm)
 	mux.HandleFunc("POST /api/auth/qr/reject", handleQRReject)
 
+	// Уведомления (Notifications)
+	mux.HandleFunc("GET /api/notifications", handleGetNotifications)
+	mux.HandleFunc("POST /api/notifications/read", handleMarkNotificationsRead)
+	mux.HandleFunc("POST /api/notifications/{id}/read", handleMarkSingleNotificationRead)
+	mux.HandleFunc("DELETE /api/notifications/{id}", handleDeleteNotification)
+	mux.HandleFunc("DELETE /api/notifications", handleClearNotifications)
+	mux.HandleFunc("POST /api/notifications/test", handleTestNotification)
+
 	// Подписки и друзья (полная совместимость с E:\соц и текущей архитектурой)
 	mux.HandleFunc("POST /api/users/{id}/follow", handleFollow)
 	mux.HandleFunc("DELETE /api/users/{id}/follow", handleUnfollow)
@@ -2766,6 +2774,307 @@ func handleQRReject(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// =========================================================================
+// РЕАЛЬНАЯ СИСТЕМА УВЕДОМЛЕНИЙ (NOTIFICATIONS SYSTEM)
+// =========================================================================
+
+type Notification struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"userId"`
+	ActorID   string    `json:"actorId,omitempty"`
+	Actor     *User     `json:"actor,omitempty"`
+	Type      string    `json:"type"` // like, comment, follow, message, call, spiritual, system
+	Title     string    `json:"title"`
+	Body      string    `json:"body"`
+	Link      string    `json:"link,omitempty"`
+	IsRead    bool      `json:"isRead"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+var (
+	inMemoryNotifications   = make(map[string][]*Notification)
+	inMemoryNotificationsMu sync.RWMutex
+)
+
+func truncateString(s string, maxLen int) string {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
+		return s
+	}
+	return string(runes[:maxLen]) + "..."
+}
+
+func createNotification(userID, actorID, notifType, title, body, link string) *Notification {
+	if userID == "" {
+		return nil
+	}
+	notif := &Notification{
+		ID:        "notif_" + strings.ReplaceAll(uuid.New().String(), "-", "")[:16],
+		UserID:    userID,
+		ActorID:   actorID,
+		Type:      notifType,
+		Title:     title,
+		Body:      body,
+		Link:      link,
+		IsRead:    false,
+		CreatedAt: time.Now(),
+	}
+
+	// Resolve actor user info if available
+	if actorID != "" {
+		if db != nil {
+			var a User
+			err := db.QueryRow("SELECT id, name, username, COALESCE(avatar, '') FROM users WHERE id = $1", actorID).Scan(&a.ID, &a.Name, &a.Username, &a.Avatar)
+			if err == nil {
+				ensureUserAvatar(&a)
+				notif.Actor = &a
+			}
+		}
+		if notif.Actor == nil {
+			store.mu.RLock()
+			if acc, ok := store.accounts[actorID]; ok {
+				uCopy := acc.User
+				ensureUserAvatar(&uCopy)
+				notif.Actor = &uCopy
+			}
+			store.mu.RUnlock()
+		}
+	}
+
+	// Persist to PostgreSQL if available
+	if db != nil {
+		var aID *string
+		if actorID != "" {
+			aID = &actorID
+		}
+		_, err := db.Exec(`
+			INSERT INTO notifications (id, user_id, actor_id, type, title, body, link, is_read, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		`, notif.ID, notif.UserID, aID, notif.Type, notif.Title, notif.Body, notif.Link, notif.IsRead, notif.CreatedAt)
+		if err != nil {
+			log.Printf("⚠️ Error inserting notification to DB: %v", err)
+		}
+	}
+
+	// Persist to in-memory store
+	inMemoryNotificationsMu.Lock()
+	inMemoryNotifications[userID] = append([]*Notification{notif}, inMemoryNotifications[userID]...)
+	if len(inMemoryNotifications[userID]) > 100 {
+		inMemoryNotifications[userID] = inMemoryNotifications[userID][:100]
+	}
+	inMemoryNotificationsMu.Unlock()
+
+	return notif
+}
+
+// GET /api/notifications — Получение списка уведомлений пользователя
+func handleGetNotifications(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	var notifs []*Notification
+	unreadCount := 0
+
+	if db != nil {
+		rows, err := db.Query(`
+			SELECT n.id, n.user_id, COALESCE(n.actor_id, ''), n.type, n.title, n.body, COALESCE(n.link, ''), n.is_read, n.created_at,
+			       COALESCE(u.name, ''), COALESCE(u.username, ''), COALESCE(u.avatar, '')
+			FROM notifications n
+			LEFT JOIN users u ON n.actor_id = u.id
+			WHERE n.user_id = $1
+			ORDER BY n.created_at DESC LIMIT 50
+		`, claims.UserID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var n Notification
+				var aName, aUsername, aAvatar string
+				if err := rows.Scan(&n.ID, &n.UserID, &n.ActorID, &n.Type, &n.Title, &n.Body, &n.Link, &n.IsRead, &n.CreatedAt, &aName, &aUsername, &aAvatar); err == nil {
+					if n.ActorID != "" {
+						n.Actor = &User{
+							ID:       n.ActorID,
+							Name:     aName,
+							Username: aUsername,
+							Avatar:   aAvatar,
+						}
+						ensureUserAvatar(n.Actor)
+					}
+					if !n.IsRead {
+						unreadCount++
+					}
+					notifs = append(notifs, &n)
+				}
+			}
+		}
+	}
+
+	// Fallback to in-memory if DB returned nothing or error
+	if len(notifs) == 0 {
+		inMemoryNotificationsMu.RLock()
+		memList := inMemoryNotifications[claims.UserID]
+		for _, n := range memList {
+			nCopy := *n
+			if !nCopy.IsRead {
+				unreadCount++
+			}
+			notifs = append(notifs, &nCopy)
+		}
+		inMemoryNotificationsMu.RUnlock()
+	}
+
+	if notifs == nil {
+		notifs = []*Notification{}
+	}
+
+	writeJSON(w, http.StatusOK, Response{
+		Status: "ok",
+		Data: map[string]interface{}{
+			"notifications": notifs,
+			"unreadCount":   unreadCount,
+		},
+	})
+}
+
+// POST /api/notifications/read — Отметить все уведомления как прочитанные
+func handleMarkNotificationsRead(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	if db != nil {
+		db.Exec("UPDATE notifications SET is_read = true WHERE user_id = $1", claims.UserID)
+	}
+
+	inMemoryNotificationsMu.Lock()
+	if list, ok := inMemoryNotifications[claims.UserID]; ok {
+		for _, n := range list {
+			n.IsRead = true
+		}
+	}
+	inMemoryNotificationsMu.Unlock()
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Все уведомления прочитаны"})
+}
+
+// POST /api/notifications/{id}/read — Отметить конкретное уведомление как прочитанное
+func handleMarkSingleNotificationRead(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	notifID := r.PathValue("id")
+	if db != nil {
+		db.Exec("UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2", notifID, claims.UserID)
+	}
+
+	inMemoryNotificationsMu.Lock()
+	if list, ok := inMemoryNotifications[claims.UserID]; ok {
+		for _, n := range list {
+			if n.ID == notifID {
+				n.IsRead = true
+				break
+			}
+		}
+	}
+	inMemoryNotificationsMu.Unlock()
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Уведомление прочитано"})
+}
+
+// DELETE /api/notifications/{id} — Удалить конкретное уведомление
+func handleDeleteNotification(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	notifID := r.PathValue("id")
+	if db != nil {
+		db.Exec("DELETE FROM notifications WHERE id = $1 AND user_id = $2", notifID, claims.UserID)
+	}
+
+	inMemoryNotificationsMu.Lock()
+	if list, ok := inMemoryNotifications[claims.UserID]; ok {
+		var updated []*Notification
+		for _, n := range list {
+			if n.ID != notifID {
+				updated = append(updated, n)
+			}
+		}
+		inMemoryNotifications[claims.UserID] = updated
+	}
+	inMemoryNotificationsMu.Unlock()
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Уведомление удалено"})
+}
+
+// DELETE /api/notifications — Очистить все уведомления
+func handleClearNotifications(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	if db != nil {
+		db.Exec("DELETE FROM notifications WHERE user_id = $1", claims.UserID)
+	}
+
+	inMemoryNotificationsMu.Lock()
+	delete(inMemoryNotifications, claims.UserID)
+	inMemoryNotificationsMu.Unlock()
+
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Все уведомления удалены"})
+}
+
+// POST /api/notifications/test — Тестовое создание уведомления
+func handleTestNotification(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	var req struct {
+		Type string `json:"type"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	var notif *Notification
+	switch req.Type {
+	case "affirmation":
+		notif = createNotification(claims.UserID, "", "spiritual", "🌅 Утренняя аффирмация New Age", "«Мой ум чист, сердце открыто, а день наполнен благополучием и созиданием.»", "/spiritual")
+	case "breathing":
+		notif = createNotification(claims.UserID, "", "spiritual", "🌬️ Время перезагрузки (Дыхание 4-7-8)", "Сделайте 2-минутную паузу на осознанное дыхание для снятия напряжения.", "/spiritual")
+	case "gratitude":
+		notif = createNotification(claims.UserID, "", "spiritual", "🌙 Вечерний дневник благодарности", "Вспомните и запишите 3 приятных момента уходящего дня перед сном.", "/spiritual")
+	case "social":
+		notif = createNotification(claims.UserID, "u_guru", "message", "💬 Новое сообщение", "Нейросетевой помощник отправил вам ответ на вопрос о духовных практиках.", "/messenger?chat=chat_ai_oracle")
+	default:
+		notif = createNotification(claims.UserID, "", "system", "🔔 Реальная система уведомлений активна", "Вы подключены к живому центру уведомлений New Age.", "/")
+	}
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: "Уведомление успешно создано",
+		Data:    notif,
+	})
+}
+
 func getRelationshipCounts(targetID string) (followersCount, followingCount, friendsCount int) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
@@ -2928,6 +3237,9 @@ func handleFollow(w http.ResponseWriter, r *http.Request) {
 		if isFriend {
 			status = "accepted"
 			msg = "Взаимная подписка! Вы теперь друзья"
+			createNotification(targetID, followerID, "friend_request", "Новый друг!", followerUsername+" и вы теперь друзья!", "/profile/@"+followerUsername)
+		} else {
+			createNotification(targetID, followerID, "follow", "Новый подписчик", followerUsername+" подписался(-ась) на ваши обновления", "/profile/@"+followerUsername)
 		}
 
 		writeJSON(w, http.StatusOK, Response{
@@ -3998,6 +4310,11 @@ func handleLikePost(w http.ResponseWriter, r *http.Request) {
 		`, postID, claims.UserID)
 		if err == nil {
 			db.Exec("UPDATE posts SET likes_count = likes_count + 1 WHERE id = $1", postID)
+			var postAuthorID string
+			_ = db.QueryRow("SELECT user_id FROM posts WHERE id = $1", postID).Scan(&postAuthorID)
+			if postAuthorID != "" && postAuthorID != claims.UserID {
+				createNotification(postAuthorID, claims.UserID, "like", "Новый лайк", claims.Username+" оценил(а) вашу публикацию", "/post/"+postID)
+			}
 		}
 	}
 	writeJSON(w, http.StatusOK, Response{Status: "ok"})
@@ -4051,6 +4368,12 @@ func handleAddComment(w http.ResponseWriter, r *http.Request) {
 			VALUES ($1, $2, $3)
 		`, postID, claims.UserID, req.Text)
 		db.Exec("UPDATE posts SET comments_count = comments_count + 1 WHERE id = $1", postID)
+
+		var postAuthorID string
+		_ = db.QueryRow("SELECT user_id FROM posts WHERE id = $1", postID).Scan(&postAuthorID)
+		if postAuthorID != "" && postAuthorID != claims.UserID {
+			createNotification(postAuthorID, claims.UserID, "comment", "Новый комментарий", claims.Username+" прокомментировал(а) ваш пост: "+truncateString(req.Text, 45), "/post/"+postID)
+		}
 	}
 	writeJSON(w, http.StatusOK, Response{Status: "ok"})
 }

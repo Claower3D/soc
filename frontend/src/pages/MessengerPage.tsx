@@ -408,6 +408,24 @@ export function MessengerPage() {
               const latestMsg = updates.messages[newLen - 1];
               if (!latestMsg.fromMe) {
                 newUnread = (c.unread || 0) + (newLen - oldLen);
+                if (typeof window !== 'undefined') {
+                  const senderName = c.user?.name || 'Новое сообщение';
+                  const msgText = String(latestMsg.text || 'Вам прислали сообщение');
+                  window.dispatchEvent(new CustomEvent('app_notification', {
+                    detail: {
+                      type: 'message',
+                      title: senderName,
+                      body: msgText.length > 80 ? msgText.slice(0, 80) + '...' : msgText,
+                      link: `/messenger?chat=${c.id}`,
+                      actor: c.user ? {
+                        id: c.user.id,
+                        name: c.user.name,
+                        username: c.user.username,
+                        avatar: c.user.avatar
+                      } : undefined
+                    }
+                  }));
+                }
               }
             }
           }

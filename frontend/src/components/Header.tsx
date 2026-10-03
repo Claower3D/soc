@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Video, Headphones,
   Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
-  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Globe, ChevronDown
+  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Globe, ChevronDown,
+  MessageCircle, UserPlus, Trash2, X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -18,7 +19,18 @@ import './Header.css';
 export function Header() {
   const { currentUser, isAuthenticated, openAuthModal } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { preferences, updatePreferences, triggerTestPush, requestDesktopPermission, browserPermission } = useNotifications();
+  const { 
+    notifications, 
+    unreadCount, 
+    markAsRead, 
+    deleteNotification, 
+    clearAllNotifications, 
+    preferences, 
+    updatePreferences, 
+    triggerTestPush, 
+    requestDesktopPermission, 
+    browserPermission 
+  } = useNotifications();
   const { currentLang, setLanguage, languages, t } = useTranslation();
   const { currency, currencyConfig, setCurrency, allCurrencies, detectedFromCountry } = useCurrency();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -29,6 +41,7 @@ export function Header() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const createRef = useRef<HTMLDivElement>(null);
   const localeRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -38,6 +51,9 @@ export function Header() {
       }
       if (localeRef.current && !localeRef.current.contains(event.target as Node)) {
         setLocaleDropdownOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -299,14 +315,18 @@ export function Header() {
         {/* Auth / Profile Area */}
         {isAuthenticated ? (
           <>
-            <div className="notification-wrapper">
+            <div className="notification-wrapper" ref={notifRef}>
               <button
                 className={`header-icon-btn ${notificationsOpen ? 'active' : ''}`}
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
                 title="Уведомления и Push-напоминания"
               >
                 <Bell size={20} />
-                <span className="notification-badge" />
+                {unreadCount > 0 && (
+                  <span className="notification-badge">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </button>
 
               {notificationsOpen && (
@@ -317,7 +337,7 @@ export function Header() {
                         className={`notif-tab-btn ${notifTab === 'alerts' ? 'active' : ''}`}
                         onClick={() => setNotifTab('alerts')}
                       >
-                        События
+                        События {unreadCount > 0 && <span className="notif-tab-count-badge">{unreadCount}</span>}
                       </button>
                       <button 
                         className={`notif-tab-btn ${notifTab === 'push_settings' ? 'active' : ''}`}
@@ -326,14 +346,126 @@ export function Header() {
                         Push-напоминания
                       </button>
                     </div>
-                    {notifTab === 'alerts' && (
-                      <span className="notifications-mark-read"><Check size={14} /> Прочитано</span>
+                    {notifTab === 'alerts' && unreadCount > 0 && (
+                      <button 
+                        className="notifications-mark-read-btn" 
+                        onClick={() => markAsRead()}
+                        title="Пометить все как прочитанные"
+                      >
+                        <Check size={13} />
+                        <span>Прочитано</span>
+                      </button>
                     )}
                   </div>
 
                   {notifTab === 'alerts' ? (
-                    <div className="notifications-list" style={{ padding: '32px 16px', textAlign: 'center', color: '#94a3b8' }}>
-                      <p style={{ margin: 0, fontSize: '14px' }}>Уведомлений пока нет</p>
+                    <div className="notifications-list-container">
+                      {notifications.length === 0 ? (
+                        <div className="notifications-empty-state">
+                          <div className="empty-bell-circle">
+                            <Bell size={24} />
+                          </div>
+                          <p className="empty-title">Уведомлений пока нет</p>
+                          <span className="empty-subtitle">Лайки, комментарии, подписки и сообщения появятся здесь</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="notifications-scrollable-list">
+                            {notifications.map((notif) => {
+                              const getNotifIcon = () => {
+                                switch (notif.type) {
+                                  case 'like': return <Heart size={12} className="notif-type-icon like" />;
+                                  case 'comment':
+                                  case 'message': return <MessageCircle size={12} className="notif-type-icon message" />;
+                                  case 'follow':
+                                  case 'friend_request': return <UserPlus size={12} className="notif-type-icon follow" />;
+                                  case 'spiritual': return <Sparkles size={12} className="notif-type-icon spiritual" />;
+                                  case 'call': return <PhoneCall size={12} className="notif-type-icon call" />;
+                                  default: return <Bell size={12} className="notif-type-icon default" />;
+                                }
+                              };
+
+                              const formatTime = (ts: string) => {
+                                if (!ts) return '';
+                                try {
+                                  const date = new Date(ts);
+                                  const now = new Date();
+                                  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+                                  if (diffSec < 60) return 'только что';
+                                  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} мин`;
+                                  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} ч`;
+                                  return date.toLocaleDateString([], { day: 'numeric', month: 'short' });
+                                } catch {
+                                  return '';
+                                }
+                              };
+
+                              return (
+                                <div 
+                                  key={notif.id} 
+                                  className={`notif-card-item ${!notif.isRead ? 'unread' : ''}`}
+                                  onClick={() => {
+                                    markAsRead(notif.id);
+                                    if (notif.link) {
+                                      navigate(notif.link);
+                                      setNotificationsOpen(false);
+                                    }
+                                  }}
+                                >
+                                  <div className="notif-card-avatar-box">
+                                    {notif.actor?.avatar ? (
+                                      <img 
+                                        src={getAvatarUrl(notif.actor)} 
+                                        alt="" 
+                                        className="notif-card-avatar"
+                                        onError={handleAvatarError} 
+                                      />
+                                    ) : (
+                                      <div className="notif-card-avatar-fallback">
+                                        {getNotifIcon()}
+                                      </div>
+                                    )}
+                                    {notif.actor?.avatar && (
+                                      <span className="notif-card-badge-badge">
+                                        {getNotifIcon()}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="notif-card-text">
+                                    <div className="notif-card-title-row">
+                                      <span className="notif-card-title">{notif.title}</span>
+                                      <span className="notif-card-time">{formatTime(notif.createdAt)}</span>
+                                    </div>
+                                    <p className="notif-card-body">{notif.body}</p>
+                                  </div>
+
+                                  <div className="notif-card-actions" onClick={e => e.stopPropagation()}>
+                                    {!notif.isRead && <span className="notif-unread-glow" title="Не прочитано" />}
+                                    <button 
+                                      className="notif-dismiss-btn" 
+                                      title="Удалить"
+                                      onClick={() => deleteNotification(notif.id)}
+                                    >
+                                      <X size={12} />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="notifications-footer-bar">
+                            <button 
+                              className="notif-clear-btn"
+                              onClick={() => clearAllNotifications()}
+                            >
+                              <Trash2 size={12} />
+                              <span>Очистить историю</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <div className="push-settings-panel">

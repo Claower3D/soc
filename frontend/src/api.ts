@@ -141,5 +141,12 @@ export const api = {
   },
   geo: {
     detect: () => apiFetch<any>('/api/geo/detect')
+  },
+  notifications: {
+    list: () => apiFetch<any>('/api/notifications'),
+    markRead: (id?: string) => apiFetch<any>(id ? `/api/notifications/${id}/read` : '/api/notifications/read', { method: 'POST' }),
+    delete: (id: string) => apiFetch<any>(`/api/notifications/${id}`, { method: 'DELETE' }),
+    clearAll: () => apiFetch<any>('/api/notifications', { method: 'DELETE' }),
+    sendTest: (type?: string) => apiFetch<any>('/api/notifications/test', { method: 'POST', body: JSON.stringify({ type }) })
   }
 };
