@@ -565,11 +565,8 @@ export function Header() {
                 className="header-avatar" 
                 onError={handleAvatarError}
               />
-              <div className="header-profile-text">
-                <span className="header-user-name">{typeof currentUser.name === 'string' ? currentUser.name.split(' ')[0] : ''}</span>
-                {currentUser.isPremium && <PremiumBadge size="sm" />}
-                <span className="header-user-handle">@{String(currentUser.username || '')}</span>
-              </div>
+              <span className="header-profile-title">Мой профиль</span>
+              {currentUser.isPremium && <PremiumBadge size="sm" />}
             </button>
           </>
         ) : (

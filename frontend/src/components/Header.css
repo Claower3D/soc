@@ -486,6 +486,77 @@
   pointer-events: none;
 }
 
+.theme-sun-icon {
+  color: #F59E0B;
+}
+
+.theme-moon-icon {
+  color: #6366F1;
+}
+
+.theme-toggle-btn:hover {
+  transform: rotate(15deg);
+}
+
+.notification-wrapper {
+  position: relative;
+}
+
+.notifications-popover {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 380px;
+  max-width: 92vw;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+  z-index: 1000;
+  overflow: hidden;
+  animation: fadeIn 0.15s ease;
+}
+
+.notifications-header {
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-bg-secondary);
+}
+
+.notif-popover-tabs {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.notif-tab-btn {
+  background: none;
+  border: none;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+}
+
+.notif-tab-btn:hover {
+  color: var(--color-text);
+  background: var(--color-bg-tertiary);
+}
+
+.notif-tab-btn.active {
+  background: var(--color-bg-card);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-xs);
+  font-weight: 700;
+}
+
 .notif-tab-count-badge {
   display: inline-flex;
   align-items: center;
@@ -897,14 +968,14 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  height: 34px;
+  height: 36px;
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
-  padding: 0 0.65rem 0 0.25rem;
+  padding: 0 0.85rem 0 0.35rem;
   border-radius: var(--radius-full);
   cursor: pointer;
   transition: all var(--transition-fast);
-  text-align: left;
+  white-space: nowrap;
 }
 
 .header-profile-badge:hover {
@@ -917,23 +988,15 @@
   height: 28px;
   border-radius: 50%;
   object-fit: cover;
+  flex-shrink: 0;
 }
 
-.header-profile-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.header-user-name {
-  font-size: 0.8rem;
+.header-profile-title {
+  font-size: 0.84rem;
   font-weight: 600;
   color: var(--color-text);
-  line-height: 1.1;
-}
-
-.header-user-handle {
-  font-size: 0.7rem;
-  color: var(--color-text-secondary);
+  line-height: 1;
+  white-space: nowrap;
 }
 
 /* Header Guest Auth Buttons */
@@ -1239,7 +1302,7 @@
     padding: 0 0.5rem;
     font-size: 0.75rem;
   }
-  .header-profile-text {
+  .header-profile-title {
     display: none;
   }
   .header-profile-badge {
