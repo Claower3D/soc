@@ -165,12 +165,27 @@ export function MessengerPage() {
     return () => { mounted = false; };
   }, [currentUserId, isAuthenticated]);
 
-  // Выбор начального активного чата
+  // Выбор начального активного чата: только для десктопа! На мобильных устройствах пользователь сначала видит список чатов!
   useEffect(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth <= 860;
+    if (isMobile) {
+      return; // На мобильных устройствах пользователь сам выбирает нужный диалог из списка
+    }
     if (!isLoading && !activeChatId && chatList.length > 0 && !requestedChatId && !datingProfileId && !targetUserParam) {
       setActiveChatId(chatList[0].id);
     }
   }, [isLoading, activeChatId, chatList, requestedChatId, datingProfileId, targetUserParam]);
+
+  // Слушаем кнопку "Назад" (браузер или физическая кнопка на телефоне)
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const cId = params.get('chat') || params.get('id');
+      setActiveChatId(cId || null);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Обработка параметров запроса: chat / id / datingProfile / user
   useEffect(() => {
@@ -320,6 +335,9 @@ export function MessengerPage() {
 
   const handleSelectChat = (id: string) => {
     setActiveChatId(id);
+    if (typeof window !== 'undefined' && window.innerWidth <= 860) {
+      window.history.pushState({ chatId: id }, '', `/messenger?chat=${id}`);
+    }
     setChatList(prev => {
       const updated = prev.map(c => {
         if (c.id === id) {
@@ -334,6 +352,13 @@ export function MessengerPage() {
       localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
+  };
+
+  const handleBackToList = () => {
+    setActiveChatId(null);
+    if (typeof window !== 'undefined' && window.location.search.includes('chat=')) {
+      window.history.pushState({}, '', '/messenger');
+    }
   };
 
   const handleCreateGroup = (newGroup: Chat) => {
@@ -456,7 +481,7 @@ export function MessengerPage() {
       <div className={`messenger-chat ${!activeChatId ? 'hide-mobile' : ''}`}>
         <ChatWindowNew 
           chat={activeChat} 
-          onBack={() => setActiveChatId(null)} 
+          onBack={handleBackToList} 
           onDeleteChat={handleDeleteChat}
           onUpdateChat={handleUpdateChat}
           availableChats={chatList}

@@ -26,7 +26,7 @@
   flex-direction: column;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 860px) {
   .messenger-page {
     grid-template-columns: 1fr;
     height: calc(100vh - var(--header-height) - 60px);
