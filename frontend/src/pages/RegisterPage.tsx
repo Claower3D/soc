@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   User as UserIcon, Mail, Lock, Eye, EyeOff, Shield, 
   CheckCircle2, ArrowRight, ArrowLeft, Sparkles, AlertCircle, 
-  Check, Info, Video, ShoppingBag, Globe, KeyRound
+  Check, Info, Video, ShoppingBag, Globe, KeyRound, QrCode, RefreshCw, Smartphone
 } from 'lucide-react';
 import { RELIGIONS_CATALOG, type UserRole, type BeliefPrivacy } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -21,11 +21,71 @@ interface RegisterPageProps {
 
 export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
   const navigate = useNavigate();
-  const { register, login, currentUser } = useAuth();
+  const { register, login, currentUser, loginWithToken } = useAuth();
   const { t, currentLang, setLanguage, languages } = useTranslation();
 
   const [authMode, setAuthMode] = useState<'register' | 'login'>(initialMode);
+  const [loginMethod, setLoginMethod] = useState<'form' | 'qr'>('form');
   const [step, setStep] = useState<1 | 2>(1);
+
+  // QR Login State
+  const [qrSessionId, setQrSessionId] = useState<string | null>(null);
+  const [qrStatus, setQrStatus] = useState<'pending' | 'confirmed' | 'expired'>('pending');
+
+  const initQR = useCallback(async () => {
+    try {
+      setQrStatus('pending');
+      const res = await fetch('/api/auth/qr/init');
+      const data = await res.json();
+      if (data.status === 'ok' && data.data?.sessionId) {
+        setQrSessionId(data.data.sessionId);
+      }
+    } catch (err) {
+      console.error('Failed to init QR session on RegisterPage:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    initQR();
+  }, [initQR]);
+
+  useEffect(() => {
+    if (!qrSessionId || qrStatus === 'confirmed') return;
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/auth/qr/status?session=${encodeURIComponent(qrSessionId)}`);
+        const data = await res.json();
+        if (data.status === 'ok' && data.data) {
+          if (!isMounted) return;
+          const sStatus = data.data.sessionStatus;
+          if (sStatus === 'confirmed') {
+            clearInterval(interval);
+            setQrStatus('confirmed');
+            if (data.data.token && data.data.user) {
+              loginWithToken(data.data.token, data.data.user);
+              setSuccessText('Вход по QR-коду успешно подтверждён! Входим в профиль...');
+              setSuccess(true);
+              setTimeout(() => {
+                navigate('/');
+              }, 1200);
+            }
+          } else if (sStatus === 'expired') {
+            clearInterval(interval);
+            setQrStatus('expired');
+          }
+        }
+      } catch {
+        // ignore poll errors
+      }
+    }, 1500);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [qrSessionId, qrStatus, loginWithToken, navigate]);
 
   // Login form state
   const [loginQuery, setLoginQuery] = useState('');
@@ -307,8 +367,32 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
 
               {/* Sacred QR Code Widget */}
               <div className="side-banner-qr-block">
-                <SacredQrLogo size={150} />
-                <span className="side-qr-caption">Сканируйте сакральный QR для входа с телефона</span>
+                {qrStatus === 'confirmed' ? (
+                  <div className="side-qr-success-card">
+                    <CheckCircle2 size={36} color="#10B981" />
+                    <strong>Вход подтверждён!</strong>
+                    <span>Авторизуем профиль...</span>
+                  </div>
+                ) : (
+                  <>
+                    <SacredQrLogo 
+                      size={150} 
+                      dataUrl={qrSessionId ? `${window.location.origin}/qr-login?session=${qrSessionId}` : `${window.location.origin}/qr-login`} 
+                    />
+                    <span className="side-qr-caption">
+                      {qrStatus === 'expired' ? 'QR-код устарел' : 'Сканируйте сакральный QR для входа с телефона'}
+                    </span>
+                    {qrStatus === 'expired' && (
+                      <button 
+                        type="button" 
+                        className="side-qr-refresh-btn"
+                        onClick={initQR}
+                      >
+                        <RefreshCw size={13} /> Обновить QR-код
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
 
               <div className="side-banner-footer">
@@ -403,78 +487,160 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                 <div className="success-loader-bar" />
               </div>
             ) : authMode === 'login' ? (
-              <form onSubmit={handleLoginSubmit} className="register-step-form">
-                <div className="step-header-text">
-                  <h2>Авторизация в профиль</h2>
-                  <p>Введите ваш Email, телефон или @username для входа</p>
+              <div className="register-login-wrapper">
+                <div className="login-method-toggle-bar">
+                  <button
+                    type="button"
+                    className={`login-method-sub-btn ${loginMethod === 'form' ? 'active' : ''}`}
+                    onClick={() => setLoginMethod('form')}
+                  >
+                    <Mail size={15} />
+                    <span>Логин и пароль</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`login-method-sub-btn ${loginMethod === 'qr' ? 'active' : ''}`}
+                    onClick={() => setLoginMethod('qr')}
+                  >
+                    <QrCode size={15} />
+                    <span>Вход по QR-коду</span>
+                  </button>
                 </div>
 
-                <div className="form-fields-grid single-col">
-                  <div className="form-group-field">
-                    <label>{t('auth.modal.email_or_phone')} *</label>
-                    <div className="form-input-box">
-                      <Mail size={18} className="field-icon" />
-                      <input 
-                        type="text" 
-                        placeholder="example@newage.ru или @username" 
-                        value={loginQuery}
-                        onChange={(e) => setLoginQuery(e.target.value)}
-                        autoFocus
-                        required 
-                      />
+                {loginMethod === 'qr' ? (
+                  <div className="register-qr-card-view">
+                    <div className="step-header-text" style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+                      <h2>Быстрый вход через смартфон</h2>
+                      <p>Откройте камеру или сканер в приложении New Age</p>
                     </div>
-                  </div>
 
-                  <div className="form-group-field">
-                    <div className="field-label-row">
-                      <label>{t('auth.modal.password')} *</label>
+                    <div className="register-qr-sacred-wrap">
+                      {qrStatus === 'confirmed' ? (
+                        <div className="qr-confirmed-success-box">
+                          <CheckCircle2 size={54} color="#10B981" />
+                          <h3>Успешный вход!</h3>
+                          <p>Авторизуем профиль в New Age...</p>
+                        </div>
+                      ) : (
+                        <>
+                          <SacredQrLogo 
+                            size={210} 
+                            dataUrl={qrSessionId ? `${window.location.origin}/qr-login?session=${qrSessionId}` : `${window.location.origin}/qr-login`} 
+                          />
+                          <div className="register-qr-instructions">
+                            <div className="register-qr-step">
+                              <Smartphone size={16} className="qr-inst-icon" />
+                              <span>1. Откройте камеру на телефоне или Профиль → Настройки → QR-сканер</span>
+                            </div>
+                            <div className="register-qr-step">
+                              <QrCode size={16} className="qr-inst-icon" />
+                              <span>2. Наведите видоискатель на QR-код и подтвердите вход</span>
+                            </div>
+                          </div>
+
+                          {qrStatus === 'expired' && (
+                            <button 
+                              type="button" 
+                              className="btn btn-primary"
+                              onClick={initQR}
+                              style={{ marginTop: '1rem' }}
+                            >
+                              <RefreshCw size={15} /> Обновить QR-код
+                            </button>
+                          )}
+                        </>
+                      )}
                     </div>
-                    <div className="form-input-box">
-                      <Lock size={18} className="field-icon" />
-                      <input 
-                        type={showLoginPassword ? 'text' : 'password'} 
-                        placeholder="Введите ваш пароль"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        autoComplete="current-password"
-                        required 
-                      />
-                      <button 
-                        type="button" 
-                        className="password-toggle-btn"
-                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+
+                    <div className="login-quick-switch-footer" style={{ marginTop: '1.5rem' }}>
+                      <span>Нет профиля в New Age? </span>
+                      <button
+                        type="button"
+                        className="inline-toggle-link"
+                        onClick={() => {
+                          setAuthMode('register');
+                          setErrorMessage(null);
+                        }}
                       >
-                        {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        Пройти быструю регистрацию
                       </button>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <form onSubmit={handleLoginSubmit} className="register-step-form">
+                    <div className="step-header-text">
+                      <h2>Авторизация в профиль</h2>
+                      <p>Введите ваш Email, телефон или @username для входа</p>
+                    </div>
 
-                <div className="form-bottom-actions">
-                  <button 
-                    type="submit" 
-                    className="primary-register-btn full-width"
-                    disabled={isLoginSubmitting}
-                  >
-                    <span>{isLoginSubmitting ? 'Проверка JWT токена...' : 'Войти в профиль'}</span>
-                    <ArrowRight size={18} />
-                  </button>
-                </div>
+                    <div className="form-fields-grid single-col">
+                      <div className="form-group-field">
+                        <label>{t('auth.modal.email_or_phone')} *</label>
+                        <div className="form-input-box">
+                          <Mail size={18} className="field-icon" />
+                          <input 
+                            type="text" 
+                            placeholder="example@newage.ru или @username" 
+                            value={loginQuery}
+                            onChange={(e) => setLoginQuery(e.target.value)}
+                            autoFocus
+                            required 
+                          />
+                        </div>
+                      </div>
 
-                <div className="login-quick-switch-footer">
-                  <span>Нет профиля в New Age? </span>
-                  <button
-                    type="button"
-                    className="inline-toggle-link"
-                    onClick={() => {
-                      setAuthMode('register');
-                      setErrorMessage(null);
-                    }}
-                  >
-                    Пройти быструю регистрацию
-                  </button>
-                </div>
-              </form>
+                      <div className="form-group-field">
+                        <div className="field-label-row">
+                          <label>{t('auth.modal.password')} *</label>
+                        </div>
+                        <div className="form-input-box">
+                          <Lock size={18} className="field-icon" />
+                          <input 
+                            type={showLoginPassword ? 'text' : 'password'} 
+                            placeholder="Введите ваш пароль"
+                            value={loginPassword}
+                            onChange={(e) => setLoginPassword(e.target.value)}
+                            autoComplete="current-password"
+                            required 
+                          />
+                          <button 
+                            type="button" 
+                            className="password-toggle-btn"
+                            onClick={() => setShowLoginPassword(!showLoginPassword)}
+                          >
+                            {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="form-bottom-actions">
+                      <button 
+                        type="submit" 
+                        className="primary-register-btn full-width"
+                        disabled={isLoginSubmitting}
+                      >
+                        <span>{isLoginSubmitting ? 'Проверка JWT токена...' : 'Войти в профиль'}</span>
+                        <ArrowRight size={18} />
+                      </button>
+                    </div>
+
+                    <div className="login-quick-switch-footer">
+                      <span>Нет профиля в New Age? </span>
+                      <button
+                        type="button"
+                        className="inline-toggle-link"
+                        onClick={() => {
+                          setAuthMode('register');
+                          setErrorMessage(null);
+                        }}
+                      >
+                        Пройти быструю регистрацию
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             ) : (
               <>
                 {step === 1 ? (

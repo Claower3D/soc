@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import logoImg from '../assets/logo.png';
 import './SacredQrLogo.css';
 
@@ -13,8 +14,28 @@ export const SacredQrLogo: React.FC<SacredQrLogoProps> = ({
   dataUrl = 'https://newage.community/join',
   glowColor = 'rgba(168, 85, 247, 0.4)'
 }) => {
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgFailed, setImgFailed] = useState(false);
+  const [generatedQr, setGeneratedQr] = useState<string>('');
+
+  useEffect(() => {
+    let active = true;
+    QRCode.toDataURL(dataUrl, {
+      errorCorrectionLevel: 'H',
+      margin: 1,
+      width: 360,
+      color: {
+        dark: '#1E1B4B',
+        light: '#FFFFFF',
+      },
+    }).then((url) => {
+      if (active) setGeneratedQr(url);
+    }).catch(() => {
+      // fallback handled below
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [dataUrl]);
 
   return (
     <div 
@@ -85,91 +106,32 @@ export const SacredQrLogo: React.FC<SacredQrLogoProps> = ({
 
       {/* Internal QR Matrix Layer */}
       <div className="sacred-qr-matrix-card">
-        {!imgFailed ? (
+        {generatedQr ? (
           <img 
-            src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=8&ecc=H&data=${encodeURIComponent(dataUrl)}`}
+            src={generatedQr}
             alt={`Sacred QR: ${dataUrl}`}
             className="sacred-qr-code-real-img"
-            onLoad={() => setImgLoaded(true)}
-            onError={() => setImgFailed(true)}
             style={{
               width: '100%',
               height: '100%',
               objectFit: 'contain',
               display: 'block',
               background: '#FFFFFF',
-              opacity: imgLoaded ? 1 : 0.4,
-              transition: 'opacity 0.2s ease',
             }}
           />
         ) : (
-        <svg viewBox="0 0 200 200" className="sacred-qr-matrix-svg">
-          {/* Clean White/Card Background */}
-          <rect width="200" height="200" rx="14" fill="#FFFFFF" />
-
-          {/* Corner Marker 1: Top-Left (Sacred Cross/Sun inspired styling) */}
-          <rect x="14" y="14" width="46" height="46" rx="10" fill="url(#sacredRainbowGrad)" />
-          <rect x="20" y="20" width="34" height="34" rx="7" fill="#FFFFFF" />
-          <rect x="26" y="26" width="22" height="22" rx="5" fill="#1E1B4B" />
-          <circle cx="37" cy="37" r="4" fill="#F59E0B" />
-
-          {/* Corner Marker 2: Top-Right (Star of David & Crescent inspired styling) */}
-          <rect x="140" y="14" width="46" height="46" rx="10" fill="url(#sacredRainbowGrad)" />
-          <rect x="146" y="20" width="34" height="34" rx="7" fill="#FFFFFF" />
-          <rect x="152" y="26" width="22" height="22" rx="5" fill="#1E1B4B" />
-          <circle cx="163" cy="37" r="4" fill="#10B981" />
-
-          {/* Corner Marker 3: Bottom-Left (Om & Wheel of Dharma inspired styling) */}
-          <rect x="14" y="140" width="46" height="46" rx="10" fill="url(#sacredRainbowGrad)" />
-          <rect x="20" y="146" width="34" height="34" rx="7" fill="#FFFFFF" />
-          <rect x="26" y="152" width="22" height="22" rx="5" fill="#1E1B4B" />
-          <circle cx="37" cy="163" r="4" fill="#3B82F6" />
-
-          {/* Intricate Sacred Data Nodes and Alignment Paths */}
-          {/* Top Row Data Blocks */}
-          <rect x="70" y="18" width="10" height="10" rx="2" fill="#312E81" />
-          <rect x="88" y="18" width="18" height="10" rx="2" fill="url(#sacredRainbowGrad)" />
-          <rect x="114" y="18" width="12" height="10" rx="2" fill="#312E81" />
-          
-          <rect x="68" y="34" width="14" height="10" rx="2" fill="url(#sacredRainbowGrad)" />
-          <rect x="90" y="34" width="20" height="10" rx="2" fill="#312E81" />
-          <rect x="118" y="34" width="10" height="10" rx="2" fill="#F59E0B" />
-
-          {/* Left Middle Data Blocks */}
-          <rect x="18" y="70" width="10" height="12" rx="2" fill="#312E81" />
-          <rect x="36" y="68" width="16" height="14" rx="2" fill="url(#sacredRainbowGrad)" />
-          <rect x="18" y="90" width="14" height="20" rx="2" fill="#312E81" />
-          <rect x="40" y="92" width="14" height="12" rx="2" fill="#F59E0B" />
-          <rect x="18" y="118" width="12" height="12" rx="2" fill="url(#sacredRainbowGrad)" />
-          <rect x="38" y="114" width="16" height="14" rx="2" fill="#312E81" />
-
-          {/* Right Middle Data Blocks */}
-          <rect x="144" y="70" width="12" height="14" rx="2" fill="#312E81" />
-          <rect x="164" y="68" width="18" height="12" rx="2" fill="url(#sacredRainbowGrad)" />
-          <rect x="142" y="92" width="16" height="12" rx="2" fill="#F59E0B" />
-          <rect x="166" y="88" width="16" height="22" rx="2" fill="#312E81" />
-          <rect x="144" y="114" width="14" height="14" rx="2" fill="url(#sacredRainbowGrad)" />
-          <rect x="166" y="118" width="14" height="12" rx="2" fill="#312E81" />
-
-          {/* Bottom Middle Data Blocks */}
-          <rect x="70" y="146" width="12" height="12" rx="2" fill="#312E81" />
-          <rect x="90" y="142" width="20" height="14" rx="2" fill="url(#sacredRainbowGrad)" />
-          <rect x="118" y="146" width="12" height="12" rx="2" fill="#F59E0B" />
-
-          <rect x="68" y="168" width="18" height="14" rx="2" fill="url(#sacredRainbowGrad)" />
-          <rect x="94" y="166" width="14" height="16" rx="2" fill="#312E81" />
-          <rect x="116" y="168" width="20" height="14" rx="2" fill="url(#sacredRainbowGrad)" />
-
-          {/* Bottom-Right Alignment Anchor (Small 4th Corner Box) */}
-          <rect x="144" y="144" width="38" height="38" rx="8" fill="#F59E0B" opacity="0.9" />
-          <rect x="150" y="150" width="26" height="26" rx="5" fill="#FFFFFF" />
-          <rect x="156" y="156" width="14" height="14" rx="3" fill="#312E81" />
-
-          {/* Concentric Center Protective Cutout for Sacred Emblem */}
-          <circle cx="100" cy="100" r="38" fill="#FFFFFF" />
-          <circle cx="100" cy="100" r="37" fill="none" stroke="url(#sacredRainbowGrad)" strokeWidth="2.5" />
-          <circle cx="100" cy="100" r="33" fill="none" stroke="#F59E0B" strokeWidth="1" strokeDasharray="3 2" />
-        </svg>
+          <img 
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=8&ecc=H&data=${encodeURIComponent(dataUrl)}`}
+            alt={`Sacred QR: ${dataUrl}`}
+            className="sacred-qr-code-real-img"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              display: 'block',
+              background: '#FFFFFF',
+            }}
+          />
         )}
 
         {/* Sacred Heart: Center Logo of All World Faiths */}

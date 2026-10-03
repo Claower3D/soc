@@ -37,6 +37,7 @@ export const QrLoginConfirmPage: React.FC = () => {
         body: JSON.stringify({
           sessionId,
           token,
+          user: currentUser,
         }),
       });
 

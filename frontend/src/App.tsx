@@ -38,7 +38,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 function AppContent() {
   const { isAuthModalOpen, closeAuthModal, authModalMode, isAuthenticated } = useAuth();
   const location = useLocation();
-  const isAuthPage = location.pathname === '/register' || location.pathname === '/signup' || location.pathname === '/login';
+  const isAuthPage = location.pathname === '/register' || location.pathname === '/signup' || location.pathname === '/login' || location.pathname === '/qr-login';
 
   if (!isAuthenticated && !isAuthPage) {
     return <Navigate to="/register" replace />;
@@ -50,6 +50,7 @@ function AppContent() {
         <Route path="/register" element={<RegisterPage initialMode="register" />} />
         <Route path="/signup" element={<RegisterPage initialMode="register" />} />
         <Route path="/login" element={<RegisterPage initialMode="login" />} />
+        <Route path="/qr-login" element={<QrLoginConfirmPage />} />
       </Routes>
     );
   }

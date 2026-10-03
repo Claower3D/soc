@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Camera, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
+import jsQR from 'jsqr';
 import { useAuth } from '../context/AuthContext';
 import './QrScannerModal.css';
 
@@ -64,11 +65,14 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose 
     setScanning(false);
   };
 
-  // Continuous frame scanning using BarcodeDetector if available
+  // Continuous frame scanning using jsQR & BarcodeDetector
   useEffect(() => {
     if (!scanning || !isOpen || success || detectedSession) return;
 
     let animId: number;
+    let isCancelled = false;
+    let isBusy = false;
+
     const hasBarcodeDetector = 'BarcodeDetector' in window;
     let detector: any = null;
     if (hasBarcodeDetector) {
@@ -78,51 +82,115 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose 
     }
 
     const scanFrame = async () => {
-      if (!videoRef.current || videoRef.current.readyState < 2) {
+      if (isCancelled) return;
+
+      const video = videoRef.current;
+      if (!video || video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
         animId = requestAnimationFrame(scanFrame);
         return;
       }
 
-      if (detector) {
-        try {
-          const barcodes = await detector.detect(videoRef.current);
-          if (barcodes && barcodes.length > 0) {
-            const rawVal = barcodes[0].rawValue;
-            handleDetectedUrl(rawVal);
-            return;
-          }
-        } catch {}
+      if (isBusy) {
+        animId = requestAnimationFrame(scanFrame);
+        return;
       }
 
-      animId = requestAnimationFrame(scanFrame);
+      isBusy = true;
+
+      try {
+        // 1. Try BarcodeDetector if available
+        if (detector) {
+          try {
+            const barcodes = await detector.detect(video);
+            if (barcodes && barcodes.length > 0) {
+              const rawVal = barcodes[0].rawValue;
+              if (rawVal) {
+                handleDetectedUrl(rawVal);
+                return;
+              }
+            }
+          } catch {}
+        }
+
+        // 2. Cross-platform jsQR fallback (Canvas pixel analysis)
+        let canvas = canvasRef.current;
+        if (!canvas) {
+          canvas = document.createElement('canvas');
+          canvasRef.current = canvas;
+        }
+
+        const maxDim = 640;
+        let w = video.videoWidth;
+        let h = video.videoHeight;
+        if (w > maxDim || h > maxDim) {
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          w = Math.floor(w * ratio);
+          h = Math.floor(h * ratio);
+        }
+
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, w, h);
+          const imageData = ctx.getImageData(0, 0, w, h);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'attemptBoth',
+          });
+          if (code && code.data) {
+            handleDetectedUrl(code.data);
+            return;
+          }
+        }
+      } catch (err) {
+        // ignore per-frame errors
+      } finally {
+        isBusy = false;
+      }
+
+      if (!isCancelled) {
+        animId = requestAnimationFrame(scanFrame);
+      }
     };
 
     animId = requestAnimationFrame(scanFrame);
 
-    return () => cancelAnimationFrame(animId);
+    return () => {
+      isCancelled = true;
+      cancelAnimationFrame(animId);
+    };
   }, [scanning, isOpen, success, detectedSession]);
 
   const handleDetectedUrl = (val: string) => {
     try {
       let sId = '';
-      if (val.includes('session=')) {
-        const url = new URL(val, window.location.origin);
+      const cleanVal = val.trim();
+      const match = cleanVal.match(/[?&]session=([^&]+)/) || cleanVal.match(/(qr_[a-zA-Z0-9]+)/);
+      if (match) {
+        sId = match[1];
+      } else if (cleanVal.startsWith('qr_')) {
+        sId = cleanVal;
+      } else if (cleanVal.includes('session=')) {
+        const url = new URL(cleanVal, window.location.origin);
         sId = url.searchParams.get('session') || '';
-      } else if (val.startsWith('qr_')) {
-        sId = val;
       }
 
       if (sId) {
         if ('vibrate' in navigator) {
-          navigator.vibrate([80, 40, 80]);
+          try {
+            navigator.vibrate([80, 40, 80]);
+          } catch {}
         }
         setDetectedSession(sId);
         stopCamera();
       }
     } catch {
-      if (val.startsWith('qr_')) {
-        setDetectedSession(val);
-        stopCamera();
+      if (val.includes('qr_')) {
+        const m = val.match(/(qr_[a-zA-Z0-9]+)/);
+        if (m) {
+          setDetectedSession(m[1]);
+          stopCamera();
+        }
       }
     }
   };
@@ -145,6 +213,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose 
         body: JSON.stringify({
           sessionId: sId,
           token,
+          user: currentUser,
         }),
       });
 
@@ -152,7 +221,9 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose 
       if (res.ok && data.status === 'ok') {
         setSuccess(true);
         if ('vibrate' in navigator) {
-          navigator.vibrate([150, 60, 150]);
+          try {
+            navigator.vibrate([150, 60, 150]);
+          } catch {}
         }
         setTimeout(() => {
           onClose();
