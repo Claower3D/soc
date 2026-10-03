@@ -28,49 +28,54 @@ interface EditProfileModalProps {
 
 type EditTab = 'general' | 'astrology' | 'appearance' | 'spiritual' | 'privacy';
 
-const SAMPLE_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
-];
-
 const SAMPLE_COVERS = [
   {
-    title: 'Космический New Age',
+    title: 'Космос & Энергия New Age',
     url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80'
   },
   {
-    title: 'Океан Тишины',
-    url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80'
+    title: 'Сакральная Мандала',
+    url: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=1200&q=80'
   },
   {
-    title: 'Вершины Алтая',
-    url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=80'
+    title: 'Храм Дзен & Медитация',
+    url: 'https://images.unsplash.com/photo-1545569341-9eb8b30979d9?auto=format&fit=crop&w=1200&q=80'
   },
   {
-    title: 'Звездный Путь',
+    title: 'Священный Лотос',
+    url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1200&q=80'
+  },
+  {
+    title: 'Северное Сияние & Аура',
+    url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?auto=format&fit=crop&w=1200&q=80'
+  },
+  {
+    title: 'Шамбала & Вершины Тибета',
+    url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80'
+  },
+  {
+    title: 'Звездный Путь & Галактика',
     url: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=1200&q=80'
   },
   {
-    title: 'Озеро на Рассвете',
-    url: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80'
+    title: 'Океан Безмятежности',
+    url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80'
   },
   {
-    title: 'Кибер Неон',
-    url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80'
+    title: 'Кристаллы & Энергия Кварца',
+    url: 'https://images.unsplash.com/photo-1567225557594-88d73e55f2cb?auto=format&fit=crop&w=1200&q=80'
   },
   {
-    title: 'Туманный Лес',
-    url: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=1200&q=80'
+    title: 'Золотой Закат Осознанности',
+    url: 'https://images.unsplash.com/photo-1507499739999-097706ad8914?auto=format&fit=crop&w=1200&q=80'
   },
   {
-    title: 'Солнечные Лучи',
-    url: 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?auto=format&fit=crop&w=1200&q=80'
+    title: 'Бамбуковая Роща Дзен',
+    url: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=1200&q=80'
+  },
+  {
+    title: 'Вершины Алтая (Место Силы)',
+    url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=80'
   }
 ];
 
@@ -633,27 +638,10 @@ export function EditProfileModal({
                 </div>
               </div>
 
-              {/* Ready Avatars Gallery */}
+              {/* Custom URL Input for Avatar */}
               <div className="gallery-section">
-                <label className="edit-field-label">Выбрать готовый аватар</label>
-                <div className="avatars-scroll-strip">
-                  {SAMPLE_AVATARS.map((av, idx) => (
-                    <div 
-                      key={idx} 
-                      className={`avatar-sample-item ${avatar === av ? 'selected' : ''}`}
-                      onClick={() => {
-                        setAvatar(av);
-                        spiritualAudio.playCrystalChime();
-                      }}
-                    >
-                      <img src={av} alt="Avatar option" />
-                      {avatar === av && <Check size={14} className="avatar-check-mark" />}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Custom URL Input for Avatar */}
-                <div className="custom-url-row" style={{ marginTop: '1rem' }}>
+                <label className="edit-field-label">Прямая ссылка на аватар (опционально)</label>
+                <div className="custom-url-row">
                   <input
                     type="url"
                     value={customAvatarUrl}
