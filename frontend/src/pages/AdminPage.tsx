@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ShieldAlert,
   Users,
@@ -36,24 +37,28 @@ interface ModerationReport {
 }
 
 export const AdminPage: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'kpi' | 'moderation' | 'users' | 'cache'>('kpi');
   const [usersList, setUsersList] = useState<User[]>([]);
   const [productsList, setProductsList] = useState<any[]>([]);
 
   useEffect(() => {
-    api.users.list().then((d: any) => Array.isArray(d) && setUsersList(d)).catch(console.warn);
-    api.marketplace.products().then((d: any) => Array.isArray(d) && setProductsList(d)).catch(console.warn);
-  }, []);
+    if (isAuthenticated && currentUser?.role === 'admin') {
+      api.users.list().then((d: any) => Array.isArray(d) && setUsersList(d)).catch(console.warn);
+      api.marketplace.products().then((d: any) => Array.isArray(d) && setProductsList(d)).catch(console.warn);
+    }
+  }, [isAuthenticated, currentUser?.role]);
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || currentUser?.role !== 'admin') {
     return (
       <div style={{ maxWidth: 760, margin: '2rem auto', padding: '1rem' }}>
         <GuestLockPrompt
-          featureName="Административная панель"
-          title="Раздел предназначен для модераторов и администраторов"
-          description="Доступ к метрикам KPI, очереди жалоб модерации и управлению пользователями ограничен правами безопасности экосистемы New Age."
-          actionText="Авторизоваться администратором"
+          featureName="Доступ ограничен"
+          title="Раздел только для администраторов платформы"
+          description="Доступ к метрикам KPI, очереди жалоб модерации и панели управления защищён правами доступа."
+          actionText="На главную"
+          onUnlock={() => navigate('/')}
         />
       </div>
     );

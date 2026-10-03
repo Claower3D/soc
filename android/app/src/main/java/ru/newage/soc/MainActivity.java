@@ -49,7 +49,6 @@ public class MainActivity extends AppCompatActivity {
     private static final int FILE_CHOOSER_REQUEST_CODE = 1001;
     private static final int PERMISSIONS_REQUEST_CODE = 1002;
 
-    private SwipeRefreshLayout mSwipeRefresh;
     private WebView mWebView;
     private ValueCallback<Uri[]> mFilePathCallback;
     private long mBackPressedTime = 0;
@@ -67,28 +66,8 @@ public class MainActivity extends AppCompatActivity {
             window.setStatusBarColor(ContextCompat.getColor(this, R.color.status_bar_color));
         }
 
-        mSwipeRefresh = new SwipeRefreshLayout(this);
         mWebView = new WebView(this);
-        mSwipeRefresh.addView(mWebView, new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        setContentView(mSwipeRefresh);
-
-        mSwipeRefresh.setColorSchemeResources(R.color.status_bar_color, android.R.color.holo_blue_dark);
-        mSwipeRefresh.setOnRefreshListener(() -> {
-            if (isNetworkAvailable()) {
-                if (mIsOfflineFallback) {
-                    mIsOfflineFallback = false;
-                    mWebView.loadUrl(LIVE_SERVER_URL);
-                } else {
-                    mWebView.reload();
-                }
-            } else {
-                mWebView.reload();
-                mSwipeRefresh.setRefreshing(false);
-            }
-        });
-
-        mSwipeRefresh.setOnChildScrollUpCallback((parent, child) -> mWebView != null && mWebView.getScrollY() > 0);
+        setContentView(mWebView);
 
         checkAndRequestPermissions();
 
@@ -163,9 +142,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                if (mSwipeRefresh != null) {
-                    mSwipeRefresh.setRefreshing(false);
-                }
                 injectBridgeScripts(view);
             }
 
@@ -173,9 +149,6 @@ public class MainActivity extends AppCompatActivity {
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
                 if (request.isForMainFrame()) {
-                    if (mSwipeRefresh != null) {
-                        mSwipeRefresh.setRefreshing(false);
-                    }
                     if (!mIsOfflineFallback) {
                         mIsOfflineFallback = true;
                         view.loadUrl(LOCAL_OFFLINE_URL);

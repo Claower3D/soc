@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { 
   X, Mail, Lock, User as UserIcon, Shield, CheckCircle2, 
-  ShoppingBag, Video, ArrowRight, Check, Compass, Info, AlertCircle, Sparkles, LogIn, UserPlus, QrCode, Smartphone
+  ShoppingBag, Video, ArrowRight, Check, Compass, Info, AlertCircle, Sparkles, LogIn, UserPlus, QrCode, Smartphone,
+  Eye, EyeOff
 } from 'lucide-react';
 import { RELIGIONS_CATALOG, type UserRole, type BeliefPrivacy } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -33,6 +34,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [step, setStep] = useState<1 | 2>(1);
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [detectedCountry, setDetectedCountry] = useState<CountryInfo | null>(null);
@@ -48,7 +51,54 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   if (!isOpen) return null;
 
-  const selectedReligion = RELIGIONS_CATALOG.find(r => r.id === selectedBeliefId) || RELIGIONS_CATALOG[0];
+  const executeRegistration = async (overrideBeliefId?: string, overrideRole?: UserRole) => {
+    const cleanUser = username.trim().toLowerCase().replace(/^@/, '');
+    if (!name.trim() || !cleanUser || !emailOrPhone.trim() || !password) {
+      setErrorMessage(t('auth.modal.err_fill_all'));
+      return;
+    }
+    if (!/^[a-z0-9_]{3,30}$/.test(cleanUser)) {
+      setErrorMessage('Уникальный ID должен содержать только латинские буквы, цифры и _ (от 3 до 30 символов)');
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMessage(t('auth.modal.err_password_len'));
+      return;
+    }
+
+    const effBelief = overrideBeliefId !== undefined ? overrideBeliefId : selectedBeliefId;
+    const effRole = overrideRole !== undefined ? overrideRole : selectedRole;
+    const effReligion = RELIGIONS_CATALOG.find(r => r.id === effBelief) || RELIGIONS_CATALOG[0];
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await register({
+        name: name.trim(),
+        username: cleanUser,
+        emailOrPhone: emailOrPhone.trim(),
+        password,
+        role: effRole,
+        beliefType: effBelief === 'none' ? 'Не указывать / Личное' : effReligion.name,
+        beliefPrivacy,
+        location: detectedCountry ? detectedCountry.nameRu : 'Россия',
+      });
+
+      if (!res.success) {
+        setErrorMessage(res.message || 'Ошибка при регистрации');
+        return;
+      }
+
+      setLoginSuccessMessage(true);
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+        onClose();
+        setLoginSuccessMessage(false);
+      }, 700);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleNextOrSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,33 +144,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     // Step 2 submit
-    setIsSubmitting(true);
-    try {
-      const res = await register({
-        name,
-        username,
-        emailOrPhone,
-        password,
-        role: selectedRole,
-        beliefType: selectedBeliefId === 'none' ? 'Не указывать / Личное' : selectedReligion.name,
-        beliefPrivacy,
-        location: detectedCountry ? detectedCountry.nameRu : 'Россия',
-      });
-
-      if (!res.success) {
-        setErrorMessage(res.message || 'Ошибка при регистрации');
-        return;
-      }
-
-      setLoginSuccessMessage(true);
-      setTimeout(() => {
-        if (onSuccess) onSuccess();
-        onClose();
-        setLoginSuccessMessage(false);
-      }, 800);
-    } finally {
-      setIsSubmitting(false);
-    }
+    await executeRegistration();
   };
 
   const handleOAuthClick = (provider: string) => {
@@ -299,11 +323,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           <div className="auth-input-wrapper">
                             <Lock size={17} className="auth-input-icon" />
                             <input 
-                              type="password" 
+                              type={showLoginPassword ? "text" : "password"} 
                               placeholder="••••••••" 
                               value={password} 
                               onChange={e => setPassword(e.target.value)}
                             />
+                            <button
+                              type="button"
+                              className="auth-password-toggle-btn"
+                              onClick={() => setShowLoginPassword(!showLoginPassword)}
+                              tabIndex={-1}
+                              aria-label="Показать пароль"
+                            >
+                              {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
                           </div>
                         </div>
 
@@ -327,7 +360,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <>
                         <div className="auth-inputs-grid-2">
                           <div className="auth-field">
-                            <label>{t('auth.modal.name_label')}</label>
+                            <label>{t('auth.modal.name_label')} *</label>
                             <div className="auth-input-wrapper">
                               <UserIcon size={17} className="auth-input-icon" />
                               <input 
@@ -335,20 +368,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                                 placeholder={t('auth.modal.name_placeholder')}
                                 value={name}
                                 onChange={e => setName(e.target.value)}
+                                autoComplete="name"
                                 required 
                               />
                             </div>
                           </div>
 
                           <div className="auth-field">
-                            <label>{t('auth.modal.username_label')}</label>
+                            <label>{t('auth.modal.username_label')} *</label>
                             <div className="auth-input-wrapper">
                               <span className="auth-at">@</span>
                               <input 
                                 type="text" 
                                 placeholder="username" 
                                 value={username}
-                                onChange={e => setUsername(e.target.value)}
+                                onChange={e => {
+                                  const clean = e.target.value.toLowerCase().replace(/^@/, '').replace(/[^a-z0-9_]/g, '');
+                                  setUsername(clean);
+                                }}
+                                autoComplete="username"
                                 required 
                               />
                             </div>
@@ -357,7 +395,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                         <div className="auth-field">
                           <div className="auth-field-header-row">
-                            <label>Номер телефона *</label>
+                            <label>Номер телефона или Email *</label>
                             {detectedCountry && (
                               <span className="auth-detected-badge" title="Страна определена автоматически">
                                 📍 {detectedCountry.nameRu}
@@ -368,23 +406,33 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             value={emailOrPhone}
                             onChange={(val) => setEmailOrPhone(val)}
                             onCountryDetected={(c) => setDetectedCountry(c)}
-                            onlyPhone={true}
-                            placeholder="+7 (999) 000-00-00"
+                            onlyPhone={false}
+                            placeholder="+7 (999) 000-00-00 или email@domain.com"
                             required
                           />
                         </div>
 
                         <div className="auth-field">
-                          <label>{t('auth.modal.password_label')}</label>
+                          <label>{t('auth.modal.password_label')} *</label>
                           <div className="auth-input-wrapper">
                             <Lock size={17} className="auth-input-icon" />
                             <input 
-                              type="password" 
+                              type={showPassword ? "text" : "password"} 
                               placeholder={t('auth.modal.password_placeholder')}
                               value={password}
                               onChange={e => setPassword(e.target.value)}
+                              autoComplete="new-password"
                               required 
                             />
+                            <button
+                              type="button"
+                              className="auth-password-toggle-btn"
+                              onClick={() => setShowPassword(!showPassword)}
+                              tabIndex={-1}
+                              aria-label="Показать пароль"
+                            >
+                              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
                           </div>
                         </div>
 
@@ -409,9 +457,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                           </span>
                         </div>
 
-                        <button type="submit" className="auth-submit-btn">
-                          {t('auth.modal.btn_next')} <ArrowRight size={18} />
-                        </button>
+                        <div className="register-actions-mobile-group">
+                          <button 
+                            type="button" 
+                            className="auth-submit-btn fast-register-btn"
+                            disabled={isSubmitting}
+                            onClick={() => executeRegistration()}
+                          >
+                            <Sparkles size={17} />
+                            {isSubmitting ? 'Регистрация...' : 'Зарегистрироваться в 1 клик'}
+                          </button>
+
+                          <button 
+                            type="submit" 
+                            className="auth-secondary-step-btn"
+                          >
+                            <span>Настроить мировоззрение и роль (Шаг 2)</span>
+                            <ArrowRight size={15} />
+                          </button>
+                        </div>
                       </>
                     )}
 
@@ -576,6 +640,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         <div className="auth-action-buttons">
                           <button type="button" className="auth-back-btn" onClick={() => setStep(1)}>
                             {t('auth.modal.btn_back')}
+                          </button>
+                          <button 
+                            type="button" 
+                            className="auth-skip-btn" 
+                            onClick={() => executeRegistration('none', 'user')}
+                            disabled={isSubmitting}
+                          >
+                            Пропустить
                           </button>
                           <button type="submit" className="auth-submit-btn" disabled={!agreedToTerms || isSubmitting}>
                             <CheckCircle2 size={17} /> {isSubmitting ? 'Регистрация...' : t('auth.modal.btn_submit_register')}

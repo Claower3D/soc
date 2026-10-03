@@ -437,10 +437,12 @@ export function Sidebar() {
                   <span className="nav-label">Кошелёк</span>
                 </NavLink>
 
-                <NavLink to="/admin" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
-                  <ShieldAlert className="nav-icon service-icon-admin" size={18} />
-                  <span className="nav-label">Админ-панель</span>
-                </NavLink>
+                {currentUser?.role === 'admin' && (
+                  <NavLink to="/admin" className={({ isActive }) => `nav-item sub-nav-item ${isActive ? 'active' : ''}`}>
+                    <ShieldAlert className="nav-icon service-icon-admin" size={18} />
+                    <span className="nav-label">Админ-панель</span>
+                  </NavLink>
+                )}
               </>
             ) : (
               <>
@@ -477,12 +479,6 @@ export function Sidebar() {
                 <div className="nav-item sub-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
                   <Wallet className="nav-icon service-icon-wallet" size={18} />
                   <span className="nav-label">Кошелёк</span>
-                  <span className="nav-lock-badge"><Lock size={12} /></span>
-                </div>
-
-                <div className="nav-item sub-nav-item guest-locked-nav" onClick={() => setAuthModalOpen(true)}>
-                  <ShieldAlert className="nav-icon service-icon-admin" size={18} />
-                  <span className="nav-label">Админ-панель</span>
                   <span className="nav-lock-badge"><Lock size={12} /></span>
                 </div>
               </>

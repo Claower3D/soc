@@ -147,11 +147,11 @@ export function ServicesPage() {
   const navigate = useNavigate();
   const { isAuthenticated, currentUser } = useAuth();
 
-  const servicesList = SERVICES.map(s => {
+  const servicesList = SERVICES.filter(s => {
     if (s.id === 'admin') {
-      return { ...s, stats: currentUser?.role === 'admin' ? 'Доступ разрешен' : 'Ограниченный доступ' };
+      return currentUser?.role === 'admin';
     }
-    return s;
+    return true;
   });
 
   if (!isAuthenticated) {
