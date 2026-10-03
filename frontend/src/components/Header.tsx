@@ -195,8 +195,8 @@ export function Header() {
         {/* Sleek AI Oracle Trigger */}
         <button
           className="header-action-btn ai-oracle-pill"
-          onClick={() => navigate('/spiritual/livezen')}
-          title="Спросить ИИ-Оракула Live Zen"
+          onClick={() => navigate('/messenger?chat=chat_ai_oracle')}
+          title="Спросить ИИ-Оракула (Говорит на всех языках мира)"
         >
           <Sparkles size={14} className="ai-oracle-icon" />
           <span className="ai-oracle-text">Оракул</span>

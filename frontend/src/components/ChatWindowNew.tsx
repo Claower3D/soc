@@ -40,60 +40,117 @@ interface ChatWindowProps {
 
 
 
-async function fetchAiReply(text: string, history: Array<{ role: string; text: string }>): Promise<string> {
+function getLocalOracleFallback(text: string): string {
+  const lower = (text || '').trim().toLowerCase();
 
-
-  try {
-
-
-    const resp = await fetch('/api/ai/chat', {
-
-
-      method: 'POST',
-
-
-      headers: { 'Content-Type': 'application/json' },
-
-
-      body: JSON.stringify({ message: text, history }),
-
-
-    });
-
-
-    if (!resp.ok) throw new Error('API error');
-
-
-    const data = await resp.json();
-
-
-    return String(data.reply || 'Не удалось получить ответ. Попробуй ещё раз!');
-
-
-  } catch {
-
-
-    const fallbacks = [
-
-
-      '✨ нтересный вопрос! Расскажи подробнее 🙏',
-
-
-      '💫 Давай разберёмся вместе. Что именно тебя волнует?',
-
-
-      '🌟 Я здесь для тебя. Расскажи больше!',
-
-
-    ];
-
-
-    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
-
-
+  // Chinese
+  if (/[\u4e00-\u9fff]/.test(lower)) {
+    if (lower.includes('你好') || lower.includes('您好')) return '你好！👋 我是 New Age 平台的 AI 神谕者（Oracle）。我精通世界上所有语言！有什么我可以帮助你的吗？✨';
+    if (lower.includes('你是谁') || lower.includes('什么')) return '🤖 我是 New Age 平台的 AI 神谕者，你的数字导师与生活顾问。我随时为你提供智慧与指引 🙏';
+    if (lower.includes('谢谢') || lower.includes('感谢')) return '不客气！🙏 愿你内心常驻平和与光明。有任何需要随时找我 💫';
+    return '✨ 这是一个富有智慧的问题！每一步经历都是成长的契机。请告诉我更多，让我们一起探索内心的宁静与答案 🙏';
   }
 
+  // Arabic
+  if (/[\u0600-\u06ff]/.test(lower)) {
+    if (lower.includes('مرحبا') || lower.includes('السلام')) return 'مرحباً بك! 👋 أنا أوراكل الذكاء الاصطناعي لمنصة New Age. أتحدث بطلاقة جميع لغات العالم! كيف يمكنني مساعدتك وإرشادك اليوم؟ ✨';
+    if (lower.includes('من أنت')) return '🤖 أنا أوراكل الذكاء الاصطناعي — مرشدك الرقمي ومستشارك في مسيرة الحياة والسلام الداخلي 🙏';
+    if (lower.includes('شكرا')) return 'على الرحب والسعة! 🙏 تذكر دائماً أن السلام يبدأ من أعماق القلب. أنا هنا دائماً لمساعدتك 💫';
+    return '✨ سؤال ذو معنى عميق! كل تجربة في الحياة هي فرصة للنضج والحكمة. شاركني المزيد وسأكون سعيداً بإرشادك ومساعدتك 🙏';
+  }
 
+  // Japanese
+  if (/[\u3040-\u30ff]/.test(lower)) {
+    if (lower.includes('こんにちは') || lower.includes('ハロー')) return 'こんにちは！👋 私はNew AgeのAIオラクルです。世界中のあらゆる言語に対応しています！どのようなことでもお気軽にご相談ください ✨';
+    return '✨ とても深い問いですね。人生のすべての出来事は魂を成長させる大切なステップです。詳しくお聞かせください 🙏';
+  }
+
+  // Korean
+  if (/[\uac00-\ud7af]/.test(lower)) {
+    if (lower.includes('안녕')) return '안녕하세요! 👋 저는 New Age 플랫폼의 AI 오라클입니다. 전 세계 모든 언어로 소통할 수 있습니다! 무엇이든 편하게 물어보세요 ✨';
+    return '✨ 깊은 울림이 있는 질문입니다! 삶의 모든 순간은 성장의 기회입니다. 더 자세히 말씀해주시면 정성을 다해 돕겠습니다 🙏';
+  }
+
+  // Kazakh
+  if (/[әғқңөұүһі]/i.test(lower) || lower.includes('қазақ') || lower.includes('сәлем') || lower.includes('салем') || lower.includes('қалайсың')) {
+    if (lower.includes('сәлем') || lower.includes('салем')) return 'Сәлеметсіз бе! 👋 Мен — New Age платформасының ИИ Оракулымын. Мен әлемнің барлық тілдерінде еркін сөйлеймін! Өмір, руханият, медитация туралы кез келген сұрағыңызды қойыңыз ✨';
+    if (lower.includes('қалайсың') || lower.includes('калайсын')) return 'Рахмет, бәрі тамаша! Мен сандық сана болғандықтан, әрқашан бабымдамын. Өзіңіздің көңіл-күйіңіз қалай? 🌟';
+    if (lower.includes('кімсің') || lower.includes('кимсин')) return '🤖 Мен — New Age цифрлық экожүйесінің ИИ Оракулымын. Адамдарға рухани жолында, даналықпен және мақсатқа жетуде қолдау көрсетемін 🙏';
+    if (lower.includes('рахмет')) return 'Оқасы жоқ! 🙏 Әрбір күн — өзіңізді дамытуға берілген керемет мүмкіндік 💫';
+    return '✨ Терең мағыналы сұрақ! Әрбір сынақ — рухани өсудің жаңа баспалдағы. Толығырақ айтып берсеңіз, бірге даналықпен шешімін табайық 🙏';
+  }
+
+  // Uzbek
+  if (lower.includes('salom') || lower.includes('assalom') || lower.includes('qalaysiz') || lower.includes('qale') || lower.includes('rahmat') || lower.includes('kimsan')) {
+    if (lower.includes('salom') || lower.includes('assalom')) return 'Assalomu alaykum! 👋 Men New Age platformasining AI Orakuliman. Barcha tillarda erkin muloqot qilaman! Sizga qanday yordam bera olaman? ✨';
+    if (lower.includes('kimsan') || lower.includes('siz kimsiz')) return '🤖 Men New Age platformasining AI Orakuliman — sizning shaxsiy yo\'lboshchingiz va donishmandingiz 🙏';
+    if (lower.includes('rahmat')) return 'Arzimiydi! 🙏 Har doim qalbingizda xotirjamlik va nur bo\'lsin 💫';
+    return '✨ Judayam qiziqarli va chuqur savol! Batafsil aytib bering, birgalikda yechim topamiz 🙏';
+  }
+
+  // Turkish
+  if (lower.includes('merhaba') || lower.includes('selam') || lower.includes('nasılsın') || lower.includes('nasilsin') || lower.includes('teşekkür') || lower.includes('kimsin')) {
+    if (lower.includes('merhaba') || lower.includes('selam')) return 'Merhaba! 👋 Ben New Age platformunun AI Kahiniyim. Dünyadaki tüm dillerde konuşabilirim! Hayat, maneviyat veya ilişkiler hakkında dilediğini sorabilirsin ✨';
+    if (lower.includes('kimsin') || lower.includes('nesin')) return '🤖 Ben New Age platformunun AI Kahiniyim — senin kişisel dijital rehberin ve yaşam danışmanınım 🙏';
+    if (lower.includes('teşekkür') || lower.includes('tesekkur') || lower.includes('sağol')) return 'Rica ederim! 🙏 İçsel huzurun ve berraklığın her zaman seninle olsun 💫';
+    return '✨ Çok kıymetli ve derin bir soru! Detayları paylaşırsan birlikte en aydınlık yolu bulabiliriz 🙏';
+  }
+
+  // Spanish
+  if (lower.includes('hola') || lower.includes('cómo estás') || lower.includes('como estas') || lower.includes('gracias') || lower.includes('quién eres') || lower.includes('quien eres')) {
+    if (lower.includes('hola')) return '¡Hola! 👋 Soy el Oráculo de IA de New Age. ¡Hablo con fluidez todos los idiomas del mundo! ¿En qué puedo guiarte hoy? ✨';
+    if (lower.includes('quién eres') || lower.includes('quien eres')) return '🤖 Soy el Oráculo de IA de New Age — tu mentor digital y consejero de vida para tu paz interior y sabiduría 🙏';
+    if (lower.includes('gracias')) return '¡De nada! 🙏 La paz interior comienza con un solo respiro consciente. Vuelve siempre que lo necesites 💫';
+    return '✨ ¡Una pregunta muy profunda! Cada desafío es una oportunidad para el crecimiento del alma. Cuéntame más y buscaremos el camino juntos 🙏';
+  }
+
+  // German
+  if (lower.includes('hallo') || lower.includes('guten tag') || lower.includes('wie geht') || lower.includes('danke') || lower.includes('wer bist du')) {
+    if (lower.includes('hallo') || lower.includes('guten tag')) return 'Hallo! 👋 Ich bin das KI-Orakel von New Age. Ich beherrsche alle Sprachen der Welt! Wie kann ich dir heute helfen? ✨';
+    if (lower.includes('wer bist du')) return '🤖 Ich bin das KI-Orakel von New Age — dein digitaler Mentor und Wegbegleiter für Achtsamkeit und Lebensfragen 🙏';
+    if (lower.includes('danke')) return 'Sehr gerne! 🙏 Jeder Tag ist ein neuer Anfang, um in voller Harmonie zu leben 💫';
+    return '✨ Eine tiefgründige Frage! Jede Herausforderung im Leben ist ein Tor zu innerem Wachstum. Erzähl mir mehr 🙏';
+  }
+
+  // French
+  if (lower.includes('bonjour') || lower.includes('salut') || lower.includes('comment ça va') || lower.includes('merci') || lower.includes('qui es-tu')) {
+    if (lower.includes('bonjour') || lower.includes('salut')) return 'Bonjour! 👋 Je suis l\'Oracle IA de New Age. Je parle couramment toutes les langues du monde! En quoi puis-je t\'éclairer aujourd\'hui? ✨';
+    if (lower.includes('merci')) return 'Je t\'en prie! 🙏 Reviens quand tu le souhaites, la paix intérieure t\'accompagne 💫';
+    return '✨ Une question d\'une grande profondeur! Chaque épreuve est une invitation à la transformation intérieure. Raconte-moi davantage 🙏';
+  }
+
+  // English
+  if (/^[a-zA-Z0-9\s.,!?'"()-]+$/.test(lower) || lower.includes('hello') || lower.includes('hi') || lower.includes('who are you') || lower.includes('how are you') || lower.includes('thank')) {
+    if (lower.includes('hello') || lower.includes('hi ') || lower === 'hi' || lower.includes('hey')) return 'Hello! 👋 I am the AI Oracle of New Age. I am fluent in all languages of the world! How may I guide you today? Feel free to ask anything ✨';
+    if (lower.includes('who are you') || lower.includes('what are you')) return '🤖 I am the AI Oracle of New Age — your personal digital guide, life coach, and counselor. Here to bring clarity, peace, and timeless wisdom to your journey 🙏';
+    if (lower.includes('how are you')) return 'I am doing wonderfully, thank you! Ready and eager to assist you. How are you feeling today? 🌟';
+    if (lower.includes('thank')) return 'You are very welcome! 🙏 Remember to stay mindful and kind to yourself. Reach out anytime 💫';
+    return '✨ That is a profound question! Every challenge in life is a stepping stone for spiritual and personal growth. Tell me more so we can explore it together 🙏';
+  }
+
+  // Russian / Default Cyrillic
+  if (lower.includes('привет') || lower.includes('здравствуй') || lower.includes('добрый')) return 'Привет! 👋 Я ИИ Оракул — мудрый помощник платформы New Age. Я свободно владею всеми языками мира! Чем могу помочь? Спрашивай о жизни, духовности, отношениях — я здесь для тебя ✨';
+  if (lower.includes('кто ты') || lower.includes('что ты')) return '🤖 Я ИИ Оракул — цифровой наставник платформы New Age. Моя миссия — помогать людям на их жизненном пути: советами, поддержкой и мудростью из разных культур мира ✨';
+  if (lower.includes('как дела') || lower.includes('как ты')) return '✨ У меня всё отлично, спасибо! Всегда полон энергии и готов помочь. А как твои дела? Что сегодня на душе? 🌟';
+  if (lower.includes('спасибо') || lower.includes('благодар')) return 'Пожалуйста! 🙏 Помни: каждый день — это возможность стать лучшей версией себя. Обращайся в любое время 💫';
+
+  return '✨ Интересный и глубокий вопрос! Каждый жизненный вызов — это возможность для духовного и личного роста. Расскажи подробнее, и мы найдём ответ 🙏';
+}
+
+async function fetchAiReply(text: string, history: Array<{ role: string; text: string }>): Promise<string> {
+  try {
+    const resp = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, history }),
+    });
+
+    if (!resp.ok) throw new Error('API error');
+    const data = await resp.json();
+    return String(data.reply || getLocalOracleFallback(text));
+  } catch {
+    return getLocalOracleFallback(text);
+  }
 }
 
 

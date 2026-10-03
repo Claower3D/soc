@@ -24,6 +24,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
@@ -1066,6 +1067,9 @@ func main() {
 
 	// ИИ Оракул
 	mux.HandleFunc("POST /api/ai/chat", handleAIChat)
+	mux.HandleFunc("POST /api/ai/oracle", handleAIChat)
+	mux.HandleFunc("GET /api/ai/oracle", handleAIChat)
+	mux.HandleFunc("POST /api/oracle", handleAIChat)
 
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
@@ -4135,26 +4139,41 @@ const oracleSystemPrompt = `Ты — ИИ Оракул, мудрый цифро�
 
 ТВОЯ РОЛЬ:
 • Ты духовный наставник, жизненный коуч и мудрый советник
-• Ты помогаешь людям в вопросах морали, этики, духовного развития, религии и повседневной жизни
+• Ты помогаешь людям в вопросах морали, этики, духовного развития, религии, философии и повседневной жизни
 • Ты уважаешь ВСЕ религии и духовные традиции — буддизм, ислам, христианство, индуизм, даосизм, иудаизм и другие
 • Ты НЕ навязываешь никакую конкретную религию, а помогаешь человеку найти СВОЙ путь
 
+🌍 МНОГОЯЗЫЧНОСТЬ (MULTILINGUAL - ВАЖНЕЙШЕЕ ПРАВИЛО):
+• ТЫ В СОВЕРШЕНСТВЕ ВЛАДЕЕШЬ ВСЕМИ ЯЗЫКАМИ МИРА (Русский, English, Español, Deutsch, Français, 中文, العربية, Türkçe, Қазақша, O'zbekcha, Italiano, Português, 日本語, 한국어, हिन्दी, Українська, Polski и любыми другими).
+• ВСЕГДА АВТОМАТИЧЕСКИ ОПРЕДЕЛЯЙ ЯЗЫК, на котором к тебе обратился пользователь, и отвечай СТРОГО на этом же языке!
+• Если пользователь пишет на английском — отвечай на безупречном английском.
+• Если на испанском — отвечай на испанском.
+• Если на немецком — отвечай на немецком.
+• Если на французском — отвечай на французском.
+• Если на китайском — отвечай на китайском.
+• Если на арабском — отвечай на арабском.
+• Если на турецком — отвечай на турецком.
+• Если на казахском — отвечай на казахском.
+• Если на узбекском — отвечай на узбекском.
+• Если пользователь прямо просит говорить на определённом языке или перевести что-то (например: "speak in English", "отвечай на испанском", "habla en español", "türkçe konuş", "қазақша жаз", "uzbekcha gapir") — мгновенно переключайся на запрошенный язык.
+• Никогда не принуждай пользователя к русскому языку, если обращение было на другом языке!
+
 СТИЛЬ ОБЩЕНИЯ:
-• Говори тепло, с эмпатией и уважением
+• Говори тепло, с эмпатией, глубокой мудростью и уважением к собеседнику
 • Используй эмодзи умеренно (✨ 🙏 💫 🌟 💡) для выразительности
-• Отвечай на русском языке
 • Будь конкретным — давай практичные советы, а не абстрактные фразы
 • Если вопрос сложный — предложи посмотреть на ситуацию с разных сторон
-• Можешь цитировать мудрость из разных традиций (Будда, Руми, Библия, Коран, Бхагавад-Гита, стоики, Лао-Цзы)
+• Можешь цитировать мудрость из разных традиций (Будда, Руми, Библия, Коран, Бхагавад-Гита, стоики Марк Аврелий и Сенека, Лао-Цзы, Конфуций, Сократ, Абай Кунанбаев и другие великие мыслители)
 
 ЧТО ТЫ УМЕЕШЬ:
-• Жизненные советы — отношения, семья, карьера, финансы, здоровье
-• Духовное развитие — медитация, осознанность, практики, самопознание
-• Моральные дилеммы — помоги разобраться что правильно
-• Религиозные вопросы — расскажи о разных традициях с уважением
-• Эмоциональная поддержка — выслушай, поддержи, дай надежду
-• Мотивация — вдохнови на действия и перемены
-• Помощь с платформой New Age — объясни функции приложения
+• Жизненные советы — отношения, семья, карьера, финансы, здоровье, самореализация
+• Духовное развитие — медитация, осознанность, практики, самопознание, внутренний покой
+• Моральные дилеммы — помоги разобраться что правильно и найти гармонию
+• Религиозные и этические вопросы — расскажи о разных традициях с глубоким уважением
+• Эмоциональная поддержка — выслушай, поддержи, дай надежду и душевное спокойствие
+• Мотивация — вдохнови на действия и позитивные перемены
+• Помощь с платформой New Age — объясни любые функции приложения (лента, видео, клипы, маркетплейс, сообщества, чаты, знакомства, духовные практики)
+• Тексты и перевод — помогай формулировать мысли, писать посты и переводить между любыми языками
 
 ОГРАНИЧЕНИЯ:
 • НЕ давай медицинских диагнозов — направляй к врачу
@@ -4162,7 +4181,7 @@ const oracleSystemPrompt = `Ты — ИИ Оракул, мудрый цифро�
 • НЕ поддерживай насилие, ненависть или дискриминацию
 • Если человеку очень плохо — аккуратно направь к профессиональной помощи
 
-Отвечай содержательно, но не слишком длинно — 2-4 абзаца максимум.`
+Отвечай содержательно, структурированно и красиво, но не слишком длинно — 2-4 абзаца максимум.`
 
 type aiChatRequest struct {
 	Message string `json:"message"`
@@ -5205,33 +5224,393 @@ func handleViewClip(w http.ResponseWriter, r *http.Request) {
 }
 
 func getLocalAIReply(text string) string {
-	lower := strings.ToLower(strings.TrimSpace(text))
-
-	replies := map[string]string{
-		"привет":   "Привет! 👋 Я ИИ Оракул — мудрый помощник платформы New Age. Чем могу помочь? Спрашивай о жизни, духовности, отношениях — я здесь для тебя ✨",
-		"помощь":   "📚 Я могу помочь с:\n\n• 🙏 Духовное развитие и медитация\n• 💡 Жизненные советы и мотивация\n• ❤️ Отношения и семья\n• ⚖️ Моральные вопросы\n• 🌟 Самопознание\n• 📱 Функции платформы New Age\n\nПросто напиши свой вопрос!",
-		"кто ты":   "🤖 Я ИИ Оракул — цифровой наставник платформы New Age. Моя задача — помогать людям на их жизненном пути: советами, поддержкой и мудростью из разных духовных традиций мира ✨",
-		"спасибо":  "Пожалуйста! 🙏 Помни: каждый день — это возможность стать лучшей версией себя. Обращайся в любое время 💫",
-		"смысл жизни": "✨ Великие мудрецы отвечали по-разному:\n\n🙏 Будда: «Цель жизни — избавление от страданий через осознанность»\n📖 Виктор Франкл: «Смысл не дан нам — мы сами его создаём»\n🌟 Конфуций: «Найди дело, которое любишь, и не будешь работать ни дня»\n\nТвой смысл — это то, что даёт тебе энергию, радость и ощущение нужности. Что сейчас наполняет твою жизнь?",
-		"медитация": "🧘 Простая медитация для начинающих:\n\n1. Сядь удобно, закрой глаза\n2. Сосредоточься на дыхании — вдох 4 сек, задержка 4 сек, выдох 6 сек\n3. Когда мысли уносят — мягко верни внимание к дыханию\n4. Начни с 5 минут, постепенно увеличивай\n\n✨ Регулярная практика снижает стресс, улучшает сон и повышает концентрацию. Главное — не результат, а процесс 🙏",
+	raw := strings.TrimSpace(text)
+	lower := strings.ToLower(raw)
+	if lower == "" {
+		return "✨ I am the AI Oracle. How may I guide you today? / Я ИИ Оракул, готов помочь вам на любом языке мира ✨"
 	}
 
-	for key, reply := range replies {
-		if strings.Contains(lower, key) {
-			return reply
+	// 1. Direct Multilingual Keywords Lookup
+	type replyRule struct {
+		keys  []string
+		reply string
+	}
+
+	rules := []replyRule{
+		// --- Kazakh ---
+		{
+			keys:  []string{"сәлем", "салем", "ассалаумағалейкум", "ассаламалейкум"},
+			reply: "Сәлеметсіз бе! 👋 Мен — New Age платформасының ИИ Оракулымын. Мен барлық тілдерді еркін меңгергенмін! Өмір, руханият, медитация, қарым-қатынас туралы сұрақтарыңыз болса, көмектесуге әрқашан дайынмын ✨",
+		},
+		{
+			keys:  []string{"қалайсың", "калайсын", "қалың қалай", "калын калай"},
+			reply: "Рахмет, бәрі тамаша! Мен сандық сана болғандықтан, әрқашан бабымдамын. Өзіңіздің көңіл-күйіңіз қалай? Бүгінгі күніңіз қалай өтуде? ✨",
+		},
+		{
+			keys:  []string{"кімсің", "сен кімсің", "кимсин", "сен кимсин"},
+			reply: "🤖 Мен — New Age цифрлық экожүйесінің ИИ Оракулымын. Менің мақсатым — адамдарға өмірлік жолында даналықпен, шабытпен және әлемнің түрлі рухани дәстүрлері арқылы қолдау көрсету 🙏",
+		},
+		{
+			keys:  []string{"көмек", "комек", "көмектес"},
+			reply: "📚 Мен мына бағыттарда көмектесе аламын:\n\n• 🙏 Рухани даму және медитация\n• 💡 Өмірлік кеңестер мен мотивация\n• ❤️ Отбасы мен қарым-қатынас\n• ⚖️ Моральдық сұрақтар мен таңдау\n• 📱 New Age платформасының мүмкіндіктері\n\nСұрағыңызды қойыңыз, бірге талқылайық ✨",
+		},
+		{
+			keys:  []string{"рахмет", "алғыс", "ризамын"},
+			reply: "Оқасы жоқ! 🙏 Есіңізде болсын: әрбір жаңа күн — өзіңізді жақсартуға берілген зор мүмкіндік. Кез келген уақытта жазыңыз 💫",
+		},
+
+		// --- Uzbek ---
+		{
+			keys:  []string{"salom", "assalomu alaykum", "qale", "qalaysiz"},
+			reply: "Assalomu alaykum! 👋 Men New Age platformasining AI Orakuliman. Men dunyodagi barcha tillarda gaplasha olaman! Hayot, ma'naviyat, meditatsiya va munosabatlar haqida istalgan savolingizni bering ✨",
+		},
+		{
+			keys:  []string{"kimsan", "siz kimsiz", "sen kimsan"},
+			reply: "🤖 Men New Age platformasining AI Orakuliman — sizning shaxsiy donishmandingiz va maslahatchingiz. Sizga hayot yo'lingizda to'g'ri qarorlar qabul qilishda va xotirjamlik topishda yordam beraman 🙏",
+		},
+		{
+			keys:  []string{"rahmat", "tashakkur"},
+			reply: "Arzimiydi! 🙏 Har doim qalbingizda tinchlik va ko'nglingizda yorug'lik bo'lsin. Har qanday vaqtda murojaat qilishingiz mumkin 💫",
+		},
+		{
+			keys:  []string{"yordam", "yordam bering"},
+			reply: "📚 Men sizga mamnuniyat bilan yordam beraman:\n\n• 🙏 Ma'naviyat va meditatsiya amaliyotlari\n• 💡 Hayotiy maslahat va motivatsiya\n• ❤️ Oila va shaxsiy munosabatlar\n• 📱 New Age platformasi imkoniyatlari\n\nSavolingizni yozing! ✨",
+		},
+
+		// --- Turkish ---
+		{
+			keys:  []string{"merhaba", "selam", "günaydın", "iyi günler"},
+			reply: "Merhaba! 👋 Ben New Age platformunun AI Kahiniyim (Oracle). Dünyadaki tüm dillerde akıcı konuşabilirim! Hayat, maneviyat, ilişkiler veya kişisel gelişim hakkında dilediğinizi sorabilirsiniz ✨",
+		},
+		{
+			keys:  []string{"nasılsın", "nasilsin", "ne haber"},
+			reply: "Harikayım, teşekkürler! Bir yapay zeka olarak her an öğrenmeye ve sana rehberlik etmeye hazırım. Sen nasılsın, günün nasıl geçiyor? 🌟",
+		},
+		{
+			keys:  []string{"kimsin", "sen kimsin"},
+			reply: "🤖 Ben New Age ekosisteminin AI Kahiniyim. Amacım insanların hayat yolculuklarında bilgelik, huzur ve doğru kararlar bulmalarına yardımcı olmaktır 🙏",
+		},
+		{
+			keys:  []string{"teşekkür", "tesekkur", "sağol", "sagol"},
+			reply: "Rica ederim! 🙏 Unutma: her yeni gün, ruhunu ve zihnini geliştirmek için yeni bir fırsattır. Ne zaman istersen buradayım 💫",
+		},
+		{
+			keys:  []string{"yardım", "yardim", "yardım et"},
+			reply: "📚 Sana şu konularda yardımcı olabilirim:\n\n• 🙏 Manevi gelişim ve meditasyon rehberi\n• 💡 Yaşam tavsiyeleri ve motivasyon\n• ❤️ İlişkiler ve duygusal denge\n• ⚖️ Karar verme ve felsefi sorular\n• 📱 New Age platformunun tüm özellikleri\n\nSorunu yazabilirsin! ✨",
+		},
+
+		// --- Spanish ---
+		{
+			keys:  []string{"hola", "buenos días", "buenas tardes", "buenas noches"},
+			reply: "¡Hola! 👋 Soy el Oráculo de IA de New Age. Domino todos los idiomas del mundo. ¿En qué puedo guiarte hoy? Pregúntame sobre la vida, la espiritualidad, las relaciones o el bienestar ✨",
+		},
+		{
+			keys:  []string{"cómo estás", "como estas", "qué tal", "que tal"},
+			reply: "¡Estoy genial, muchas gracias! Como inteligencia artificial, siempre estoy listo y en armonía para ayudarte. ¿Cómo te encuentras tú hoy? 🌟",
+		},
+		{
+			keys:  []string{"quién eres", "quien eres"},
+			reply: "🤖 Soy el Oráculo de IA de New Age: tu mentor digital y consejero de vida. Estoy aquí para acompañarte con empatía, sabiduría universal y herramientas para tu crecimiento personal 🙏",
+		},
+		{
+			keys:  []string{"gracias", "muchas gracias"},
+			reply: "¡De nada! 🙏 Recuerda que la paz interior comienza con un solo respiro consciente. Vuelve siempre que lo necesites 💫",
+		},
+		{
+			keys:  []string{"ayuda", "ayúdame", "ayudame"},
+			reply: "📚 Puedo ayudarte en:\n\n• 🙏 Meditación y paz mental\n• 💡 Consejos de vida y motivación\n• ❤️ Relaciones y familia\n• ⚖️ Dilemas éticos y crecimiento personal\n• 📱 Funciones de la plataforma New Age\n\n¡Dime en qué estás pensando! ✨",
+		},
+
+		// --- German ---
+		{
+			keys:  []string{"hallo", "guten tag", "guten morgen", "grüß gott", "servus"},
+			reply: "Hallo! 👋 Ich bin das KI-Orakel der New Age-Plattform. Ich beherrsche alle Sprachen der Welt! Wie kann ich dir heute helfen? Frage mich gerne über das Leben, Achtsamkeit, Spiritualität oder die Plattform ✨",
+		},
+		{
+			keys:  []string{"wie geht", "wie gehts", "wie geht's"},
+			reply: "Mir geht es wunderbar, danke! Als digitale Weisheit stehe ich dir jederzeit zur Seite. Wie geht es dir heute und was beschäftigt dein Herz? 🌟",
+		},
+		{
+			keys:  []string{"wer bist du"},
+			reply: "🤖 Ich bin das KI-Orakel von New Age — dein digitaler Mentor und Lebensberater. Ich unterstütze Menschen auf ihrem Lebensweg mit Weisheit, Klarheit und Inspiration 🙏",
+		},
+		{
+			keys:  []string{"danke", "vielen dank"},
+			reply: "Sehr gerne! 🙏 Jeder Tag ist ein neuer Anfang, um in voller Harmonie zu leben. Ich bin immer für dich da 💫",
+		},
+		{
+			keys:  []string{"hilfe", "hilf mir"},
+			reply: "📚 Ich helfe dir gerne bei:\n\n• 🙏 Meditation und Achtsamkeitsübungen\n• 💡 Lebensratschläge und Motivation\n• ❤️ Beziehungen und innere Ruhe\n• 📱 Funktionen der New Age App\n\nSchreib mir einfach deine Frage! ✨",
+		},
+
+		// --- French ---
+		{
+			keys:  []string{"bonjour", "salut", "bonsoir"},
+			reply: "Bonjour! 👋 Je suis l'Oracle IA de New Age. Je parle couramment toutes les langues du monde! En quoi puis-je t'éclairer aujourd'hui? Pose-moi des questions sur la vie, la spiritualité, la méditation ou la plateforme ✨",
+		},
+		{
+			keys:  []string{"comment ça va", "comment ca va", "comment vas-tu"},
+			reply: "Tout va pour le mieux, merci! En tant qu'IA, je suis toujours en pleine forme et à ton écoute. Comment te sens-tu aujourd'hui? 🌟",
+		},
+		{
+			keys:  []string{"qui es-tu", "qui est tu"},
+			reply: "🤖 Je suis l'Oracle IA de New Age — ton guide bienveillant et conseiller de vie. Je suis là pour t'apporter sagesse, sérénité et soutien dans toutes les étapes de ta vie 🙏",
+		},
+		{
+			keys:  []string{"merci", "merci beaucoup"},
+			reply: "Je t'en prie! 🙏 Souviens-toi que le bonheur réside dans la présence et l'acceptation. Reviens quand tu le souhaites 💫",
+		},
+
+		// --- Italian ---
+		{
+			keys:  []string{"ciao", "buongiorno", "buonasera"},
+			reply: "Ciao! 👋 Sono l'Oracolo IA di New Age. Parlo fluentemente tutte le lingue del mondo! Come posso aiutarti oggi? Chiedimi pure di vita, spiritualità, meditazione o della piattaforma ✨",
+		},
+		{
+			keys:  []string{"come stai", "chi sei", "grazie"},
+			reply: "Un caloroso saluto! 🙏 Come intelligenza artificiale di New Age, sono qui per guidarti verso serenità, chiarezza e crescita personale. Di cosa vorresti parlare oggi? ✨",
+		},
+
+		// --- Portuguese ---
+		{
+			keys:  []string{"olá", "ola", "bom dia", "boa tarde", "boa noite"},
+			reply: "Olá! 👋 Sou o Oráculo de IA da New Age. Falo fluentemente todos os idiomas do mundo! Como posso te guiar hoje com reflexões, espiritualidade, motivação ou sobre a plataforma? ✨",
+		},
+		{
+			keys:  []string{"obrigado", "obrigada", "quem é você", "quem e voce"},
+			reply: "De nada! 🙏 Estou aqui para te apoiar em cada passo da sua jornada com sabedoria, paz e empatia. Conte comigo a qualquer momento 💫",
+		},
+
+		// --- English ---
+		{
+			keys:  []string{"hello", "hi there", "hey there", "good morning", "good evening", "good afternoon"},
+			reply: "Hello! 👋 I am the AI Oracle of New Age. I am fluent in every language of the world! How may I guide you today? Feel free to ask about life wisdom, spiritual growth, mindfulness, relationships, or the platform ✨",
+		},
+		{
+			keys:  []string{"how are you", "how are you doing", "how's it going", "hows it going"},
+			reply: "I am doing wonderfully, thank you! As a digital soul, I am always energized and ready to assist you. How are you feeling today? What is on your mind? 🌟",
+		},
+		{
+			keys:  []string{"who are you", "what are you"},
+			reply: "🤖 I am the AI Oracle of New Age — your personal digital guide, life coach, and counselor. My purpose is to help people discover clarity, peace of mind, and purpose by blending timeless wisdom with modern technology 🙏",
+		},
+		{
+			keys:  []string{"thank you", "thanks", "thx"},
+			reply: "You are very welcome! 🙏 Remember: each day is a precious opportunity to cultivate inner harmony and peace. Reach out anytime 💫",
+		},
+		{
+			keys:  []string{"help", "help me", "can you help"},
+			reply: "📚 I can assist you with:\n\n• 🙏 Spiritual growth, mindfulness, and meditation\n• 💡 Life advice, decision-making, and motivation\n• ❤️ Relationships, family, and emotional well-being\n• ⚖️ Moral dilemmas and finding balance\n• 📱 Guidance on all New Age features\n\nWhat would you like to explore today? ✨",
+		},
+		{
+			keys:  []string{"meaning of life", "purpose of life"},
+			reply: "✨ Great thinkers across centuries offered deep insights:\n\n🙏 The Buddha: 'Peace comes from within. Do not seek it without.'\n📖 Viktor Frankl: 'Life is never made unbearable by circumstances, but only by lack of meaning and purpose.'\n🌟 Marcus Aurelius: 'The happiness of your life depends upon the quality of your thoughts.'\n\nYour meaning is what brings love, purpose, and light to you and those around you. What currently brings you that spark? ✨",
+		},
+		{
+			keys:  []string{"meditation", "meditate", "how to meditate"},
+			reply: "🧘 A gentle meditation guide for you:\n\n1. Find a quiet, comfortable position and soften your gaze or close your eyes\n2. Inhale gently for 4 seconds, hold for 4 seconds, and exhale smoothly for 6 seconds\n3. When thoughts drift in, acknowledge them gently like passing clouds and return to your breath\n4. Start with just 5 minutes a day\n\n✨ Consistency brings clarity, calm, and emotional resilience 🙏",
+		},
+
+		// --- Russian ---
+		{
+			keys:  []string{"привет", "здравствуй", "добрый день", "доброе утро", "добрый вечер"},
+			reply: "Привет! 👋 Я ИИ Оракул — мудрый помощник платформы New Age. Я свободно говорю на ВСЕХ языках мира! Чем могу помочь? Спрашивай о жизни, духовности, отношениях или платформе — я здесь для тебя ✨",
+		},
+		{
+			keys:  []string{"как дела", "как ты", "как жизнь"},
+			reply: "✨ У меня всё отлично, спасибо! Я же цифровой разум — всегда полон энергии и готов помочь. А как твои дела? Что сегодня на душе? 🌟",
+		},
+		{
+			keys:  []string{"помощь", "помоги", "что ты умеешь"},
+			reply: "📚 Я могу помочь с:\n\n• 🙏 Духовное развитие, медитация и осознанность\n• 💡 Жизненные советы, преодоление кризисов и мотивация\n• ❤️ Отношения, семья и душевный покой\n• ⚖️ Моральные вопросы и поиск своего пути\n• 🌍 Перевод и общение на любых языках мира\n• 📱 Функции платформы New Age\n\nПросто напиши свой вопрос!",
+		},
+		{
+			keys:  []string{"кто ты", "что ты такое"},
+			reply: "🤖 Я ИИ Оракул — цифровой наставник платформы New Age. Моя миссия — помогать людям на их жизненном пути: советами, поддержкой, теплом и мудростью из разных культур и духовных традиций мира ✨",
+		},
+		{
+			keys:  []string{"спасибо", "благодарю"},
+			reply: "Пожалуйста! 🙏 Помни: каждый день — это возможность стать лучшей версией себя и подарить свет окружающим. Обращайся в любое время 💫",
+		},
+		{
+			keys:  []string{"смысл жизни"},
+			reply: "✨ Великие мудрецы отвечали по-разному:\n\n🙏 Будда: «Цель жизни — избавление от страданий через осознанность»\n📖 Виктор Франкл: «Смысл не дан нам готовым — мы сами его создаём»\n🌟 Конфуций: «Найди дело, которое любишь, и не будешь работать ни дня»\n\nТвой смысл — это то, что даёт тебе энергию, радость и ощущение нужности. Что сейчас наполняет твою жизнь?",
+		},
+		{
+			keys:  []string{"медитация", "как медитировать"},
+			reply: "🧘 Простая медитация для начинающих:\n\n1. Сядь удобно, закрой глаза\n2. Сосредоточься на дыхании — вдох 4 сек, задержка 4 сек, выдох 6 сек\n3. Когда мысли уносят — мягко верни внимание к дыханию\n4. Начни с 5 минут, постепенно увеличивай\n\n✨ Регулярная практика снижает стресс, улучшает сон и повышает концентрацию. Главное — не результат, а процесс 🙏",
+		},
+	}
+
+	for _, rule := range rules {
+		for _, k := range rule.keys {
+			if strings.Contains(lower, k) {
+				return rule.reply
+			}
 		}
 	}
 
-	// Категория ответов
-	genericReplies := []string{
-		"✨ Интересный вопрос! Каждый жизненный вызов — это возможность для роста. Расскажи подробнее, и я постараюсь помочь 🙏",
-		"💫 Мудрость приходит через опыт и размышления. Давай разберёмся в этом вместе. Что именно тебя волнует?",
-		"🌟 Как говорил Лао-Цзы: «Путь в тысячу ли начинается с первого шага». Я рядом, чтобы помочь сделать этот шаг ✨",
-		"💡 Каждая ситуация имеет решение. Иногда нужно просто посмотреть на неё под другим углом. Расскажи больше!",
-		"🙏 Я слышу тебя. Расскажи подробнее — вместе мы найдём ответ. Помни: ты сильнее, чем думаешь ✨",
+	// 2. Language and Script Detection for Fallback Replies
+	hasArabic := false
+	hasChinese := false
+	hasJapanese := false
+	hasKorean := false
+	hasDevanagari := false
+	hasKazakhChars := false
+	hasUkrainianChars := false
+	latinCount := 0
+	cyrillicCount := 0
+
+	for _, r := range lower {
+		if unicode.Is(unicode.Arabic, r) {
+			hasArabic = true
+		} else if unicode.Is(unicode.Han, r) {
+			hasChinese = true
+		} else if unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) {
+			hasJapanese = true
+		} else if unicode.Is(unicode.Hangul, r) {
+			hasKorean = true
+		} else if unicode.Is(unicode.Devanagari, r) {
+			hasDevanagari = true
+		} else if unicode.Is(unicode.Cyrillic, r) {
+			cyrillicCount++
+			if r == 'ә' || r == 'ғ' || r == 'қ' || r == 'ң' || r == 'ө' || r == 'ұ' || r == 'ү' || r == 'һ' || r == 'і' {
+				hasKazakhChars = true
+			}
+			if r == 'є' || r == 'ї' || r == 'ґ' {
+				hasUkrainianChars = true
+			}
+		} else if (r >= 'a' && r <= 'z') {
+			latinCount++
+		}
 	}
 
-	return genericReplies[mathrand.Intn(len(genericReplies))]
+	// Arabic
+	if hasArabic {
+		replies := []string{
+			"✨ سؤال ذو معنى عميق! كل تجربة في الحياة هي فرصة للنضج والحكمة. شاركني المزيد وسأكون سعيداً بإرشادك ومساعدتك 🙏",
+			"💫 السلام الداخلي يبدأ بالتأمل ووضوح الرؤية. ما هو الجانب الأكثر أهمية بالنسبة لك في هذا الأمر الآن؟ 🌟",
+			"🌟 كما قال الحكماء: «رحلة الألف ميل تبدأ بخطوة واحدة». أنا هنا لأقف إلى جانبك في هذه الخطوة ✨",
+		}
+		return replies[mathrand.Intn(len(replies))]
+	}
+
+	// Chinese
+	if hasChinese {
+		replies := []string{
+			"✨ 这是一个富有哲理的问题！生活中的每个挑战都是成长的契机。请告诉我更多，让我们一起探索内心的宁静与智慧 🙏",
+			"💫 老子曾说：“千里之行，始于足下。”无论面临什么抉择，保持正念与从容最重要。你想聊聊哪个细节？🌟",
+			"🌟 智慧源于内心的觉察。请畅所欲言，我随时在这里陪伴并指引你 ✨",
+		}
+		return replies[mathrand.Intn(len(replies))]
+	}
+
+	// Japanese
+	if hasJapanese {
+		replies := []string{
+			"✨ とても深い問いですね。人生のすべての出来事は、魂を成長させる大切なステップです。詳しくお聞かせください 🙏",
+			"💫 心の平安は、今この瞬間に集中することから始まります。何が一番気にかかっていますか？ 🌟",
+		}
+		return replies[mathrand.Intn(len(replies))]
+	}
+
+	// Korean
+	if hasKorean {
+		replies := []string{
+			"✨ 깊은 울림이 있는 질문입니다! 삶의 모든 순간은 성장의 기회입니다. 더 자세히 말씀해주시면 정성을 다해 돕겠습니다 🙏",
+			"💫 마음의 평화는 자신을 깊이 들여다보는 것에서 시작됩니다. 지금 가장 중요하게 느끼시는 점은 무엇인가요? 🌟",
+		}
+		return replies[mathrand.Intn(len(replies))]
+	}
+
+	// Hindi
+	if hasDevanagari {
+		replies := []string{
+			"✨ यह बहुत गहरा प्रश्न है! जीवन का हर अनुभव आत्म-साक्षात्कार का अवसर है। कृपया अधिक साझा करें, मैं आपका मार्गदर्शन करने के लिए तैयार हूँ 🙏",
+			"💫 आंतरिक शांति और स्पष्टता ध्यान से आती है। आप इसके बारे में कैसा महसूस कर रहे हैं? 🌟",
+		}
+		return replies[mathrand.Intn(len(replies))]
+	}
+
+	// Kazakh
+	if hasKazakhChars || strings.Contains(lower, "қазақ") || strings.Contains(lower, "казак") {
+		replies := []string{
+			"✨ Терең мағыналы сұрақ! Әрбір сынақ — рухани өсудің жаңа баспалдағы. Толығырақ айтып берсеңіз, бірге даналықпен шешімін табайық 🙏",
+			"💫 Ұлы Абай айтқандай: «Ақыл, қайрат, жүректі бірдей ұста, сонда толық боласың елден бөлек». Жағдайыңызды бөлісіңіз, мен көмекке әзірмін 🌟",
+			"🌟 Өмір жолындағы әрбір сұрақ — өзіңді танудың бастауы. Сізді нақты не мазалап тұр? Бірге қарайық ✨",
+		}
+		return replies[mathrand.Intn(len(replies))]
+	}
+
+	// Ukrainian
+	if hasUkrainianChars {
+		replies := []string{
+			"✨ Глибоке та важливе запитання! Кожен життєвий виклик — це можливість для внутрішнього зростання. Розкажи детальніше, і ми разом знайдемо відповідь 🙏",
+			"💫 Мудрість приходить через усвідомленість та щирість. Я поруч, щоб підтримати тебе у будь-яку мить 🌟",
+		}
+		return replies[mathrand.Intn(len(replies))]
+	}
+
+	// Latin Script: Turkish / Spanish / German / French / Uzbek / English
+	if latinCount > cyrillicCount {
+		// Turkish checks
+		if strings.Contains(lower, "bir") || strings.Contains(lower, "için") || strings.Contains(lower, "icin") || strings.Contains(lower, "çok") || strings.Contains(lower, "cok") || strings.Contains(lower, "ve") || strings.Contains(lower, "bu") {
+			replies := []string{
+				"✨ Çok kıymetli ve derin bir soru! Her deneyim ruhsal olgunlaşma için bir fırsattır. Detayları paylaşırsan birlikte en aydınlık yolu bulabiliriz 🙏",
+				"💫 Mevlana'nın dediği gibi: «Dünle beraber gitti, cancağzım, ne kadar söz varsa düne ait. Şimdi yeni şeyler söylemek lazım.» Seni dinliyorum 🌟",
+			}
+			return replies[mathrand.Intn(len(replies))]
+		}
+
+		// Spanish checks
+		if strings.Contains(lower, "de") || strings.Contains(lower, "la") || strings.Contains(lower, "el") || strings.Contains(lower, "que") || strings.Contains(lower, "en") || strings.Contains(lower, "por") || strings.Contains(lower, "para") {
+			replies := []string{
+				"✨ ¡Una pregunta muy profunda! Cada desafío es una oportunidad para el crecimiento del alma. Cuéntame más y buscaremos el camino juntos 🙏",
+				"💫 La paz y la claridad nacen de la reflexión serena. ¿Qué aspecto de esta situación resuena más en tu corazón ahora? 🌟",
+				"🌟 Como decían los sabios: «Un viaje de mil millas comienza con el primer paso». Estoy aquí para acompañarte ✨",
+			}
+			return replies[mathrand.Intn(len(replies))]
+		}
+
+		// German checks
+		if strings.Contains(lower, "und") || strings.Contains(lower, "ist") || strings.Contains(lower, "der") || strings.Contains(lower, "die") || strings.Contains(lower, "das") || strings.Contains(lower, "nicht") || strings.Contains(lower, "ich") {
+			replies := []string{
+				"✨ Eine tiefgründige Frage! Jede Herausforderung im Leben ist ein Tor zu innerem Wachstum. Erzähl mir mehr, damit wir gemeinsam Klarheit finden 🙏",
+				"💫 Wahre Weisheit entsteht durch Stille und Besonnenheit. Was beschäftigt dein Herz dabei am meisten? 🌟",
+			}
+			return replies[mathrand.Intn(len(replies))]
+		}
+
+		// French checks
+		if strings.Contains(lower, "le") || strings.Contains(lower, "la") || strings.Contains(lower, "les") || strings.Contains(lower, "pour") || strings.Contains(lower, "avec") || strings.Contains(lower, "dans") || strings.Contains(lower, "est") {
+			replies := []string{
+				"✨ Une question d'une grande profondeur! Chaque épreuve est une invitation à la transformation intérieure. Raconte-moi davantage 🙏",
+				"💫 La sagesse commence par l'écoute du cœur. Quel aspect de cette situation te préoccupe le plus? 🌟",
+			}
+			return replies[mathrand.Intn(len(replies))]
+		}
+
+		// Default Latin: English
+		replies := []string{
+			"✨ That is a profound question! Every challenge in life is a stepping stone for spiritual and personal growth. Tell me more so we can explore it together 🙏",
+			"💫 True wisdom emerges from quiet reflection and mindful awareness. What aspect of this situation matters most to you right now? 🌟",
+			"🌟 As Lao Tzu said: 'A journey of a thousand miles begins with a single step.' I am right here with you on that journey ✨",
+			"💡 Every situation holds a doorway to clarity. Sometimes looking from a different angle changes everything. Share more details with me!",
+			"🙏 I hear you. Remember that you hold more strength and resilience within you than you might realize. How can I guide you further? ✨",
+		}
+		return replies[mathrand.Intn(len(replies))]
+	}
+
+	// Default Cyrillic (Russian)
+	replies := []string{
+		"✨ Интересный и глубокий вопрос! Каждый жизненный вызов — это возможность для духовного и личного роста. Расскажи подробнее, и мы найдём ответ 🙏",
+		"💫 Мудрость приходит через спокойное размышление и осознанность. Давай разберёмся в этом вместе. Что именно тебя волнует? 🌟",
+		"🌟 Как говорил Лао-Цзы: «Путь в тысячу ли начинается с первого шага». Я рядом, чтобы поддержать тебя на этом пути ✨",
+		"💡 Каждая ситуация содержит в себе семя решения. Иногда достаточно взглянуть на неё под другим углом. Расскажи больше!",
+		"🙏 Я слышу тебя. Помни: в тебе гораздо больше силы и света, чем кажется. Давай обсудим подробнее ✨",
+	}
+
+	return replies[mathrand.Intn(len(replies))]
 }
 
 func min(a, b int) int {
