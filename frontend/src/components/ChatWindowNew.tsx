@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
 
-import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Radio, Sparkles } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles } from 'lucide-react';
 import { type Chat, type Message } from '../data/mock';
 import { formatLastSeen } from '../utils/onlineStatus';
 import './ChatWindowNew.css';
@@ -362,6 +362,14 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const silenceTimerRef = useRef<any>(null);
   const currentVoiceQueryRef = useRef<string>('');
   const finalTranscriptRef = useRef<string>('');
+  const [aiSpeechText, setAiSpeechText] = useState('');
+  const [aiSpeechCharIdx, setAiSpeechCharIdx] = useState(0);
+  const [voiceSessionStart, setVoiceSessionStart] = useState(0);
+  const voiceOrbRef = useRef<HTMLDivElement>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const levelRafRef = useRef<number | null>(null);
+  const voiceTranscriptEndRef = useRef<HTMLDivElement>(null);
   const isVoiceChatActiveRef = useRef(isVoiceChatActive);
   isVoiceChatActiveRef.current = isVoiceChatActive;
   const isMicMutedRef = useRef(isMicMuted);
@@ -663,6 +671,23 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     setSpeakingMsgId(null);
   }, [chat?.id]);
 
+  // Полная очистка при уходе со страницы
+  useEffect(() => {
+    return () => {
+      isVoiceChatActiveRef.current = false;
+      try { recognitionRef.current?.abort(); } catch {}
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+      if (levelRafRef.current) cancelAnimationFrame(levelRafRef.current);
+      try { audioCtxRef.current?.close(); } catch {}
+      micStreamRef.current?.getTracks().forEach(t => t.stop());
+    };
+  }, []);
+
+  // Автопрокрутка живой расшифровки разговора
+  useEffect(() => {
+    voiceTranscriptEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages.length, liveTranscript, isVoiceChatActive]);
+
   const speakAloud = (text: string, onEnd?: () => void) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       if (onEnd) onEnd();
@@ -677,27 +702,94 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         return;
       }
 
-      const utter = new SpeechSynthesisUtterance(clean);
-      // На громкой связи — максимальная громкость 1.0, иначе комфортная 0.4
-      utter.volume = isSpeakerLoudRef.current ? 1.0 : 0.4;
-      utter.rate = 1.0;
-      utter.pitch = 1.02;
+      setAiSpeechText(clean);
+      setAiSpeechCharIdx(0);
 
+      // Разбиваем на предложения — звучит естественнее и Chrome не обрывает длинную речь
+      const chunks = clean.match(/[^.!?…]+[.!?…]*\s*/g) || [clean];
       const voice = getBestVoice(availableVoices);
-      if (voice) utter.voice = voice;
-
-      utter.onend = () => {
+      let offset = 0;
+      let idx = 0;
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        setAiSpeechCharIdx(clean.length);
         if (onEnd) onEnd();
       };
-      utter.onerror = () => {
-        if (onEnd) onEnd();
+
+      const speakNext = () => {
+        if (!isVoiceChatActiveRef.current && onEnd) { finish(); return; }
+        if (idx >= chunks.length) { finish(); return; }
+        const chunk = chunks[idx];
+        const chunkOffset = offset;
+        const utter = new SpeechSynthesisUtterance(chunk);
+        // На громкой связи — максимальная громкость 1.0, иначе комфортная 0.4
+        utter.volume = isSpeakerLoudRef.current ? 1.0 : 0.4;
+        utter.rate = 1.05;
+        utter.pitch = 1.02;
+        utter.lang = 'ru-RU';
+        if (voice) utter.voice = voice;
+        utter.onstart = () => setAiSpeechCharIdx(chunkOffset);
+        utter.onboundary = (e: SpeechSynthesisEvent) => {
+          setAiSpeechCharIdx(chunkOffset + (e.charIndex || 0) + (e.charLength || 0));
+        };
+        utter.onend = () => {
+          offset += chunk.length;
+          idx++;
+          setAiSpeechCharIdx(offset);
+          speakNext();
+        };
+        utter.onerror = (e: any) => {
+          if (e?.error === 'interrupted' || e?.error === 'canceled') return;
+          finish();
+        };
+        window.speechSynthesis.speak(utter);
       };
 
-      window.speechSynthesis.speak(utter);
+      speakNext();
     } catch (e) {
       console.warn('Speech synthesis error:', e);
       if (onEnd) onEnd();
     }
+  };
+
+  // Индикатор громкости микрофона — шар «дышит» в такт голосу пользователя
+  const startMicLevel = (stream: MediaStream) => {
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx: AudioContext = new Ctx();
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      src.connect(analyser);
+      audioCtxRef.current = ctx;
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteFrequencyData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i++) sum += data[i];
+        const avg = sum / data.length / 255;
+        const status = voiceStatusRef.current;
+        let level = 0;
+        if (status === 'listening' && !isMicMutedRef.current) level = Math.min(1, avg * 3.2);
+        if (voiceOrbRef.current) voiceOrbRef.current.style.setProperty('--lvl', level.toFixed(3));
+        levelRafRef.current = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch (e) {
+      console.warn('Mic level error', e);
+    }
+  };
+
+  const stopMicLevel = () => {
+    if (levelRafRef.current) cancelAnimationFrame(levelRafRef.current);
+    levelRafRef.current = null;
+    try { audioCtxRef.current?.close(); } catch {}
+    audioCtxRef.current = null;
+    micStreamRef.current?.getTracks().forEach(t => t.stop());
+    micStreamRef.current = null;
   };
 
   const startRecognition = () => {
@@ -721,11 +813,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       rec.lang = 'ru-RU';
 
       rec.onstart = () => {
-        setVoiceStatus('listening');
+        if (voiceStatusRef.current === 'listening') setVoiceStatus('listening');
       };
 
       rec.onresult = (event: any) => {
         if (isMicMutedRef.current) return;
+        // Пока Оракул думает/говорит — не слушаем (иначе на громкой связи микрофон ловит его голос)
+        if (voiceStatusRef.current !== 'listening') return;
 
         let interim = '';
         let newFinal = '';
@@ -753,12 +847,12 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = setTimeout(() => {
             const queryToSend = (finalTranscriptRef.current + ' ' + interim).trim();
-            if (queryToSend && isVoiceChatActiveRef.current) {
+            if (queryToSend && isVoiceChatActiveRef.current && voiceStatusRef.current === 'listening') {
               finalTranscriptRef.current = '';
               setLiveTranscript('');
               handleVoiceQuerySubmit(queryToSend);
             }
-          }, 1300); // 1.3 секунды паузы фиксируют сказанную фразу и транскрибируют её в сообщение
+          }, 1100); // ~1 секунда паузы — фраза фиксируется и уходит Оракулу, как в живом разговоре
         }
       };
 
@@ -787,6 +881,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const handleVoiceQuerySubmit = async (spokenText: string) => {
     if (!spokenText.trim() || !chat) return;
 
+    voiceStatusRef.current = 'thinking';
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch {}
     }
@@ -804,6 +899,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
     const currentMsgs = messagesRef.current;
     const updatedMessages = [...currentMsgs, newMsg];
+    messagesRef.current = updatedMessages;
     setMessages(updatedMessages);
     saveMessages(updatedMessages);
 
@@ -827,14 +923,17 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         status: 'read',
       };
 
-      const withReply = [...updatedMessages, reply];
+      const withReply = [...messagesRef.current, reply];
+      messagesRef.current = withReply;
       setMessages(withReply);
       saveMessages(withReply);
 
       if (isVoiceChatActiveRef.current) {
+        voiceStatusRef.current = 'speaking';
         setVoiceStatus('speaking');
         speakAloud(replyText, () => {
           if (isVoiceChatActiveRef.current) {
+            voiceStatusRef.current = 'listening';
             setVoiceStatus('listening');
             finalTranscriptRef.current = '';
             setLiveTranscript('');
@@ -857,15 +956,46 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     }
   };
 
+  const VOICE_GREETINGS = [
+    'Привет! Я рядом и слушаю тебя. О чём поговорим?',
+    'Здравствуй! Рад тебя слышать. Расскажи, что у тебя на душе?',
+    'Привет, я на связи. Говори свободно — я внимательно слушаю.',
+  ];
+
   const startVoiceChat = async () => {
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+      startMicLevel(stream);
+      isVoiceChatActiveRef.current = true;
       setIsVoiceChatActive(true);
-      setVoiceStatus('listening');
       setLiveTranscript('');
       finalTranscriptRef.current = '';
       currentVoiceQueryRef.current = '';
-      startRecognition();
+
+      // Оракул сам начинает живой разговор — приветствие голосом + в текст
+      const greeting = VOICE_GREETINGS[Math.floor(Math.random() * VOICE_GREETINGS.length)];
+      const greetMsg: Message = {
+        id: `msg_ai_${Date.now()}`,
+        text: greeting,
+        fromMe: false,
+        time: formatTime(),
+        status: 'read',
+      };
+      const withGreet = [...messagesRef.current, greetMsg];
+      setVoiceSessionStart(messagesRef.current.length);
+      messagesRef.current = withGreet;
+      setMessages(withGreet);
+      saveMessages(withGreet);
+
+      setVoiceStatus('speaking');
+      voiceStatusRef.current = 'speaking';
+      speakAloud(greeting, () => {
+        if (!isVoiceChatActiveRef.current) return;
+        setVoiceStatus('listening');
+        voiceStatusRef.current = 'listening';
+        if (!isMicMutedRef.current) startRecognition();
+      });
     } catch (err) {
       console.error('Mic permission error:', err);
       alert('Для голосового общения необходим доступ к микрофону. Пожалуйста, разрешите микрофон в настройках браузера.');
@@ -873,9 +1003,12 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   };
 
   const stopVoiceChat = () => {
+    isVoiceChatActiveRef.current = false;
     setIsVoiceChatActive(false);
     setVoiceStatus('idle');
     setLiveTranscript('');
+    setAiSpeechText('');
+    setAiSpeechCharIdx(0);
     finalTranscriptRef.current = '';
     currentVoiceQueryRef.current = '';
     if (silenceTimerRef.current) {
@@ -891,6 +1024,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+    stopMicLevel();
   };
 
   const toggleVoiceChat = () => {
@@ -902,9 +1036,11 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   };
 
   const interruptAiSpeech = () => {
+    voiceStatusRef.current = 'listening';
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+    setAiSpeechCharIdx(aiSpeechText.length);
     setVoiceStatus('listening');
     if (!isMicMuted) {
       startRecognition();
@@ -1751,87 +1887,117 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
 
 
-      {/* Voice Chat Dock (на громкой связи) */}
+      {/* Живой голосовой разговор — полноэкранный фон поверх чата */}
       {isVoiceChatActive && (
-        <div className="cw-voice-dock">
-          <div className="cw-voice-dock-top">
-            <div className="cw-voice-dock-status">
-              <span className={`cw-voice-status-dot ${voiceStatus}`} />
-              <div className="cw-voice-status-info">
-                <span className="cw-voice-status-title">
-                  {voiceStatus === 'listening' && (isMicMuted ? 'Микрофон заглушен' : 'Слушаю вас... Говорите (текст сразу пишется в чат)')}
-                  {voiceStatus === 'thinking' && 'Оракул думает над ответом...'}
-                  {voiceStatus === 'speaking' && 'Оракул отвечает голосом...'}
-                  {voiceStatus === 'idle' && 'Пауза'}
-                </span>
-                <span className="cw-voice-status-sub">
-                  {isSpeakerLoud ? '🔊 Громкая связь активна • Авто-транскрипция в текст' : '🔈 Обычная громкость'}
-                </span>
+        <div className={`cw-live-overlay status-${voiceStatus}`}>
+          <div className="cw-live-bg">
+            <span className="cw-live-blob b1" />
+            <span className="cw-live-blob b2" />
+            <span className="cw-live-blob b3" />
+            <span className="cw-live-stars" />
+          </div>
+
+          <div className="cw-live-top">
+            <div className="cw-live-top-info">
+              <span className="cw-live-rec-dot" />
+              <span className="cw-live-top-title">Живой разговор • {chatName}</span>
+            </div>
+            <button type="button" className="cw-live-close" onClick={stopVoiceChat} title="Закончить разговор">
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="cw-live-center">
+            <div
+              ref={voiceOrbRef}
+              className="cw-live-orb"
+              onClick={voiceStatus === 'speaking' ? interruptAiSpeech : undefined}
+              title={voiceStatus === 'speaking' ? 'Нажмите, чтобы перебить и говорить самому' : ''}
+            >
+              <span className="cw-live-ring r1" />
+              <span className="cw-live-ring r2" />
+              <span className="cw-live-ring r3" />
+              <div className="cw-live-orb-core">
+                <img src={chatAvatar || '/ai_avatar.jpg'} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
               </div>
             </div>
 
-            <div className={`cw-voice-waves ${voiceStatus === 'speaking' || (voiceStatus === 'listening' && !isMicMuted) ? 'active' : ''}`}>
-              <span className="cw-wave-bar" />
-              <span className="cw-wave-bar" />
-              <span className="cw-wave-bar" />
-              <span className="cw-wave-bar" />
-              <span className="cw-wave-bar" />
+            <div className="cw-live-status">
+              {voiceStatus === 'listening' && (isMicMuted ? 'Микрофон выключен' : 'Слушаю тебя…')}
+              {voiceStatus === 'thinking' && 'Оракул размышляет…'}
+              {voiceStatus === 'speaking' && 'Оракул говорит'}
+              {voiceStatus === 'idle' && 'Подключение…'}
+            </div>
+            <div className="cw-live-hint">
+              {voiceStatus === 'speaking'
+                ? 'Нажми на шар, чтобы перебить'
+                : voiceStatus === 'listening' && !isMicMuted
+                  ? 'Просто говори — пауза отправит фразу'
+                  : '\u00A0'}
             </div>
           </div>
 
-          {liveTranscript && (
-            <div className="cw-voice-transcript">
-              <span className="cw-transcript-label">Вы говорите:</span>
-              <span className="cw-transcript-text">«{liveTranscript}»</span>
-            </div>
-          )}
-
-          <div className="cw-voice-dock-controls">
-            <button 
-              type="button"
-              className={`cw-voice-ctrl-btn ${isMicMuted ? 'muted' : ''}`}
-              onClick={toggleMicMute}
-              title={isMicMuted ? "Включить микрофон" : "Заглушить микрофон"}
-            >
-              {isMicMuted ? <MicOff size={16} /> : <Mic size={16} />}
-              <span>{isMicMuted ? 'Микрофон ВЫКЛ' : 'Микрофон'}</span>
-            </button>
-
-            <button 
-              type="button"
-              className={`cw-voice-ctrl-btn ${isSpeakerLoud ? 'speaker-loud' : ''}`}
-              onClick={toggleSpeakerLoud}
-              title={isSpeakerLoud ? "Громкая связь: включена (максимальная громкость)" : "Включить громкую связь"}
-            >
-              {isSpeakerLoud ? <Volume2 size={16} /> : <Volume1 size={16} />}
-              <span>{isSpeakerLoud ? 'Громкая связь: ВКЛ' : 'Громкая связь: ВЫКЛ'}</span>
-            </button>
-
-            {voiceStatus === 'speaking' && (
-              <button 
-                type="button"
-                className="cw-voice-ctrl-btn interrupt"
-                onClick={interruptAiSpeech}
-                title="Прервать ответ и говорить самому"
-              >
-                <Radio size={16} />
-                <span>Прервать</span>
-              </button>
+          {/* Расшифровка всего разговора в текст */}
+          <div className="cw-live-transcript">
+            {messages.slice(voiceSessionStart).map((m, i, arr) => {
+              const isLastAi = !m.fromMe && i === arr.length - 1 && voiceStatus === 'speaking' && aiSpeechText;
+              return (
+                <div key={String(m.id)} className={`cw-live-line ${m.fromMe ? 'me' : 'ai'}`}>
+                  <span className="cw-live-who">{m.fromMe ? 'Вы' : 'Оракул'}</span>
+                  <span className="cw-live-text">
+                    {isLastAi ? (
+                      <>
+                        <span className="spoken">{aiSpeechText.slice(0, aiSpeechCharIdx)}</span>
+                        <span className="pending">{aiSpeechText.slice(aiSpeechCharIdx)}</span>
+                      </>
+                    ) : String(m.text || '')}
+                  </span>
+                </div>
+              );
+            })}
+            {voiceStatus === 'thinking' && (
+              <div className="cw-live-line ai">
+                <span className="cw-live-who">Оракул</span>
+                <span className="cw-live-text"><span className="cw-live-thinking"><i /><i /><i /></span></span>
+              </div>
             )}
+            {liveTranscript && (
+              <div className="cw-live-line me live">
+                <span className="cw-live-who">Вы</span>
+                <span className="cw-live-text">{liveTranscript}<span className="cw-live-caret" /></span>
+              </div>
+            )}
+            <div ref={voiceTranscriptEndRef} />
+          </div>
 
-            <button 
+          <div className="cw-live-controls">
+            <button
               type="button"
-              className="cw-voice-ctrl-btn stop"
-              onClick={stopVoiceChat}
-              title="Закончить разговор"
+              className={`cw-live-btn ${isMicMuted ? 'off' : ''}`}
+              onClick={toggleMicMute}
+              title={isMicMuted ? 'Включить микрофон' : 'Выключить микрофон'}
             >
-              <VolumeX size={16} />
+              {isMicMuted ? <MicOff size={22} /> : <Mic size={22} />}
+              <span>{isMicMuted ? 'Вкл. микрофон' : 'Микрофон'}</span>
+            </button>
+
+            <button type="button" className="cw-live-btn end" onClick={stopVoiceChat} title="Закончить разговор">
+              <VolumeX size={24} />
               <span>Закончить разговор</span>
+            </button>
+
+            <button
+              type="button"
+              className={`cw-live-btn ${isSpeakerLoud ? 'on' : ''}`}
+              onClick={toggleSpeakerLoud}
+              title="Громкая связь"
+            >
+              {isSpeakerLoud ? <Volume2 size={22} /> : <Volume1 size={22} />}
+              <span>{isSpeakerLoud ? 'Громкая' : 'Тихо'}</span>
             </button>
           </div>
         </div>
       )}
-
       {/* Input */}
 
 
