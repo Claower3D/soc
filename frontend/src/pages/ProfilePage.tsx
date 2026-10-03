@@ -385,6 +385,17 @@ export function ProfilePage() {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const handleOpenSettings = (e: any) => {
+      if (isMe) {
+        setEditProfileInitialTab(e.detail?.tab || 'privacy');
+        setIsEditProfileOpen(true);
+      }
+    };
+    window.addEventListener('open-profile-settings', handleOpenSettings);
+    return () => window.removeEventListener('open-profile-settings', handleOpenSettings);
+  }, [isMe]);
+
   const isUserOnline = useMemo(() => {
     if (isMe) return true;
     return Boolean(profileData?.online ?? activeUser?.online);
@@ -629,10 +640,24 @@ export function ProfilePage() {
           className="cover-img" 
         />
         <div className="cover-gradient" />
+        {isMe && (
+          <button
+            type="button"
+            className="profile-cover-settings-btn"
+            onClick={() => {
+              setEditProfileInitialTab('privacy');
+              setIsEditProfileOpen(true);
+            }}
+            title="Настройки профиля и безопасности"
+          >
+            <Settings size={15} />
+            <span>Настройки</span>
+          </button>
+        )}
       </div>
 
       {/* Profile Header Card */}
-                        <div className="profile-header-container">
+      <div className="profile-header-container">
         <div className="profile-header-card profile-instagram-layout">
           
           <div className="profile-top-layout">
@@ -674,6 +699,15 @@ export function ProfilePage() {
                       <PremiumBadge size="lg" showText />
                     </span>
                   )}
+                  <button 
+                    type="button" 
+                    className={`profile-share-mini-btn ${copiedLink ? 'copied' : ''}`}
+                    onClick={handleShareProfile}
+                    title="Поделиться профилем"
+                  >
+                    <Share2 size={12} />
+                    <span>{copiedLink ? 'Скопировано!' : 'Поделиться'}</span>
+                  </button>
                 </div>
 
                 <div className="username-role-row" style={{ margin: 0 }}>
@@ -906,20 +940,11 @@ export function ProfilePage() {
                   <button className="btn btn-secondary" onClick={() => { setEditProfileInitialTab('general'); setIsEditProfileOpen(true); }}>
                     <Edit3 size={14} /> Редактировать
                   </button>
-                  <button className="btn btn-secondary" onClick={() => { setEditProfileInitialTab('privacy'); setIsEditProfileOpen(true); }} title="Настройки профиля и безопасности">
-                    <Settings size={14} /> Настройки
-                  </button>
-                  <button className="btn btn-secondary" onClick={handleShareProfile}>
-                    <Share2 size={14} /> {copiedLink ? 'Скопировано!' : 'Поделиться'}
-                  </button>
                 </>
               ) : (
                 <>
                   <button className="btn btn-primary" onClick={() => setAuthModalOpen(true)}>
                     <LogIn size={16} /> Войти в аккаунт
-                  </button>
-                  <button className="btn btn-secondary" onClick={handleShareProfile}>
-                    <Share2 size={16} /> Поделиться
                   </button>
                 </>
               )

@@ -24,6 +24,39 @@
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.4) 100%);
 }
 
+.profile-cover-settings-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-full, 9999px);
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 5;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  user-select: none;
+}
+
+.profile-cover-settings-btn:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.profile-cover-settings-btn:active {
+  transform: scale(0.96);
+}
+
 /* Header Container */
 .profile-header-container {
   padding: 0 1.5rem;
@@ -307,6 +340,54 @@
   0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
   50% { box-shadow: 0 0 12px 2px rgba(245, 158, 11, 0.2); }
 }
+
+/* Mini Share Profile Button next to Premium */
+.profile-share-mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.22rem 0.65rem;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--color-bg-secondary, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+  color: var(--color-text-secondary, #94a3b8);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  line-height: 1;
+}
+
+.profile-share-mini-btn:hover {
+  background: var(--color-bg-tertiary, rgba(255, 255, 255, 0.12));
+  border-color: var(--color-accent, #6366f1);
+  color: var(--color-accent, #818cf8);
+  transform: translateY(-1px);
+}
+
+.profile-share-mini-btn.copied {
+  background: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  color: #10b981 !important;
+}
+
+.profile-share-mini-btn:active {
+  transform: scale(0.96);
+}
+
+[data-theme="light"] .profile-share-mini-btn {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+[data-theme="light"] .profile-share-mini-btn:hover {
+  background: #e2e8f0;
+  border-color: #6366f1;
+  color: #4f46e5;
+}
+
 
 .meta-belief {
   background: #FFFFFF;

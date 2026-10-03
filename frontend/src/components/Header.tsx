@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Video, Headphones,
   Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
   Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Globe, ChevronDown,
-  MessageCircle, UserPlus, Trash2, X
+  MessageCircle, UserPlus, Trash2, X, Settings
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -43,6 +43,8 @@ export function Header() {
   const localeRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const isProfilePage = location.pathname.startsWith('/profile');
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -553,6 +555,19 @@ export function Header() {
                 </div>
               )}
             </div>
+
+            {isProfilePage && (
+              <button
+                className="header-action-btn header-settings-pill"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('open-profile-settings', { detail: { tab: 'privacy' } }));
+                }}
+                title="Настройки профиля и безопасности"
+              >
+                <Settings size={16} />
+                <span className="btn-text">Настройки</span>
+              </button>
+            )}
 
             <button
               className="header-profile-badge"
