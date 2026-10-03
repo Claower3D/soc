@@ -361,6 +361,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<any>(null);
   const currentVoiceQueryRef = useRef<string>('');
+  const finalTranscriptRef = useRef<string>('');
   const isVoiceChatActiveRef = useRef(isVoiceChatActive);
   isVoiceChatActiveRef.current = isVoiceChatActive;
   const isMicMutedRef = useRef(isMicMuted);
@@ -727,34 +728,37 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         if (isMicMutedRef.current) return;
 
         let interim = '';
-        let final = '';
+        let newFinal = '';
 
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const item = event.results[i];
           if (item && item[0]) {
             const transcript = item[0].transcript;
             if (item.isFinal) {
-              final += transcript;
+              newFinal += transcript + ' ';
             } else {
               interim += transcript;
             }
           }
         }
 
-        const currentSpoken = (final || interim).trim();
-        if (currentSpoken) {
-          setLiveTranscript(currentSpoken);
-          currentVoiceQueryRef.current = (currentVoiceQueryRef.current ? currentVoiceQueryRef.current + ' ' : '') + currentSpoken;
+        if (newFinal) {
+          finalTranscriptRef.current = (finalTranscriptRef.current + ' ' + newFinal).trim();
+        }
+
+        const currentCombined = (finalTranscriptRef.current + ' ' + interim).trim();
+        if (currentCombined) {
+          setLiveTranscript(currentCombined);
 
           if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = setTimeout(() => {
-            const queryToSend = currentVoiceQueryRef.current.trim();
+            const queryToSend = (finalTranscriptRef.current + ' ' + interim).trim();
             if (queryToSend && isVoiceChatActiveRef.current) {
-              currentVoiceQueryRef.current = '';
+              finalTranscriptRef.current = '';
               setLiveTranscript('');
               handleVoiceQuerySubmit(queryToSend);
             }
-          }, 1400); // 1.4 секунды паузы отправляют фразу
+          }, 1300); // 1.3 секунды паузы фиксируют сказанную фразу и транскрибируют её в сообщение
         }
       };
 
@@ -786,6 +790,9 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch {}
     }
+
+    finalTranscriptRef.current = '';
+    setLiveTranscript('');
 
     const newMsg: Message = {
       id: `msg_${Date.now()}`,
@@ -829,6 +836,8 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         speakAloud(replyText, () => {
           if (isVoiceChatActiveRef.current) {
             setVoiceStatus('listening');
+            finalTranscriptRef.current = '';
+            setLiveTranscript('');
             if (!isMicMutedRef.current) {
               startRecognition();
             }
@@ -841,6 +850,8 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       setIsAiTyping(false);
       if (isVoiceChatActiveRef.current) {
         setVoiceStatus('listening');
+        finalTranscriptRef.current = '';
+        setLiveTranscript('');
         startRecognition();
       }
     }
@@ -852,6 +863,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       setIsVoiceChatActive(true);
       setVoiceStatus('listening');
       setLiveTranscript('');
+      finalTranscriptRef.current = '';
       currentVoiceQueryRef.current = '';
       startRecognition();
     } catch (err) {
@@ -864,6 +876,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     setIsVoiceChatActive(false);
     setVoiceStatus('idle');
     setLiveTranscript('');
+    finalTranscriptRef.current = '';
     currentVoiceQueryRef.current = '';
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
@@ -1336,14 +1349,14 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
             <button 
               className={`cw-voice-header-btn ${isVoiceChatActive ? 'active' : ''}`}
               onClick={toggleVoiceChat}
-              title={isVoiceChatActive ? "Завершить голосовой чат" : "Начать голосовой чат на громкой связи"}
+              title={isVoiceChatActive ? "Закончить разговор" : "Начать разговор на громкой связи"}
             >
-              <Volume2 size={16} className={isVoiceChatActive ? 'pulse-anim' : ''} />
+              {isVoiceChatActive ? <VolumeX size={16} /> : <Volume2 size={16} className="pulse-anim" />}
               <div className="cw-voice-header-text">
                 <span className="cw-voice-header-title">
-                  {isVoiceChatActive ? 'Голосовой чат ВКЛ' : 'Голосовой чат'}
+                  {isVoiceChatActive ? 'Закончить разговор' : 'Начать разговор'}
                 </span>
-                <span className="cw-voice-header-sub">Громкая связь</span>
+                <span className="cw-voice-header-sub">Громкая связь • Текст</span>
               </div>
             </button>
           ) : (
@@ -1365,16 +1378,16 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                 <Sparkles size={20} />
               </div>
               <div className="cw-voice-banner-info">
-                <div className="cw-voice-banner-title">Голосовой диалог с ИИ Оракулом</div>
-                <div className="cw-voice-banner-sub">Общайтесь вслух на громкой связи без клавиатуры — слушайте ответы голосом</div>
+                <div className="cw-voice-banner-title">Голосовой разговор с Оракулом (транскрипция в текст)</div>
+                <div className="cw-voice-banner-sub">Общайтесь вслух на громкой связи: ваши слова и ответы Оракула сохраняются в чат</div>
               </div>
             </div>
             <button 
               className={`cw-voice-banner-btn ${isVoiceChatActive ? 'active' : ''}`}
               onClick={toggleVoiceChat}
             >
-              <Volume2 size={16} />
-              <span>{isVoiceChatActive ? 'Завершить чат' : 'Начать голосовой чат (Громкая связь)'}</span>
+              {isVoiceChatActive ? <VolumeX size={16} /> : <Volume2 size={16} />}
+              <span>{isVoiceChatActive ? 'Закончить разговор' : 'Начать разговор'}</span>
             </button>
           </div>
         )}
@@ -1570,6 +1583,21 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         )}
 
 
+        {/* Live speech transcription bubble in chat */}
+        {isVoiceChatActive && liveTranscript && (
+          <div className="cw-msg-row outgoing live-transcribing">
+            <div className="cw-bubble me cw-bubble-live">
+              <div className="cw-bubble-text">{liveTranscript}</div>
+              <div className="cw-bubble-meta">
+                <span className="cw-live-indicator">
+                  <span className="cw-live-dot" />
+                  транскрибация речи...
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
 
 
@@ -1731,13 +1759,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               <span className={`cw-voice-status-dot ${voiceStatus}`} />
               <div className="cw-voice-status-info">
                 <span className="cw-voice-status-title">
-                  {voiceStatus === 'listening' && (isMicMuted ? 'Микрофон заглушен' : 'Слушаю вас... Говорите свободно')}
+                  {voiceStatus === 'listening' && (isMicMuted ? 'Микрофон заглушен' : 'Слушаю вас... Говорите (текст сразу пишется в чат)')}
                   {voiceStatus === 'thinking' && 'Оракул думает над ответом...'}
-                  {voiceStatus === 'speaking' && 'Оракул говорит (громкая связь)'}
+                  {voiceStatus === 'speaking' && 'Оракул отвечает голосом...'}
                   {voiceStatus === 'idle' && 'Пауза'}
                 </span>
                 <span className="cw-voice-status-sub">
-                  {isSpeakerLoud ? '🔊 Громкая связь активна (100% громкости)' : '🔈 Обычная громкость'}
+                  {isSpeakerLoud ? '🔊 Громкая связь активна • Авто-транскрипция в текст' : '🔈 Обычная громкость'}
                 </span>
               </div>
             </div>
@@ -1795,10 +1823,10 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               type="button"
               className="cw-voice-ctrl-btn stop"
               onClick={stopVoiceChat}
-              title="Завершить голосовой режим"
+              title="Закончить разговор"
             >
-              <X size={16} />
-              <span>Завершить</span>
+              <VolumeX size={16} />
+              <span>Закончить разговор</span>
             </button>
           </div>
         </div>
@@ -1927,33 +1955,25 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           </button>
 
 
+        ) : isAi ? (
+          <button 
+            type="button"
+            className={`cw-voice-input-btn ${isVoiceChatActive ? 'active' : ''}`}
+            onClick={toggleVoiceChat}
+            title={isVoiceChatActive ? "Закончить разговор" : "Начать разговор на громкой связи"}
+          >
+            {isVoiceChatActive ? <VolumeX size={18} /> : <Mic size={18} />}
+            <span>{isVoiceChatActive ? 'Закончить разговор' : 'Начать разговор'}</span>
+          </button>
         ) : (
-
-
           <>
-
-
             <button className="cw-input-icon" onClick={handleVoiceRecord} disabled={isRecording}>
-
-
               <Mic size={20} />
-
-
             </button>
-
-
             <button className="cw-input-icon" onClick={handleVideoRecord} disabled={isRecording}>
-
-
               <Video size={20} />
-
-
             </button>
-
-
           </>
-
-
         )}
 
 
