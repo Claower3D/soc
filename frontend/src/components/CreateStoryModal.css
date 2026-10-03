@@ -1,1360 +1,1121 @@
 /* ========================================================================= */
-/* NEW AGE STORY CAMERA OVERLAY & CONTAINER (MATCHING MOBILE SCREENSHOTS)   */
+/* INSTAGRAM-STYLE STORY CAMERA & PREVIEW (PURE IMMERSIVE FULLSCREEN)       */
 /* ========================================================================= */
 
 .newage-story-camera-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(5, 8, 14, 0.88);
-  backdrop-filter: blur(16px);
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(20px);
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem;
-  animation: cameraFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  touch-action: manipulation;
+  animation: instaFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes cameraFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+@keyframes instaFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-.newage-story-camera-container {
+.newage-story-camera-container.insta-fullscreen {
   width: 100%;
   max-width: 440px;
   height: 94vh;
-  max-height: 840px;
-  background: #0b0f19;
-  border-radius: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 40px rgba(99, 102, 241, 0.15);
+  max-height: 880px;
+  background: #000000;
+  border-radius: 36px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 0, 0, 0.8);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
-  user-select: none;
 }
 
 @media (max-width: 600px) {
-  .newage-story-camera-overlay {
-    padding: 0;
-  }
-  .newage-story-camera-container {
-    max-width: 100%;
+  .newage-story-camera-container.insta-fullscreen {
+    max-width: 100vw;
     height: 100vh;
     max-height: 100vh;
     border-radius: 0;
-    border: none;
-  }
-  .story-camera-top-bar {
-    padding: 0.5rem 0.6rem 0.3rem;
-    gap: 0.35rem;
-  }
-  .story-top-title-block {
-    flex-shrink: 0;
-  }
-  .story-top-title {
-    font-size: 0.82rem;
-  }
-  .story-top-brand {
-    font-size: 0.68rem;
-  }
-  .story-top-mode-pills {
-    padding: 2px;
-    gap: 1px;
-  }
-  .story-mode-pill {
-    padding: 3px 6px;
-    font-size: 0.68rem;
-    gap: 3px;
-  }
-  .story-stage-row {
-    min-height: 320px;
-    padding: 0.2rem 0.6rem 0;
-  }
-  .story-category-tabs-row {
-    padding: 0.35rem 0.6rem 0;
-    gap: 4px;
-  }
-  .story-cat-pill {
-    padding: 4px 8px;
-    font-size: 0.68rem;
-  }
-  .story-bottom-drawer {
-    padding: 0.3rem 0.6rem 0;
-  }
-  .story-bottom-action-bar {
-    padding: 0.4rem 0.6rem 0.6rem;
-  }
-  .action-publish-btn {
-    padding: 6px 10px;
-    font-size: 0.74rem;
+    box-shadow: none;
   }
 }
 
 /* ========================================================================= */
-/* VIEW 1: STORY CAMERA VIEW (Камера историй New Age)                        */
+/* WHITE FLASH ON SNAP                                                       */
 /* ========================================================================= */
 
-.story-camera-view {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+.camera-flash-overlay {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.16s ease-out;
+}
+
+.camera-flash-overlay.active {
+  opacity: 0.95;
+}
+
+/* ========================================================================= */
+/* MAIN IMMERSIVE VIEWFINDER                                                 */
+/* ========================================================================= */
+
+.insta-story-viewfinder {
+  position: relative;
   width: 100%;
-  justify-content: space-between;
-  position: relative;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-bottom: 0.25rem;
-}
-
-/* Top Navigation Bar */
-.story-camera-top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.8rem 1rem 0.5rem;
-  gap: 0.5rem;
-  z-index: 20;
-}
-
-.story-nav-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  border: none;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.story-nav-btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  transform: scale(1.05);
-}
-
-.story-top-title-block {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.15;
-}
-
-.story-top-title {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #ffffff;
-  letter-spacing: -0.2px;
-}
-
-.story-top-brand {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #818cf8;
-}
-
-/* Mode Switcher Tabs */
-.story-top-mode-pills {
-  display: flex;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.06);
-  padding: 3px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  gap: 2px;
-}
-
-.story-mode-pill {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 4px 9px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.story-mode-pill:hover {
-  color: #ffffff;
-}
-
-.story-mode-pill.active {
-  background: #1e293b;
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-}
-
-.story-mode-pill.live-pill.active {
-  background: #ef4444;
-  color: #ffffff;
-}
-
-.story-top-confirm-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.story-top-confirm-btn:hover {
-  background: rgba(99, 102, 241, 0.9);
-  border-color: #818cf8;
-  transform: scale(1.08);
-}
-
-/* ========================================================================= */
-/* MAIN STAGE (Central Viewfinder + Right Tools Column)                      */
-/* ========================================================================= */
-
-.story-stage-row {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  position: relative;
-  padding: 0.25rem 0.8rem 0;
-  flex: 1;
-  min-height: 380px;
-  max-height: 480px;
-  gap: 0.6rem;
-}
-
-/* Central Viewfinder Card */
-.story-viewfinder-card {
-  flex: 1;
-  border-radius: 24px;
-  position: relative;
-  overflow: hidden;
+  height: 100%;
   background: #000000;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
 }
 
-.viewfinder-media-layer,
-.viewfinder-photo-layer {
+/* Full-bleed video feed */
+.insta-video-stream {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  object-fit: cover;
   z-index: 1;
 }
 
-.viewfinder-photo-layer {
-  background-size: cover;
-  background-position: center;
-}
-
-.viewfinder-video-stream {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.viewfinder-video-stream.mirror-camera {
+.insta-video-stream.mirror-camera {
   transform: scaleX(-1);
 }
 
-.viewfinder-retake-btn {
+.insta-photo-layer {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 12;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  padding: 5px 12px;
-  border-radius: 16px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.viewfinder-retake-btn:hover {
-  background: rgba(99, 102, 241, 0.85);
-  border-color: #818cf8;
-  transform: scale(1.05);
-}
-
-.viewfinder-camera-placeholder {
+  inset: 0;
   width: 100%;
   height: 100%;
+  background-size: cover;
+  background-position: center;
+  z-index: 2;
+}
+
+.text-mode-canvas {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #090d16;
-  color: #94a3b8;
-  padding: 1.5rem;
+  padding: 2rem;
+  cursor: pointer;
+}
+
+.text-mode-placeholder {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 1.3rem;
+  font-weight: 600;
   text-align: center;
 }
 
-.viewfinder-camera-loading {
+.text-mode-display {
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.4;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+/* Loading & Error States */
+.insta-camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  background: #090d16;
+  padding: 1.5rem;
+}
+
+.insta-camera-loading,
+.insta-camera-error {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 0.82rem;
-  color: #94a3b8;
+  gap: 1rem;
+  text-align: center;
+  color: #ffffff;
+  max-width: 320px;
 }
 
 .spin-icon {
   animation: spin 1.2s linear infinite;
-  color: #6366f1;
 }
 
 @keyframes spin {
-  100% { transform: rotate(360deg); }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-.viewfinder-camera-error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 0.8rem;
-  color: #f87171;
-  max-width: 280px;
-}
-
-.btn-camera-retry {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+.btn-insta-pill {
+  padding: 10px 20px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.15);
   color: #ffffff;
-  padding: 6px 14px;
-  border-radius: 18px;
-  font-size: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 0.88rem;
   font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
-.btn-camera-retry:hover {
-  background: rgba(255, 255, 255, 0.22);
+.btn-insta-pill.primary {
+  background: #6366f1;
+  border-color: #818cf8;
+}
+
+.btn-insta-pill:hover {
   transform: scale(1.04);
 }
 
-.btn-camera-retry.gallery-btn {
-  background: rgba(99, 102, 241, 0.25);
-  border-color: rgba(99, 102, 241, 0.5);
-  color: #a5b4fc;
-}
+/* ========================================================================= */
+/* TOP HUD (Close, Flash, Preview Tools)                                     */
+/* ========================================================================= */
 
-.btn-camera-retry.gallery-btn:hover {
-  background: rgba(99, 102, 241, 0.4);
-}
-
-/* Author Badge inside Viewfinder */
-.viewfinder-author-badge {
+.insta-top-hud {
   position: absolute;
-  top: 14px;
-  left: 14px;
-  z-index: 10;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 16px 18px 24px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
-  padding: 4px 12px 4px 5px;
-  border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.author-badge-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 1.5px solid #6366f1;
-}
-
-.author-badge-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-}
-
-.author-name {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.author-tag {
-  font-size: 0.68rem;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-/* Viewfinder Music Badge */
-.viewfinder-music-badge {
-  position: absolute;
-  top: 56px;
-  left: 14px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  padding: 3px 10px;
-  border-radius: 14px;
-  font-size: 0.7rem;
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.music-pulse {
-  color: #f59e0b;
-  animation: pulse 1.5s infinite;
-}
-
-/* Filter Badge */
-.viewfinder-filter-badge {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(6px);
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 0.68rem;
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-/* Text Overlay on Story */
-.viewfinder-text-overlay {
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  z-index: 8;
-  display: flex;
-  justify-content: center;
-}
-
-.viewfinder-text-overlay.pos-top { top: 90px; }
-.viewfinder-text-overlay.pos-center { top: 40%; }
-.viewfinder-text-overlay.pos-bottom { bottom: 90px; }
-
-.viewfinder-text-overlay p {
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(6px);
-  padding: 6px 14px;
-  border-radius: 14px;
-  color: #ffffff;
-  font-size: 0.95rem;
-  font-weight: 600;
-  text-align: center;
-  margin: 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-/* AR Masks Overlays */
-.ar-mask-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  z-index: 30;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.65) 0%, rgba(0, 0, 0, 0.25) 60%, transparent 100%);
   pointer-events: none;
 }
 
-.ar-emoji {
-  font-size: 3.5rem;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.6));
-  animation: floatEmoji 2.5s ease-in-out infinite alternate;
+.insta-top-hud > * {
+  pointer-events: auto;
 }
 
-@keyframes floatEmoji {
-  from { transform: translateY(-6px) scale(0.98); }
-  to { transform: translateY(6px) scale(1.02); }
-}
-
-/* Viewfinder Bottom HUD (Timer + Flip + Big Shutter + Mic) */
-.viewfinder-bottom-hud {
-  position: absolute;
-  bottom: 12px;
-  left: 0;
-  right: 0;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-}
-
-.hud-timer-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: #ffffff;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
-  padding: 2px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  letter-spacing: 0.4px;
-}
-
-.hud-rec-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #ef4444;
-}
-
-.hud-rec-dot.blinking {
-  animation: blinkRec 0.9s infinite alternate;
-}
-
-@keyframes blinkRec {
-  from { opacity: 0.3; transform: scale(0.8); }
-  to { opacity: 1; transform: scale(1.2); }
-}
-
-.hud-controls-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  width: 100%;
-  max-width: 240px;
-}
-
-.hud-action-circle-btn {
+.insta-icon-btn {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.18s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.hud-action-circle-btn:hover {
-  background: rgba(255, 255, 255, 0.28);
-  transform: scale(1.06);
-}
-
-.hud-action-circle-btn.muted {
-  background: rgba(239, 68, 68, 0.4);
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.6);
-}
-
-/* Big Central Shutter Button */
-.hud-shutter-btn {
-  width: 66px;
-  height: 66px;
-  border-radius: 50%;
-  background: transparent;
-  border: 4px solid #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.15s ease;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-}
-
-.hud-shutter-btn:hover {
-  transform: scale(1.05);
-}
-
-.hud-shutter-btn:active {
-  transform: scale(0.95);
-}
-
-.hud-shutter-inner {
-  border-radius: 50%;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.hud-shutter-inner.red {
-  width: 48px;
-  height: 48px;
-  background: #ef4444;
-}
-
-.hud-shutter-inner.white {
-  width: 48px;
-  height: 48px;
-  background: #ffffff;
-}
-
-.hud-shutter-btn.is-recording .hud-shutter-inner {
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  background: #ef4444;
-}
-
-/* ========================================================================= */
-/* RIGHT VERTICAL TOOLS COLUMN (Aa, Stickers, Music, Sparkles, Expanded)     */
-/* ========================================================================= */
-
-.story-vertical-tools-column {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  z-index: 15;
-  padding: 4px 0;
-  flex-shrink: 0;
-  transition: all 0.25s ease;
-}
-
-.story-tool-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  transition: all 0.2s;
-}
-
-.story-tool-icon-box {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(8px);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.2s;
-}
-
-.story-tool-item:hover .story-tool-icon-box,
-.story-tool-item.active .story-tool-icon-box {
-  background: rgba(99, 102, 241, 0.85);
-  border-color: rgba(129, 140, 248, 0.6);
+.insta-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
   transform: scale(1.08);
 }
 
-.tool-typography-icon {
+.insta-top-center-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.insta-preview-top-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.insta-tool-text-icon {
+  font-size: 1.15rem;
   font-weight: 800;
-  font-size: 1.05rem;
   letter-spacing: -0.5px;
 }
 
-.story-tool-label {
-  font-size: 0.72rem;
-  font-weight: 600;
+/* Music sticker badge */
+.insta-music-pill {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-  white-space: nowrap;
-}
-
-.story-tool-expand-btn .story-tool-icon-box {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-/* ========================================================================= */
-/* CATEGORY TABS & BOTTOM DRAWER                                             */
-/* ========================================================================= */
-
-.story-category-tabs-row {
+  padding: 6px 14px;
+  border-radius: 20px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0.5rem 0.8rem 0;
-}
-
-.story-cat-pill {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 5px 11px;
-  font-size: 0.72rem;
+  gap: 7px;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: #94a3b8;
+  z-index: 25;
+}
+
+.music-pill-del {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
   cursor: pointer;
-  transition: all 0.2s;
+  margin-left: 4px;
 }
 
-.story-cat-pill:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.1);
-}
+/* ========================================================================= */
+/* LEFT VERTICAL FLOATING TOOLS (Instagram Screenshot 3)                     */
+/* ========================================================================= */
 
-.story-cat-pill.active {
-  background: #1e293b;
-  color: #ffffff;
-  border-color: rgba(99, 102, 241, 0.6);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.story-bottom-drawer {
-  padding: 0.4rem 0.8rem 0;
+.insta-left-vertical-toolbar {
+  position: absolute;
+  left: 14px;
+  top: 78px;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 14px;
+  z-index: 25;
 }
 
-.drawer-pane {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-/* Filters & Masks row */
-.drawer-filters-row {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 2px 0;
-  scrollbar-width: none;
-}
-
-.drawer-filters-row::-webkit-scrollbar {
-  display: none;
-}
-
-.drawer-filter-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
+.insta-left-tool-btn {
   background: transparent;
   border: none;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.filter-thumb-box {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background-size: cover;
-  background-position: center;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  transition: all 0.2s;
-}
-
-.drawer-filter-card.active .filter-thumb-box {
-  border-color: #6366f1;
-  transform: scale(1.08);
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.6);
-}
-
-.filter-thumb-name {
-  font-size: 0.65rem;
-  color: #94a3b8;
-  font-weight: 500;
-  max-width: 50px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.drawer-filter-card.active .filter-thumb-name {
-  color: #ffffff;
-  font-weight: 700;
-}
-
-/* AR Masks row */
-.drawer-masks-row {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding: 2px 0;
-  scrollbar-width: none;
-}
-
-.drawer-masks-row::-webkit-scrollbar {
-  display: none;
-}
-
-.drawer-mask-pill {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 4px 9px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.drawer-mask-pill.active {
-  background: rgba(99, 102, 241, 0.25);
-  border-color: #6366f1;
-}
-
-.mask-emoji {
-  font-size: 0.95rem;
-}
-
-.mask-name {
-  font-size: 0.68rem;
-  color: #ffffff;
-  font-weight: 500;
-}
-
-/* Backgrounds tab */
-.drawer-bg-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-open-gallery-picker {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: #1e293b;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-  padding: 6px 12px;
-  border-radius: 14px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-open-gallery-picker:hover {
-  background: #334155;
-}
-
-.btn-open-gallery-picker.upload {
-  background: rgba(99, 102, 241, 0.2);
-  border-color: rgba(99, 102, 241, 0.5);
-  color: #818cf8;
-}
-
-.drawer-bg-thumbnails {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-}
-
-.bg-thumb-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background-size: cover;
-  background-position: center;
-  border: 2px solid transparent;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.bg-thumb-btn.active {
-  border-color: #6366f1;
-  transform: scale(1.06);
-}
-
-/* Text tab */
-.drawer-stickers-row {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.quick-stk-chip {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  border-radius: 14px;
-  padding: 4px 9px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.text-pos-switcher {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  color: #94a3b8;
-}
-
-.pos-pill {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #cbd5e1;
-  border-radius: 12px;
-  padding: 3px 8px;
-  font-size: 0.7rem;
-  cursor: pointer;
-}
-
-.pos-pill.active {
-  background: #6366f1;
-  color: #ffffff;
-}
-
-/* Caption Input */
-.story-caption-input-box {
-  width: 100%;
-}
-
-.story-caption-field {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  padding: 8px 12px;
-  color: #ffffff;
-  font-size: 0.82rem;
-  outline: none;
-  transition: border-color 0.2s;
-  box-sizing: border-box;
-}
-
-.story-caption-field:focus {
-  border-color: #6366f1;
-}
-
-.story-caption-field::placeholder {
-  color: #64748b;
-}
-
-/* ========================================================================= */
-/* INSTAGRAM AR EFFECT WHEEL (Screenshot: media_1789991567406.jpg)           */
-/* ========================================================================= */
-
-.story-effect-wheel-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.18s ease;
+}
+
+.insta-left-tool-btn:hover {
+  transform: scale(1.08);
+}
+
+.insta-left-tool-btn.active .insta-left-tool-icon {
+  background: rgba(99, 102, 241, 0.85);
+  border-color: #818cf8;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.6);
+}
+
+.insta-left-tool-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(14px);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  padding: 0.5rem 0 0.8rem;
-  width: 100%;
-  position: relative;
-  animation: fadeInEffectWheel 0.2s ease-out;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
-@keyframes fadeInEffectWheel {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+.left-aa-symbol {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
 }
 
-.effect-wheel-track {
+.insta-left-tool-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin-top: 3px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+}
+
+/* ========================================================================= */
+/* BOTTOM CAMERA HUD (Shutter, Gallery, Flip, Mode Slider)                  */
+/* ========================================================================= */
+
+.insta-bottom-camera-hud {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px 20px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.4) 65%, transparent 100%);
+  pointer-events: none;
+}
+
+.insta-bottom-camera-hud > * {
+  pointer-events: auto;
+}
+
+/* Recording timer indicator */
+.insta-rec-timer-pill {
+  background: rgba(239, 68, 68, 0.9);
+  color: #ffffff;
+  padding: 4px 14px;
+  border-radius: 16px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.5);
+  animation: pulse 1s infinite alternate;
+}
+
+.rec-red-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+/* Lens Carousel */
+.insta-lenses-carousel {
   display: flex;
   align-items: center;
   gap: 14px;
   overflow-x: auto;
-  width: 100%;
-  padding: 6px calc(50% - 31px);
+  max-width: 100%;
+  padding: 6px 12px;
   scrollbar-width: none;
-  scroll-snap-type: x mandatory;
 }
 
-.effect-wheel-track::-webkit-scrollbar {
+.insta-lenses-carousel::-webkit-scrollbar {
   display: none;
 }
 
-.effect-wheel-lens {
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  flex-shrink: 0;
-  scroll-snap-align: center;
-  transition: all 0.22s cubic-bezier(0.25, 1, 0.5, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.wheel-lens-inner {
-  width: 48px;
-  height: 48px;
+.insta-lens-circle {
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.28);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.35);
   overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  background: #1e293b;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
-  transition: all 0.22s cubic-bezier(0.25, 1, 0.5, 1);
-}
-
-.effect-wheel-lens.lens-center-active .wheel-lens-inner {
-  width: 62px;
-  height: 62px;
-  border: 3.5px solid #ffffff;
-  box-shadow: 0 0 18px rgba(255, 255, 255, 0.5), 0 6px 18px rgba(0, 0, 0, 0.7);
-  transform: scale(1.06);
-}
-
-.lens-none-graphic {
-  width: 100%;
-  height: 100%;
-  background: #374151;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.lens-ban-icon {
-  font-size: 1.85rem;
-  color: #f1f5f9;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.lens-thumb-graphic {
-  width: 100%;
-  height: 100%;
-  background-size: cover;
-  background-position: center;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.lens-emoji-tag {
-  font-size: 1.3rem;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
-}
-
-.lens-emoji-only {
-  font-size: 1.5rem;
-}
-
-.effect-wheel-name-badge {
-  margin-top: 8px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: #ffffff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
-  letter-spacing: -0.1px;
-}
-
-/* ========================================================================= */
-/* BOTTOM ACTION BAR (Ваша история, Близкие друзья, >)                      */
-/* ========================================================================= */
-
-.story-bottom-action-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.6rem 0.8rem 0.8rem;
-  gap: 8px;
-}
-
-.action-publish-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-weight: 600;
-  transition: all 0.2s;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.action-publish-btn:hover {
-  background: rgba(255, 255, 255, 0.16);
-  transform: translateY(-1px);
-}
-
-.action-publish-btn:active {
-  transform: scale(0.97);
-}
-
-.story-avatar-ring {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  padding: 2px;
-  background: linear-gradient(135deg, #f59e0b, #ec4899, #8b5cf6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
 }
 
-.ring-avatar-img {
+.insta-lens-circle.active {
+  border-color: #ffffff;
+  transform: scale(1.18);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.65);
+}
+
+.lens-thumb-img {
   width: 100%;
   height: 100%;
-  border-radius: 50%;
   object-fit: cover;
 }
 
-.close-friends-star-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #10b981;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+.lens-char {
+  font-size: 1.3rem;
 }
 
-.action-publish-circle-next {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #4f46e5;
-  color: #ffffff;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.45);
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.action-publish-circle-next:hover {
-  background: #4338ca;
-  transform: scale(1.08);
-}
-
-.action-publish-circle-next:active {
-  transform: scale(0.94);
-}
-
-/* ========================================================================= */
-/* VIEW 2: GALLERY MEDIA PICKER SCREEN (Дополнить историю)                   */
-/* ========================================================================= */
-
-.story-gallery-view {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  overflow-y: auto;
-  background: #0b0f19;
-  padding: 0.8rem 1rem;
-  gap: 0.9rem;
-}
-
-.story-gallery-top-bar {
+/* Main Shutter Row */
+.insta-shutter-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
+  padding: 0 12px;
 }
 
-.gallery-nav-btn {
-  width: 36px;
-  height: 36px;
+/* Gallery Thumb Button */
+.insta-gallery-thumb-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  border: 2px solid #ffffff;
+  position: relative;
+  overflow: hidden;
+  background: #111827;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+  transition: transform 0.18s ease;
+}
+
+.insta-gallery-thumb-btn:hover {
+  transform: scale(1.08);
+}
+
+.thumb-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gallery-plus-icon {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  background: #6366f1;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* THE INSTAGRAM SHUTTER BUTTON */
+.insta-shutter-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.insta-shutter-button {
+  position: relative;
+  width: 82px;
+  height: 82px;
+  border-radius: 50%;
+  background: transparent;
   border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+  padding: 0;
+  transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.insta-shutter-button:active,
+.insta-shutter-button.is-recording {
+  transform: scale(1.14);
+}
+
+/* Circular SVG Progress Ring */
+.shutter-progress-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+
+.shutter-ring-bg {
+  stroke: rgba(255, 255, 255, 0.88);
+  stroke-width: 4.5;
+  fill: none;
+}
+
+.shutter-ring-fill {
+  stroke: #ef4444;
+  stroke-width: 5.5;
+  fill: none;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.1s linear;
+}
+
+/* Inner Core */
+.shutter-inner-core {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: all 0.18s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shutter-inner-core.recording {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: #ef4444;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.8);
+}
+
+.shutter-quick-hint {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 6px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  letter-spacing: 0.2px;
+}
+
+/* Flip Camera Button */
+.insta-flip-camera-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(14px);
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
-.gallery-view-title {
-  font-size: 1.05rem;
+.insta-flip-camera-btn:hover {
+  transform: rotate(180deg) scale(1.08);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Mode Slider */
+.insta-mode-slider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 4px 0 0;
+}
+
+.mode-slider-item {
+  background: transparent;
+  border: none;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: #ffffff;
-  margin: 0;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  transition: all 0.18s;
+  padding: 4px 6px;
 }
 
-/* 3 Quick Cards: Шаблоны, Музыка, Коллаж */
-.gallery-quick-cards-row {
+.mode-slider-item.active {
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+  position: relative;
+}
+
+.mode-slider-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+/* ========================================================================= */
+/* PREVIEW & PUBLISHING BAR (Instagram Screenshot 1 Bottom Bar)              */
+/* ========================================================================= */
+
+.insta-preview-bottom-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px 18px 24px;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.4) 70%, transparent 100%);
+}
+
+.insta-publish-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  border-radius: 28px;
+  border: none;
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.insta-publish-btn.your-story {
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.insta-publish-btn.your-story:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.02);
+}
+
+.publish-avatar-wrapper {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1.5px solid #ffffff;
+  flex-shrink: 0;
+}
+
+.publish-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.insta-publish-btn.close-friends {
+  background: rgba(34, 197, 94, 0.25);
+  backdrop-filter: blur(14px);
+  border: 1.5px solid rgba(34, 197, 94, 0.7);
+}
+
+.insta-publish-btn.close-friends:hover {
+  background: rgba(34, 197, 94, 0.4);
+  transform: scale(1.02);
+}
+
+.publish-star-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #22c55e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.insta-publish-circle-next {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #6366f1;
+  color: #ffffff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.6);
+}
+
+.insta-publish-circle-next:hover {
+  background: #4f46e5;
+  transform: scale(1.08);
+}
+
+/* ========================================================================= */
+/* TEXT EDITOR OVERLAY                                                       */
+/* ========================================================================= */
+
+.insta-text-editor-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(20px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+}
+
+.text-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
+}
+
+.text-pos-toggle {
+  display: flex;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 2px;
+}
+
+.text-pos-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.text-pos-btn.active {
+  background: #ffffff;
+  color: #000000;
+}
+
+.btn-cycle-color {
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 16px;
+  cursor: pointer;
+}
+
+.btn-text-done {
+  background: #ffffff;
+  color: #000000;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 18px;
+  cursor: pointer;
+}
+
+.text-editor-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 0;
+}
+
+.insta-text-editor-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.4;
+  resize: none;
+  font-family: inherit;
+}
+
+/* Bottom Drawers for Stickers, Music, Filters */
+.insta-drawer-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #111827;
+  border-radius: 28px 28px 0 0;
+  padding: 18px 20px 28px;
+  z-index: 45;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8);
+  animation: slideUp 0.22s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.sheet-header button {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.sheet-filters-list {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.sheet-filter-item {
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #ffffff;
+  font-size: 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sheet-filter-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #1e293b;
+  border: 2px solid;
+}
+
+.sheet-stickers-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 
-.gallery-quick-card {
-  background: #131a29;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+.sheet-sticker-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: #fff;
+  padding: 10px;
+  border-radius: 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sheet-sticker-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.sheet-music-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.sheet-music-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sheet-music-row.active {
+  background: rgba(99, 102, 241, 0.3);
+  border: 1px solid #818cf8;
+}
+
+.sheet-music-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #6366f1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sheet-music-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-music-info b {
+  font-size: 0.85rem;
+}
+
+.sheet-music-info span {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+/* ========================================================================= */
+/* GALLERY MEDIA PICKER VIEW (Screenshot 2 "Дополнить историю")             */
+/* ========================================================================= */
+
+.insta-gallery-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: #000000;
+  color: #ffffff;
+  overflow-y: auto;
+}
+
+.insta-gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gallery-nav-icon {
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.gallery-header-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+/* Quick Action Pills */
+.insta-gallery-pills-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 14px 16px 10px;
+}
+
+.insta-gallery-card-tile {
+  background: #111827;
   border-radius: 18px;
-  padding: 12px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.18s;
 }
 
-.gallery-quick-card:hover {
-  background: #1e283d;
-  border-color: rgba(255, 255, 255, 0.16);
+.insta-gallery-card-tile:hover {
   transform: translateY(-2px);
+  background: #1f2937;
 }
 
-.quick-card-icon-box {
+.card-tile-icon-box {
   width: 44px;
   height: 44px;
   border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
-.template-bg { background: linear-gradient(135deg, #ec4899, #8b5cf6); }
-.music-bg { background: linear-gradient(135deg, #f59e0b, #ef4444); }
-.collage-bg { background: linear-gradient(135deg, #3b82f6, #06b6d4); }
+.template-gradient {
+  background: linear-gradient(135deg, #ec4899, #8b5cf6);
+}
 
-.quick-card-label {
+.music-gradient {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+}
+
+.collage-gradient {
+  background: linear-gradient(135deg, #06b6d4, #3b82f6);
+}
+
+.insta-gallery-card-tile span {
   font-size: 0.78rem;
   font-weight: 600;
-  color: #ffffff;
+  color: #e2e8f0;
 }
 
-/* Filter Subbar */
-.gallery-filter-subbar {
+/* Sub-bar dropdown & buttons */
+.insta-gallery-subbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 10px 16px;
 }
 
 .gallery-filter-select {
   background: transparent;
   border: none;
   color: #ffffff;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 700;
   cursor: pointer;
   outline: none;
 }
 
 .gallery-filter-select option {
-  background: #1e293b;
+  background: #111827;
   color: #ffffff;
 }
 
-.gallery-filter-right-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.btn-gallery-action {
+.gallery-right-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
+  gap: 8px;
+}
+
+.btn-gallery-pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   color: #ffffff;
-  padding: 5px 12px;
-  border-radius: 14px;
-  font-size: 0.74rem;
+  font-size: 0.78rem;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
 }
 
-.btn-gallery-action.outline {
+.btn-gallery-pill.outline {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 /* Media Grid */
-.gallery-media-grid {
+.insta-gallery-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  padding-bottom: 1rem;
+  gap: 3px;
+  padding: 2px 0 16px;
+  flex: 1;
 }
 
 .gallery-camera-tile {
   aspect-ratio: 1;
-  background: #131a29;
-  border-radius: 14px;
-  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: #181c27;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  color: #ffffff;
-  font-size: 0.75rem;
-  font-weight: 600;
+  gap: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.15s;
 }
 
 .gallery-camera-tile:hover {
-  background: #1e283d;
-  border-color: #6366f1;
+  background: #23293a;
 }
 
-.camera-tile-icon-circle {
-  width: 44px;
-  height: 44px;
+.camera-tile-circle {
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
   display: flex;
@@ -1362,13 +1123,18 @@
   justify-content: center;
 }
 
+.gallery-camera-tile span {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
 .gallery-photo-tile {
   aspect-ratio: 1;
-  border-radius: 14px;
-  overflow: hidden;
+  background: #111827;
   cursor: pointer;
+  overflow: hidden;
   position: relative;
-  background: #151c2a;
 }
 
 .gallery-photo-tile img {
@@ -1385,4 +1151,13 @@
 .gallery-photo-tile.selected {
   outline: 3px solid #6366f1;
   outline-offset: -3px;
+}
+
+.insta-gallery-bottom-slider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 14px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }

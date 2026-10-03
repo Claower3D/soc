@@ -1,12 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  X, Camera, Image as ImageIcon, Sparkles, Type, Check, 
-  Radio, Video, Mic, MicOff, RefreshCw, Smile, 
-  Square, Wand2, Eye,
-  ArrowLeft, Music, Bookmark, AtSign, PenLine, 
-  Download, MoreHorizontal, ChevronDown, ChevronUp, 
-  ChevronRight, Star, LayoutTemplate, Grid2X2, Plus,
-  RotateCcw
+  X, Camera, Image as ImageIcon, Sparkles, Check, 
+  RefreshCw, Smile, Square, Eye,
+  ArrowLeft, Music, 
+  Download, ChevronRight, Star, LayoutTemplate, Grid2X2, Plus,
+  RotateCcw, Zap, ZapOff, Infinity as InfinityIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { type Story } from '../data/mock';
@@ -107,37 +105,36 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
   // Screen views: 'camera' | 'gallery'
   const [screen, setScreen] = useState<'camera' | 'gallery'>('camera');
 
-  // Camera modes: 'photo' | 'camera_record' | 'live'
-  const [activeMode, setActiveMode] = useState<'photo' | 'camera_record' | 'live'>('camera_record');
+  // Camera sub-modes: 'story' (default Insta) | 'create_text' | 'boomerang' | 'live'
+  const [cameraSubMode, setCameraSubMode] = useState<'story' | 'create_text' | 'boomerang' | 'live'>('story');
+
+  // Bottom slider active mode: 'post' | 'story' | 'reels' | 'live'
+  const [bottomSliderMode, setBottomSliderMode] = useState<'post' | 'story' | 'reels' | 'live'>('story');
 
   // Photo & Background states
   const [selectedImage, setSelectedImage] = useState<string>(STORY_PRESETS[0]);
   const [selectedGradient, setSelectedGradient] = useState<string | null>(null);
+  const [gradientIdx, setGradientIdx] = useState(0);
   const [storyText, setStoryText] = useState('');
-  const [textPosition, setTextPosition] = useState<'center' | 'bottom' | 'top'>('bottom');
   const [isPhotoSnapped, setIsPhotoSnapped] = useState(false);
+  const [isTextEditing, setIsTextEditing] = useState(false);
+  const [textPosition, setTextPosition] = useState<'center' | 'bottom' | 'top'>('bottom');
   
   // Effects: Filter & AR Mask
   const [activeFilter, setActiveFilter] = useState<StoryFilter>(STORY_FILTERS[0]);
   const [activeMask, setActiveMask] = useState<StoryMask>(STORY_MASKS[0]);
-  const [activeTab, setActiveTab] = useState<'effects' | 'backgrounds' | 'text'>('effects');
   const [selectedMusic, setSelectedMusic] = useState<string | null>(null);
+  const [showMusicPicker, setShowMusicPicker] = useState(false);
+  const [showFilterPicker, setShowFilterPicker] = useState(false);
+  const [showStickersPicker, setShowStickersPicker] = useState(false);
 
   // Instagram AR Effect Wheel mode state
   const [isEffectWheelOpen, setIsEffectWheelOpen] = useState(false);
   const wheelTrackRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (isEffectWheelOpen && wheelTrackRef.current) {
-      const activeEl = wheelTrackRef.current.querySelector('.lens-center-active');
-      if (activeEl) {
-        activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-      }
-    }
-  }, [isEffectWheelOpen, activeMask.id]);
-
-  // Right sidebar expanded state
-  const [isToolsExpanded, setIsToolsExpanded] = useState(false);
+  // Flash & Camera options
+  const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
+  const [isFlashing, setIsFlashing] = useState(false);
 
   // Camera & Recording states
   const [cameraActive, setCameraActive] = useState(false);
@@ -152,14 +149,11 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
   const [userUploadedImages, setUserUploadedImages] = useState<string[]>([]);
 
   // Live Stream broadcast states
-  const [isLiveActive, setIsLiveActive] = useState(false);
-  const [liveViewersCount, setLiveViewersCount] = useState(14);
-  const [liveHearts, setLiveHearts] = useState<number[]>([]);
+  const liveViewersCount = 14;
   const [liveChatMessages, setLiveChatMessages] = useState<Array<{ id: number; name: string; text: string }>>([]);
   const [liveNewMsg, setLiveNewMsg] = useState('');
 
   // Device Controls
-  const [isMuted, setIsMuted] = useState(false);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   // Refs
@@ -169,6 +163,11 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
   const recordedChunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recordIntervalRef = useRef<any>(null);
+
+  // Press & Hold Shutter Tracking
+  const holdTimerRef = useRef<any>(null);
+  const pressStartTimeRef = useRef<number>(0);
+  const isLongPressRef = useRef(false);
 
   // Stop camera stream helper
   const stopCamera = () => {
@@ -209,7 +208,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       console.warn('Camera attempt 1 (video+audio) failed:', err1);
     }
 
-    // 2. Попытка: только видео с идеальным facingMode (если микрофон занят или запрещен)
+    // 2. Попытка: только видео с идеальным facingMode
     try {
       return await navigator.mediaDevices.getUserMedia({
         video: {
@@ -221,7 +220,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       console.warn('Camera attempt 2 (video-only with facingMode) failed:', err2);
     }
 
-    // 3. Попытка: базовое видео без ограничений (для внешних веб-камер на ПК и виртуальных камер)
+    // 3. Попытка: базовое видео без ограничений
     try {
       return await navigator.mediaDevices.getUserMedia({
         video: true,
@@ -268,7 +267,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       }
       videoPreviewRef.current.play().catch(e => console.warn('Video element play error:', e));
     }
-  }, [cameraActive, screen, activeMode, facingMode, isPhotoSnapped]);
+  }, [cameraActive, screen, cameraSubMode, facingMode, isPhotoSnapped]);
 
   const toggleFacingMode = () => {
     setFacingMode(prev => (prev === 'user' ? 'environment' : 'user'));
@@ -279,6 +278,8 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
     if (isOpen) {
       setIsPhotoSnapped(false);
       setRecordedVideoUrl(null);
+      setCameraSubMode('story');
+      setBottomSliderMode('story');
       startCamera();
     } else {
       stopCamera();
@@ -289,28 +290,6 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
     };
   }, [isOpen, facingMode]);
-
-  const handleModeChange = (mode: 'photo' | 'camera_record' | 'live') => {
-    setActiveMode(mode);
-    setRecordedVideoUrl(null);
-    setIsPhotoSnapped(false);
-    setIsLiveActive(mode === 'live');
-    if (!cameraActive) {
-      startCamera();
-    }
-  };
-
-  // Live Stream Heart animations and viewer fluctuations
-  useEffect(() => {
-    if (!isLiveActive) return;
-    const interval = setInterval(() => {
-      setLiveViewersCount(prev => Math.max(8, prev + Math.floor(Math.random() * 5) - 2));
-      if (Math.random() > 0.5) {
-        setLiveHearts(prev => [...prev.slice(-12), Date.now()]);
-      }
-    }, 2500);
-    return () => clearInterval(interval);
-  }, [isLiveActive]);
 
   // Video recording handlers
   const startRecording = () => {
@@ -351,6 +330,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
       recorder.start(500);
       setIsRecording(true);
       setRecordSeconds(0);
+      try { navigator.vibrate?.([60]); } catch {}
 
       if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
       recordIntervalRef.current = setInterval(() => {
@@ -373,50 +353,99 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
     }
     setIsRecording(false);
     if (recordIntervalRef.current) clearInterval(recordIntervalRef.current);
+    try { navigator.vibrate?.([40]); } catch {}
   };
 
-  // Shutter action based on mode
-  const handleShutterClick = () => {
-    if (activeMode === 'camera_record') {
-      if (!isRecording) {
-        startRecording();
-      } else {
-        stopRecording();
-      }
-    } else if (activeMode === 'photo') {
-      // Snap frame from live video
-      if (videoPreviewRef.current && cameraActive) {
-        try {
-          const video = videoPreviewRef.current;
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth || 720;
-          canvas.height = video.videoHeight || 1280;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            if (facingMode === 'user') {
-              ctx.translate(canvas.width, 0);
-              ctx.scale(-1, 1);
-            }
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-            setSelectedImage(dataUrl);
-            setSelectedGradient(null);
-            setIsPhotoSnapped(true);
-            return;
+  // Snap photo from live video
+  const snapPhoto = () => {
+    // Flash effect
+    setIsFlashing(true);
+    try { navigator.vibrate?.([40]); } catch {}
+    setTimeout(() => setIsFlashing(false), 160);
+
+    if (videoPreviewRef.current && cameraActive) {
+      try {
+        const video = videoPreviewRef.current;
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 720;
+        canvas.height = video.videoHeight || 1280;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          if (facingMode === 'user') {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
           }
-        } catch (e) {
-          console.warn('Snap photo error:', e);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+          setSelectedImage(dataUrl);
+          setSelectedGradient(null);
+          setRecordedVideoUrl(null);
+          setIsPhotoSnapped(true);
+          return;
         }
+      } catch (e) {
+        console.warn('Snap photo error:', e);
       }
-      // If camera wasn't active, open gallery
-      setScreen('gallery');
-    } else if (activeMode === 'live') {
-      setIsLiveActive(prev => !prev);
+    }
+    // If camera wasn't active, open gallery
+    setScreen('gallery');
+  };
+
+  // UNIFIED INSTAGRAM SHUTTER HANDLERS:
+  // 1 Tap (< 280ms) = Snap Photo
+  // Press & Hold (> 280ms) = Record Video while held!
+  const handleShutterPointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (cameraSubMode === 'live') {
+      return;
+    }
+
+    pressStartTimeRef.current = Date.now();
+    isLongPressRef.current = false;
+
+    // Start hold timer
+    holdTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      startRecording();
+    }, 280);
+  };
+
+  const handleShutterPointerUp = (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (cameraSubMode === 'live') return;
+
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+
+    const duration = Date.now() - pressStartTimeRef.current;
+
+    if (isLongPressRef.current || isRecording) {
+      // It was a long press video record: stop it now
+      stopRecording();
+      isLongPressRef.current = false;
+    } else if (duration < 280) {
+      // It was a quick single tap: Snap photo!
+      snapPhoto();
     }
   };
 
-  const handleRetakePhoto = () => {
+  const handleShutterPointerCancel = (e: React.PointerEvent) => {
+    e.preventDefault();
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (isLongPressRef.current || isRecording) {
+      stopRecording();
+      isLongPressRef.current = false;
+    }
+  };
+
+  const handleRetakeMedia = () => {
     setIsPhotoSnapped(false);
+    setRecordedVideoUrl(null);
     if (!cameraActive) {
       startCamera();
     }
@@ -434,16 +463,16 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
         setRecordedVideoUrl(null);
         setIsPhotoSnapped(true);
         setScreen('camera');
-        setActiveMode('photo');
+        setCameraSubMode('story');
       };
       reader.readAsDataURL(file);
     }
   };
 
   const handlePublishStory = (isCloseFriends: boolean = false) => {
-    const isLive = activeMode === 'live';
-    const isRecorded = activeMode === 'camera_record' && recordedVideoUrl;
-    const isPhoto = activeMode === 'photo' || !isRecorded;
+    const isLive = cameraSubMode === 'live';
+    const isRecorded = !!recordedVideoUrl;
+    const isPhoto = !isRecorded;
 
     const createdAt = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -519,13 +548,21 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
     setLiveNewMsg('');
   };
 
+  const cycleGradient = () => {
+    const nextIdx = (gradientIdx + 1) % GRADIENT_PRESETS.length;
+    setGradientIdx(nextIdx);
+    setSelectedGradient(GRADIENT_PRESETS[nextIdx]);
+  };
+
   if (!isOpen) return null;
 
-  const showLiveFeed = (cameraActive && !recordedVideoUrl && (!isPhotoSnapped || activeMode !== 'photo'));
+  // Is media ready for preview / publishing (photo captured or video recorded or text mode)
+  const isMediaReady = isPhotoSnapped || !!recordedVideoUrl || (cameraSubMode === 'create_text' && storyText.trim().length > 0);
+  const showLiveFeed = (cameraActive && !recordedVideoUrl && !isPhotoSnapped && cameraSubMode !== 'create_text');
 
   return (
     <div className="newage-story-camera-overlay" onClick={() => { stopCamera(); onClose(); }}>
-      <div className="newage-story-camera-container" onClick={e => e.stopPropagation()}>
+      <div className="newage-story-camera-container insta-fullscreen" onClick={e => e.stopPropagation()}>
         
         {/* Hidden File Input for uploading media */}
         <input
@@ -536,583 +573,356 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
           onChange={handleFileChange}
         />
 
+        {/* White Screen Snap Flash Overlay */}
+        {isFlashing && <div className="camera-flash-overlay active" />}
+
         {/* ========================================================================= */}
-        {/* VIEW 1: CAMERA CREATION SCREEN (Камера историй New Age)                  */}
+        {/* VIEW 1: FULLSCREEN CAMERA & PREVIEW SCREEN                                */}
         {/* ========================================================================= */}
         {screen === 'camera' && (
-          <div className="story-camera-view">
+          <div className="insta-story-viewfinder">
             
-            {/* Top Navigation Bar */}
-            <div className="story-camera-top-bar">
-              <button 
-                type="button" 
-                className="story-nav-btn" 
-                onClick={() => { stopCamera(); onClose(); }}
-                title="Назад / Закрыть"
-              >
-                <ArrowLeft size={22} />
-              </button>
+            {/* Live Camera Feed (Fills 100% of the screen) */}
+            <video
+              ref={videoPreviewRef}
+              autoPlay
+              playsInline
+              muted
+              style={{
+                display: showLiveFeed ? 'block' : 'none',
+                filter: activeFilter.filterCss,
+              }}
+              className={`insta-video-stream ${facingMode === 'user' ? 'mirror-camera' : ''}`}
+            />
 
-              <div className="story-top-title-block">
-                <span className="story-top-title">историй</span>
-                <span className="story-top-brand">New Age</span>
-              </div>
+            {/* Recorded Video Playback */}
+            {recordedVideoUrl && (
+              <video
+                src={recordedVideoUrl}
+                autoPlay
+                loop
+                playsInline
+                className="insta-video-stream recorded-playback"
+                style={{ filter: activeFilter.filterCss }}
+              />
+            )}
 
-              {/* Mode Switcher Tabs */}
-              <div className="story-top-mode-pills">
-                <button
-                  type="button"
-                  className={`story-mode-pill ${activeMode === 'photo' ? 'active' : ''}`}
-                  onClick={() => handleModeChange('photo')}
-                >
-                  <ImageIcon size={13} /> Фото
-                </button>
-                <button
-                  type="button"
-                  className={`story-mode-pill ${activeMode === 'camera_record' ? 'active' : ''}`}
-                  onClick={() => handleModeChange('camera_record')}
-                >
-                  <Video size={13} /> Запись видео
-                </button>
-                <button
-                  type="button"
-                  className={`story-mode-pill live-pill ${activeMode === 'live' ? 'active' : ''}`}
-                  onClick={() => handleModeChange('live')}
-                >
-                  <Radio size={13} /> LIVE Эфир
-                </button>
-              </div>
-
-              {/* Confirm Checkmark Button when Effect Wheel is active (media_1789991567406.jpg) */}
-              {isEffectWheelOpen && (
-                <button
-                  type="button"
-                  className="story-top-confirm-btn"
-                  onClick={() => setIsEffectWheelOpen(false)}
-                  title="Готово"
-                >
-                  <Check size={22} />
-                </button>
-              )}
-            </div>
-
-            {/* Main Stage with Viewfinder & Right Tools Column */}
-            <div className="story-stage-row">
-              
-              {/* Central Viewfinder Card (9:16 Aspect Ratio) */}
+            {/* Snapped Photo Layer */}
+            {isPhotoSnapped && !recordedVideoUrl && (
               <div 
-                className="story-viewfinder-card"
-                style={{
-                  background: (activeMode === 'photo' && (isPhotoSnapped || !cameraActive))
-                    ? (selectedGradient ? selectedGradient : `url(${selectedImage}) center/cover no-repeat`)
-                    : '#000000',
-                }}
+                className="insta-photo-layer" 
+                style={{ 
+                  backgroundImage: selectedGradient ? selectedGradient : `url(${selectedImage})`,
+                  filter: activeFilter.filterCss 
+                }} 
+              />
+            )}
+
+            {/* Create Text Mode Gradient Canvas */}
+            {cameraSubMode === 'create_text' && !isPhotoSnapped && !recordedVideoUrl && (
+              <div 
+                className="insta-photo-layer text-mode-canvas"
+                style={{ background: selectedGradient || GRADIENT_PRESETS[0] }}
+                onClick={() => setIsTextEditing(true)}
               >
-                {/* Live Camera Feed (Always in DOM for instant ref binding) */}
-                <video
-                  ref={videoPreviewRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  style={{
-                    display: showLiveFeed ? 'block' : 'none',
-                    filter: activeFilter.filterCss,
-                  }}
-                  className={`viewfinder-video-stream ${facingMode === 'user' ? 'mirror-camera' : ''}`}
-                />
-
-                {/* Recorded Video Playback */}
-                {recordedVideoUrl && !isRecording && activeMode === 'camera_record' && (
-                  <video
-                    src={recordedVideoUrl}
-                    controls
-                    autoPlay
-                    loop
-                    playsInline
-                    className="viewfinder-video-stream recorded-playback"
-                    style={{ filter: activeFilter.filterCss }}
-                  />
-                )}
-
-                {/* Camera Inactive / Loading / Error State */}
-                {!cameraActive && !isPhotoSnapped && !recordedVideoUrl && (
-                  <div className="viewfinder-camera-placeholder">
-                    {cameraLoading ? (
-                      <div className="viewfinder-camera-loading">
-                        <RefreshCw size={28} className="spin-icon" />
-                        <span>Подключение камеры...</span>
-                      </div>
-                    ) : cameraError ? (
-                      <div className="viewfinder-camera-error">
-                        <p>{cameraError}</p>
-                        <button type="button" className="btn-camera-retry" onClick={startCamera}>
-                          <RefreshCw size={14} /> Повторить попытку
-                        </button>
-                        <button type="button" className="btn-camera-retry gallery-btn" onClick={() => setScreen('gallery')}>
-                          <ImageIcon size={14} /> Выбрать из галереи
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="viewfinder-camera-loading">
-                        <Camera size={32} color="#6366f1" />
-                        <span>Нажмите «Включить камеру»</span>
-                        <button type="button" className="btn-camera-retry" onClick={startCamera}>
-                          Включить камеру
-                        </button>
-                      </div>
-                    )}
+                {!storyText ? (
+                  <div className="text-mode-placeholder">
+                    <span>Нажмите, чтобы ввести текст...</span>
                   </div>
-                )}
-
-                {/* Photo Mode Background Layer when a photo is selected or snapped */}
-                {activeMode === 'photo' && (isPhotoSnapped || !cameraActive) && !selectedGradient && (
-                  <div 
-                    className="viewfinder-photo-layer" 
-                    style={{ 
-                      backgroundImage: `url(${selectedImage})`,
-                      filter: activeFilter.filterCss 
-                    }} 
-                  />
-                )}
-
-                {/* AR Face Masks / Overlays */}
-                {activeMask.id !== 'none' && (
-                  <div className={`ar-mask-layer mask-${activeMask.overlayType}`}>
-                    {activeMask.overlayType === 'glasses' && <div className="ar-emoji">🕶️</div>}
-                    {activeMask.overlayType === 'crown' && <div className="ar-emoji">👑</div>}
-                    {activeMask.overlayType === 'cat_ears' && <div className="ar-emoji">🐱</div>}
-                    {activeMask.overlayType === 'angel_halo' && <div className="ar-emoji">😇</div>}
-                    {activeMask.overlayType === 'cyber_visor' && <div className="ar-emoji">🥽</div>}
-                    {activeMask.overlayType === 'sparkles' && <div className="ar-emoji">✨</div>}
-                  </div>
-                )}
-
-                {/* Top Author Tag in Viewfinder */}
-                <div className="viewfinder-author-badge">
-                  <img src={currentUser.avatar} alt={currentUser.name} className="author-badge-avatar" />
-                  <div className="author-badge-text">
-                    <span className="author-name">{currentUser.name || 'Галимов Максим'}</span>
-                    <span className="author-tag">
-                      {activeMode === 'live' ? 'Прямой эфир' : 'Ваша история'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Music Badge Overlay if Selected */}
-                {selectedMusic && (
-                  <div className="viewfinder-music-badge">
-                    <Music size={12} className="music-pulse" />
-                    <span>{selectedMusic}</span>
-                  </div>
-                )}
-
-                {/* Retake Button if photo is snapped */}
-                {activeMode === 'photo' && isPhotoSnapped && (
-                  <button 
-                    type="button" 
-                    className="viewfinder-retake-btn"
-                    onClick={handleRetakePhoto}
-                    title="Снять заново"
-                  >
-                    <RotateCcw size={13} /> Переснять
-                  </button>
-                )}
-
-                {/* Active Filter Name Badge */}
-                {activeFilter.id !== 'normal' && (
-                  <div className="viewfinder-filter-badge" style={{ borderColor: activeFilter.badgeColor }}>
-                    <Wand2 size={11} /> {activeFilter.name}
-                  </div>
-                )}
-
-                {/* Text Overlay on Story */}
-                {storyText && (
-                  <div className={`viewfinder-text-overlay pos-${textPosition}`}>
+                ) : (
+                  <div className="text-mode-display">
                     <p>{storyText}</p>
                   </div>
                 )}
-
-                {/* Live Stream Viewers & Hearts */}
-                {activeMode === 'live' && (
-                  <>
-                    <div className="viewfinder-live-header-pill">
-                      <span className="live-pulse-dot" />
-                      <span>LIVE</span>
-                      <span className="live-count"><Eye size={12} /> {liveViewersCount}</span>
-                    </div>
-
-                    <div className="viewfinder-live-hearts">
-                      {liveHearts.map(hk => (
-                        <span key={hk} className="floating-heart">❤️</span>
-                      ))}
-                    </div>
-
-                    <div className="viewfinder-live-chat">
-                      {liveChatMessages.slice(-3).map(m => (
-                        <div key={m.id} className="live-chat-row">
-                          <b>{m.name}:</b> {m.text}
-                        </div>
-                      ))}
-                      <form onSubmit={handleSendLiveComment} className="live-chat-input">
-                        <input
-                          type="text"
-                          placeholder="Написать в эфир..."
-                          value={liveNewMsg}
-                          onChange={e => setLiveNewMsg(e.target.value)}
-                        />
-                      </form>
-                    </div>
-                  </>
-                )}
-
-                {/* Bottom Viewfinder HUD: Timer, Flip, Record, Mic */}
-                <div className="viewfinder-bottom-hud">
-                  
-                  {/* Timer Bar */}
-                  <div className="hud-timer-badge">
-                    <span className={`hud-rec-dot ${isRecording ? 'blinking' : ''}`} />
-                    <span>00:{recordSeconds < 10 ? `0${recordSeconds}` : recordSeconds} / 00:30</span>
-                  </div>
-
-                  {/* Buttons Row: Flip, Big Shutter, Mic */}
-                  <div className="hud-controls-row">
-                    <button
-                      type="button"
-                      className="hud-action-circle-btn"
-                      onClick={toggleFacingMode}
-                      title="Переключить камеру (передняя / задняя)"
-                    >
-                      <RefreshCw size={19} />
-                    </button>
-
-                    {/* Central Big Shutter Button */}
-                    <button
-                      type="button"
-                      className={`hud-shutter-btn ${activeMode} ${isRecording ? 'is-recording' : ''}`}
-                      onClick={handleShutterClick}
-                      title={activeMode === 'camera_record' ? (isRecording ? 'Остановить' : 'Запись') : 'Сделать снимок'}
-                    >
-                      <div className={`hud-shutter-inner ${activeMode === 'photo' ? 'white' : 'red'}`}>
-                        {isRecording && <Square size={16} fill="#ffffff" color="#ffffff" />}
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`hud-action-circle-btn ${isMuted ? 'muted' : ''}`}
-                      onClick={() => {
-                        setIsMuted(!isMuted);
-                        if (mediaStreamRef.current) {
-                          mediaStreamRef.current.getAudioTracks().forEach(t => t.enabled = isMuted);
-                        }
-                      }}
-                      title={isMuted ? 'Включить звук' : 'Выключить звук'}
-                    >
-                      {isMuted ? <MicOff size={19} /> : <Mic size={19} />}
-                    </button>
-                  </div>
-                </div>
-
               </div>
+            )}
 
-              {/* Right Vertical Floating Tools Column (Screenshot 1 & 3) */}
-              <div className={`story-vertical-tools-column ${isToolsExpanded ? 'expanded' : 'collapsed'}`}>
-                
-                {/* 1. Aa Текст */}
-                <button 
-                  type="button" 
-                  className={`story-tool-item ${activeTab === 'text' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('text')}
-                  title="Текст"
-                >
-                  <div className="story-tool-icon-box">
-                    <span className="tool-typography-icon">Aa</span>
+            {/* Camera Inactive / Loading / Error State */}
+            {!cameraActive && !isPhotoSnapped && !recordedVideoUrl && cameraSubMode !== 'create_text' && (
+              <div className="insta-camera-placeholder">
+                {cameraLoading ? (
+                  <div className="insta-camera-loading">
+                    <RefreshCw size={36} className="spin-icon" color="#ffffff" />
+                    <span>Подключение камеры...</span>
                   </div>
-                  {isToolsExpanded && <span className="story-tool-label">Текст</span>}
-                </button>
-
-                {/* 2. Стикеры */}
-                <button 
-                  type="button" 
-                  className="story-tool-item"
-                  onClick={() => setActiveTab('text')}
-                  title="Стикеры"
-                >
-                  <div className="story-tool-icon-box">
-                    <Smile size={20} />
+                ) : cameraError ? (
+                  <div className="insta-camera-error">
+                    <p>{cameraError}</p>
+                    <button type="button" className="btn-insta-pill" onClick={startCamera}>
+                      <RefreshCw size={15} /> Повторить попытку
+                    </button>
+                    <button type="button" className="btn-insta-pill gallery" onClick={() => setScreen('gallery')}>
+                      <ImageIcon size={15} /> Выбрать из галереи
+                    </button>
                   </div>
-                  {isToolsExpanded && <span className="story-tool-label">Стикеры</span>}
-                </button>
+                ) : (
+                  <div className="insta-camera-loading">
+                    <Camera size={44} color="#ffffff" />
+                    <button type="button" className="btn-insta-pill primary" onClick={startCamera}>
+                      Включить камеру
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
-                {/* 3. Музыка */}
+            {/* AR Face Masks / Overlays */}
+            {activeMask.id !== 'none' && (
+              <div className={`ar-mask-layer mask-${activeMask.overlayType}`}>
+                {activeMask.overlayType === 'glasses' && <div className="ar-emoji">🕶️</div>}
+                {activeMask.overlayType === 'crown' && <div className="ar-emoji">👑</div>}
+                {activeMask.overlayType === 'cat_ears' && <div className="ar-emoji">🐱</div>}
+                {activeMask.overlayType === 'angel_halo' && <div className="ar-emoji">😇</div>}
+                {activeMask.overlayType === 'cyber_visor' && <div className="ar-emoji">🥽</div>}
+                {activeMask.overlayType === 'sparkles' && <div className="ar-emoji">✨</div>}
+              </div>
+            )}
+
+            {/* Text Overlay on Preview */}
+            {storyText && isMediaReady && (
+              <div 
+                className={`viewfinder-text-overlay pos-${textPosition}`}
+                onClick={() => setIsTextEditing(true)}
+              >
+                <p>{storyText}</p>
+              </div>
+            )}
+
+            {/* Music Badge Overlay if Selected */}
+            {selectedMusic && isMediaReady && (
+              <div className="insta-music-pill">
+                <Music size={13} className="music-pulse" />
+                <span>{selectedMusic}</span>
+                <button type="button" onClick={() => setSelectedMusic(null)} className="music-pill-del">×</button>
+              </div>
+            )}
+
+            {/* =================================================================== */}
+            {/* TOP BAR CONTROLS                                                    */}
+            {/* =================================================================== */}
+            <div className="insta-top-hud">
+              
+              {/* Left Button: Close (in camera) or Retake/Back (in preview) */}
+              {!isMediaReady ? (
                 <button 
                   type="button" 
-                  className={`story-tool-item ${selectedMusic ? 'active' : ''}`}
+                  className="insta-icon-btn close-btn" 
+                  onClick={() => { stopCamera(); onClose(); }}
+                  title="Закрыть"
+                >
+                  <X size={26} />
+                </button>
+              ) : (
+                <button 
+                  type="button" 
+                  className="insta-icon-btn close-btn" 
+                  onClick={handleRetakeMedia}
+                  title="Переснять"
+                >
+                  <ArrowLeft size={24} />
+                </button>
+              )}
+
+              {/* Center Controls (Camera Mode: Flash Toggle) */}
+              {!isMediaReady && (
+                <div className="insta-top-center-tools">
+                  <button 
+                    type="button" 
+                    className={`insta-icon-btn flash-btn ${flashMode === 'on' ? 'active' : ''}`}
+                    onClick={() => setFlashMode(prev => prev === 'off' ? 'on' : 'off')}
+                    title="Вспышка"
+                  >
+                    {flashMode === 'on' ? <Zap size={22} fill="#FACC15" color="#FACC15" /> : <ZapOff size={22} />}
+                  </button>
+                </div>
+              )}
+
+              {/* Right Controls */}
+              {!isMediaReady ? (
+                <div className="insta-top-right-tools">
+                  <button 
+                    type="button" 
+                    className="insta-icon-btn"
+                    onClick={toggleFacingMode}
+                    title="Сменить камеру"
+                  >
+                    <RotateCcw size={22} />
+                  </button>
+                </div>
+              ) : (
+                /* Preview Editing Tools across top right */
+                <div className="insta-preview-top-tools">
+                  {/* Text Aa */}
+                  <button 
+                    type="button" 
+                    className="insta-icon-btn"
+                    onClick={() => setIsTextEditing(true)}
+                    title="Добавить текст"
+                  >
+                    <span className="insta-tool-text-icon">Aa</span>
+                  </button>
+
+                  {/* Stickers */}
+                  <button 
+                    type="button" 
+                    className="insta-icon-btn"
+                    onClick={() => setShowStickersPicker(prev => !prev)}
+                    title="Стикеры"
+                  >
+                    <Smile size={22} />
+                  </button>
+
+                  {/* Music */}
+                  <button 
+                    type="button" 
+                    className="insta-icon-btn"
+                    onClick={() => setShowMusicPicker(prev => !prev)}
+                    title="Музыка"
+                  >
+                    <Music size={22} />
+                  </button>
+
+                  {/* Filters */}
+                  <button 
+                    type="button" 
+                    className="insta-icon-btn"
+                    onClick={() => setShowFilterPicker(prev => !prev)}
+                    title="Фильтры"
+                  >
+                    <Sparkles size={22} />
+                  </button>
+
+                  {/* Save */}
+                  <button 
+                    type="button" 
+                    className="insta-icon-btn"
+                    onClick={() => alert('Медиафайл сохранён на устройство')}
+                    title="Сохранить"
+                  >
+                    <Download size={22} />
+                  </button>
+                </div>
+              )}
+
+            </div>
+
+            {/* =================================================================== */}
+            {/* LEFT VERTICAL TOOLS (Shown in Live Camera Mode - Screenshot 3)     */}
+            {/* =================================================================== */}
+            {!isMediaReady && (
+              <div className="insta-left-vertical-toolbar">
+                {/* 1. Aa Создать */}
+                <button 
+                  type="button" 
+                  className={`insta-left-tool-btn ${cameraSubMode === 'create_text' ? 'active' : ''}`}
                   onClick={() => {
-                    if (selectedMusic) {
-                      setSelectedMusic(null);
+                    if (cameraSubMode === 'create_text') {
+                      setCameraSubMode('story');
+                      setSelectedGradient(null);
                     } else {
-                      setSelectedMusic(MUSIC_TRACKS[0].title);
+                      setCameraSubMode('create_text');
+                      setSelectedGradient(GRADIENT_PRESETS[gradientIdx]);
+                      setIsTextEditing(true);
                     }
                   }}
-                  title="Музыка"
+                  title="Создать (Текст)"
                 >
-                  <div className="story-tool-icon-box">
-                    <Music size={20} />
+                  <div className="insta-left-tool-icon">
+                    <span className="left-aa-symbol">Aa</span>
                   </div>
-                  {isToolsExpanded && <span className="story-tool-label">Музыка</span>}
+                  <span className="insta-left-tool-label">Создать</span>
                 </button>
 
-                {/* 4. Эффекты */}
+                {/* 2. ∞ Бумеранг */}
                 <button 
                   type="button" 
-                  className={`story-tool-item ${(activeTab === 'effects' || isEffectWheelOpen) ? 'active' : ''}`}
-                  onClick={() => {
-                    setIsEffectWheelOpen(prev => !prev);
-                    setActiveTab('effects');
-                  }}
+                  className={`insta-left-tool-btn ${cameraSubMode === 'boomerang' ? 'active' : ''}`}
+                  onClick={() => setCameraSubMode(prev => prev === 'boomerang' ? 'story' : 'boomerang')}
+                  title="Бумеранг"
+                >
+                  <div className="insta-left-tool-icon">
+                    <InfinityIcon size={20} />
+                  </div>
+                  <span className="insta-left-tool-label">Бумеранг</span>
+                </button>
+
+                {/* 3. ✨ Эффекты */}
+                <button 
+                  type="button" 
+                  className={`insta-left-tool-btn ${isEffectWheelOpen ? 'active' : ''}`}
+                  onClick={() => setIsEffectWheelOpen(prev => !prev)}
                   title="Эффекты"
                 >
-                  <div className="story-tool-icon-box">
+                  <div className="insta-left-tool-icon">
                     <Sparkles size={20} />
                   </div>
-                  {isToolsExpanded && <span className="story-tool-label">Эффекты</span>}
+                  <span className="insta-left-tool-label">Эффекты</span>
                 </button>
 
-                {/* Extended tools shown when expanded */}
-                {isToolsExpanded && (
-                  <>
-                    <button 
-                      type="button" 
-                      className="story-tool-item"
-                      onClick={() => alert('История сохранена в черновики')}
-                      title="Сохранить"
-                    >
-                      <div className="story-tool-icon-box">
-                        <Bookmark size={19} />
-                      </div>
-                      <span className="story-tool-label">Сохранить</span>
-                    </button>
+                {/* 4. ⊞ Коллаж / Разметка */}
+                <button 
+                  type="button" 
+                  className="insta-left-tool-btn"
+                  onClick={() => alert('Коллаж активирован')}
+                  title="Коллаж"
+                >
+                  <div className="insta-left-tool-icon">
+                    <Grid2X2 size={19} />
+                  </div>
+                  <span className="insta-left-tool-label">Коллаж</span>
+                </button>
+              </div>
+            )}
 
-                    <button 
-                      type="button" 
-                      className="story-tool-item"
-                      onClick={() => setStoryText(prev => `${prev} @`)}
-                      title="Упомянуть"
-                    >
-                      <div className="story-tool-icon-box">
-                        <AtSign size={19} />
-                      </div>
-                      <span className="story-tool-label">Упомянуть</span>
-                    </button>
+            {/* Interactive Live Chat on Live Mode */}
+            {cameraSubMode === 'live' && !isMediaReady && (
+              <div className="insta-live-chat-panel">
+                <div className="insta-live-badge-row">
+                  <span className="live-red-pill">LIVE</span>
+                  <span className="live-viewers-tag"><Eye size={12} /> {liveViewersCount}</span>
+                </div>
+                <div className="insta-live-messages">
+                  {liveChatMessages.slice(-3).map(m => (
+                    <div key={m.id} className="live-chat-bubble">
+                      <b>{m.name}:</b> {m.text}
+                    </div>
+                  ))}
+                </div>
+                <form onSubmit={handleSendLiveComment} className="insta-live-input-box">
+                  <input
+                    type="text"
+                    placeholder="Написать в прямой эфир..."
+                    value={liveNewMsg}
+                    onChange={e => setLiveNewMsg(e.target.value)}
+                  />
+                </form>
+              </div>
+            )}
 
-                    <button 
-                      type="button" 
-                      className="story-tool-item"
-                      onClick={() => alert('Режим рисования активирован')}
-                      title="Рисунок"
-                    >
-                      <div className="story-tool-icon-box">
-                        <PenLine size={19} />
-                      </div>
-                      <span className="story-tool-label">Рисунок</span>
-                    </button>
-
-                    <button 
-                      type="button" 
-                      className="story-tool-item"
-                      onClick={() => alert('Медиафайл скачивается на устройство')}
-                      title="Скачать"
-                    >
-                      <div className="story-tool-icon-box">
-                        <Download size={19} />
-                      </div>
-                      <span className="story-tool-label">Сохранить</span>
-                    </button>
-
-                    <button 
-                      type="button" 
-                      className="story-tool-item"
-                      onClick={() => setActiveTab('backgrounds')}
-                      title="Ещё"
-                    >
-                      <div className="story-tool-icon-box">
-                        <MoreHorizontal size={19} />
-                      </div>
-                      <span className="story-tool-label">Ещё</span>
-                    </button>
-                  </>
+            {/* =================================================================== */}
+            {/* BOTTOM CONTROLS (Insta Camera Shutter OR Publishing Bar)            */}
+            {/* =================================================================== */}
+            {!isMediaReady ? (
+              <div className="insta-bottom-camera-hud">
+                
+                {/* Recording Timer Badge */}
+                {isRecording && (
+                  <div className="insta-rec-timer-pill">
+                    <span className="rec-red-pulse-dot" />
+                    <span>00:{recordSeconds < 10 ? `0${recordSeconds}` : recordSeconds} / 00:30</span>
+                  </div>
                 )}
 
-                {/* Expand / Collapse toggle chevron */}
-                <button
-                  type="button"
-                  className="story-tool-item story-tool-expand-btn"
-                  onClick={() => setIsToolsExpanded(!isToolsExpanded)}
-                  title={isToolsExpanded ? 'Свернуть' : 'Развернуть инструменты'}
-                >
-                  <div className="story-tool-icon-box">
-                    {isToolsExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                  </div>
-                  {isToolsExpanded && <span className="story-tool-label">Свернуть</span>}
-                </button>
-
-              </div>
-
-            </div>
-
-            {/* Category Selector Tabs Under Viewfinder */}
-            <div className="story-category-tabs-row">
-              <button
-                type="button"
-                className={`story-cat-pill ${activeTab === 'effects' ? 'active' : ''}`}
-                onClick={() => setActiveTab('effects')}
-              >
-                <Sparkles size={14} /> Фильтры & Маски
-              </button>
-              <button
-                type="button"
-                className={`story-cat-pill ${activeTab === 'backgrounds' ? 'active' : ''}`}
-                onClick={() => setActiveTab('backgrounds')}
-              >
-                <ImageIcon size={14} /> Фоны & Фото
-              </button>
-              <button
-                type="button"
-                className={`story-cat-pill ${activeTab === 'text' ? 'active' : ''}`}
-                onClick={() => setActiveTab('text')}
-              >
-                <Type size={14} /> Текст & Стикеры
-              </button>
-            </div>
-
-            {/* Active Drawer: Filters & Masks / Backgrounds / Text */}
-            <div className="story-bottom-drawer">
-              
-              {/* TAB 1: FILTERS & AR MASKS */}
-              {activeTab === 'effects' && (
-                <div className="drawer-pane">
-                  <div className="drawer-filters-row">
-                    {STORY_FILTERS.map((f) => (
-                      <button
-                        key={f.id}
-                        type="button"
-                        className={`drawer-filter-card ${activeFilter.id === f.id ? 'active' : ''}`}
-                        onClick={() => setActiveFilter(f)}
-                      >
-                        <div 
-                          className="filter-thumb-box"
-                          style={{
-                            backgroundImage: `url(${selectedImage})`,
-                            filter: f.filterCss
-                          }}
-                        />
-                        <span className="filter-thumb-name">{f.name}</span>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* AR Masks Carousel */}
-                  <div className="drawer-masks-row">
-                    {STORY_MASKS.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        className={`drawer-mask-pill ${activeMask.id === m.id ? 'active' : ''}`}
-                        onClick={() => {
-                          setActiveMask(m);
-                          setIsEffectWheelOpen(true);
-                        }}
-                      >
-                        <span className="mask-emoji">{m.icon}</span>
-                        <span className="mask-name">{m.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 2: BACKGROUNDS & PHOTO (WITH LINK TO GALLERY) */}
-              {activeTab === 'backgrounds' && (
-                <div className="drawer-pane">
-                  <div className="drawer-bg-actions">
-                    <button
-                      type="button"
-                      className="btn-open-gallery-picker"
-                      onClick={() => setScreen('gallery')}
-                    >
-                      <ImageIcon size={16} /> Открыть галерею фото
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-open-gallery-picker upload"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Plus size={16} /> Загрузить файл
-                    </button>
-                  </div>
-
-                  <div className="drawer-bg-thumbnails">
-                    {STORY_PRESETS.slice(0, 6).map((img, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        className={`bg-thumb-btn ${selectedImage === img && !selectedGradient ? 'active' : ''}`}
-                        style={{ backgroundImage: `url(${img})` }}
-                        onClick={() => {
-                          setSelectedImage(img);
-                          setSelectedGradient(null);
-                          setIsPhotoSnapped(true);
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 3: TEXT & STICKERS */}
-              {activeTab === 'text' && (
-                <div className="drawer-pane">
-                  <div className="drawer-stickers-row">
-                    {['🔥 Огонь', '✨ New Day', '🎧 В наушниках', '📍 Локация', '☕ Coffee Time', '💯 100%', '🌟 Zen'].map((stk, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        className="quick-stk-chip"
-                        onClick={() => setStoryText(prev => prev ? `${prev} ${stk}` : stk)}
-                      >
-                        {stk}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="text-pos-switcher">
-                    <span>Положение:</span>
-                    {(['top', 'center', 'bottom'] as const).map(p => (
-                      <button
-                        key={p}
-                        type="button"
-                        className={`pos-pill ${textPosition === p ? 'active' : ''}`}
-                        onClick={() => setTextPosition(p)}
-                      >
-                        {p === 'top' ? 'Сверху' : p === 'center' ? 'По центру' : 'Внизу'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* AR Effect Wheel (media_1789991567406.jpg) OR Caption Input (media_1789991567403.jpg) */}
-              {isEffectWheelOpen ? (
-                <div className="story-effect-wheel-wrapper">
-                  <div className="effect-wheel-track" ref={wheelTrackRef}>
+                {/* Horizontal Effect Lenses Carousel (Screenshot 3) */}
+                {isEffectWheelOpen && (
+                  <div className="insta-lenses-carousel" ref={wheelTrackRef}>
                     {STORY_LENSES.map((lens) => {
                       const isSelected = activeMask.id === lens.id;
                       return (
                         <button
                           key={lens.id}
                           type="button"
-                          className={`effect-wheel-lens ${isSelected ? 'lens-center-active' : ''}`}
+                          className={`insta-lens-circle ${isSelected ? 'active' : ''}`}
                           onClick={() => {
                             const found = STORY_MASKS.find(m => m.id === lens.id) || STORY_MASKS[0];
                             setActiveMask(found);
@@ -1123,57 +933,154 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                           }}
                           title={lens.name}
                         >
-                          <div className="wheel-lens-inner">
-                            {lens.id === 'none' ? (
-                              <div className="lens-none-graphic">
-                                <span className="lens-ban-icon">⊘</span>
-                              </div>
-                            ) : lens.thumb ? (
-                              <div 
-                                className="lens-thumb-graphic" 
-                                style={{ backgroundImage: `url(${lens.thumb})` }}
-                              >
-                                <span className="lens-emoji-tag">{lens.icon}</span>
-                              </div>
-                            ) : (
-                              <span className="lens-emoji-only">{lens.icon}</span>
-                            )}
-                          </div>
+                          {lens.thumb ? (
+                            <img src={lens.thumb} alt={lens.name} className="lens-thumb-img" />
+                          ) : (
+                            <span className="lens-char">{lens.icon}</span>
+                          )}
                         </button>
                       );
                     })}
                   </div>
-                  <div className="effect-wheel-name-badge">
-                    {activeMask.id === 'none' ? 'Без эффекта' : activeMask.name}
+                )}
+
+                {/* Main Shutter Row: Gallery (Left) • Shutter (Center) • Flip (Right) */}
+                <div className="insta-shutter-row">
+                  
+                  {/* Gallery Media Thumbnail */}
+                  <button 
+                    type="button" 
+                    className="insta-gallery-thumb-btn"
+                    onClick={() => setScreen('gallery')}
+                    title="Открыть галерею"
+                  >
+                    {userUploadedImages[0] ? (
+                      <img src={userUploadedImages[0]} alt="Gallery" className="thumb-preview-img" />
+                    ) : (
+                      <img src={STORY_PRESETS[0]} alt="Gallery" className="thumb-preview-img" />
+                    )}
+                    <span className="gallery-plus-icon">+</span>
+                  </button>
+
+                  {/* Central Shutter Button (Tap = Photo, Hold = Video!) */}
+                  <div className="insta-shutter-wrapper">
+                    <button
+                      type="button"
+                      className={`insta-shutter-button ${isRecording ? 'is-recording' : ''}`}
+                      onPointerDown={handleShutterPointerDown}
+                      onPointerUp={handleShutterPointerUp}
+                      onPointerCancel={handleShutterPointerCancel}
+                      onPointerLeave={handleShutterPointerCancel}
+                      title="1 нажатие — фото, зажать — видео"
+                    >
+                      {/* Outer Ring & Progress SVG */}
+                      <svg className="shutter-progress-ring" viewBox="0 0 100 100">
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="44"
+                          className="shutter-ring-bg"
+                        />
+                        {isRecording && (
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="44"
+                            className="shutter-ring-fill"
+                            style={{
+                              strokeDasharray: 2 * Math.PI * 44,
+                              strokeDashoffset: 2 * Math.PI * 44 * (1 - (recordSeconds / 30)),
+                            }}
+                          />
+                        )}
+                      </svg>
+
+                      {/* Inner Circle / Center */}
+                      <div className={`shutter-inner-core ${isRecording ? 'recording' : ''}`}>
+                        {isRecording && <Square size={16} fill="#ffffff" color="#ffffff" />}
+                      </div>
+                    </button>
+
+                    {/* Hint text for first-time use */}
+                    {!isRecording && !isEffectWheelOpen && (
+                      <span className="shutter-quick-hint">Фото / Видео</span>
+                    )}
                   </div>
-                </div>
-              ) : (
-                <div className="story-caption-input-box">
-                  <input
-                    type="text"
-                    placeholder="Добавьте подпись..."
-                    value={storyText}
-                    onChange={e => setStoryText(e.target.value)}
-                    maxLength={140}
-                    className="story-caption-field"
-                  />
-                </div>
-              )}
 
-            </div>
+                  {/* Camera Flip Button */}
+                  <button 
+                    type="button" 
+                    className="insta-flip-camera-btn"
+                    onClick={toggleFacingMode}
+                    title="Переключить камеру"
+                  >
+                    <RefreshCw size={22} />
+                  </button>
 
-            {/* Bottom Publishing Action Bar (media_1789991567403.jpg) */}
-            {!isEffectWheelOpen && (
-              <div className="story-bottom-action-bar">
+                </div>
+
+                {/* Bottom Mode Slider (Screenshot 2 & 3: ПУБЛИКАЦИЯ • ИСТОРИЯ • REELS) */}
+                <div className="insta-mode-slider">
+                  <button 
+                    type="button" 
+                    className={`mode-slider-item ${bottomSliderMode === 'post' ? 'active' : ''}`}
+                    onClick={() => {
+                      setBottomSliderMode('post');
+                      setScreen('gallery');
+                    }}
+                  >
+                    ПУБЛИКАЦИЯ
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className={`mode-slider-item ${bottomSliderMode === 'story' ? 'active' : ''}`}
+                    onClick={() => {
+                      setBottomSliderMode('story');
+                      setCameraSubMode('story');
+                    }}
+                  >
+                    ИСТОРИЯ
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className={`mode-slider-item ${bottomSliderMode === 'reels' ? 'active' : ''}`}
+                    onClick={() => {
+                      setBottomSliderMode('reels');
+                      alert('Переход к созданию Reels');
+                    }}
+                  >
+                    REELS
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className={`mode-slider-item ${bottomSliderMode === 'live' ? 'active' : ''}`}
+                    onClick={() => {
+                      setBottomSliderMode('live');
+                      setCameraSubMode('live');
+                    }}
+                  >
+                    ПРЯМОЙ ЭФИР
+                  </button>
+                </div>
+
+              </div>
+            ) : (
+              /* =================================================================== */
+              /* PUBLISHING BAR (Shown in Preview Mode - Screenshot 1 Bottom Bar)    */
+              /* =================================================================== */
+              <div className="insta-preview-bottom-bar">
                 
                 {/* Button 1: Ваша история */}
                 <button
                   type="button"
-                  className="action-publish-btn your-story-btn"
+                  className="insta-publish-btn your-story"
                   onClick={() => handlePublishStory(false)}
                 >
-                  <div className="story-avatar-ring">
-                    <img src={currentUser.avatar} alt={currentUser.name} className="ring-avatar-img" />
+                  <div className="publish-avatar-wrapper">
+                    <img src={currentUser.avatar} alt={currentUser.name} className="publish-avatar-img" />
                   </div>
                   <span>Ваша история</span>
                 </button>
@@ -1181,25 +1088,163 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                 {/* Button 2: Близкие друзья */}
                 <button
                   type="button"
-                  className="action-publish-btn close-friends-btn"
+                  className="insta-publish-btn close-friends"
                   onClick={() => handlePublishStory(true)}
                 >
-                  <div className="close-friends-star-icon">
+                  <div className="publish-star-icon">
                     <Star size={14} fill="#ffffff" color="#ffffff" />
                   </div>
                   <span>Близкие друзья</span>
                 </button>
 
-                {/* Button 3: Round Blue Action Button > */}
+                {/* Button 3: Round Next Arrow > */}
                 <button
                   type="button"
-                  className="action-publish-circle-next"
+                  className="insta-publish-circle-next"
                   onClick={() => handlePublishStory(false)}
-                  title="Опубликовать"
+                  title="Опубликовать историю"
                 >
-                  <ChevronRight size={22} />
+                  <ChevronRight size={24} />
                 </button>
 
+              </div>
+            )}
+
+            {/* =================================================================== */}
+            {/* FLOATING TEXT EDITOR MODAL (Typing overlay)                         */}
+            {/* =================================================================== */}
+            {isTextEditing && (
+              <div className="insta-text-editor-overlay">
+                <div className="text-editor-header">
+                  <div className="text-pos-toggle">
+                    <button 
+                      type="button"
+                      className={`text-pos-btn ${textPosition === 'top' ? 'active' : ''}`}
+                      onClick={() => setTextPosition('top')}
+                    >
+                      Сверху
+                    </button>
+                    <button 
+                      type="button"
+                      className={`text-pos-btn ${textPosition === 'center' ? 'active' : ''}`}
+                      onClick={() => setTextPosition('center')}
+                    >
+                      Центр
+                    </button>
+                    <button 
+                      type="button"
+                      className={`text-pos-btn ${textPosition === 'bottom' ? 'active' : ''}`}
+                      onClick={() => setTextPosition('bottom')}
+                    >
+                      Снизу
+                    </button>
+                  </div>
+
+                  {cameraSubMode === 'create_text' && (
+                    <button type="button" className="btn-cycle-color" onClick={cycleGradient}>
+                      🎨 Цвет фона
+                    </button>
+                  )}
+
+                  <button 
+                    type="button" 
+                    className="btn-text-done"
+                    onClick={() => setIsTextEditing(false)}
+                  >
+                    Готово
+                  </button>
+                </div>
+
+                <div className="text-editor-body">
+                  <textarea
+                    autoFocus
+                    placeholder="Добавьте подпись..."
+                    value={storyText}
+                    onChange={e => setStoryText(e.target.value)}
+                    maxLength={160}
+                    className="insta-text-editor-input"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Quick Filter Switcher Drawer */}
+            {showFilterPicker && (
+              <div className="insta-drawer-sheet">
+                <div className="sheet-header">
+                  <span>Выберите фильтр</span>
+                  <button type="button" onClick={() => setShowFilterPicker(false)}>✕</button>
+                </div>
+                <div className="sheet-filters-list">
+                  {STORY_FILTERS.map(f => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={`sheet-filter-item ${activeFilter.id === f.id ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveFilter(f);
+                        setShowFilterPicker(false);
+                      }}
+                    >
+                      <div className="sheet-filter-circle" style={{ borderColor: f.badgeColor }} />
+                      <span>{f.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Stickers Drawer */}
+            {showStickersPicker && (
+              <div className="insta-drawer-sheet">
+                <div className="sheet-header">
+                  <span>Стикеры и эмодзи</span>
+                  <button type="button" onClick={() => setShowStickersPicker(false)}>✕</button>
+                </div>
+                <div className="sheet-stickers-grid">
+                  {['🔥 Огонь', '✨ New Day', '🎧 В наушниках', '📍 Локация', '☕ Coffee Time', '💯 100%', '🌟 Zen', '❤️ Любовь', '🚀 Вперёд', '👑 VIP'].map((stk, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className="sheet-sticker-btn"
+                      onClick={() => {
+                        setStoryText(prev => prev ? `${prev} ${stk}` : stk);
+                        setShowStickersPicker(false);
+                      }}
+                    >
+                      {stk}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Music Picker Drawer */}
+            {showMusicPicker && (
+              <div className="insta-drawer-sheet">
+                <div className="sheet-header">
+                  <span>Музыка для истории</span>
+                  <button type="button" onClick={() => setShowMusicPicker(false)}>✕</button>
+                </div>
+                <div className="sheet-music-list">
+                  {MUSIC_TRACKS.map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      className={`sheet-music-row ${selectedMusic === t.title ? 'active' : ''}`}
+                      onClick={() => {
+                        setSelectedMusic(t.title);
+                        setShowMusicPicker(false);
+                      }}
+                    >
+                      <div className="sheet-music-icon"><Music size={16} /></div>
+                      <div className="sheet-music-info">
+                        <b>{t.title}</b>
+                        <span>{t.artist} • {t.duration}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -1210,24 +1255,24 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
         {/* VIEW 2: GALLERY MEDIA PICKER SCREEN (Дополнить историю - Screenshot 2)   */}
         {/* ========================================================================= */}
         {screen === 'gallery' && (
-          <div className="story-gallery-view">
+          <div className="insta-gallery-view">
             
             {/* Top Bar: Close, Title, Camera Icon */}
-            <div className="story-gallery-top-bar">
+            <div className="insta-gallery-header">
               <button 
                 type="button" 
-                className="gallery-nav-btn" 
+                className="gallery-nav-icon" 
                 onClick={() => setScreen('camera')}
                 title="Назад к камере"
               >
-                <X size={22} />
+                <X size={24} />
               </button>
 
-              <h3 className="gallery-view-title">Дополнить историю</h3>
+              <h3 className="gallery-header-title">Дополнить историю</h3>
 
               <button 
                 type="button" 
-                className="gallery-nav-btn" 
+                className="gallery-nav-icon" 
                 onClick={() => { 
                   setScreen('camera'); 
                   setIsPhotoSnapped(false);
@@ -1235,15 +1280,14 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                 }}
                 title="Открыть камеру"
               >
-                <Camera size={20} />
+                <Camera size={22} />
               </button>
             </div>
 
-            {/* 3 Quick Cards: Шаблоны, Музыка, Коллаж */}
-            <div className="gallery-quick-cards-row">
-              
+            {/* 3 Quick Cards: Шаблоны, Музыка, Коллаж (Screenshot 2) */}
+            <div className="insta-gallery-pills-row">
               <div 
-                className="gallery-quick-card"
+                className="insta-gallery-card-tile"
                 onClick={() => {
                   setSelectedImage(STORY_PRESETS[1]);
                   setStoryText('✨ Стильный шаблон New Age');
@@ -1251,27 +1295,27 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                   setScreen('camera');
                 }}
               >
-                <div className="quick-card-icon-box template-bg">
+                <div className="card-tile-icon-box template-gradient">
                   <LayoutTemplate size={22} color="#ffffff" />
                 </div>
-                <span className="quick-card-label">Шаблоны</span>
+                <span>Шаблоны</span>
               </div>
 
               <div 
-                className="gallery-quick-card"
+                className="insta-gallery-card-tile"
                 onClick={() => {
                   setSelectedMusic(MUSIC_TRACKS[0].title);
                   alert(`Музыкальный трек "${MUSIC_TRACKS[0].title}" добавлен к истории`);
                 }}
               >
-                <div className="quick-card-icon-box music-bg">
+                <div className="card-tile-icon-box music-gradient">
                   <Music size={22} color="#ffffff" />
                 </div>
-                <span className="quick-card-label">Музыка</span>
+                <span>Музыка</span>
               </div>
 
               <div 
-                className="gallery-quick-card"
+                className="insta-gallery-card-tile"
                 onClick={() => {
                   setSelectedGradient(GRADIENT_PRESETS[1]);
                   setStoryText('Коллаж впечатлений');
@@ -1279,16 +1323,15 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                   setScreen('camera');
                 }}
               >
-                <div className="quick-card-icon-box collage-bg">
+                <div className="card-tile-icon-box collage-gradient">
                   <Grid2X2 size={22} color="#ffffff" />
                 </div>
-                <span className="quick-card-label">Коллаж</span>
+                <span>Коллаж</span>
               </div>
-
             </div>
 
-            {/* Filter Row: "Недавние ▾" and "Выбрать" */}
-            <div className="gallery-filter-subbar">
+            {/* Filter Sub-bar: "Недавние ▾" and "Загрузить / Выбрать" */}
+            <div className="insta-gallery-subbar">
               <div className="gallery-dropdown-wrap">
                 <select 
                   value={galleryFilter} 
@@ -1302,10 +1345,10 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                 </select>
               </div>
 
-              <div className="gallery-filter-right-actions">
+              <div className="gallery-right-actions">
                 <button
                   type="button"
-                  className="btn-gallery-action"
+                  className="btn-gallery-pill"
                   onClick={() => fileInputRef.current?.click()}
                   title="Загрузить фото с устройства"
                 >
@@ -1313,7 +1356,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                 </button>
                 <button
                   type="button"
-                  className="btn-gallery-action outline"
+                  className="btn-gallery-pill outline"
                   onClick={() => alert('Режим множественного выбора активирован')}
                 >
                   <Check size={14} /> Выбрать
@@ -1321,8 +1364,8 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
               </div>
             </div>
 
-            {/* Media Grid: 1st tile is Camera, then thumbnails */}
-            <div className="gallery-media-grid">
+            {/* Media Grid: 1st tile is Live Camera, followed by photos */}
+            <div className="insta-gallery-grid">
               
               {/* Tile 1: Live Camera Tile */}
               <div 
@@ -1334,8 +1377,8 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                 }}
                 title="Снять на камеру"
               >
-                <div className="camera-tile-icon-circle">
-                  <Camera size={26} color="#ffffff" />
+                <div className="camera-tile-circle">
+                  <Camera size={28} color="#ffffff" />
                 </div>
                 <span>Камера</span>
               </div>
@@ -1350,7 +1393,7 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                     setSelectedGradient(null);
                     setIsPhotoSnapped(true);
                     setScreen('camera');
-                    setActiveMode('photo');
+                    setCameraSubMode('story');
                   }}
                 >
                   <img src={imgUrl} alt={`Upload ${idx}`} />
@@ -1367,13 +1410,20 @@ export function CreateStoryModal({ isOpen, onClose, onCreateStory }: CreateStory
                     setSelectedGradient(null);
                     setIsPhotoSnapped(true);
                     setScreen('camera');
-                    setActiveMode('photo');
+                    setCameraSubMode('story');
                   }}
                 >
                   <img src={presetUrl} alt={`Preset ${idx}`} />
                 </div>
               ))}
 
+            </div>
+
+            {/* Bottom Mode Slider in Gallery */}
+            <div className="insta-gallery-bottom-slider">
+              <button type="button" className="mode-slider-item">ПУБЛИКАЦИЯ</button>
+              <button type="button" className="mode-slider-item active">ИСТОРИЯ</button>
+              <button type="button" className="mode-slider-item">REELS</button>
             </div>
 
           </div>
