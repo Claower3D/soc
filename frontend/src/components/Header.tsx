@@ -47,7 +47,7 @@ export function Header() {
   const isProfilePage = location.pathname.startsWith('/profile');
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
       if (createRef.current && !createRef.current.contains(event.target as Node)) {
         setCreateMenuOpen(false);
       }
@@ -59,7 +59,11 @@ export function Header() {
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
 
   return (
@@ -332,7 +336,13 @@ export function Header() {
               </button>
 
               {notificationsOpen && (
-                <div className="notifications-popover">
+                <>
+                  <div 
+                    className="notifications-mobile-backdrop" 
+                    onClick={() => setNotificationsOpen(false)} 
+                    aria-hidden="true" 
+                  />
+                  <div className="notifications-popover">
                   <div className="notifications-header">
                     <div className="notif-popover-tabs">
                       <button 
@@ -553,8 +563,9 @@ export function Header() {
                     </div>
                   )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
+          </div>
 
             {isProfilePage && (
               <button

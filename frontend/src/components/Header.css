@@ -502,19 +502,85 @@
   position: relative;
 }
 
+.notifications-mobile-backdrop {
+  display: none;
+}
+
 .notifications-popover {
   position: absolute;
-  top: calc(100% + 12px);
-  right: 0;
-  width: 380px;
-  max-width: 92vw;
+  top: calc(100% + 10px);
+  right: -50px;
+  width: 370px;
+  max-width: min(370px, calc(100vw - 20px));
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: 16px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
   z-index: 1000;
   overflow: hidden;
   animation: fadeIn 0.15s ease;
+}
+
+@media (max-width: 640px) {
+  .notifications-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 1099;
+    animation: fadeIn 0.15s ease;
+  }
+
+  .notifications-popover {
+    position: fixed;
+    top: 56px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-width: 440px;
+    margin: 0 auto;
+    max-height: calc(85dvh);
+    border-radius: 18px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    z-index: 1100;
+  }
+
+  .notifications-header {
+    padding: 0.6rem 0.75rem;
+  }
+
+  .notif-popover-tabs {
+    flex: 1;
+    display: flex;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .notif-tab-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.76rem;
+    white-space: nowrap;
+  }
+
+  .notifications-list-container {
+    max-height: calc(75dvh - 110px);
+  }
+
+  .push-settings-panel {
+    max-height: calc(75dvh - 110px);
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 380px) {
+  .notif-tab-btn {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.25rem;
+  }
 }
 
 .notifications-header {
@@ -524,11 +590,13 @@
   align-items: center;
   justify-content: space-between;
   background: var(--color-bg-secondary);
+  gap: 0.5rem;
 }
 
 .notif-popover-tabs {
   display: flex;
   gap: 0.35rem;
+  min-width: 0;
 }
 
 .notif-tab-btn {
