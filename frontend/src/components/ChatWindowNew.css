@@ -542,4 +542,373 @@
   text-overflow: ellipsis;
 }
 
+/* ============================================
+   Voice Chat Mode (На громкой связи)
+   ============================================ */
+
+.cw-voice-header-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  color: #9333ea;
+  padding: 5px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  user-select: none;
+}
+
+[data-theme='dark'] .cw-voice-header-btn {
+  color: #c084fc;
+  border-color: rgba(192, 132, 252, 0.4);
+}
+
+.cw-voice-header-btn:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(236, 72, 153, 0.25));
+  transform: translateY(-1px);
+}
+
+.cw-voice-header-btn.active {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: #10b981;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
+}
+
+.cw-voice-header-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  line-height: 1.1;
+}
+
+.cw-voice-header-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.cw-voice-header-sub {
+  font-size: 9.5px;
+  opacity: 0.85;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pulse-anim {
+  animation: cwPulseVoice 1.4s infinite ease-in-out;
+}
+
+@keyframes cwPulseVoice {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
+/* Voice Banner inside chat */
+.cw-voice-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 6px 12px 14px 12px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(147, 51, 234, 0.08), rgba(99, 102, 241, 0.12));
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
+.cw-voice-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cw-voice-banner-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.cw-voice-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cw-voice-banner-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.cw-voice-banner-sub {
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+}
+
+.cw-voice-banner-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #9333ea, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+}
+
+.cw-voice-banner-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+}
+
+.cw-voice-banner-btn.active {
+  background: #ef4444;
+}
+
+/* Voice Chat Dock */
+.cw-voice-dock {
+  background: var(--color-bg-card);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: slideVoiceDock 0.2s ease;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+}
+
+@keyframes slideVoiceDock {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cw-voice-dock-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cw-voice-dock-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cw-voice-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cw-voice-status-dot.listening {
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+  animation: cwPulseVoice 1.2s infinite;
+}
+
+.cw-voice-status-dot.thinking {
+  background: #f59e0b;
+  box-shadow: 0 0 10px #f59e0b;
+  animation: cwPulseVoice 0.8s infinite;
+}
+
+.cw-voice-status-dot.speaking {
+  background: #a855f7;
+  box-shadow: 0 0 12px #a855f7;
+  animation: cwPulseVoice 0.9s infinite;
+}
+
+.cw-voice-status-dot.idle {
+  background: #9ca3af;
+}
+
+.cw-voice-status-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.cw-voice-status-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.cw-voice-status-sub {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.cw-voice-waves {
+  display: flex;
+  align-items: center;
+  gap: 3.5px;
+  height: 24px;
+}
+
+.cw-wave-bar {
+  width: 3.5px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--color-accent, #6366f1);
+  transition: height 0.15s ease;
+}
+
+.cw-voice-waves.active .cw-wave-bar:nth-child(1) {
+  animation: cwWaveMotion 0.8s infinite ease-in-out;
+}
+.cw-voice-waves.active .cw-wave-bar:nth-child(2) {
+  animation: cwWaveMotion 0.8s infinite 0.15s ease-in-out;
+}
+.cw-voice-waves.active .cw-wave-bar:nth-child(3) {
+  animation: cwWaveMotion 0.8s infinite 0.3s ease-in-out;
+}
+.cw-voice-waves.active .cw-wave-bar:nth-child(4) {
+  animation: cwWaveMotion 0.8s infinite 0.45s ease-in-out;
+}
+.cw-voice-waves.active .cw-wave-bar:nth-child(5) {
+  animation: cwWaveMotion 0.8s infinite 0.6s ease-in-out;
+}
+
+@keyframes cwWaveMotion {
+  0%, 100% { height: 6px; }
+  50% { height: 22px; }
+}
+
+.cw-voice-transcript {
+  background: rgba(147, 51, 234, 0.07);
+  border-left: 3px solid #9333ea;
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.cw-transcript-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #9333ea;
+  white-space: nowrap;
+}
+
+.cw-transcript-text {
+  font-size: 13.5px;
+  font-style: italic;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.cw-voice-dock-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cw-voice-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cw-voice-ctrl-btn:hover {
+  background: var(--color-bg-card);
+  border-color: var(--color-accent);
+}
+
+.cw-voice-ctrl-btn.speaker-loud {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.15);
+  color: #7c3aed;
+}
+
+[data-theme='dark'] .cw-voice-ctrl-btn.speaker-loud {
+  color: #c084fc;
+}
+
+.cw-voice-ctrl-btn.muted {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.cw-voice-ctrl-btn.interrupt {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.cw-voice-ctrl-btn.stop {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  margin-left: auto;
+}
+
+.cw-voice-ctrl-btn.stop:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* Bubble speak replay button */
+.cw-bubble-speak-btn {
+  background: none;
+  border: none;
+  padding: 0 4px;
+  margin-right: 4px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, transform 0.15s;
+  opacity: 0.75;
+}
+
+.cw-bubble-speak-btn:hover {
+  opacity: 1;
+  color: var(--color-accent);
+  transform: scale(1.15);
+}
+
+.cw-bubble-speak-btn.active {
+  opacity: 1;
+  color: #a855f7;
+  animation: cwPulseVoice 1s infinite;
+}
+
+
 

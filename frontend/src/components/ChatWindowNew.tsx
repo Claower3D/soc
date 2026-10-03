@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
 
-import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Radio, Sparkles } from 'lucide-react';
 import { type Chat, type Message } from '../data/mock';
 import { formatLastSeen } from '../utils/onlineStatus';
 import './ChatWindowNew.css';
@@ -149,6 +149,30 @@ async function fetchAiReply(text: string, history: Array<{ role: string; text: s
     return getLocalOracleFallback(text);
   }
 }
+
+function cleanTextForSpeech(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/[*_#`~>]/g, ' ')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  if (!voices || voices.length === 0) return null;
+  const ruVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('ru'));
+  if (ruVoices.length > 0) {
+    const naturalRu = ruVoices.find(v => {
+      const n = (v.name || '').toLowerCase();
+      return n.includes('google') || n.includes('natural') || n.includes('yandex') || n.includes('dmitri') || n.includes('tatyana') || n.includes('milena');
+    });
+    return naturalRu || ruVoices[0];
+  }
+  return voices.find(v => v.default) || voices[0] || null;
+}
+
 
 
 
@@ -324,6 +348,29 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  // Voice Chat (на громкой связи)
+  const [isVoiceChatActive, setIsVoiceChatActive] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
+  const [isSpeakerLoud, setIsSpeakerLoud] = useState(true); // По умолчанию громкая связь включена
+  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState('');
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  const recognitionRef = useRef<any>(null);
+  const silenceTimerRef = useRef<any>(null);
+  const currentVoiceQueryRef = useRef<string>('');
+  const isVoiceChatActiveRef = useRef(isVoiceChatActive);
+  isVoiceChatActiveRef.current = isVoiceChatActive;
+  const isMicMutedRef = useRef(isMicMuted);
+  isMicMutedRef.current = isMicMuted;
+  const voiceStatusRef = useRef(voiceStatus);
+  voiceStatusRef.current = voiceStatus;
+  const isSpeakerLoudRef = useRef(isSpeakerLoud);
+  isSpeakerLoudRef.current = isSpeakerLoud;
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
 
   
@@ -574,9 +621,329 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
   }, []);
 
+  const saveMessages = (msgs: Message[]) => {
+    if (onUpdateChat && chat) {
+      const last = msgs[msgs.length - 1];
+      onUpdateChat(chat.id, {
+        messages: msgs,
+        lastMessage: last ? String(last.text || '').slice(0, 50) : '',
+        time: formatTime(),
+      });
+    }
+  };
 
+  // Load available voices for Speech Synthesis
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const loadVoices = () => {
+        const v = window.speechSynthesis.getVoices();
+        if (v && v.length > 0) {
+          setAvailableVoices(v);
+        }
+      };
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+      return () => {
+        if (window.speechSynthesis) {
+          window.speechSynthesis.onvoiceschanged = null;
+        }
+      };
+    }
+  }, []);
 
+  // Cleanup voice chat on chat change
+  useEffect(() => {
+    if (isVoiceChatActive) {
+      stopVoiceChat();
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeakingMsgId(null);
+  }, [chat?.id]);
 
+  const speakAloud = (text: string, onEnd?: () => void) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      if (onEnd) onEnd();
+      return;
+    }
+
+    try {
+      window.speechSynthesis.cancel();
+      const clean = cleanTextForSpeech(text);
+      if (!clean) {
+        if (onEnd) onEnd();
+        return;
+      }
+
+      const utter = new SpeechSynthesisUtterance(clean);
+      // На громкой связи — максимальная громкость 1.0, иначе комфортная 0.4
+      utter.volume = isSpeakerLoudRef.current ? 1.0 : 0.4;
+      utter.rate = 1.0;
+      utter.pitch = 1.02;
+
+      const voice = getBestVoice(availableVoices);
+      if (voice) utter.voice = voice;
+
+      utter.onend = () => {
+        if (onEnd) onEnd();
+      };
+      utter.onerror = () => {
+        if (onEnd) onEnd();
+      };
+
+      window.speechSynthesis.speak(utter);
+    } catch (e) {
+      console.warn('Speech synthesis error:', e);
+      if (onEnd) onEnd();
+    }
+  };
+
+  const startRecognition = () => {
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRec) {
+      alert('Ваш браузер не поддерживает распознавание речи. Для голосового общения используйте Google Chrome или Яндекс Браузер.');
+      stopVoiceChat();
+      return;
+    }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+    }
+
+    try {
+      const rec = new SpeechRec();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'ru-RU';
+
+      rec.onstart = () => {
+        setVoiceStatus('listening');
+      };
+
+      rec.onresult = (event: any) => {
+        if (isMicMutedRef.current) return;
+
+        let interim = '';
+        let final = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const item = event.results[i];
+          if (item && item[0]) {
+            const transcript = item[0].transcript;
+            if (item.isFinal) {
+              final += transcript;
+            } else {
+              interim += transcript;
+            }
+          }
+        }
+
+        const currentSpoken = (final || interim).trim();
+        if (currentSpoken) {
+          setLiveTranscript(currentSpoken);
+          currentVoiceQueryRef.current = (currentVoiceQueryRef.current ? currentVoiceQueryRef.current + ' ' : '') + currentSpoken;
+
+          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = setTimeout(() => {
+            const queryToSend = currentVoiceQueryRef.current.trim();
+            if (queryToSend && isVoiceChatActiveRef.current) {
+              currentVoiceQueryRef.current = '';
+              setLiveTranscript('');
+              handleVoiceQuerySubmit(queryToSend);
+            }
+          }, 1400); // 1.4 секунды паузы отправляют фразу
+        }
+      };
+
+      rec.onerror = (event: any) => {
+        if (event.error === 'not-allowed') {
+          alert('Доступ к микрофону заблокирован. Разрешите микрофон в настройках браузера.');
+          stopVoiceChat();
+        }
+      };
+
+      rec.onend = () => {
+        if (isVoiceChatActiveRef.current && !isMicMutedRef.current && voiceStatusRef.current === 'listening') {
+          try {
+            rec.start();
+          } catch {}
+        }
+      };
+
+      recognitionRef.current = rec;
+      rec.start();
+    } catch (err) {
+      console.error('Recognition start error:', err);
+    }
+  };
+
+  const handleVoiceQuerySubmit = async (spokenText: string) => {
+    if (!spokenText.trim() || !chat) return;
+
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch {}
+    }
+
+    const newMsg: Message = {
+      id: `msg_${Date.now()}`,
+      text: spokenText,
+      fromMe: true,
+      time: formatTime(),
+      status: 'sent',
+    };
+
+    const currentMsgs = messagesRef.current;
+    const updatedMessages = [...currentMsgs, newMsg];
+    setMessages(updatedMessages);
+    saveMessages(updatedMessages);
+
+    setVoiceStatus('thinking');
+    setIsAiTyping(true);
+
+    const history = updatedMessages.map(m => ({
+      role: m.fromMe ? 'user' : 'assistant',
+      text: String(m.text || ''),
+    }));
+
+    try {
+      const replyText = await fetchAiReply(spokenText, history);
+      setIsAiTyping(false);
+
+      const reply: Message = {
+        id: `msg_ai_${Date.now()}`,
+        text: replyText,
+        fromMe: false,
+        time: formatTime(),
+        status: 'read',
+      };
+
+      const withReply = [...updatedMessages, reply];
+      setMessages(withReply);
+      saveMessages(withReply);
+
+      if (isVoiceChatActiveRef.current) {
+        setVoiceStatus('speaking');
+        speakAloud(replyText, () => {
+          if (isVoiceChatActiveRef.current) {
+            setVoiceStatus('listening');
+            if (!isMicMutedRef.current) {
+              startRecognition();
+            }
+          } else {
+            setVoiceStatus('idle');
+          }
+        });
+      }
+    } catch (err) {
+      setIsAiTyping(false);
+      if (isVoiceChatActiveRef.current) {
+        setVoiceStatus('listening');
+        startRecognition();
+      }
+    }
+  };
+
+  const startVoiceChat = async () => {
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      setIsVoiceChatActive(true);
+      setVoiceStatus('listening');
+      setLiveTranscript('');
+      currentVoiceQueryRef.current = '';
+      startRecognition();
+    } catch (err) {
+      console.error('Mic permission error:', err);
+      alert('Для голосового общения необходим доступ к микрофону. Пожалуйста, разрешите микрофон в настройках браузера.');
+    }
+  };
+
+  const stopVoiceChat = () => {
+    setIsVoiceChatActive(false);
+    setVoiceStatus('idle');
+    setLiveTranscript('');
+    currentVoiceQueryRef.current = '';
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+      recognitionRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
+  const toggleVoiceChat = () => {
+    if (isVoiceChatActive) {
+      stopVoiceChat();
+    } else {
+      startVoiceChat();
+    }
+  };
+
+  const interruptAiSpeech = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setVoiceStatus('listening');
+    if (!isMicMuted) {
+      startRecognition();
+    }
+  };
+
+  const toggleMicMute = () => {
+    setIsMicMuted(prev => {
+      const next = !prev;
+      if (next) {
+        if (recognitionRef.current) {
+          try { recognitionRef.current.stop(); } catch {}
+        }
+      } else {
+        if (isVoiceChatActive && voiceStatus === 'listening') {
+          startRecognition();
+        }
+      }
+      return next;
+    });
+  };
+
+  const toggleSpeakerLoud = () => {
+    setIsSpeakerLoud(prev => !prev);
+  };
+
+  const toggleSpeakMessage = (msgId: string, text: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    if (speakingMsgId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMsgId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    setSpeakingMsgId(msgId);
+
+    const clean = cleanTextForSpeech(text);
+    const utter = new SpeechSynthesisUtterance(clean);
+    utter.volume = isSpeakerLoud ? 1.0 : 0.5;
+    utter.rate = 1.0;
+    utter.pitch = 1.02;
+
+    const voice = getBestVoice(availableVoices);
+    if (voice) utter.voice = voice;
+
+    utter.onend = () => setSpeakingMsgId(null);
+    utter.onerror = () => setSpeakingMsgId(null);
+
+    window.speechSynthesis.speak(utter);
+  };
 
   if (!chat) {
 
@@ -618,43 +985,6 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
 
   const isOnline = isAi || Boolean(chat.user?.online);
-
-
-
-
-
-  const saveMessages = (msgs: Message[]) => {
-
-
-    if (onUpdateChat) {
-
-
-      const last = msgs[msgs.length - 1];
-
-
-      onUpdateChat(chat.id, {
-
-
-        messages: msgs,
-
-
-        lastMessage: last ? String(last.text || '').slice(0, 50) : '',
-
-
-        time: formatTime(),
-
-
-      });
-
-
-    }
-
-
-  };
-
-
-
-
 
   const handleSend = () => {
 
@@ -1002,38 +1332,55 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
 
         <div className="cw-header-actions">
-
-
-          <button className="cw-action-btn"><Phone size={18} /></button>
-
-
-          <button className="cw-action-btn"><Video size={18} /></button>
-
-
+          {isAi ? (
+            <button 
+              className={`cw-voice-header-btn ${isVoiceChatActive ? 'active' : ''}`}
+              onClick={toggleVoiceChat}
+              title={isVoiceChatActive ? "Завершить голосовой чат" : "Начать голосовой чат на громкой связи"}
+            >
+              <Volume2 size={16} className={isVoiceChatActive ? 'pulse-anim' : ''} />
+              <div className="cw-voice-header-text">
+                <span className="cw-voice-header-title">
+                  {isVoiceChatActive ? 'Голосовой чат ВКЛ' : 'Голосовой чат'}
+                </span>
+                <span className="cw-voice-header-sub">Громкая связь</span>
+              </div>
+            </button>
+          ) : (
+            <>
+              <button className="cw-action-btn"><Phone size={18} /></button>
+              <button className="cw-action-btn"><Video size={18} /></button>
+            </>
+          )}
           <button className="cw-action-btn"><MoreVertical size={18} /></button>
-
-
         </div>
-
-
       </div>
 
-
-
-
-
       {/* Messages */}
-
-
       <div className="cw-messages">
-
+        {isAi && (
+          <div className="cw-voice-banner">
+            <div className="cw-voice-banner-left">
+              <div className="cw-voice-banner-icon">
+                <Sparkles size={20} />
+              </div>
+              <div className="cw-voice-banner-info">
+                <div className="cw-voice-banner-title">Голосовой диалог с ИИ Оракулом</div>
+                <div className="cw-voice-banner-sub">Общайтесь вслух на громкой связи без клавиатуры — слушайте ответы голосом</div>
+              </div>
+            </div>
+            <button 
+              className={`cw-voice-banner-btn ${isVoiceChatActive ? 'active' : ''}`}
+              onClick={toggleVoiceChat}
+            >
+              <Volume2 size={16} />
+              <span>{isVoiceChatActive ? 'Завершить чат' : 'Начать голосовой чат (Громкая связь)'}</span>
+            </button>
+          </div>
+        )}
 
         {messages.length === 0 ? (
-
-
           <div className="cw-no-messages">Выберите диалог для начала общения</div>
-
-
         ) : (
 
 
@@ -1156,26 +1503,22 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
 
                   <div className="cw-bubble-meta">
-
-
-                    <span className="cw-bubble-time">{time}</span>
-
-
-                    {isMe && (
-
-
-                      <span className={`cw-ticks ${status === 'read' ? 'read' : ''}`}>
-
-
-                        {status === 'sent' ? '✓' : '✓✓'}
-
-
-                      </span>
-
-
+                    {!isMe && isAi && text && (
+                      <button 
+                        type="button"
+                        className={`cw-bubble-speak-btn ${speakingMsgId === msg.id ? 'active' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); toggleSpeakMessage(msg.id, text); }}
+                        title={speakingMsgId === msg.id ? "Остановить озвучку" : "Озвучить на громкой связи"}
+                      >
+                        {speakingMsgId === msg.id ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                      </button>
                     )}
-
-
+                    <span className="cw-bubble-time">{time}</span>
+                    {isMe && (
+                      <span className={`cw-ticks ${status === 'read' ? 'read' : ''}`}>
+                        {status === 'sent' ? '✓' : '✓✓'}
+                      </span>
+                    )}
                   </div>
 
 
@@ -1379,6 +1722,87 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
 
 
+
+      {/* Voice Chat Dock (на громкой связи) */}
+      {isVoiceChatActive && (
+        <div className="cw-voice-dock">
+          <div className="cw-voice-dock-top">
+            <div className="cw-voice-dock-status">
+              <span className={`cw-voice-status-dot ${voiceStatus}`} />
+              <div className="cw-voice-status-info">
+                <span className="cw-voice-status-title">
+                  {voiceStatus === 'listening' && (isMicMuted ? 'Микрофон заглушен' : 'Слушаю вас... Говорите свободно')}
+                  {voiceStatus === 'thinking' && 'Оракул думает над ответом...'}
+                  {voiceStatus === 'speaking' && 'Оракул говорит (громкая связь)'}
+                  {voiceStatus === 'idle' && 'Пауза'}
+                </span>
+                <span className="cw-voice-status-sub">
+                  {isSpeakerLoud ? '🔊 Громкая связь активна (100% громкости)' : '🔈 Обычная громкость'}
+                </span>
+              </div>
+            </div>
+
+            <div className={`cw-voice-waves ${voiceStatus === 'speaking' || (voiceStatus === 'listening' && !isMicMuted) ? 'active' : ''}`}>
+              <span className="cw-wave-bar" />
+              <span className="cw-wave-bar" />
+              <span className="cw-wave-bar" />
+              <span className="cw-wave-bar" />
+              <span className="cw-wave-bar" />
+            </div>
+          </div>
+
+          {liveTranscript && (
+            <div className="cw-voice-transcript">
+              <span className="cw-transcript-label">Вы говорите:</span>
+              <span className="cw-transcript-text">«{liveTranscript}»</span>
+            </div>
+          )}
+
+          <div className="cw-voice-dock-controls">
+            <button 
+              type="button"
+              className={`cw-voice-ctrl-btn ${isMicMuted ? 'muted' : ''}`}
+              onClick={toggleMicMute}
+              title={isMicMuted ? "Включить микрофон" : "Заглушить микрофон"}
+            >
+              {isMicMuted ? <MicOff size={16} /> : <Mic size={16} />}
+              <span>{isMicMuted ? 'Микрофон ВЫКЛ' : 'Микрофон'}</span>
+            </button>
+
+            <button 
+              type="button"
+              className={`cw-voice-ctrl-btn ${isSpeakerLoud ? 'speaker-loud' : ''}`}
+              onClick={toggleSpeakerLoud}
+              title={isSpeakerLoud ? "Громкая связь: включена (максимальная громкость)" : "Включить громкую связь"}
+            >
+              {isSpeakerLoud ? <Volume2 size={16} /> : <Volume1 size={16} />}
+              <span>{isSpeakerLoud ? 'Громкая связь: ВКЛ' : 'Громкая связь: ВЫКЛ'}</span>
+            </button>
+
+            {voiceStatus === 'speaking' && (
+              <button 
+                type="button"
+                className="cw-voice-ctrl-btn interrupt"
+                onClick={interruptAiSpeech}
+                title="Прервать ответ и говорить самому"
+              >
+                <Radio size={16} />
+                <span>Прервать</span>
+              </button>
+            )}
+
+            <button 
+              type="button"
+              className="cw-voice-ctrl-btn stop"
+              onClick={stopVoiceChat}
+              title="Завершить голосовой режим"
+            >
+              <X size={16} />
+              <span>Завершить</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Input */}
 
