@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { 
   Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, 
   Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send, Smile,
-  Radio, Users, Sparkles, Flame, Video, Activity, Hash, Disc3
+  Radio, Users, Sparkles, Flame, Video, Activity, Hash, Disc3,
+  Search
 } from 'lucide-react';
 import { type Clip, type ClipComment } from '../data/mock';
 import { api } from '../api';
@@ -150,6 +151,8 @@ export function ClipsPage() {
 
   const [activeTab, setActiveTab] = useState<ClipTab>('all');
   const [selectedTag, setSelectedTag] = useState<string>('Все');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [activeClipProgress, setActiveClipProgress] = useState<number>(0);
   const [floatingReactions, setFloatingReactions] = useState<{ id: number; emoji: string; left: number }[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -482,10 +485,20 @@ export function ClipsPage() {
       if (c.user.id !== currentUser.id) return false;
     }
     if (selectedTag !== 'Все') {
-      const tagLower = selectedTag.toLowerCase();
+      const tagLower = selectedTag.toLowerCase().replace(/^#/, '');
       const hasTag = (c.tags && c.tags.some(t => t.toLowerCase().includes(tagLower))) || 
         (c.caption && c.caption.toLowerCase().includes(tagLower));
       if (!hasTag) return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase().replace(/^#/, '');
+      const matchTag = c.tags && c.tags.some(t => t.toLowerCase().includes(q));
+      const matchCaption = c.caption && c.caption.toLowerCase().includes(q);
+      const matchAuthor = (c.user.name && c.user.name.toLowerCase().includes(q)) ||
+                          (c.user.username && c.user.username.toLowerCase().includes(q));
+      const matchMusic = (c.musicTitle && c.musicTitle.toLowerCase().includes(q)) ||
+                         (c.musicAuthor && c.musicAuthor.toLowerCase().includes(q));
+      if (!matchTag && !matchCaption && !matchAuthor && !matchMusic) return false;
     }
     return true;
   });
@@ -504,13 +517,14 @@ export function ClipsPage() {
       </div>
 
       {/* Category Tab Selector & Quick Hashtag Chips (Top Bar) */}
+      {/* Category Tab Selector & Search Engine (Top Bar) */}
       <div className="clips-top-header-panel">
         <div className="clips-category-nav-bar">
           <div className="clips-category-tabs">
             <button 
               type="button" 
-              className={`clips-cat-tab ${activeTab === 'all' ? 'active' : ''}`}
-              onClick={() => { setActiveTab('all'); setActiveIndex(0); scrollToClip(0); }}
+              className={`clips-cat-tab ${activeTab === 'all' && !searchQuery && selectedTag === 'Все' ? 'active' : ''}`}
+              onClick={() => { setActiveTab('all'); setSelectedTag('Все'); setSearchQuery(''); setActiveIndex(0); scrollToClip(0); }}
             >
               <Sparkles size={14} />
               <span>Все</span>
@@ -550,6 +564,23 @@ export function ClipsPage() {
             </button>
           </div>
 
+          {/* Search Engine Trigger Button */}
+          <button 
+            type="button" 
+            className={`clips-search-toggle-btn ${(isSearchOpen || searchQuery || selectedTag !== 'Все') ? 'active' : ''}`}
+            onClick={() => setIsSearchOpen(prev => !prev)}
+            title="Поиск клипов и теги"
+          >
+            <Search size={14} />
+            {selectedTag !== 'Все' ? (
+              <span className="clips-search-active-pill">#{selectedTag}</span>
+            ) : searchQuery ? (
+              <span className="clips-search-active-pill">{searchQuery}</span>
+            ) : (
+              <span>Поиск</span>
+            )}
+          </button>
+
           {/* Prominent Upload Clip Button in Top Bar */}
           <button 
             type="button" 
@@ -562,20 +593,108 @@ export function ClipsPage() {
           </button>
         </div>
 
-        {/* Quick Hashtag Chips Filter Bar */}
-        <div className="clips-hashtag-chips-bar">
-          {QUICK_HASHTAGS.map(tag => (
-            <button
-              key={tag}
-              type="button"
-              className={`clips-hashtag-chip ${selectedTag === tag ? 'active' : ''}`}
-              onClick={() => { setSelectedTag(tag); setActiveIndex(0); scrollToClip(0); }}
+        {/* Search Engine & Tags Popover */}
+        {isSearchOpen && (
+          <div className="clips-search-dropdown-panel" onClick={e => e.stopPropagation()}>
+            <div className="clips-search-bar-row">
+              <Search size={16} className="clips-search-bar-icon" />
+              <input 
+                type="text"
+                className="clips-search-input-field"
+                placeholder="Поиск по клипам, авторам или #тегам..."
+                value={searchQuery}
+                onChange={e => {
+                  const val = e.target.value;
+                  setSearchQuery(val);
+                  if (val === '') {
+                    setSelectedTag('Все');
+                  }
+                  setActiveIndex(0);
+                  scrollToClip(0);
+                }}
+                autoFocus
+              />
+              {(searchQuery || selectedTag !== 'Все') && (
+                <button 
+                  type="button" 
+                  className="clips-search-reset-btn"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedTag('Все');
+                    setActiveIndex(0);
+                    scrollToClip(0);
+                  }}
+                  title="Очистить поиск"
+                >
+                  <X size={14} />
+                </button>
+              )}
+              <button 
+                type="button" 
+                className="clips-search-done-btn"
+                onClick={() => setIsSearchOpen(false)}
+              >
+                Готово
+              </button>
+            </div>
+
+            {/* Quick Hashtags in Search Engine */}
+            <div className="clips-search-hashtags-section">
+              <div className="clips-search-tags-heading">
+                <Hash size={12} />
+                <span>Теги для быстрого поиска:</span>
+              </div>
+              <div className="clips-search-tags-wrap">
+                {QUICK_HASHTAGS.map(tag => {
+                  const isCurrentTagActive = selectedTag === tag || (tag !== 'Все' && searchQuery.toLowerCase().includes(tag.toLowerCase()));
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      className={`clips-search-tag-chip ${isCurrentTagActive ? 'active' : ''}`}
+                      onClick={() => {
+                        if (tag === 'Все') {
+                          setSelectedTag('Все');
+                          setSearchQuery('');
+                        } else {
+                          setSelectedTag(tag);
+                          setSearchQuery(`#${tag}`);
+                        }
+                        setActiveIndex(0);
+                        scrollToClip(0);
+                      }}
+                    >
+                      <Hash size={11} className="hashtag-chip-icon" />
+                      <span>{tag}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Subtle Active Filter Pill when Search Panel is closed */}
+        {!isSearchOpen && (selectedTag !== 'Все' || searchQuery) && (
+          <div className="clips-active-filter-badge">
+            <span className="active-filter-text">
+              Фильтр: <strong>{searchQuery || `#${selectedTag}`}</strong> ({displayedClips.length})
+            </span>
+            <button 
+              type="button" 
+              className="active-filter-close"
+              onClick={() => {
+                setSelectedTag('Все');
+                setSearchQuery('');
+                setActiveIndex(0);
+                scrollToClip(0);
+              }}
+              title="Сбросить фильтр"
             >
-              <Hash size={11} className="hashtag-hash-icon" />
-              <span>{tag}</span>
+              <X size={12} />
             </button>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="clips-feed-wrapper">
@@ -612,20 +731,39 @@ export function ClipsPage() {
           {displayedClips.length === 0 ? (
             <div className="clips-empty-state">
               <div className="clips-empty-icon-wrapper">
-                <Video size={48} />
+                {searchQuery || selectedTag !== 'Все' ? <Search size={44} /> : <Video size={48} />}
               </div>
-              <h2 className="clips-empty-title">Клипов пока нет</h2>
+              <h2 className="clips-empty-title">
+                {searchQuery || selectedTag !== 'Все' ? 'Ничего не найдено' : 'Клипов пока нет'}
+              </h2>
               <p className="clips-empty-subtitle">
-                Опубликуйте первое короткое видео и запустите новую волну в экосистеме!
+                {searchQuery || selectedTag !== 'Все'
+                  ? `По запросу ${searchQuery ? `«${searchQuery}»` : `#${selectedTag}`} клипов не обнаружено.`
+                  : 'Опубликуйте первое короткое видео и запустите новую волну в экосистеме!'}
               </p>
-              <button 
-                type="button" 
-                className="clips-empty-btn"
-                onClick={handleTriggerUpload}
-              >
-                <Plus size={18} />
-                <span>Загрузить первый клип</span>
-              </button>
+              {searchQuery || selectedTag !== 'Все' ? (
+                <button 
+                  type="button" 
+                  className="clips-empty-btn"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSelectedTag('Все');
+                    setActiveIndex(0);
+                    scrollToClip(0);
+                  }}
+                >
+                  <span>Сбросить поиск</span>
+                </button>
+              ) : (
+                <button 
+                  type="button" 
+                  className="clips-empty-btn"
+                  onClick={handleTriggerUpload}
+                >
+                  <Plus size={18} />
+                  <span>Загрузить первый клип</span>
+                </button>
+              )}
             </div>
           ) : (
             displayedClips.map((clip, index) => {

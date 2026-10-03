@@ -90,54 +90,250 @@
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.1);
 }
 
-/* Quick Hashtag Chips Bar */
-.clips-hashtag-chips-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow-x: auto;
-  max-width: 90vw;
-  padding: 2px 4px;
-  scrollbar-width: none;
-}
-
-.clips-hashtag-chips-bar::-webkit-scrollbar {
-  display: none;
-}
-
-.clips-hashtag-chip {
+/* Search Engine Toggle Button in Clips Top Bar */
+.clips-search-toggle-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
+  gap: 6px;
+  padding: 6px 14px;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 11px;
-  font-weight: 500;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  white-space: nowrap;
-  backdrop-filter: blur(10px);
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
-.clips-hashtag-chip:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+.clips-search-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
   border-color: rgba(255, 255, 255, 0.25);
   transform: translateY(-1px);
 }
 
-.clips-hashtag-chip.active {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(236, 72, 153, 0.4));
+.clips-search-toggle-btn.active {
+  background: rgba(139, 92, 246, 0.25);
   border-color: rgba(168, 85, 247, 0.6);
-  color: #fff;
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+  color: #c084fc;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.25);
 }
 
-.hashtag-hash-icon {
+.clips-search-active-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #38bdf8;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Search Engine Popover Dropdown with Tags */
+.clips-search-dropdown-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(15, 15, 20, 0.94);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  padding: 12px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.12);
+  width: 92vw;
+  max-width: 580px;
+  animation: clipsFadeSlideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes clipsFadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.clips-search-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+  padding: 4px 12px;
+  transition: all 0.2s ease;
+}
+
+.clips-search-bar-row:focus-within {
+  border-color: rgba(168, 85, 247, 0.7);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.25);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.clips-search-bar-icon {
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+}
+
+.clips-search-input-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 13.5px;
+  padding: 6px 0;
+}
+
+.clips-search-input-field::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.clips-search-reset-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.clips-search-reset-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.clips-search-done-btn {
+  background: linear-gradient(135deg, #8b5cf6, #a855f7);
+  border: none;
+  border-radius: 9999px;
+  color: #ffffff;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.clips-search-done-btn:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+/* Quick Hashtags in Search Engine */
+.clips-search-hashtags-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.clips-search-tags-heading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-left: 4px;
+}
+
+.clips-search-tags-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.clips-search-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clips-search-tag-chip:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.clips-search-tag-chip.active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.45), rgba(236, 72, 153, 0.45));
+  border-color: rgba(168, 85, 247, 0.7);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.35);
+}
+
+.hashtag-chip-icon {
   opacity: 0.6;
+}
+
+/* Subtle Active Filter Pill */
+.clips-active-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  background: rgba(18, 18, 24, 0.85);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  animation: clipsFadeSlideDown 0.2s ease;
+}
+
+.clips-active-filter-badge strong {
+  color: #c084fc;
+}
+
+.active-filter-close {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.active-filter-close:hover {
+  background: rgba(239, 68, 68, 0.7);
+  color: #ffffff;
 }
 
 .clips-category-tabs {
