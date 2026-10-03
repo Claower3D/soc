@@ -852,13 +852,19 @@ export function EditProfileModal({
               {/* === QR Code Scanner & Login === */}
               <div className="privacy-settings-box">
                 <div className="settings-qr-scanner-card">
-                  <div className="settings-qr-info">
+                  <div className="settings-qr-left-content">
                     <div className="settings-qr-icon-wrap">
-                      <QrCode size={20} />
+                      <QrCode size={24} />
+                      <div className="settings-qr-icon-halo" />
                     </div>
-                    <div>
-                      <strong className="toggle-heading">Вход по QR-коду</strong>
-                      <span className="toggle-subtext">Сканируйте QR-код для мгновенного входа в аккаунт с мобильного или веб</span>
+                    <div className="settings-qr-text-meta">
+                      <div className="settings-qr-badge-title">
+                        <strong className="settings-qr-title">Вход по QR-коду</strong>
+                        <span className="settings-qr-quick-tag">Быстрый доступ</span>
+                      </div>
+                      <p className="settings-qr-description">
+                        Сканируйте QR-код на экране другого устройства или в браузере для моментальной авторизации без ввода пароля
+                      </p>
                     </div>
                   </div>
                   <button 
@@ -870,8 +876,10 @@ export function EditProfileModal({
                         onOpenQrScanner();
                       }
                     }}
+                    title="Запустить сканер QR-кода через камеру"
                   >
-                    <QrCode size={14} /> Открыть QR-сканер
+                    <QrCode size={16} />
+                    <span>Открыть QR-сканер</span>
                   </button>
                 </div>
               </div>

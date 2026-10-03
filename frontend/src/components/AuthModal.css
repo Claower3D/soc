@@ -267,7 +267,12 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 0.5rem 0.5rem 1rem 0.5rem;
+  padding: 1rem 0.75rem 1.25rem 0.75rem;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.04) 0%, rgba(168, 85, 247, 0.04) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  border-radius: 20px;
+  margin: 0.25rem 0 1rem 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
 }
 
 .qr-box-wrapper {
@@ -288,22 +293,27 @@
 .qr-instructions {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
-  margin-bottom: 1.25rem;
-  max-width: 320px;
+  gap: 0.55rem;
+  margin-top: 1rem;
+  max-width: 330px;
+  width: 100%;
 }
 
 .qr-step-item {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  font-size: 0.82rem;
-  color: #475569;
+  gap: 0.65rem;
+  font-size: 0.825rem;
+  color: var(--color-text-secondary, #64748b);
   text-align: left;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(139, 92, 246, 0.12);
 }
 
 .qr-step-icon {
-  color: #6366F1;
+  color: #8B5CF6;
   flex-shrink: 0;
 }
 
