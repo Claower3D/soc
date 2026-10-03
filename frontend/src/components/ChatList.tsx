@@ -541,6 +541,13 @@ export function ChatList({
                         if (chat.isLocked && !isLockedUnlocked) {
                           return '🔒 Содержимое защищено PIN';
                         }
+                        if (chat.isTyping) {
+                          return (
+                            <span className="chat-typing-indicator-text">
+                              печатает.....
+                            </span>
+                          );
+                        }
                         const lastMsg = chat.messages && chat.messages.length > 0 ? chat.messages[chat.messages.length - 1] : null;
                         const isOutgoing = lastMsg ? lastMsg.fromMe : false;
                         const status = lastMsg?.status || 'read';

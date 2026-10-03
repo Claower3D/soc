@@ -999,6 +999,12 @@ func main() {
 	mux.HandleFunc("POST /api/auth/send-code", rateLimitMiddleware(smsLimiter, handleSendCode))
 	mux.HandleFunc("POST /api/auth/verify-code", rateLimitMiddleware(smsLimiter, handleVerifyCode))
 
+	// QR-код авторизация (вход со смартфона)
+	mux.HandleFunc("GET /api/auth/qr/init", handleQRInit)
+	mux.HandleFunc("GET /api/auth/qr/status", handleQRStatus)
+	mux.HandleFunc("POST /api/auth/qr/confirm", handleQRConfirm)
+	mux.HandleFunc("POST /api/auth/qr/reject", handleQRReject)
+
 	// Подписки и друзья (полная совместимость с E:\соц и текущей архитектурой)
 	mux.HandleFunc("POST /api/users/{id}/follow", handleFollow)
 	mux.HandleFunc("DELETE /api/users/{id}/follow", handleUnfollow)
@@ -2329,18 +2335,15 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GET /api/auth/me — Валидация сессии по JWT Bearer токену
-func handleAuthMe(w http.ResponseWriter, r *http.Request) {
-	token := extractBearerToken(r)
+// getUserFromToken извлекает и верифицирует пользователя по JWT токену
+func getUserFromToken(token string) (*User, error) {
 	if token == "" {
-		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Токен авторизации отсутствует"})
-		return
+		return nil, errors.New("токен авторизации отсутствует")
 	}
 
 	claims, err := parseAndValidateJWT(token)
 	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Недействительный или просроченный токен: " + err.Error()})
-		return
+		return nil, errors.New("недействительный или просроченный токен: " + err.Error())
 	}
 
 	var user *User
@@ -2377,11 +2380,44 @@ func handleAuthMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user == nil {
-		writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден в базе"})
-		return
+		for _, mu := range mockUsers {
+			if mu.ID == claims.UserID {
+				uCopy := mu
+				ensureUserAvatar(&uCopy)
+				uCopy.FollowersCount, uCopy.FollowingCount, uCopy.FriendsCount = getRelationshipCounts(claims.UserID)
+				user = &uCopy
+				break
+			}
+		}
+	}
+
+	if user == nil {
+		return nil, errors.New("пользователь не найден в базе")
 	}
 
 	ensureUserAvatar(user)
+	return user, nil
+}
+
+// GET /api/auth/me — Валидация сессии по JWT Bearer токену
+func handleAuthMe(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	if token == "" {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Токен авторизации отсутствует"})
+		return
+	}
+
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Недействительный или просроченный токен: " + err.Error()})
+		return
+	}
+
+	user, err := getUserFromToken(token)
+	if err != nil || user == nil {
+		writeJSON(w, http.StatusNotFound, Response{Status: "error", Message: "Пользователь не найден в базе"})
+		return
+	}
 
 	writeJSON(w, http.StatusOK, Response{
 		Status: "ok",
@@ -2561,6 +2597,172 @@ func handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 			"user":      user,
 			"isNewUser": isNewUser,
 		},
+	})
+}
+
+// =========================================================================
+// QR-КОД АВТОРИЗАЦИЯ (ВХОД ЧЕРЕЗ СМАРТФОН)
+// =========================================================================
+
+type QRSession struct {
+	SessionID string    `json:"sessionId"`
+	Status    string    `json:"status"` // "pending", "confirmed", "rejected", "expired"
+	UserID    string    `json:"userId,omitempty"`
+	User      *User     `json:"user,omitempty"`
+	Token     string    `json:"token,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+var (
+	qrSessions   = make(map[string]*QRSession)
+	qrSessionsMu sync.RWMutex
+)
+
+// GET /api/auth/qr/init — Инициализация сессии для входа по QR-коду
+func handleQRInit(w http.ResponseWriter, r *http.Request) {
+	sessionID := "qr_" + strings.ReplaceAll(uuid.New().String(), "-", "")[:16]
+	session := &QRSession{
+		SessionID: sessionID,
+		Status:    "pending",
+		CreatedAt: time.Now(),
+		ExpiresAt: time.Now().Add(5 * time.Minute),
+	}
+
+	qrSessionsMu.Lock()
+	qrSessions[sessionID] = session
+	// Очищаем просроченные сессии
+	for k, v := range qrSessions {
+		if time.Now().After(v.ExpiresAt) {
+			delete(qrSessions, k)
+		}
+	}
+	qrSessionsMu.Unlock()
+
+	writeJSON(w, http.StatusOK, Response{
+		Status: "ok",
+		Data: map[string]interface{}{
+			"sessionId": sessionID,
+			"expiresIn": 300,
+		},
+	})
+}
+
+// GET /api/auth/qr/status?session=... — Опрос статуса сессии QR-кода
+func handleQRStatus(w http.ResponseWriter, r *http.Request) {
+	sessionID := strings.TrimSpace(r.URL.Query().Get("session"))
+	if sessionID == "" {
+		sessionID = strings.TrimSpace(r.URL.Query().Get("sessionId"))
+	}
+	if sessionID == "" {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Параметр session обязателен"})
+		return
+	}
+
+	qrSessionsMu.RLock()
+	session, exists := qrSessions[sessionID]
+	qrSessionsMu.RUnlock()
+
+	if !exists || time.Now().After(session.ExpiresAt) {
+		writeJSON(w, http.StatusOK, Response{
+			Status: "ok",
+			Data: map[string]interface{}{
+				"sessionId":     sessionID,
+				"sessionStatus": "expired",
+			},
+		})
+		return
+	}
+
+	respData := map[string]interface{}{
+		"sessionId":     session.SessionID,
+		"sessionStatus": session.Status,
+	}
+	if session.Status == "confirmed" {
+		respData["token"] = session.Token
+		respData["user"] = session.User
+	}
+
+	writeJSON(w, http.StatusOK, Response{
+		Status: "ok",
+		Data:   respData,
+	})
+}
+
+// POST /api/auth/qr/confirm — Подтверждение входа с мобильного телефона
+func handleQRConfirm(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		SessionID string `json:"sessionId"`
+		Token     string `json:"token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
+		return
+	}
+
+	token := req.Token
+	if token == "" {
+		token = extractBearerToken(r)
+	}
+	if token == "" {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходим токен авторизации"})
+		return
+	}
+
+	user, err := getUserFromToken(token)
+	if err != nil || user == nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Ошибка проверки авторизации"})
+		return
+	}
+
+	qrSessionsMu.Lock()
+	session, exists := qrSessions[req.SessionID]
+	if !exists || time.Now().After(session.ExpiresAt) {
+		qrSessionsMu.Unlock()
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Сессия QR-кода не найдена или истекла"})
+		return
+	}
+
+	// Генерируем токен для новой авторизованной сессии
+	newToken, _ := generateJWT(*user, user.Username)
+	if newToken == "" {
+		newToken = token
+	}
+
+	session.Status = "confirmed"
+	session.Token = newToken
+	session.User = user
+	session.UserID = user.ID
+	qrSessionsMu.Unlock()
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: "Вход успешно подтверждён",
+		Data: map[string]interface{}{
+			"user": user,
+		},
+	})
+}
+
+// POST /api/auth/qr/reject — Отклонение сессии QR-кода
+func handleQRReject(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		SessionID string `json:"sessionId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
+		return
+	}
+
+	qrSessionsMu.Lock()
+	if session, exists := qrSessions[req.SessionID]; exists {
+		session.Status = "rejected"
+	}
+	qrSessionsMu.Unlock()
+
+	writeJSON(w, http.StatusOK, Response{
+		Status:  "ok",
+		Message: "Вход отклонён",
 	})
 }
 

@@ -5,7 +5,7 @@ import {
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Users, Share2, Edit3, Heart, MessageSquare,
   CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn, Plus, Brain, Sparkles,
-  Calendar, Moon, Film
+  Calendar, Moon, Film, QrCode
 } from 'lucide-react';
 import { 
   RELIGIONS_CATALOG, type User, type Post, type Story, type Video as VideoType, 
@@ -29,6 +29,7 @@ import { AuthModal } from '../components/AuthModal';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import { PremiumBadge } from '../components/PremiumBadge';
 import { ConsciousnessClassModal } from '../components/ConsciousnessClassModal';
+import { QrScannerModal } from '../components/QrScannerModal';
 import { useCurrency } from '../context/CurrencyContext';
 import { 
   getStoredFollowingIds, 
@@ -372,6 +373,7 @@ export function ProfilePage() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isConsciousnessModalOpen, setIsConsciousnessModalOpen] = useState(false);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
   const [, setActivityTick] = useState(0);
 
   useEffect(() => {
@@ -875,6 +877,9 @@ export function ProfilePage() {
                   </button>
                   <button className="btn btn-secondary" onClick={() => setIsEditProfileOpen(true)}>
                     <Edit3 size={14} /> Редактировать
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setIsQrScannerOpen(true)} title="Сканировать QR-код для входа">
+                    <QrCode size={14} /> QR-сканер
                   </button>
                   <button className="btn btn-secondary" onClick={handleShareProfile}>
                     <Share2 size={14} /> {copiedLink ? 'Скопировано!' : 'Поделиться'}
@@ -1442,6 +1447,12 @@ export function ProfilePage() {
             cognitionVector: res.dominantVector
           });
         }}
+      />
+
+      {/* QR Scanner Modal */}
+      <QrScannerModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
       />
     </div>
   );

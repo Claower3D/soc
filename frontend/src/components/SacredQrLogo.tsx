@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import logoImg from '../assets/logo.png';
 import './SacredQrLogo.css';
 
@@ -13,6 +13,9 @@ export const SacredQrLogo: React.FC<SacredQrLogoProps> = ({
   dataUrl = 'https://newage.community/join',
   glowColor = 'rgba(168, 85, 247, 0.4)'
 }) => {
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
+
   return (
     <div 
       className="sacred-qr-container"
@@ -82,6 +85,24 @@ export const SacredQrLogo: React.FC<SacredQrLogoProps> = ({
 
       {/* Internal QR Matrix Layer */}
       <div className="sacred-qr-matrix-card">
+        {!imgFailed ? (
+          <img 
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=8&ecc=H&data=${encodeURIComponent(dataUrl)}`}
+            alt={`Sacred QR: ${dataUrl}`}
+            className="sacred-qr-code-real-img"
+            onLoad={() => setImgLoaded(true)}
+            onError={() => setImgFailed(true)}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              display: 'block',
+              background: '#FFFFFF',
+              opacity: imgLoaded ? 1 : 0.4,
+              transition: 'opacity 0.2s ease',
+            }}
+          />
+        ) : (
         <svg viewBox="0 0 200 200" className="sacred-qr-matrix-svg">
           {/* Clean White/Card Background */}
           <rect width="200" height="200" rx="14" fill="#FFFFFF" />
@@ -149,6 +170,7 @@ export const SacredQrLogo: React.FC<SacredQrLogoProps> = ({
           <circle cx="100" cy="100" r="37" fill="none" stroke="url(#sacredRainbowGrad)" strokeWidth="2.5" />
           <circle cx="100" cy="100" r="33" fill="none" stroke="#F59E0B" strokeWidth="1" strokeDasharray="3 2" />
         </svg>
+        )}
 
         {/* Sacred Heart: Center Logo of All World Faiths */}
         <div className="sacred-qr-center-emblem">

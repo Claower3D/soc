@@ -529,6 +529,7 @@ export interface Chat {
   customTheme?: ChatTheme;
   isFavorite?: boolean;
   isImportant?: boolean;
+  isTyping?: boolean;
   tagId?: string;
 }
 

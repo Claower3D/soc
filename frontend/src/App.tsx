@@ -24,6 +24,7 @@ import { FoodDeliveryPage } from './pages/FoodDeliveryPage';
 import { DatingPage } from './pages/DatingPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { SearchPage } from './pages/SearchPage';
+import { QrLoginConfirmPage } from './pages/QrLoginConfirmPage';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -90,6 +91,7 @@ function AppContent() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/me" element={<ProfilePage />} />
             <Route path="/profile/:userId" element={<ProfilePage />} />
+            <Route path="/qr-login" element={<QrLoginConfirmPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </ErrorBoundary>

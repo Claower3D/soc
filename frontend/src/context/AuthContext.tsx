@@ -58,6 +58,7 @@ interface AuthContextType {
     location?: string;
   }) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
+  loginWithToken: (token: string, user: any) => void;
   updateProfile: (data: Partial<User>) => void;
 }
 
@@ -455,6 +456,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthenticated(false);
   };
 
+  const loginWithToken = (token: string, user: any) => {
+    if (!user) return;
+    if (user.username) user.username = String(user.username).replace(/^@+/, '');
+    user.isPremium = true;
+    setJwtToken(token);
+    setActiveUser(user);
+    setIsAuthenticated(true);
+    localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+    localStorage.setItem(STORAGE_KEY_TOKEN, token);
+    localStorage.setItem('new_age_is_auth', 'true');
+    Object.assign(defaultCurrentUser, user);
+
+    setAllAccounts((prev) => {
+      const exists = prev.some((a) => a && (a.id === user.id || a.username === user.username));
+      if (!exists) {
+        return [
+          {
+            ...user,
+            emailOrPhone: user.emailOrPhone || user.phone || user.username,
+            createdAt: new Date().toISOString(),
+          } as RegisteredAccount,
+          ...prev,
+        ];
+      }
+      return prev.map((a) => (a && (a.id === user.id || a.username === user.username) ? { ...a, ...user } : a));
+    });
+  };
+
   const updateProfile = (data: Partial<User>) => {
     setActiveUser((prev) => {
       const updated = { ...prev, ...data };
@@ -499,6 +528,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
+        loginWithToken,
         updateProfile,
       }}
     >

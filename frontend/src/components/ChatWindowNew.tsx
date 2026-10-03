@@ -759,53 +759,36 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
 
       setIsAiTyping(true);
-
+      window.dispatchEvent(new CustomEvent('chat_typing_status', { detail: { chatId: chat.id, isTyping: true } }));
+      if (onUpdateChat) {
+        onUpdateChat(chat.id, { isTyping: true });
+      }
 
       fetchAiReply(text, history).then(replyText => {
-
-
         const reply: Message = {
-
-
           id: `msg_ai_${Date.now()}`,
-
-
           text: replyText,
-
-
           fromMe: false,
-
-
           time: formatTime(),
-
-
           status: 'read',
-
-
         };
-
-
         setMessages(prev => {
-
-
           const updated = [...prev, reply];
-
-
           saveMessages(updated);
-
-
           return updated;
-
-
         });
-
-
         setIsAiTyping(false);
-
-
+        window.dispatchEvent(new CustomEvent('chat_typing_status', { detail: { chatId: chat.id, isTyping: false } }));
+        if (onUpdateChat) {
+          onUpdateChat(chat.id, { isTyping: false });
+        }
+      }).catch(() => {
+        setIsAiTyping(false);
+        window.dispatchEvent(new CustomEvent('chat_typing_status', { detail: { chatId: chat.id, isTyping: false } }));
+        if (onUpdateChat) {
+          onUpdateChat(chat.id, { isTyping: false });
+        }
       });
-
-
     }
 
 

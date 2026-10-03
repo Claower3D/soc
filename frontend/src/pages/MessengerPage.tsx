@@ -386,9 +386,35 @@ export function MessengerPage() {
     }
   };
 
+  useEffect(() => {
+    const handleTypingEvent = (e: any) => {
+      const { chatId, isTyping } = e.detail || {};
+      if (!chatId) return;
+      setChatList(prev => prev.map(c => c.id === chatId ? { ...c, isTyping: Boolean(isTyping) } : c));
+    };
+    window.addEventListener('chat_typing_status', handleTypingEvent);
+    return () => window.removeEventListener('chat_typing_status', handleTypingEvent);
+  }, []);
+
   const handleUpdateChat = (chatId: string, updates: Partial<Chat>) => {
     setChatList(prev => {
-      const updated = prev.map(c => c.id === chatId ? { ...c, ...updates } : c);
+      const updated = prev.map(c => {
+        if (c.id === chatId) {
+          let newUnread = updates.unread !== undefined ? updates.unread : c.unread;
+          if (updates.messages && activeChatId !== chatId) {
+            const oldLen = c.messages ? c.messages.length : 0;
+            const newLen = updates.messages.length;
+            if (newLen > oldLen) {
+              const latestMsg = updates.messages[newLen - 1];
+              if (!latestMsg.fromMe) {
+                newUnread = (c.unread || 0) + (newLen - oldLen);
+              }
+            }
+          }
+          return { ...c, ...updates, unread: newUnread };
+        }
+        return c;
+      });
       localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updated));
 
       // Синхронизация для приватных диалогов 1-на-1 между локальными аккаунтами

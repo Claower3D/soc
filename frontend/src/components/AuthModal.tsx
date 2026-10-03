@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   X, Mail, Lock, User as UserIcon, Shield, CheckCircle2, 
   ShoppingBag, Video, ArrowRight, Check, Compass, Info, AlertCircle, Sparkles, LogIn, UserPlus, QrCode, Smartphone,
@@ -27,7 +27,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   initialMode = 'login',
   onSuccess 
 }) => {
-  const { login, register, currentUser } = useAuth();
+  const { login, register, currentUser, loginWithToken } = useAuth();
   const { t } = useTranslation();
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
   const [loginMethod, setLoginMethod] = useState<'form' | 'qr'>('form');
@@ -48,6 +48,67 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [legalModalOpen, setLegalModalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'privacy' | 'terms'>('privacy');
+
+  // QR Login State
+  const [qrSessionId, setQrSessionId] = useState<string | null>(null);
+  const [qrStatus, setQrStatus] = useState<'pending' | 'confirmed' | 'expired'>('pending');
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'login' || loginMethod !== 'qr') {
+      return;
+    }
+
+    let active = true;
+    let pollInterval: any = null;
+
+    const initQR = async () => {
+      try {
+        const res = await fetch('/api/auth/qr/init');
+        const data = await res.json();
+        if (data.status === 'ok' && data.data?.sessionId) {
+          if (!active) return;
+          const sId = data.data.sessionId;
+          setQrSessionId(sId);
+          setQrStatus('pending');
+
+          pollInterval = setInterval(async () => {
+            try {
+              const statusRes = await fetch(`/api/auth/qr/status?session=${encodeURIComponent(sId)}`);
+              const statusData = await statusRes.json();
+              if (statusData.status === 'ok' && statusData.data) {
+                const sStatus = statusData.data.sessionStatus;
+                if (sStatus === 'confirmed') {
+                  clearInterval(pollInterval);
+                  setQrStatus('confirmed');
+                  if (statusData.data.token && statusData.data.user) {
+                    loginWithToken(statusData.data.token, statusData.data.user);
+                    setLoginSuccessMessage(true);
+                    setTimeout(() => {
+                      onClose();
+                    }, 1200);
+                  }
+                } else if (sStatus === 'expired') {
+                  clearInterval(pollInterval);
+                  setQrStatus('expired');
+                }
+              }
+            } catch {
+              // ignore transient network poll errors
+            }
+          }, 1500);
+        }
+      } catch (err) {
+        console.error('Failed to init QR session:', err);
+      }
+    };
+
+    initQR();
+
+    return () => {
+      active = false;
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [isOpen, mode, loginMethod]);
 
   if (!isOpen) return null;
 
@@ -262,17 +323,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {mode === 'login' && loginMethod === 'qr' && (
                 <div className="qr-login-container">
                   <div className="qr-sacred-stage">
-                    <SacredQrLogo size={220} />
+                    {qrStatus === 'confirmed' ? (
+                      <div className="qr-confirmed-success" style={{textAlign: 'center', padding: '30px 15px'}}>
+                        <div style={{fontSize: '48px', marginBottom: '12px'}}>✨</div>
+                        <h3 style={{color: '#10B981', fontWeight: 700, margin: '0 0 8px'}}>Успешный вход!</h3>
+                        <p style={{color: 'var(--color-text-secondary)', fontSize: '0.9rem'}}>Авторизуем ваш аккаунт...</p>
+                      </div>
+                    ) : qrStatus === 'expired' ? (
+                      <div className="qr-expired-block" style={{textAlign: 'center', padding: '30px 15px'}}>
+                        <p style={{color: '#EF4444', marginBottom: '12px'}}>QR-код устарел</p>
+                        <button 
+                          type="button" 
+                          className="btn btn-primary"
+                          onClick={() => {
+                            setQrStatus('pending');
+                            setQrSessionId(null);
+                          }}
+                        >
+                          Обновить QR-код
+                        </button>
+                      </div>
+                    ) : (
+                      <SacredQrLogo 
+                        size={220} 
+                        dataUrl={qrSessionId ? `${window.location.origin}/qr-login?session=${qrSessionId}` : `${window.location.origin}/qr-login`} 
+                      />
+                    )}
                   </div>
 
                   <div className="qr-instructions">
                     <div className="qr-step-item">
                       <Smartphone size={16} className="qr-step-icon" />
-                      <span>Откройте приложение <b>New Age</b> на телефоне</span>
+                      <span>Откройте камеру на телефоне или приложение <b>New Age</b></span>
                     </div>
                     <div className="qr-step-item">
                       <QrCode size={16} className="qr-step-icon" />
-                      <span>Перейдите в <b>Профиль → QR-сканер</b> и наведите камеру</span>
+                      <span>Наведите камеру на QR-код и подтвердите вход</span>
                     </div>
                   </div>
                 </div>
