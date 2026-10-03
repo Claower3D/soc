@@ -4,8 +4,8 @@ import {
   Grid, Video as VideoIcon, Headphones, Bookmark, 
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Users, Share2, Edit3, Heart, MessageSquare,
-  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogOut, LogIn, Plus, Brain, Sparkles,
-  Calendar, Moon, Film, QrCode
+  CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogIn, Plus, Brain, Sparkles,
+  Calendar, Moon, Film, Settings, Info, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { 
   RELIGIONS_CATALOG, type User, type Post, type Story, type Video as VideoType, 
@@ -372,6 +372,8 @@ export function ProfilePage() {
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [editProfileInitialTab, setEditProfileInitialTab] = useState<'general' | 'astrology' | 'appearance' | 'spiritual' | 'privacy'>('general');
+  const [showDetailedInfo, setShowDetailedInfo] = useState(false);
   const [isConsciousnessModalOpen, setIsConsciousnessModalOpen] = useState(false);
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
   const [, setActivityTick] = useState(0);
@@ -415,6 +417,16 @@ export function ProfilePage() {
     const localCount = realFollowingList.length;
     return Math.max(raw, localCount);
   }, [profileData, activeUser?.followingCount, realFollowingList.length]);
+
+  const hasDetailedInfo = useMemo(() => {
+    if (!activeUser) return false;
+    return Boolean(
+      (activeUser.beliefType && activeUser.beliefType !== 'Не указано' && activeUser.beliefType !== 'Не указывать / Личное') ||
+      activeUser.consciousnessLevel ||
+      isMe ||
+      (activeUser.birthDate && (isMe || activeUser.showBirthDate !== false))
+    );
+  }, [activeUser, isMe]);
 
   const userHasStories = useMemo(() => {
     if (!activeUser) return false;
@@ -752,97 +764,116 @@ export function ProfilePage() {
                   </a>
                 )}
 
-                {activeUser.beliefType && activeUser.beliefType !== 'Не указано' && activeUser.beliefType !== 'Не указывать / Личное' && (
-                  (isMe || activeUser.beliefPrivacy === 'public' || (activeUser.beliefPrivacy === 'followers' && isFollowing)) && (() => {
-                    const religion = RELIGIONS_CATALOG.find(r => r.name === activeUser.beliefType);
-                    return (
-                      <div 
-                        className="meta-item meta-belief" 
-                        title={isMe ? `Видимость: ${activeUser.beliefPrivacy === 'private' ? 'Только мне (Скрыто)' : activeUser.beliefPrivacy === 'followers' ? 'Только подписчикам' : 'Публично'}` : 'Мировоззрение'}
-                      >
-                        {religion ? (
-                          <ReligionSymbol id={religion.id} size={18} className="meta-belief-symbol" />
-                        ) : (
-                          <Compass size={15} />
-                        )}
-                        <span>{activeUser.beliefType}</span>
-                        {religion?.symbolTitle && (
-                          <span className="meta-belief-symbol-name">({religion.symbolTitle})</span>
-                        )}
-                        {isMe && activeUser.beliefPrivacy === 'private' && (
-                          <span className="belief-privacy-badge" title="Скрыто от других"><Shield size={11} /></span>
-                        )}
-                      </div>
-                    );
-                  })()
-                )}
-
-                {activeUser.consciousnessLevel ? (
-                  <div 
-                    className="meta-item meta-consciousness" 
-                    onClick={() => setIsConsciousnessModalOpen(true)}
-                    style={{ cursor: 'pointer' }}
-                    title="Класс сознания и ведущий язык восприятия человека. Нажмите для подробностей"
-                  >
-                    <Brain size={15} className="consciousness-icon" />
-                    <span className="consciousness-level-badge">{activeUser.consciousnessLevel} класс</span>
-                    <span className="consciousness-title-text">
-                      {activeUser.consciousnessTitle 
-                        ? (activeUser.consciousnessTitle.includes('—') ? activeUser.consciousnessTitle.split('—')[1].trim() : activeUser.consciousnessTitle)
-                        : 'Осознанность'}
-                    </span>
-                    {activeUser.cognitionVector && (
-                      <span className="consciousness-vector-tag">
-                        {activeUser.cognitionVector === 'visual_analogies' && '🍏 на яблоках'}
-                        {activeUser.cognitionVector === 'exact_sciences' && '📐 логика и факты'}
-                        {activeUser.cognitionVector === 'pragmatic' && '⚡ польза и действие'}
-                        {activeUser.cognitionVector === 'philosophical' && '📖 смыслы'}
-                        {activeUser.cognitionVector === 'spiritual' && '✨ паттерны и единство'}
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  isMe && (
+                {hasDetailedInfo && (
+                  <div className="profile-details-collapsible">
                     <button 
                       type="button" 
-                      className="meta-item meta-consciousness-empty"
-                      onClick={() => setIsConsciousnessModalOpen(true)}
-                      title="Пройти диагностику класса сознания и определить свой язык общения"
+                      className="profile-toggle-info-btn"
+                      onClick={() => setShowDetailedInfo(prev => !prev)}
+                      title={showDetailedInfo ? 'Скрыть информацию' : 'Подробная информация'}
                     >
-                      <Brain size={15} />
-                      <span>Определить класс сознания</span>
-                      <Sparkles size={12} className="meta-sparkle" />
+                      <Info size={13} />
+                      <span>{showDetailedInfo ? 'Скрыть информацию' : 'Подробная информация'}</span>
+                      {showDetailedInfo ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                     </button>
-                  )
+
+                    {showDetailedInfo && (
+                      <div className="profile-meta-chips-dropdown">
+                        {activeUser.beliefType && activeUser.beliefType !== 'Не указано' && activeUser.beliefType !== 'Не указывать / Личное' && (
+                          (isMe || activeUser.beliefPrivacy === 'public' || (activeUser.beliefPrivacy === 'followers' && isFollowing)) && (() => {
+                            const religion = RELIGIONS_CATALOG.find(r => r.name === activeUser.beliefType);
+                            return (
+                              <div 
+                                className="meta-item meta-belief" 
+                                title={isMe ? `Видимость: ${activeUser.beliefPrivacy === 'private' ? 'Только мне (Скрыто)' : activeUser.beliefPrivacy === 'followers' ? 'Только подписчикам' : 'Публично'}` : 'Мировоззрение'}
+                              >
+                                {religion ? (
+                                  <ReligionSymbol id={religion.id} size={18} className="meta-belief-symbol" />
+                                ) : (
+                                  <Compass size={15} />
+                                )}
+                                <span>{activeUser.beliefType}</span>
+                                {religion?.symbolTitle && (
+                                  <span className="meta-belief-symbol-name">({religion.symbolTitle})</span>
+                                )}
+                                {isMe && activeUser.beliefPrivacy === 'private' && (
+                                  <span className="belief-privacy-badge" title="Скрыто от других"><Shield size={11} /></span>
+                                )}
+                              </div>
+                            );
+                          })()
+                        )}
+
+                        {activeUser.consciousnessLevel ? (
+                          <div 
+                            className="meta-item meta-consciousness" 
+                            onClick={() => setIsConsciousnessModalOpen(true)}
+                            style={{ cursor: 'pointer' }}
+                            title="Класс сознания и ведущий язык восприятия человека. Нажмите для подробностей"
+                          >
+                            <Brain size={15} className="consciousness-icon" />
+                            <span className="consciousness-level-badge">{activeUser.consciousnessLevel} класс</span>
+                            <span className="consciousness-title-text">
+                              {activeUser.consciousnessTitle 
+                                ? (activeUser.consciousnessTitle.includes('—') ? activeUser.consciousnessTitle.split('—')[1].trim() : activeUser.consciousnessTitle)
+                                : 'Осознанность'}
+                            </span>
+                            {activeUser.cognitionVector && (
+                              <span className="consciousness-vector-tag">
+                                {activeUser.cognitionVector === 'visual_analogies' && '🍏 на яблоках'}
+                                {activeUser.cognitionVector === 'exact_sciences' && '📐 логика и факты'}
+                                {activeUser.cognitionVector === 'pragmatic' && '⚡ польза и действие'}
+                                {activeUser.cognitionVector === 'philosophical' && '📖 смыслы'}
+                                {activeUser.cognitionVector === 'spiritual' && '✨ паттерны и единство'}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          isMe && (
+                            <button 
+                              type="button" 
+                              className="meta-item meta-consciousness-empty"
+                              onClick={() => setIsConsciousnessModalOpen(true)}
+                              title="Пройти диагностику класса сознания и определить свой язык общения"
+                            >
+                              <Brain size={15} />
+                              <span>Определить класс сознания</span>
+                              <Sparkles size={12} className="meta-sparkle" />
+                            </button>
+                          )
+                        )}
+
+                        {activeUser.birthDate && (isMe || activeUser.showBirthDate !== false) && (() => {
+                          const astro = calculateZodiacProfile(activeUser.birthDate);
+                          const dateObj = new Date(activeUser.birthDate);
+                          const formattedDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+                          return (
+                            <div className="meta-item meta-birthdate" title="Дата рождения и возраст">
+                              <Calendar size={15} />
+                              <span>{formattedDate} {astro ? `(${astro.age} лет)` : ''}</span>
+                            </div>
+                          );
+                        })()}
+
+                        {activeUser.birthDate && (isMe || activeUser.showZodiac !== false) && (() => {
+                          const astro = calculateZodiacProfile(activeUser.birthDate);
+                          if (!astro) return null;
+                          return (
+                            <div 
+                              className="meta-item meta-zodiac" 
+                              title={`Стихия: ${astro.element}, Планета: ${astro.planet}. Восточный знак: ${astro.easternElement} ${astro.easternSign}`}
+                            >
+                              <Moon size={15} className="zodiac-icon-spin" />
+                              <span className="zodiac-sign-bold">{astro.sign}</span>
+                              <span className="zodiac-element-pill">{astro.element}</span>
+                              <span className="zodiac-eastern-pill">{astro.easternSign}</span>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
                 )}
-
-                {activeUser.birthDate && (isMe || activeUser.showBirthDate !== false) && (() => {
-                  const astro = calculateZodiacProfile(activeUser.birthDate);
-                  const dateObj = new Date(activeUser.birthDate);
-                  const formattedDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
-                  return (
-                    <div className="meta-item meta-birthdate" title="Дата рождения и возраст">
-                      <Calendar size={15} />
-                      <span>{formattedDate} {astro ? `(${astro.age} лет)` : ''}</span>
-                    </div>
-                  );
-                })()}
-
-                {activeUser.birthDate && (isMe || activeUser.showZodiac !== false) && (() => {
-                  const astro = calculateZodiacProfile(activeUser.birthDate);
-                  if (!astro) return null;
-                  return (
-                    <div 
-                      className="meta-item meta-zodiac" 
-                      title={`Стихия: ${astro.element}, Планета: ${astro.planet}. Восточный знак: ${astro.easternElement} ${astro.easternSign}`}
-                    >
-                      <Moon size={15} className="zodiac-icon-spin" />
-                      <span className="zodiac-sign-bold">{astro.sign}</span>
-                      <span className="zodiac-element-pill">{astro.element}</span>
-                      <span className="zodiac-eastern-pill">{astro.easternSign}</span>
-                    </div>
-                  );
-                })()}
               </div>
             </div>
           </div>
@@ -872,27 +903,14 @@ export function ProfilePage() {
                   <button className="btn btn-primary" onClick={() => setIsCreatePostOpen(true)}>
                     <Plus size={14} /> Опубликовать
                   </button>
-                  <button className="btn btn-secondary" onClick={() => setIsCreateStoryOpen(true)}>
-                    <Plus size={14} /> История
-                  </button>
-                  <button className="btn btn-secondary" onClick={() => setIsEditProfileOpen(true)}>
+                  <button className="btn btn-secondary" onClick={() => { setEditProfileInitialTab('general'); setIsEditProfileOpen(true); }}>
                     <Edit3 size={14} /> Редактировать
                   </button>
-                  <button className="btn btn-secondary" onClick={() => setIsQrScannerOpen(true)} title="Сканировать QR-код для входа">
-                    <QrCode size={14} /> QR-сканер
+                  <button className="btn btn-secondary" onClick={() => { setEditProfileInitialTab('privacy'); setIsEditProfileOpen(true); }} title="Настройки профиля и безопасности">
+                    <Settings size={14} /> Настройки
                   </button>
                   <button className="btn btn-secondary" onClick={handleShareProfile}>
                     <Share2 size={14} /> {copiedLink ? 'Скопировано!' : 'Поделиться'}
-                  </button>
-                  <button 
-                    className="btn btn-logout" 
-                    onClick={() => {
-                      logout();
-                      navigate('/');
-                    }}
-                    title="Выйти из аккаунта"
-                  >
-                    <LogOut size={14} /> Выйти
                   </button>
                 </>
               ) : (
@@ -1349,6 +1367,12 @@ export function ProfilePage() {
         onSave={(updated) => {
           updateProfile(updated);
           setIsEditProfileOpen(false);
+        }}
+        initialTab={editProfileInitialTab}
+        onOpenQrScanner={() => setIsQrScannerOpen(true)}
+        onLogout={() => {
+          logout();
+          navigate('/');
         }}
       />
 

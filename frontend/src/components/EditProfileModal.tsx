@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { 
   X, Camera, MapPin, Globe, Sparkles, Shield, ShoppingBag, 
   Video, User as UserIcon, Check, Image as ImageIcon,
-  Flame, Award, Eye, Calendar, Moon, Sun, Compass
+  Flame, Award, Eye, Calendar, Moon, Sun, Compass,
+  QrCode, LogOut
 } from 'lucide-react';
 import { 
   type User, type UserRole, type BeliefPrivacy, 
@@ -20,6 +21,9 @@ interface EditProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (updatedUser: User) => void;
+  initialTab?: EditTab;
+  onOpenQrScanner?: () => void;
+  onLogout?: () => void;
 }
 
 type EditTab = 'general' | 'astrology' | 'appearance' | 'spiritual' | 'privacy';
@@ -70,9 +74,22 @@ const SAMPLE_COVERS = [
   }
 ];
 
-export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalProps) {
-  const { currentUser, updateProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<EditTab>('general');
+export function EditProfileModal({ 
+  isOpen, 
+  onClose, 
+  onSave, 
+  initialTab = 'general',
+  onOpenQrScanner,
+  onLogout 
+}: EditProfileModalProps) {
+  const { currentUser, updateProfile, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState<EditTab>(initialTab);
+
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
   const [name, setName] = useState(currentUser?.name || '');
   const [username, setUsername] = useState(currentUser?.username ? currentUser.username.replace(/^@+/, '') : '');
   const [bio, setBio] = useState(currentUser?.bio || '');
@@ -844,23 +861,59 @@ export function EditProfileModal({ isOpen, onClose, onSave }: EditProfileModalPr
 
               <div className="privacy-divider" />
 
+              {/* === QR Code Scanner & Login === */}
+              <div className="privacy-settings-box">
+                <div className="settings-qr-scanner-card">
+                  <div className="settings-qr-info">
+                    <div className="settings-qr-icon-wrap">
+                      <QrCode size={20} />
+                    </div>
+                    <div>
+                      <strong className="toggle-heading">Вход по QR-коду</strong>
+                      <span className="toggle-subtext">Сканируйте QR-код для мгновенного входа в аккаунт с мобильного или веб</span>
+                    </div>
+                  </div>
+                  <button 
+                    type="button" 
+                    className="btn-open-qr-scanner"
+                    onClick={() => {
+                      onClose();
+                      if (onOpenQrScanner) {
+                        onOpenQrScanner();
+                      }
+                    }}
+                  >
+                    <QrCode size={14} /> Открыть QR-сканер
+                  </button>
+                </div>
+              </div>
+
+              <div className="privacy-divider" />
+
               {/* === Account Actions === */}
               <div className="account-danger-actions">
                 <button 
                   type="button" 
                   className="btn-account-logout"
                   onClick={() => {
-                    alert('Выход из аккаунта...');
+                    if (window.confirm('Вы действительно хотите выйти из аккаунта?')) {
+                      onClose();
+                      if (onLogout) {
+                        onLogout();
+                      } else {
+                        logout();
+                      }
+                    }
                   }}
                 >
-                  Выйти
+                  <LogOut size={16} /> Выйти из аккаунта
                 </button>
                 <button 
                   type="button" 
                   className="btn-account-delete"
                   onClick={() => {
                     if (confirm('Вы уверены, что хотите удалить аккаунт? Это действие необратимо!')) {
-                      alert('Аккаунт удален.');
+                      alert('Функция удаления аккаунта находится в обработке.');
                     }
                   }}
                 >
