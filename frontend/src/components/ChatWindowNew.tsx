@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-
-
 import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles } from 'lucide-react';
 import { type Chat, type Message } from '../data/mock';
 import { formatLastSeen } from '../utils/onlineStatus';
+import { API_BASE_URL } from '../api';
 import './ChatWindowNew.css';
 
 
@@ -136,7 +135,7 @@ function getLocalOracleFallback(text: string): string {
 
 async function fetchAiReply(text: string, history: Array<{ role: string; text: string }>): Promise<string> {
   try {
-    const resp = await fetch('/api/ai/chat', {
+    const resp = await fetch(`${API_BASE_URL}/api/ai/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text, history }),
@@ -153,9 +152,12 @@ async function fetchAiReply(text: string, history: Array<{ role: string; text: s
 function cleanTextForSpeech(text: string): string {
   if (!text) return '';
   return text
-    .replace(/[*_#`~>]/g, ' ')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
     .replace(/https?:\/\/\S+/g, '')
-    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    .replace(/[*_#`~>|]/g, ' ')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -357,6 +359,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const [liveTranscript, setLiveTranscript] = useState('');
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<any>(null);
@@ -665,6 +668,10 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     if (isVoiceChatActive) {
       stopVoiceChat();
     }
+    if (ttsAudioRef.current) {
+      try { ttsAudioRef.current.pause(); } catch {}
+      ttsAudioRef.current = null;
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -676,6 +683,10 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     return () => {
       isVoiceChatActiveRef.current = false;
       try { recognitionRef.current?.abort(); } catch {}
+      if (ttsAudioRef.current) {
+        try { ttsAudioRef.current.pause(); } catch {}
+        ttsAudioRef.current = null;
+      }
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
       if (levelRafRef.current) cancelAnimationFrame(levelRafRef.current);
       try { audioCtxRef.current?.close(); } catch {}
@@ -688,43 +699,24 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     voiceTranscriptEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages.length, liveTranscript, isVoiceChatActive]);
 
-  const speakAloud = (text: string, onEnd?: () => void) => {
+  const fallbackWebSpeech = (clean: string, finish: () => void) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      if (onEnd) onEnd();
+      finish();
       return;
     }
-
     try {
       window.speechSynthesis.cancel();
-      const clean = cleanTextForSpeech(text);
-      if (!clean) {
-        if (onEnd) onEnd();
-        return;
-      }
-
-      setAiSpeechText(clean);
-      setAiSpeechCharIdx(0);
-
-      // Разбиваем на предложения — звучит естественнее и Chrome не обрывает длинную речь
       const chunks = clean.match(/[^.!?…]+[.!?…]*\s*/g) || [clean];
       const voice = getBestVoice(availableVoices);
       let offset = 0;
       let idx = 0;
-      let finished = false;
-      const finish = () => {
-        if (finished) return;
-        finished = true;
-        setAiSpeechCharIdx(clean.length);
-        if (onEnd) onEnd();
-      };
 
       const speakNext = () => {
-        if (!isVoiceChatActiveRef.current && onEnd) { finish(); return; }
+        if (!isVoiceChatActiveRef.current) { finish(); return; }
         if (idx >= chunks.length) { finish(); return; }
         const chunk = chunks[idx];
         const chunkOffset = offset;
         const utter = new SpeechSynthesisUtterance(chunk);
-        // На громкой связи — максимальная громкость 1.0, иначе комфортная 0.4
         utter.volume = isSpeakerLoudRef.current ? 1.0 : 0.4;
         utter.rate = 1.05;
         utter.pitch = 1.02;
@@ -748,9 +740,104 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       };
 
       speakNext();
-    } catch (e) {
-      console.warn('Speech synthesis error:', e);
+    } catch {
+      finish();
+    }
+  };
+
+  const speakAloud = (text: string, onEnd?: () => void) => {
+    const clean = cleanTextForSpeech(text);
+    if (!clean) {
       if (onEnd) onEnd();
+      return;
+    }
+
+    setAiSpeechText(clean);
+    setAiSpeechCharIdx(0);
+
+    // Остановка предыдущего звука или синтеза
+    if (ttsAudioRef.current) {
+      try {
+        ttsAudioRef.current.pause();
+        ttsAudioRef.current.currentTime = 0;
+      } catch {}
+      ttsAudioRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try { window.speechSynthesis.cancel(); } catch {}
+    }
+
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      setAiSpeechCharIdx(clean.length);
+      if (voiceOrbRef.current) {
+        voiceOrbRef.current.style.setProperty('--lvl', '0');
+      }
+      if (onEnd) onEnd();
+    };
+
+    // Фронтенд воспроизводит естественный человеческий голос из нейронного TTS бэкенда
+    try {
+      const ttsUrl = `${API_BASE_URL}/api/ai/tts?text=${encodeURIComponent(clean)}&lang=ru`;
+      const audio = new Audio(ttsUrl);
+      audio.volume = isSpeakerLoudRef.current ? 1.0 : 0.45;
+      ttsAudioRef.current = audio;
+
+      // Синхронизация караоке-субтитров по прогрессу реального аудио
+      audio.ontimeupdate = () => {
+        if (audio.duration > 0) {
+          const ratio = Math.min(1, audio.currentTime / audio.duration);
+          setAiSpeechCharIdx(Math.floor(clean.length * ratio));
+        }
+      };
+
+      // Пульсация шара Оракула в такт речи
+      let animFrameId: number | null = null;
+      let phase = 0;
+      const animateSpeakingOrb = () => {
+        if (!ttsAudioRef.current || ttsAudioRef.current.paused || voiceStatusRef.current !== 'speaking') {
+          if (animFrameId) cancelAnimationFrame(animFrameId);
+          return;
+        }
+        phase += 0.16;
+        const wave = 0.5 + 0.5 * Math.abs(Math.sin(phase) * Math.cos(phase * 0.65));
+        if (voiceOrbRef.current) {
+          voiceOrbRef.current.style.setProperty('--lvl', wave.toFixed(3));
+        }
+        animFrameId = requestAnimationFrame(animateSpeakingOrb);
+      };
+
+      audio.onplay = () => {
+        animateSpeakingOrb();
+      };
+
+      audio.onended = () => {
+        if (animFrameId) cancelAnimationFrame(animFrameId);
+        ttsAudioRef.current = null;
+        finish();
+      };
+
+      audio.onerror = (e) => {
+        console.warn('Neural TTS playback error, falling back to Web Speech:', e);
+        if (animFrameId) cancelAnimationFrame(animFrameId);
+        ttsAudioRef.current = null;
+        fallbackWebSpeech(clean, finish);
+      };
+
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('Audio play prevented or network error, fallback:', err);
+          if (animFrameId) cancelAnimationFrame(animFrameId);
+          ttsAudioRef.current = null;
+          fallbackWebSpeech(clean, finish);
+        });
+      }
+    } catch (e) {
+      console.warn('Speech initialization error:', e);
+      fallbackWebSpeech(clean, finish);
     }
   };
 
@@ -1021,6 +1108,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       } catch {}
       recognitionRef.current = null;
     }
+    if (ttsAudioRef.current) {
+      try {
+        ttsAudioRef.current.pause();
+        ttsAudioRef.current.currentTime = 0;
+      } catch {}
+      ttsAudioRef.current = null;
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -1037,6 +1131,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
   const interruptAiSpeech = () => {
     voiceStatusRef.current = 'listening';
+    if (ttsAudioRef.current) {
+      try {
+        ttsAudioRef.current.pause();
+        ttsAudioRef.current.currentTime = 0;
+      } catch {}
+      ttsAudioRef.current = null;
+    }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -1064,34 +1165,86 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   };
 
   const toggleSpeakerLoud = () => {
-    setIsSpeakerLoud(prev => !prev);
+    setIsSpeakerLoud(prev => {
+      const next = !prev;
+      if (ttsAudioRef.current) {
+        ttsAudioRef.current.volume = next ? 1.0 : 0.45;
+      }
+      return next;
+    });
   };
 
   const toggleSpeakMessage = (msgId: string, text: string) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-
     if (speakingMsgId === msgId) {
-      window.speechSynthesis.cancel();
+      if (ttsAudioRef.current) {
+        try { ttsAudioRef.current.pause(); } catch {}
+        ttsAudioRef.current = null;
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
       setSpeakingMsgId(null);
       return;
     }
 
-    window.speechSynthesis.cancel();
+    if (ttsAudioRef.current) {
+      try { ttsAudioRef.current.pause(); } catch {}
+      ttsAudioRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     setSpeakingMsgId(msgId);
 
     const clean = cleanTextForSpeech(text);
-    const utter = new SpeechSynthesisUtterance(clean);
-    utter.volume = isSpeakerLoud ? 1.0 : 0.5;
-    utter.rate = 1.0;
-    utter.pitch = 1.02;
+    if (!clean) {
+      setSpeakingMsgId(null);
+      return;
+    }
 
-    const voice = getBestVoice(availableVoices);
-    if (voice) utter.voice = voice;
+    const fallbackSpeak = () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        const utter = new SpeechSynthesisUtterance(clean);
+        utter.volume = isSpeakerLoud ? 1.0 : 0.5;
+        utter.rate = 1.0;
+        utter.pitch = 1.02;
+        const voice = getBestVoice(availableVoices);
+        if (voice) utter.voice = voice;
+        utter.onend = () => setSpeakingMsgId(null);
+        utter.onerror = () => setSpeakingMsgId(null);
+        window.speechSynthesis.speak(utter);
+      } else {
+        setSpeakingMsgId(null);
+      }
+    };
 
-    utter.onend = () => setSpeakingMsgId(null);
-    utter.onerror = () => setSpeakingMsgId(null);
+    try {
+      const ttsUrl = `${API_BASE_URL}/api/ai/tts?text=${encodeURIComponent(clean)}&lang=ru`;
+      const audio = new Audio(ttsUrl);
+      audio.volume = isSpeakerLoud ? 1.0 : 0.5;
+      ttsAudioRef.current = audio;
 
-    window.speechSynthesis.speak(utter);
+      audio.onended = () => {
+        setSpeakingMsgId(null);
+        ttsAudioRef.current = null;
+      };
+
+      audio.onerror = () => {
+        ttsAudioRef.current = null;
+        fallbackSpeak();
+      };
+
+      const p = audio.play();
+      if (p !== undefined) {
+        p.catch(() => {
+          ttsAudioRef.current = null;
+          fallbackSpeak();
+        });
+      }
+    } catch {
+      ttsAudioRef.current = null;
+      fallbackSpeak();
+    }
   };
 
   if (!chat) {

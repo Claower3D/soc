@@ -1,7 +1,7 @@
 
 
 
-const getApiBaseUrl = (): string => {
+export const getApiBaseUrl = (): string => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
@@ -20,7 +20,7 @@ const getApiBaseUrl = (): string => {
   return '';
 };
 
-const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Базовая функция для выполнения запросов к API с обработкой ошибок и авторизацией.

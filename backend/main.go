@@ -17,6 +17,7 @@ import (
 	"log"
 	mathrand "math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -1107,6 +1108,8 @@ func main() {
 	mux.HandleFunc("POST /api/ai/oracle", handleAIChat)
 	mux.HandleFunc("GET /api/ai/oracle", handleAIChat)
 	mux.HandleFunc("POST /api/oracle", handleAIChat)
+	mux.HandleFunc("GET /api/ai/tts", handleAITTS)
+	mux.HandleFunc("POST /api/ai/tts", handleAITTS)
 
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
@@ -4897,6 +4900,209 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		"reply":  getLocalAIReply(req.Message),
 		"source": "local",
 	})
+}
+
+// ==================== NEURAL TEXT-TO-SPEECH (TTS) ====================
+
+var (
+	ttsCacheMu sync.RWMutex
+	ttsCache   = make(map[string][]byte)
+	ttsClient  = &http.Client{Timeout: 8 * time.Second}
+)
+
+func cleanTextForTTS(raw string) string {
+	// Remove markdown code blocks, links, headers, formatting
+	s := regexp.MustCompile(`(?s)\x60\x60\x60.*?\x60\x60\x60`).ReplaceAllString(raw, " ")
+	s = regexp.MustCompile(`\x60.*?\x60`).ReplaceAllString(s, " ")
+	s = regexp.MustCompile(`\[([^\]]+)\]\([^\)]+\)`).ReplaceAllString(s, "$1")
+	s = regexp.MustCompile(`https?://\S+`).ReplaceAllString(s, " ")
+	replacer := strings.NewReplacer("*", " ", "_", " ", "#", " ", ">", " ", "~", " ", "`", " ", "|", " ")
+	s = replacer.Replace(s)
+
+	// Filter out emoji and symbols that cause robotic glitching
+	var b strings.Builder
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsSpace(r) ||
+			r == '.' || r == ',' || r == '!' || r == '?' || r == '-' || r == ':' || r == ';' || r == '—' || r == '«' || r == '»' || r == '"' {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune(' ')
+		}
+	}
+	res := strings.Join(strings.Fields(b.String()), " ")
+	return strings.TrimSpace(res)
+}
+
+func splitTextIntoTTSChunks(text string, maxLen int) []string {
+	runes := []rune(text)
+	if len(runes) <= maxLen {
+		return []string{text}
+	}
+	var chunks []string
+	for len(runes) > 0 {
+		if len(runes) <= maxLen {
+			chunks = append(chunks, string(runes))
+			break
+		}
+		cut := maxLen
+		foundCut := false
+		for i := maxLen; i >= maxLen/2; i-- {
+			if runes[i] == '.' || runes[i] == '!' || runes[i] == '?' {
+				cut = i + 1
+				foundCut = true
+				break
+			}
+		}
+		if !foundCut {
+			for i := maxLen; i >= maxLen/3; i-- {
+				if runes[i] == ',' || runes[i] == ';' || runes[i] == ':' {
+					cut = i + 1
+					foundCut = true
+					break
+				}
+			}
+		}
+		if !foundCut {
+			for i := maxLen; i >= 1; i-- {
+				if unicode.IsSpace(runes[i]) {
+					cut = i
+					foundCut = true
+					break
+				}
+			}
+		}
+		chunk := strings.TrimSpace(string(runes[:cut]))
+		if chunk != "" {
+			chunks = append(chunks, chunk)
+		}
+		if cut < len(runes) {
+			runes = []rune(strings.TrimSpace(string(runes[cut:])))
+		} else {
+			break
+		}
+	}
+	return chunks
+}
+
+func fetchGoogleTTSChunk(chunk, lang string) ([]byte, error) {
+	ttsURL := fmt.Sprintf("https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=%s&q=%s",
+		url.QueryEscape(lang), url.QueryEscape(chunk))
+	req, err := http.NewRequest("GET", ttsURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+	req.Header.Set("Referer", "https://translate.google.com/")
+	req.Header.Set("Accept", "*/*")
+
+	resp, err := ttsClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("tts upstream returned status %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
+func handleAITTS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	var rawText, lang string
+	if r.Method == "POST" {
+		var req struct {
+			Text string `json:"text"`
+			Lang string `json:"lang"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		rawText = req.Text
+		lang = req.Lang
+	}
+	if rawText == "" {
+		rawText = r.URL.Query().Get("text")
+		if rawText == "" {
+			rawText = r.URL.Query().Get("q")
+		}
+	}
+	if lang == "" {
+		lang = r.URL.Query().Get("lang")
+		if lang == "" {
+			lang = "ru"
+		}
+	}
+
+	clean := cleanTextForTTS(rawText)
+	if clean == "" {
+		http.Error(w, "empty text", http.StatusBadRequest)
+		return
+	}
+
+	if len([]rune(clean)) > 600 {
+		clean = string([]rune(clean)[:600])
+	}
+
+	cacheKey := lang + ":" + clean
+	ttsCacheMu.RLock()
+	cachedAudio, exists := ttsCache[cacheKey]
+	ttsCacheMu.RUnlock()
+
+	if exists && len(cachedAudio) > 0 {
+		w.Header().Set("Content-Type", "audio/mpeg")
+		w.Header().Set("Content-Length", strconv.Itoa(len(cachedAudio)))
+		w.Header().Set("Accept-Ranges", "bytes")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		_, _ = w.Write(cachedAudio)
+		return
+	}
+
+	chunks := splitTextIntoTTSChunks(clean, 130)
+	var combined bytes.Buffer
+	for _, chunk := range chunks {
+		if strings.TrimSpace(chunk) == "" {
+			continue
+		}
+		b, err := fetchGoogleTTSChunk(chunk, lang)
+		if err != nil {
+			log.Printf("[TTS Error] chunk '%s': %v", chunk, err)
+			continue
+		}
+		combined.Write(b)
+	}
+
+	finalBytes := combined.Bytes()
+	if len(finalBytes) == 0 {
+		http.Error(w, "failed to synthesize speech", http.StatusBadGateway)
+		return
+	}
+
+	ttsCacheMu.Lock()
+	if len(ttsCache) > 500 {
+		count := 0
+		for k := range ttsCache {
+			delete(ttsCache, k)
+			count++
+			if count > 250 {
+				break
+			}
+		}
+	}
+	ttsCache[cacheKey] = finalBytes
+	ttsCacheMu.Unlock()
+
+	w.Header().Set("Content-Type", "audio/mpeg")
+	w.Header().Set("Content-Length", strconv.Itoa(len(finalBytes)))
+	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write(finalBytes)
 }
 
 // GET /api/chats/{id}/messages — get messages for a chat
