@@ -4,13 +4,14 @@ import {
   Video, Headphones,
   Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
   Users, Film, LogIn, Sparkles, Wind, Heart, BellRing,
-  MessageCircle, UserPlus, Trash2, X, Settings, Search
+  MessageCircle, UserPlus, Trash2, X, Settings, Search, QrCode
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useTranslation } from '../context/LanguageContext';
 import { AuthModal } from './AuthModal';
 import { EditProfileModal, type EditTab } from './EditProfileModal';
+import { QrScannerModal } from './QrScannerModal';
 import { PremiumBadge } from './PremiumBadge';
 import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './Header.css';
@@ -36,6 +37,7 @@ export function Header() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<EditTab>('preferences');
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
   const createRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -45,8 +47,13 @@ export function Header() {
       setSettingsInitialTab(e.detail?.tab || 'preferences');
       setIsSettingsOpen(true);
     };
+    const handleOpenQr = () => setIsQrScannerOpen(true);
     window.addEventListener('open-profile-settings', handleOpenSettings);
-    return () => window.removeEventListener('open-profile-settings', handleOpenSettings);
+    window.addEventListener('open-qr-scanner', handleOpenQr);
+    return () => {
+      window.removeEventListener('open-profile-settings', handleOpenSettings);
+      window.removeEventListener('open-qr-scanner', handleOpenQr);
+    };
   }, []);
 
   useEffect(() => {
@@ -500,6 +507,15 @@ export function Header() {
             </button>
 
             <button
+              className="header-action-btn header-qr-pill"
+              onClick={() => setIsQrScannerOpen(true)}
+              title="Сканировать QR-код для входа на компьютере"
+            >
+              <QrCode size={16} />
+              <span className="btn-text">QR-код</span>
+            </button>
+
+            <button
               className="header-profile-badge"
               onClick={() => navigate(currentUser.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser.id}`)}
               title={`Мой профиль: ${currentUser.name} (@${currentUser.username})`}
@@ -551,12 +567,22 @@ export function Header() {
             setIsSettingsOpen(false);
           }}
           initialTab={settingsInitialTab}
+          onOpenQrScanner={() => {
+            setIsSettingsOpen(false);
+            setIsQrScannerOpen(true);
+          }}
           onLogout={() => {
             logout();
             navigate('/');
           }}
         />
       )}
+
+      {/* Global QR Scanner Modal */}
+      <QrScannerModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+      />
     </header>
   );
 }

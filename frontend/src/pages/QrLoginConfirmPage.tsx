@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../api';
 import { Monitor, CheckCircle, XCircle, ShieldCheck, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 import './QrLoginConfirmPage.css';
@@ -28,7 +29,7 @@ export const QrLoginConfirmPage: React.FC = () => {
 
     try {
       const token = jwtToken || localStorage.getItem('new_age_jwt_token') || '';
-      const res = await fetch('/api/auth/qr/confirm', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/qr/confirm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -57,7 +58,7 @@ export const QrLoginConfirmPage: React.FC = () => {
   const handleReject = async () => {
     if (sessionId) {
       try {
-        await fetch('/api/auth/qr/reject', {
+        await fetch(`${API_BASE_URL}/api/auth/qr/reject`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId }),

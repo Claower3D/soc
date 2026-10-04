@@ -1099,6 +1099,7 @@ export function EditProfileModal({
                       if (onOpenQrScanner) {
                         onOpenQrScanner();
                       }
+                      window.dispatchEvent(new CustomEvent('open-qr-scanner'));
                     }}
                     title="Запустить сканер QR-кода через камеру"
                   >

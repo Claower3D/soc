@@ -5,7 +5,7 @@ import {
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Users, Share2, Edit3, Heart, MessageSquare,
   CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogIn, Plus, Brain, Sparkles,
-  Calendar, Moon, Film, Settings, Info, ChevronDown, ChevronUp
+  Calendar, Moon, Film, Settings, Info, ChevronDown, ChevronUp, QrCode
 } from 'lucide-react';
 import { 
   RELIGIONS_CATALOG, type User, type Post, type Story, type Video as VideoType, 
@@ -374,6 +374,12 @@ export function ProfilePage() {
   const [isConsciousnessModalOpen, setIsConsciousnessModalOpen] = useState(false);
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
   const [, setActivityTick] = useState(0);
+
+  useEffect(() => {
+    const handleOpenQr = () => setIsQrScannerOpen(true);
+    window.addEventListener('open-qr-scanner', handleOpenQr);
+    return () => window.removeEventListener('open-qr-scanner', handleOpenQr);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -914,6 +920,14 @@ export function ProfilePage() {
                     window.dispatchEvent(new CustomEvent('open-profile-settings', { detail: { tab: 'general' } }));
                   }}>
                     <Edit3 size={14} /> Редактировать
+                  </button>
+                  <button 
+                    type="button"
+                    className="btn btn-secondary profile-qr-btn" 
+                    onClick={() => setIsQrScannerOpen(true)}
+                    title="Открыть QR-сканер для авторизации на компьютере"
+                  >
+                    <QrCode size={14} /> QR-сканер
                   </button>
                 </>
               ) : (

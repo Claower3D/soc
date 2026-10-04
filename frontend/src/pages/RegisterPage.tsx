@@ -12,6 +12,7 @@ import { LegalModal } from '../components/LegalModal';
 import { SacredQrLogo } from '../components/SacredQrLogo';
 import { CountryPhoneInput } from '../components/CountryPhoneInput';
 import { type CountryInfo } from '../utils/countryDetect';
+import { API_BASE_URL } from '../api';
 import logoImg from '../assets/logo.png';
 import './RegisterPage.css';
 
@@ -35,7 +36,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
   const initQR = useCallback(async () => {
     try {
       setQrStatus('pending');
-      const res = await fetch('/api/auth/qr/init');
+      const res = await fetch(`${API_BASE_URL}/api/auth/qr/init`);
       const data = await res.json();
       if (data.status === 'ok' && data.data?.sessionId) {
         setQrSessionId(data.data.sessionId);
@@ -55,7 +56,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
     let isMounted = true;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/auth/qr/status?session=${encodeURIComponent(qrSessionId)}`);
+        const res = await fetch(`${API_BASE_URL}/api/auth/qr/status?session=${encodeURIComponent(qrSessionId)}`);
         const data = await res.json();
         if (data.status === 'ok' && data.data) {
           if (!isMounted) return;

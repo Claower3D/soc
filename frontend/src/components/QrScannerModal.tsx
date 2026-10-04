@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Camera, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
 import jsQR from 'jsqr';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../api';
 import './QrScannerModal.css';
 
 interface QrScannerModalProps {
@@ -42,9 +43,17 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose 
   const startCamera = async () => {
     setErrorText(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 640 }, height: { ideal: 640 } }
-      });
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Камера не поддерживается вашим браузером');
+      }
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } }
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -204,7 +213,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose 
 
     try {
       const token = jwtToken || localStorage.getItem('new_age_jwt_token') || '';
-      const res = await fetch('/api/auth/qr/confirm', {
+      const res = await fetch(`${API_BASE_URL}/api/auth/qr/confirm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -11,6 +11,7 @@ import { LegalModal } from './LegalModal';
 import { SacredQrLogo } from './SacredQrLogo';
 import { CountryPhoneInput } from './CountryPhoneInput';
 import { type CountryInfo } from '../utils/countryDetect';
+import { API_BASE_URL } from '../api';
 import logoImg from '../assets/logo.png';
 import './AuthModal.css';
 
@@ -63,7 +64,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     const initQR = async () => {
       try {
-        const res = await fetch('/api/auth/qr/init');
+        const res = await fetch(`${API_BASE_URL}/api/auth/qr/init`);
         const data = await res.json();
         if (data.status === 'ok' && data.data?.sessionId) {
           if (!active) return;
@@ -73,7 +74,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           pollInterval = setInterval(async () => {
             try {
-              const statusRes = await fetch(`/api/auth/qr/status?session=${encodeURIComponent(sId)}`);
+              const statusRes = await fetch(`${API_BASE_URL}/api/auth/qr/status?session=${encodeURIComponent(sId)}`);
               const statusData = await statusRes.json();
               if (statusData.status === 'ok' && statusData.data) {
                 const sStatus = statusData.data.sessionStatus;
