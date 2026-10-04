@@ -408,10 +408,6 @@ export function ProfilePage() {
     return formatLastSeen(ls, isUserOnline, lsText);
   }, [isMe, isUserOnline, profileData, activeUser?.lastSeen, activeUser?.lastSeenText]);
 
-  const friendsDisplayCount = useMemo(() => {
-    const raw = (profileData as any)?.friendsCount ?? activeUser?.friendsCount ?? 0;
-    return typeof raw === 'number' ? raw : 0;
-  }, [profileData, activeUser?.friendsCount]);
 
   const followersDisplayCount = useMemo(() => {
     const raw = profileData && typeof (profileData as any).followersCount === 'number'
@@ -742,15 +738,11 @@ export function ProfilePage() {
                 </div>
               </div>
 
-              {/* Row 2: Compact Stats (Instagram style) */}
+              {/* Row 2: Compact Stats (Instagram style: пост, подписчик, подписки, критики) */}
               <div className="profile-stats-compact">
                 <div className="stat-item">
                   <span className="stat-count">{userPosts.length}</span>
                   <span className="stat-label">{getPluralForm(userPosts.length, 'пост', 'поста', 'постов')}</span>
-                </div>
-                <div className="stat-item clickable" onClick={() => setModalType('Друзья')}>
-                  <span className="stat-count">{friendsDisplayCount}</span>
-                  <span className="stat-label">{getPluralForm(friendsDisplayCount, 'друг', 'друга', 'друзей')}</span>
                 </div>
                 <div className="stat-item clickable" onClick={() => setModalType('Подписчики')}>
                   <span className="stat-count">{followersDisplayCount.toLocaleString('ru-RU')}</span>
@@ -760,22 +752,18 @@ export function ProfilePage() {
                   <span className="stat-count">{followingDisplayCount.toLocaleString('ru-RU')}</span>
                   <span className="stat-label">{getPluralForm(followingDisplayCount, 'подписка', 'подписки', 'подписок')}</span>
                 </div>
+                <div className="stat-item clickable" onClick={() => setModalType('Критики')}>
+                  <span className="stat-count">{realCriticsList.length.toLocaleString('ru-RU')}</span>
+                  <span className="stat-label">{getPluralForm(realCriticsList.length, 'критик', 'критика', 'критиков')}</span>
+                </div>
               </div>
 
-              {/* Substats (Clips, Critics) */}
-              {(((profileData as any)?.clipsCount ?? 0) > 0 || realCriticsList.length > 0) && (
+              {/* Substats (Clips) */}
+              {(((profileData as any)?.clipsCount ?? 0) > 0) && (
                 <div className="profile-substats-row">
-                  {realCriticsList.length > 0 && (
-                    <div className="substat-item clickable" onClick={() => setModalType('Критики')} title="Критики профиля">
-                      <Flame size={13} className="critic-flame-icon" />
-                      <span><b>{realCriticsList.length.toLocaleString('ru-RU')}</b> {getPluralForm(realCriticsList.length, 'критик', 'критика', 'критиков')}</span>
-                    </div>
-                  )}
-                  {((profileData as any)?.clipsCount ?? 0) > 0 && (
-                    <div className="substat-item">
-                      <span><b>{(profileData as any)?.clipsCount}</b> {getPluralForm((profileData as any)?.clipsCount, 'волна', 'волны', 'волн')}</span>
-                    </div>
-                  )}
+                  <div className="substat-item">
+                    <span><b>{(profileData as any)?.clipsCount}</b> {getPluralForm((profileData as any)?.clipsCount, 'волна', 'волны', 'волн')}</span>
+                  </div>
                 </div>
               )}
 
