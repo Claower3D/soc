@@ -18,29 +18,28 @@
   gap: 1.5rem;
 }
 
-/* Official Motto Banner */
+/* Official Motto Banner — Compact */
 .feed-motto-banner {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(56, 189, 248, 0.08) 100%);
-  border: 1px solid rgba(99, 102, 241, 0.25);
-  border-radius: var(--radius-md);
-  padding: 0.75rem 1.15rem;
-  margin-bottom: 1.25rem;
-  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.05);
+  gap: 0.65rem;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.06) 0%, rgba(56, 189, 248, 0.06) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: var(--radius-md, 12px);
+  padding: 0.35rem 0.75rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.04);
   transition: all var(--transition-fast);
 }
 
 .feed-motto-banner:hover {
-  border-color: rgba(99, 102, 241, 0.45);
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.1);
-  transform: translateY(-1px);
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);
 }
 
 .motto-badge-icon {
-  width: 36px;
-  height: 36px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: linear-gradient(135deg, #6366F1 0%, #38BDF8 100%);
   display: flex;
@@ -48,45 +47,59 @@
   justify-content: center;
   color: white;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 1px 4px rgba(99, 102, 241, 0.25);
 }
 
 .motto-text-content {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   flex: 1;
-  gap: 0.1rem;
+  min-width: 0;
+  gap: 0.4rem;
+  overflow: hidden;
 }
 
 .motto-quote {
-  font-size: 0.95rem;
-  font-weight: 800;
+  font-size: 0.82rem;
+  font-weight: 700;
   color: var(--color-text);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.motto-separator {
+  color: var(--color-text-tertiary, #94a3b8);
+  font-size: 0.75rem;
+  flex-shrink: 0;
 }
 
 .motto-sub {
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .motto-shield-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
-  padding: 0.3rem 0.65rem;
+  padding: 0.2rem 0.55rem;
   border-radius: var(--radius-full);
-  font-size: 0.74rem;
-  font-weight: 700;
+  font-size: 0.7rem;
+  font-weight: 600;
   color: var(--color-accent);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 [data-theme="dark"] .feed-motto-banner {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(56, 189, 248, 0.12) 100%);
-  border-color: rgba(99, 102, 241, 0.35);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(56, 189, 248, 0.1) 100%);
+  border-color: rgba(99, 102, 241, 0.25);
 }
 
 [data-theme="dark"] .motto-quote {
@@ -94,19 +107,35 @@
 }
 
 [data-theme="dark"] .motto-shield-pill {
-  background: rgba(15, 23, 42, 0.7);
-  border-color: rgba(99, 102, 241, 0.3);
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(99, 102, 241, 0.25);
   color: #A5B4FC;
 }
 
 @media (max-width: 600px) {
   .feed-motto-banner {
-    flex-wrap: wrap;
-    padding: 0.65rem 0.85rem;
+    padding: 0.35rem 0.6rem;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+  }
+  .motto-separator {
+    display: none;
+  }
+  .motto-text-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.05rem;
+  }
+  .motto-quote {
+    font-size: 0.78rem;
+  }
+  .motto-sub {
+    font-size: 0.68rem;
+    line-height: 1.15;
   }
   .motto-shield-pill {
-    margin-top: 0.25rem;
-    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.66rem;
   }
 }
 

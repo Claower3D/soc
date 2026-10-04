@@ -220,14 +220,15 @@ export function FeedPage() {
         {/* Official Motto Banner */}
         <div className="feed-motto-banner">
           <div className="motto-badge-icon">
-            <LifeBuoy size={18} className="motto-icon" />
+            <LifeBuoy size={14} className="motto-icon" />
           </div>
           <div className="motto-text-content">
             <span className="motto-quote">«Спасение служба»</span>
-            <span className="motto-sub">Официальный девиз платформы • Помощь, взаимная поддержка и безопасность каждого участника</span>
+            <span className="motto-separator">•</span>
+            <span className="motto-sub">Помощь, взаимная поддержка и безопасность</span>
           </div>
-          <div className="motto-shield-pill">
-            <ShieldCheck size={14} /> <span>Экосистема доверия</span>
+          <div className="motto-shield-pill" title="Экосистема доверия и безопасности">
+            <ShieldCheck size={13} /> <span>Экосистема доверия</span>
           </div>
         </div>
 
