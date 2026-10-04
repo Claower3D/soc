@@ -1,24 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
   Video, Headphones,
   Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
-  Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Globe, ChevronDown,
+  Users, Film, LogIn, Sparkles, Wind, Heart, BellRing,
   MessageCircle, UserPlus, Trash2, X, Settings, Search
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useTranslation } from '../context/LanguageContext';
-import { useCurrency } from '../context/CurrencyContext';
 import { AuthModal } from './AuthModal';
+import { EditProfileModal, type EditTab } from './EditProfileModal';
 import { PremiumBadge } from './PremiumBadge';
 import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './Header.css';
 
 export function Header() {
-  const { currentUser, isAuthenticated, openAuthModal } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { currentUser, isAuthenticated, openAuthModal, updateProfile, logout } = useAuth();
   const { 
     notifications, 
     unreadCount, 
@@ -31,28 +29,30 @@ export function Header() {
     requestDesktopPermission, 
     browserPermission 
   } = useNotifications();
-  const { currentLang, setLanguage, languages, t } = useTranslation();
-  const { currency, currencyConfig, setCurrency, allCurrencies, detectedFromCountry } = useCurrency();
+  const { t } = useTranslation();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [localeDropdownOpen, setLocaleDropdownOpen] = useState(false);
-  const [localeTab, setLocaleTab] = useState<'lang' | 'currency'>('lang');
   const [notifTab, setNotifTab] = useState<'alerts' | 'push_settings'>('alerts');
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<EditTab>('preferences');
   const createRef = useRef<HTMLDivElement>(null);
-  const localeRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const location = useLocation();
-  const isProfilePage = location.pathname.startsWith('/profile');
+
+  useEffect(() => {
+    const handleOpenSettings = (e: any) => {
+      setSettingsInitialTab(e.detail?.tab || 'preferences');
+      setIsSettingsOpen(true);
+    };
+    window.addEventListener('open-profile-settings', handleOpenSettings);
+    return () => window.removeEventListener('open-profile-settings', handleOpenSettings);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent | TouchEvent) {
       if (createRef.current && !createRef.current.contains(event.target as Node)) {
         setCreateMenuOpen(false);
-      }
-      if (localeRef.current && !localeRef.current.contains(event.target as Node)) {
-        setLocaleDropdownOpen(false);
       }
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
         setNotificationsOpen(false);
@@ -234,96 +234,7 @@ export function Header() {
           <Search size={15} />
         </button>
 
-        {/* Combined Locale (Language & Currency) Selector */}
-        <div className="header-locale-wrapper" ref={localeRef}>
-          <button
-            className={`header-control-pill header-locale-btn ${localeDropdownOpen ? 'active' : ''}`}
-            onClick={() => setLocaleDropdownOpen(!localeDropdownOpen)}
-            title="Язык и валюта платформы"
-          >
-            <Globe size={14} className="header-control-icon" />
-            <span className="locale-btn-label">
-              {currentLang.toUpperCase()} · {currencyConfig.symbol}
-            </span>
-            <ChevronDown size={11} className={`header-control-chevron ${localeDropdownOpen ? 'open' : ''}`} />
-          </button>
 
-          {localeDropdownOpen && (
-            <div className="header-locale-dropdown">
-              <div className="locale-dropdown-tabs">
-                <button
-                  type="button"
-                  className={`locale-tab-btn ${localeTab === 'lang' ? 'active' : ''}`}
-                  onClick={() => setLocaleTab('lang')}
-                >
-                  <Globe size={12} />
-                  <span>Язык</span>
-                </button>
-                <button
-                  type="button"
-                  className={`locale-tab-btn ${localeTab === 'currency' ? 'active' : ''}`}
-                  onClick={() => setLocaleTab('currency')}
-                >
-                  <span>{currencyConfig.symbol}</span>
-                  <span>Валюта</span>
-                </button>
-              </div>
-
-              {localeTab === 'lang' ? (
-                <div className="lang-options-list">
-                  {languages.map((lang) => (
-                    <button
-                      key={lang.code}
-                      type="button"
-                      className={`lang-option-item ${currentLang === lang.code ? 'selected' : ''}`}
-                      onClick={() => {
-                        setLanguage(lang.code);
-                        setLocaleDropdownOpen(false);
-                      }}
-                    >
-                      <span className="lang-code-badge">{lang.code.toUpperCase()}</span>
-                      <span className="lang-item-name">{lang.nativeName}</span>
-                      {currentLang === lang.code && <Check size={14} className="lang-check-icon" />}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="currency-options-list">
-                  {detectedFromCountry && (
-                    <div className="currency-detected-note-banner">
-                      <span>Регион: <strong>{detectedFromCountry}</strong></span>
-                    </div>
-                  )}
-                  {allCurrencies.map((c) => (
-                    <button
-                      key={c.code}
-                      type="button"
-                      className={`currency-option-item ${currency === c.code ? 'selected' : ''}`}
-                      onClick={() => {
-                        setCurrency(c.code);
-                        setLocaleDropdownOpen(false);
-                      }}
-                    >
-                      <span className="curr-symbol-badge">{c.symbol}</span>
-                      <span className="curr-item-name">{c.name}</span>
-                      <span className="curr-item-code">{c.code}</span>
-                      {currency === c.code && <Check size={14} className="curr-check-icon" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Theme Toggle Button (Day / Night mode) */}
-        <button
-          className="header-icon-btn theme-toggle-btn"
-          onClick={toggleTheme}
-          title={theme === 'dark' ? "Дневная тема" : "Ночная тема"}
-        >
-          {theme === 'dark' ? <Sun size={16} className="theme-sun-icon" /> : <Moon size={16} className="theme-moon-icon" />}
-        </button>
 
         <div className="header-divider" />
 
@@ -576,18 +487,17 @@ export function Header() {
             )}
           </div>
 
-            {isProfilePage && (
-              <button
-                className="header-action-btn header-settings-pill"
-                onClick={() => {
-                  window.dispatchEvent(new CustomEvent('open-profile-settings', { detail: { tab: 'privacy' } }));
-                }}
-                title="Настройки профиля и безопасности"
-              >
-                <Settings size={16} />
-                <span className="btn-text">Настройки</span>
-              </button>
-            )}
+            <button
+              className="header-action-btn header-settings-pill"
+              onClick={() => {
+                setSettingsInitialTab('preferences');
+                setIsSettingsOpen(true);
+              }}
+              title="Настройки: тема день/ночь, язык, валюта, профиль"
+            >
+              <Settings size={16} />
+              <span className="btn-text">Настройки</span>
+            </button>
 
             <button
               className="header-profile-badge"
@@ -630,6 +540,23 @@ export function Header() {
         onClose={() => setAuthModalOpen(false)} 
         onSuccess={() => {}}
       />
+
+      {/* Global Settings & Profile Edit Modal */}
+      {isAuthenticated && (
+        <EditProfileModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          onSave={(updated) => {
+            updateProfile(updated);
+            setIsSettingsOpen(false);
+          }}
+          initialTab={settingsInitialTab}
+          onLogout={() => {
+            logout();
+            navigate('/');
+          }}
+        />
+      )}
     </header>
   );
 }

@@ -1512,3 +1512,339 @@
   }
 }
 
+/* ========================================================================= */
+/* TAB: PREFERENCES / INTERFACE (Theme, Language, Currency)                  */
+/* ========================================================================= */
+.settings-section-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.settings-icon-bubble {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.theme-bubble {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.lang-bubble {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.curr-bubble {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.settings-section-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.settings-section-desc {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+/* Theme Option Cards */
+.theme-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.theme-option-card {
+  border: 2px solid var(--color-border);
+  border-radius: 14px;
+  padding: 1rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  position: relative;
+  transition: all var(--transition-fast);
+  background: var(--color-bg-card);
+}
+
+.theme-option-card:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.theme-option-card.selected {
+  border-color: var(--color-accent);
+  background: rgba(var(--color-accent-rgb), 0.05);
+}
+
+.theme-card-preview {
+  height: 60px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0 1rem;
+}
+
+.light-preview {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #f59e0b;
+}
+
+.dark-preview {
+  background: #0f172a;
+  border: 1px solid #334155;
+  color: #818cf8;
+}
+
+.preview-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.preview-line {
+  height: 6px;
+  border-radius: 3px;
+}
+
+.light-preview .preview-line {
+  background: #cbd5e1;
+}
+
+.dark-preview .preview-line {
+  background: #334155;
+}
+
+.preview-line.short {
+  width: 45%;
+}
+
+.preview-line.long {
+  width: 80%;
+}
+
+.theme-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.theme-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-text-primary);
+}
+
+.theme-sub {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+}
+
+.theme-selected-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Languages Grid */
+.languages-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 0.65rem;
+}
+
+.lang-card-btn {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  border-radius: 12px;
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+  color: var(--color-text-primary);
+}
+
+.lang-card-btn:hover {
+  border-color: var(--color-accent);
+  background: var(--color-bg-hover);
+}
+
+.lang-card-btn.selected {
+  border-color: var(--color-accent);
+  background: rgba(var(--color-accent-rgb), 0.08);
+}
+
+.lang-code-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.75rem;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.lang-names {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.lang-native {
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lang-en {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+}
+
+.lang-selected-check {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+/* Currencies Grid */
+.currencies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.65rem;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 0.35rem;
+}
+
+.currency-card-btn {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  border-radius: 12px;
+  padding: 0.65rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+  color: var(--color-text-primary);
+}
+
+.currency-card-btn:hover {
+  border-color: #10b981;
+  background: var(--color-bg-hover);
+}
+
+.currency-card-btn.selected {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.curr-symbol-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.curr-names {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.curr-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.curr-code {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.curr-flag {
+  font-size: 0.85rem;
+}
+
+.curr-desc {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.curr-selected-check {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+@media (max-width: 600px) {
+  .theme-options-grid {
+    grid-template-columns: 1fr;
+  }
+  .languages-grid {
+    grid-template-columns: 1fr;
+  }
+  .currencies-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -3,13 +3,16 @@ import {
   X, Camera, MapPin, Globe, Sparkles, Shield, ShoppingBag, 
   Video, User as UserIcon, Check, Image as ImageIcon,
   Flame, Award, Eye, Calendar, Moon, Sun, Compass,
-  QrCode, LogOut, Upload, Link as LinkIcon
+  QrCode, LogOut, Upload, Link as LinkIcon, Sliders
 } from 'lucide-react';
 import { 
   type User, type UserRole, type BeliefPrivacy, 
   RELIGIONS_CATALOG 
 } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../context/LanguageContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { spiritualAudio } from '../utils/spiritualAudio';
 import { calculateZodiacProfile, type ZodiacInfo } from '../utils/astrology';
 import { detectUserCityAndCountry } from '../utils/countryDetect';
@@ -26,7 +29,7 @@ interface EditProfileModalProps {
   onLogout?: () => void;
 }
 
-type EditTab = 'general' | 'astrology' | 'appearance' | 'spiritual' | 'privacy';
+export type EditTab = 'general' | 'preferences' | 'astrology' | 'appearance' | 'spiritual' | 'privacy';
 
 const SAMPLE_COVERS = [
   {
@@ -88,6 +91,9 @@ export function EditProfileModal({
   onLogout 
 }: EditProfileModalProps) {
   const { currentUser, updateProfile, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const { currentLang, setLanguage, languages } = useTranslation();
+  const { currency, setCurrency, allCurrencies, currencyConfig, detectedFromCountry } = useCurrency();
   const [activeTab, setActiveTab] = useState<EditTab>(initialTab);
 
   useEffect(() => {
@@ -259,6 +265,24 @@ export function EditProfileModal({
 
             <button 
               type="button"
+              className={`edit-tab-item ${activeTab === 'preferences' ? 'active' : ''}`}
+              onClick={() => setActiveTab('preferences')}
+            >
+              <Sliders size={16} />
+              <span>Интерфейс</span>
+            </button>
+
+            <button 
+              type="button"
+              className={`edit-tab-item ${activeTab === 'appearance' ? 'active' : ''}`}
+              onClick={() => setActiveTab('appearance')}
+            >
+              <ImageIcon size={16} />
+              <span>Дизайн</span>
+            </button>
+
+            <button 
+              type="button"
               className={`edit-tab-item ${activeTab === 'spiritual' ? 'active' : ''}`}
               onClick={() => setActiveTab('spiritual')}
             >
@@ -277,15 +301,6 @@ export function EditProfileModal({
 
             <button 
               type="button"
-              className={`edit-tab-item ${activeTab === 'appearance' ? 'active' : ''}`}
-              onClick={() => setActiveTab('appearance')}
-            >
-              <ImageIcon size={16} />
-              <span>Дизайн</span>
-            </button>
-
-            <button 
-              type="button"
               className={`edit-tab-item ${activeTab === 'privacy' ? 'active' : ''}`}
               onClick={() => setActiveTab('privacy')}
             >
@@ -299,9 +314,10 @@ export function EditProfileModal({
           <div className="edit-modal-top-bar">
             <h3 className="edit-modal-main-title">
               {activeTab === 'general' && 'Профиль'}
+              {activeTab === 'preferences' && 'Интерфейс и настройки'}
+              {activeTab === 'appearance' && 'Дизайн'}
               {activeTab === 'spiritual' && 'Духовный путь'}
               {activeTab === 'astrology' && 'Астрология'}
-              {activeTab === 'appearance' && 'Дизайн'}
               {activeTab === 'privacy' && 'Безопасность'}
             </h3>
             <button className="edit-close-x-btn" onClick={onClose} title="Закрыть">
@@ -552,6 +568,154 @@ export function EditProfileModal({
                     className="custom-switch-check"
                   />
                 </label>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* TAB: ИНТЕРФЕЙС И НАСТРОЙКИ (День/Ночь, Язык, Валюта)                      */}
+          {/* ========================================================================= */}
+          {activeTab === 'preferences' && (
+            <div className="edit-tab-pane">
+              {/* Секция 1: Тема оформления (День / Ночь) */}
+              <div className="settings-section-card">
+                <div className="settings-section-header">
+                  <div className="settings-icon-bubble theme-bubble">
+                    {theme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
+                  </div>
+                  <div>
+                    <h4 className="settings-section-title">Тема оформления (День / Ночь)</h4>
+                    <p className="settings-section-desc">Выберите режим отображения: светлый (день) или тёмный (ночь)</p>
+                  </div>
+                </div>
+
+                <div className="theme-options-grid">
+                  <div 
+                    className={`theme-option-card light-card ${theme === 'light' ? 'selected' : ''}`}
+                    onClick={() => setTheme('light')}
+                  >
+                    <div className="theme-card-preview light-preview">
+                      <Sun size={24} className="theme-preview-icon" />
+                      <div className="preview-lines">
+                        <div className="preview-line short" />
+                        <div className="preview-line long" />
+                      </div>
+                    </div>
+                    <div className="theme-card-info">
+                      <span className="theme-name">☀️ Дневная тема</span>
+                      <span className="theme-sub">Светлый интерфейс</span>
+                    </div>
+                    {theme === 'light' && (
+                      <span className="theme-selected-badge">
+                        <Check size={14} />
+                      </span>
+                    )}
+                  </div>
+
+                  <div 
+                    className={`theme-option-card dark-card ${theme === 'dark' ? 'selected' : ''}`}
+                    onClick={() => setTheme('dark')}
+                  >
+                    <div className="theme-card-preview dark-preview">
+                      <Moon size={24} className="theme-preview-icon" />
+                      <div className="preview-lines">
+                        <div className="preview-line short" />
+                        <div className="preview-line long" />
+                      </div>
+                    </div>
+                    <div className="theme-card-info">
+                      <span className="theme-name">🌙 Ночная тема</span>
+                      <span className="theme-sub">Тёмный интерфейс</span>
+                    </div>
+                    {theme === 'dark' && (
+                      <span className="theme-selected-badge">
+                        <Check size={14} />
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Секция 2: Язык платформы */}
+              <div className="settings-section-card">
+                <div className="settings-section-header">
+                  <div className="settings-icon-bubble lang-bubble">
+                    <Globe size={20} />
+                  </div>
+                  <div>
+                    <h4 className="settings-section-title">Язык интерфейса</h4>
+                    <p className="settings-section-desc">Выберите язык меню, кнопок и системных уведомлений</p>
+                  </div>
+                </div>
+
+                <div className="languages-grid">
+                  {languages.map((lang) => {
+                    const isSelected = currentLang === lang.code;
+                    return (
+                      <button
+                        key={lang.code}
+                        type="button"
+                        className={`lang-card-btn ${isSelected ? 'selected' : ''}`}
+                        onClick={() => setLanguage(lang.code)}
+                      >
+                        <div className="lang-code-box">{lang.code.toUpperCase()}</div>
+                        <div className="lang-names">
+                          <span className="lang-native">{lang.nativeName}</span>
+                          <span className="lang-en">{lang.name}</span>
+                        </div>
+                        {isSelected && (
+                          <span className="lang-selected-check">
+                            <Check size={16} />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Секция 3: Основная валюта */}
+              <div className="settings-section-card">
+                <div className="settings-section-header">
+                  <div className="settings-icon-bubble curr-bubble">
+                    <span style={{ fontSize: '1.1rem', fontWeight: 800 }}>{currencyConfig.symbol}</span>
+                  </div>
+                  <div>
+                    <h4 className="settings-section-title">Основная валюта</h4>
+                    <p className="settings-section-desc">
+                      Валюта для цен товаров, услуг, переводов и баланса
+                      {detectedFromCountry && <span> · Регион: <strong>{detectedFromCountry}</strong></span>}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="currencies-grid">
+                  {allCurrencies.map((c) => {
+                    const isSelected = currency === c.code;
+                    return (
+                      <button
+                        key={c.code}
+                        type="button"
+                        className={`currency-card-btn ${isSelected ? 'selected' : ''}`}
+                        onClick={() => setCurrency(c.code)}
+                      >
+                        <div className="curr-symbol-avatar">{c.symbol}</div>
+                        <div className="curr-names">
+                          <div className="curr-title-row">
+                            <span className="curr-flag">{c.flag}</span>
+                            <span className="curr-code">{c.code}</span>
+                          </div>
+                          <span className="curr-desc">{c.name}</span>
+                        </div>
+                        {isSelected && (
+                          <span className="curr-selected-check">
+                            <Check size={15} />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           )}

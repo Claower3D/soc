@@ -18,7 +18,6 @@ import { ReligionSymbol } from '../components/ReligionSymbols';
 import { useAuth } from '../context/AuthContext';
 import { FollowersModal } from '../components/FollowersModal';
 import { PostDetailModal } from '../components/PostDetailModal';
-import { EditProfileModal } from '../components/EditProfileModal';
 import { CreatePostModal } from '../components/CreatePostModal';
 import { CreateStoryModal } from '../components/CreateStoryModal';
 import { StoriesBar } from '../components/StoriesBar';
@@ -63,7 +62,7 @@ export { getAvatarUrl };
 export function ProfilePage() {
   const { userId } = useParams();
   const navigate = useNavigate();
-  const { currentUser, isAuthenticated, logout, updateProfile, allAccounts } = useAuth();
+  const { currentUser, isAuthenticated, updateProfile, allAccounts } = useAuth();
   const { formatPrice } = useCurrency();
 
   // Normalize route param (e.g. '@claower' -> 'claower', 'me', or custom ID)
@@ -371,8 +370,6 @@ export function ProfilePage() {
   const [modalType, setModalType] = useState<'Подписчики' | 'Подписки' | 'Критики' | 'Друзья' | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-  const [editProfileInitialTab, setEditProfileInitialTab] = useState<'general' | 'astrology' | 'appearance' | 'spiritual' | 'privacy'>('general');
   const [showDetailedInfo, setShowDetailedInfo] = useState(false);
   const [isConsciousnessModalOpen, setIsConsciousnessModalOpen] = useState(false);
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
@@ -384,17 +381,6 @@ export function ProfilePage() {
     }, 30000);
     return () => clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    const handleOpenSettings = (e: any) => {
-      if (isMe) {
-        setEditProfileInitialTab(e.detail?.tab || 'privacy');
-        setIsEditProfileOpen(true);
-      }
-    };
-    window.addEventListener('open-profile-settings', handleOpenSettings);
-    return () => window.removeEventListener('open-profile-settings', handleOpenSettings);
-  }, [isMe]);
 
   const isUserOnline = useMemo(() => {
     if (isMe) return true;
@@ -641,8 +627,7 @@ export function ProfilePage() {
             type="button"
             className="profile-cover-settings-btn"
             onClick={() => {
-              setEditProfileInitialTab('privacy');
-              setIsEditProfileOpen(true);
+              window.dispatchEvent(new CustomEvent('open-profile-settings', { detail: { tab: 'appearance' } }));
             }}
             title="Настройки профиля и безопасности"
           >
@@ -925,7 +910,9 @@ export function ProfilePage() {
                   <button className="btn btn-primary" onClick={() => setIsCreatePostOpen(true)}>
                     <Plus size={14} /> Опубликовать
                   </button>
-                  <button className="btn btn-secondary" onClick={() => { setEditProfileInitialTab('general'); setIsEditProfileOpen(true); }}>
+                  <button className="btn btn-secondary" onClick={() => {
+                    window.dispatchEvent(new CustomEvent('open-profile-settings', { detail: { tab: 'general' } }));
+                  }}>
                     <Edit3 size={14} /> Редактировать
                   </button>
                 </>
@@ -1373,21 +1360,7 @@ export function ProfilePage() {
         />
       )}
 
-      {/* Edit Profile Modal */}
-      <EditProfileModal
-        isOpen={isEditProfileOpen}
-        onClose={() => setIsEditProfileOpen(false)}
-        onSave={(updated) => {
-          updateProfile(updated);
-          setIsEditProfileOpen(false);
-        }}
-        initialTab={editProfileInitialTab}
-        onOpenQrScanner={() => setIsQrScannerOpen(true)}
-        onLogout={() => {
-          logout();
-          navigate('/');
-        }}
-      />
+
 
       {/* Auth Modal */}
       <AuthModal
