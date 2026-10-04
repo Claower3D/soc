@@ -154,31 +154,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const token = localStorage.getItem(STORAGE_KEY_TOKEN);
     if (!token) return;
 
-    fetch('/api/auth/me', {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then((res) => {
-        if (!res.ok) {
-          console.warn('Backend session verification note: Token expired or invalid');
-          return null;
-        }
-        return res.json();
-      })
-      .then((data) => {
-        const u = data?.data?.user || data?.user;
+    api.auth.me()
+      .then((data: any) => {
+        const u = data?.user || data?.data?.user;
         if (u && (u.id || u.username)) {
           if (u.username) u.username = String(u.username).replace(/^@+/, '');
           if (!isRealCustomAvatar(u.avatar)) u.avatar = DEFAULT_AVATAR;
-          setActiveUser(u);
+          setActiveUser((prev) => {
+            const merged = { ...prev, ...u };
+            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(merged));
+            return merged;
+          });
           setIsAuthenticated(true);
-          localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(u));
           localStorage.setItem('new_age_is_auth', 'true');
         }
       })
-      .catch(() => {
-        // Backend unavailable — keep local user state
+      .catch((err) => {
+        console.warn('Backend session verification note:', err);
       });
   }, []);
 
@@ -504,6 +496,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (token) {
       api.users.updateProfile({
         name: data.name,
+        username: data.username,
         bio: data.bio,
         avatar: data.avatar,
         cover_image: data.coverImage,
@@ -513,6 +506,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         belief_privacy: data.beliefPrivacy,
         birth_date: data.birthDate,
         gender: data.gender,
+        show_birth_date: data.showBirthDate,
+        show_zodiac: data.showZodiac,
+        zodiac_sign: data.zodiacSign,
+        eastern_zodiac: data.easternZodiac,
+        consciousness_level: data.consciousnessLevel,
+        consciousness_title: data.consciousnessTitle,
+        cognition_vector: data.cognitionVector,
+      }).then((res: any) => {
+        const u = res?.user || res?.data?.user;
+        if (u) {
+          setActiveUser((prev) => {
+            const merged = { ...prev, ...u };
+            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(merged));
+            return merged;
+          });
+        }
       }).catch(err => console.warn('Failed to sync profile to server:', err));
     }
   };

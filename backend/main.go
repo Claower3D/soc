@@ -183,9 +183,14 @@ type User struct {
 	Verified       bool   `json:"verified,omitempty"`
 	BirthDate      string `json:"birthDate,omitempty"`
 	Gender         string `json:"gender,omitempty"`
-	ShowBirthDate  bool   `json:"showBirthDate,omitempty"`
-	ShowZodiac     bool   `json:"showZodiac,omitempty"`
-	FollowersCount int    `json:"followersCount"`
+	ShowBirthDate      bool   `json:"showBirthDate,omitempty"`
+	ShowZodiac         bool   `json:"showZodiac,omitempty"`
+	ZodiacSign         string `json:"zodiacSign,omitempty"`
+	EasternZodiac      string `json:"easternZodiac,omitempty"`
+	ConsciousnessLevel int    `json:"consciousnessLevel,omitempty"`
+	ConsciousnessTitle string `json:"consciousnessTitle,omitempty"`
+	CognitionVector    string `json:"cognitionVector,omitempty"`
+	FollowersCount     int    `json:"followersCount"`
 	FollowingCount int    `json:"followingCount"`
 	FriendsCount   int    `json:"friendsCount"`
 	CriticsCount   int    `json:"criticsCount,omitempty"`
@@ -428,8 +433,31 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 		   OR avatar LIKE '%unsplash%';
 	`)
 
-	// Убеждаемся что колонки online и last_seen присутствуют в таблице users, а также таблица story_views и колонка viewers_count
+	// Убеждаемся что все необходимые колонки присутствуют в таблице users
 	_, _ = conn.Exec(`
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_image TEXT DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS website TEXT DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS location TEXT DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS country_code VARCHAR(10) DEFAULT 'RU';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(50) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date VARCHAR(50) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS zodiac_sign VARCHAR(50) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS eastern_zodiac VARCHAR(50) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS gender VARCHAR(30) DEFAULT 'hidden';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS show_birth_date BOOLEAN DEFAULT TRUE;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS show_zodiac BOOLEAN DEFAULT TRUE;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS belief_type VARCHAR(100) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS belief_privacy VARCHAR(50) DEFAULT 'public';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS consciousness_level INT DEFAULT 1;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS consciousness_title VARCHAR(100) DEFAULT 'Странник';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS cognition_vector VARCHAR(50) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS followers_count INT DEFAULT 0;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS following_count INT DEFAULT 0;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS posts_count INT DEFAULT 0;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS critics_count INT DEFAULT 0;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS online BOOLEAN DEFAULT FALSE;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 		ALTER TABLE stories ADD COLUMN IF NOT EXISTS viewers_count INT DEFAULT 0;
@@ -2387,11 +2415,23 @@ func getUserFromToken(token string) (*User, error) {
 	if db != nil {
 		var u User
 		query := `
-		SELECT id, name, username, COALESCE(avatar, ''), COALESCE(bio, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(verified, false), COALESCE(followers_count, 0), COALESCE(following_count, 0), COALESCE(critics_count, 0), COALESCE(posts_count, 0)
+		SELECT id, name, username, COALESCE(avatar, ''), COALESCE(cover_image, ''), COALESCE(bio, ''), 
+		       COALESCE(location, ''), COALESCE(website, ''), COALESCE(role, 'user'), 
+		       COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(birth_date, ''), 
+		       COALESCE(gender, 'hidden'), COALESCE(show_birth_date, true), COALESCE(show_zodiac, true),
+		       COALESCE(zodiac_sign, ''), COALESCE(eastern_zodiac, ''), 
+		       COALESCE(consciousness_level, 1), COALESCE(consciousness_title, 'Странник'), COALESCE(cognition_vector, ''),
+		       COALESCE(verified, false), COALESCE(followers_count, 0), COALESCE(following_count, 0), COALESCE(critics_count, 0), COALESCE(posts_count, 0)
 		FROM users WHERE id = $1 LIMIT 1
 		`
 		err := db.QueryRow(query, claims.UserID).Scan(
-			&u.ID, &u.Name, &u.Username, &u.Avatar, &u.Bio, &u.Role, &u.BeliefType, &u.BeliefPrivacy, &u.Verified, &u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount,
+			&u.ID, &u.Name, &u.Username, &u.Avatar, &u.CoverImage, &u.Bio,
+			&u.Location, &u.Website, &u.Role,
+			&u.BeliefType, &u.BeliefPrivacy, &u.BirthDate,
+			&u.Gender, &u.ShowBirthDate, &u.ShowZodiac,
+			&u.ZodiacSign, &u.EasternZodiac,
+			&u.ConsciousnessLevel, &u.ConsciousnessTitle, &u.CognitionVector,
+			&u.Verified, &u.FollowersCount, &u.FollowingCount, &u.CriticsCount, &u.PostsCount,
 		)
 		if err == nil {
 			u.Online = true
@@ -3962,6 +4002,8 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 			SELECT id, username, name, COALESCE(avatar, ''), COALESCE(cover_image, ''), COALESCE(bio, ''), COALESCE(location, ''), 
 			       COALESCE(website, ''), COALESCE(role, 'user'), COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), 
 			       COALESCE(birth_date, ''), COALESCE(gender, 'hidden'), COALESCE(show_birth_date, true), COALESCE(show_zodiac, true),
+			       COALESCE(zodiac_sign, ''), COALESCE(eastern_zodiac, ''),
+			       COALESCE(consciousness_level, 1), COALESCE(consciousness_title, 'Странник'), COALESCE(cognition_vector, ''),
 			       COALESCE(followers_count, 0), COALESCE(following_count, 0), COALESCE(posts_count, 0), COALESCE(verified, false),
 			       COALESCE(online, false), COALESCE(last_seen, NOW() - INTERVAL '1 day')
 			FROM users WHERE id = $1 OR LOWER(username) = LOWER($1) OR LOWER(username) = LOWER($2)
@@ -3969,6 +4011,8 @@ func handleUserProfile(w http.ResponseWriter, r *http.Request) {
 			&user.ID, &user.Username, &user.Name, &user.Avatar, &user.CoverImage, &user.Bio, &user.Location,
 			&user.Website, &user.Role, &user.BeliefType, &user.BeliefPrivacy,
 			&user.BirthDate, &user.Gender, &user.ShowBirthDate, &user.ShowZodiac,
+			&user.ZodiacSign, &user.EasternZodiac,
+			&user.ConsciousnessLevel, &user.ConsciousnessTitle, &user.CognitionVector,
 			&user.FollowersCount, &user.FollowingCount, &user.PostsCount, &user.Verified,
 			&dbOnline, &dbLastSeen,
 		)
@@ -4100,16 +4144,24 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name          string `json:"name"`
-		Bio           string `json:"bio"`
-		Avatar        string `json:"avatar"`
-		CoverImage    string `json:"cover_image"`
-		Location      string `json:"location"`
-		Website       string `json:"website"`
-		BeliefType    string `json:"belief_type"`
-		BeliefPrivacy string `json:"belief_privacy"`
-		BirthDate     string `json:"birth_date"`
-		Gender        string `json:"gender"`
+		Name               string `json:"name"`
+		Username           string `json:"username"`
+		Bio                string `json:"bio"`
+		Avatar             string `json:"avatar"`
+		CoverImage         string `json:"cover_image"`
+		Location           string `json:"location"`
+		Website            string `json:"website"`
+		BeliefType         string `json:"belief_type"`
+		BeliefPrivacy      string `json:"belief_privacy"`
+		BirthDate          string `json:"birth_date"`
+		Gender             string `json:"gender"`
+		ShowBirthDate      *bool  `json:"show_birth_date"`
+		ShowZodiac         *bool  `json:"show_zodiac"`
+		ZodiacSign         string `json:"zodiac_sign"`
+		EasternZodiac      string `json:"eastern_zodiac"`
+		ConsciousnessLevel *int   `json:"consciousness_level"`
+		ConsciousnessTitle string `json:"consciousness_title"`
+		CognitionVector    string `json:"cognition_vector"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
@@ -4123,6 +4175,23 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 			targetID = claims.UserID
 		}
 
+		showBirthDate := true
+		if req.ShowBirthDate != nil {
+			showBirthDate = *req.ShowBirthDate
+		}
+		showZodiac := true
+		if req.ShowZodiac != nil {
+			showZodiac = *req.ShowZodiac
+		}
+		consciousnessLevel := 1
+		if req.ConsciousnessLevel != nil && *req.ConsciousnessLevel > 0 {
+			consciousnessLevel = *req.ConsciousnessLevel
+		}
+		consciousnessTitle := req.ConsciousnessTitle
+		if consciousnessTitle == "" {
+			consciousnessTitle = "Странник"
+		}
+
 		_, err := db.Exec(`
 			UPDATE users SET 
 				name = COALESCE(NULLIF($1, ''), name), 
@@ -4134,13 +4203,25 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 				belief_type = $7, 
 				belief_privacy = $8,
 				birth_date = $9,
-				gender = $10
-			WHERE id = $11 OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($11, '@', ''))
-		`, req.Name, req.Bio, req.Avatar, req.CoverImage, req.Location, req.Website, req.BeliefType, req.BeliefPrivacy, req.BirthDate, req.Gender, targetID)
+				gender = $10,
+				show_birth_date = $11,
+				show_zodiac = $12,
+				zodiac_sign = COALESCE(NULLIF($13, ''), zodiac_sign),
+				eastern_zodiac = COALESCE(NULLIF($14, ''), eastern_zodiac),
+				consciousness_level = CASE WHEN $15 > 0 THEN $15 ELSE consciousness_level END,
+				consciousness_title = COALESCE(NULLIF($16, ''), consciousness_title),
+				cognition_vector = COALESCE(NULLIF($17, ''), cognition_vector)
+			WHERE id = $18 OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($18, '@', ''))
+		`, req.Name, req.Bio, req.Avatar, req.CoverImage, req.Location, req.Website, req.BeliefType, req.BeliefPrivacy, req.BirthDate, req.Gender, showBirthDate, showZodiac, req.ZodiacSign, req.EasternZodiac, consciousnessLevel, consciousnessTitle, req.CognitionVector, targetID)
 		if err != nil {
 			log.Printf("⚠️ Ошибка обновления профиля в DB: %v", err)
-			writeJSON(w, http.StatusInternalServerError, Response{Status: "error", Message: "Ошибка обновления профиля"})
+			writeJSON(w, http.StatusInternalServerError, Response{Status: "error", Message: "Ошибка обновления профиля: " + err.Error()})
 			return
+		}
+
+		if req.Username != "" {
+			cleanU := strings.ToLower(strings.TrimPrefix(req.Username, "@"))
+			_, _ = db.Exec(`UPDATE users SET username = $1 WHERE (id = $2 OR LOWER(username) = LOWER($2)) AND NOT EXISTS (SELECT 1 FROM users WHERE LOWER(username) = $1 AND id != $2)`, cleanU, targetID)
 		}
 	}
 
@@ -4160,6 +4241,7 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	if ok {
 		if req.Name != "" { acc.User.Name = req.Name }
+		if req.Username != "" { acc.User.Username = strings.TrimPrefix(req.Username, "@") }
 		acc.User.Bio = req.Bio
 		if req.Avatar != "" { acc.User.Avatar = req.Avatar }
 		if req.CoverImage != "" { acc.User.CoverImage = req.CoverImage }
@@ -4169,12 +4251,20 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		if req.BeliefPrivacy != "" { acc.User.BeliefPrivacy = req.BeliefPrivacy }
 		acc.User.BirthDate = req.BirthDate
 		acc.User.Gender = req.Gender
+		if req.ShowBirthDate != nil { acc.User.ShowBirthDate = *req.ShowBirthDate }
+		if req.ShowZodiac != nil { acc.User.ShowZodiac = *req.ShowZodiac }
+		if req.ZodiacSign != "" { acc.User.ZodiacSign = req.ZodiacSign }
+		if req.EasternZodiac != "" { acc.User.EasternZodiac = req.EasternZodiac }
+		if req.ConsciousnessLevel != nil && *req.ConsciousnessLevel > 0 { acc.User.ConsciousnessLevel = *req.ConsciousnessLevel }
+		if req.ConsciousnessTitle != "" { acc.User.ConsciousnessTitle = req.ConsciousnessTitle }
+		if req.CognitionVector != "" { acc.User.CognitionVector = req.CognitionVector }
 		store.accounts[accountKey] = acc
 	}
 	store.saveToDisk()
 	store.mu.Unlock()
 
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Профиль обновлен"})
+	updatedUser, _ := getUserFromToken(token)
+	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Профиль обновлен", Data: map[string]interface{}{"user": updatedUser}})
 }
 
 // POST /api/posts
