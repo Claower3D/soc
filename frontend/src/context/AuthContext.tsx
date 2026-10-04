@@ -156,6 +156,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     api.auth.me()
       .then((data: any) => {
+        if (!data || data.status === 'unauthenticated') {
+          localStorage.removeItem(STORAGE_KEY_TOKEN);
+          localStorage.setItem('new_age_is_auth', 'false');
+          setJwtToken(null);
+          return;
+        }
         const u = data?.user || data?.data?.user;
         if (u && (u.id || u.username)) {
           if (u.username) u.username = String(u.username).replace(/^@+/, '');
@@ -169,8 +175,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.setItem('new_age_is_auth', 'true');
         }
       })
-      .catch((err) => {
-        console.warn('Backend session verification note:', err);
+      .catch(() => {
+        // Silently reset state if token is expired or backend session is unauthenticated
+        localStorage.removeItem(STORAGE_KEY_TOKEN);
+        localStorage.setItem('new_age_is_auth', 'false');
+        setJwtToken(null);
       });
   }, []);
 

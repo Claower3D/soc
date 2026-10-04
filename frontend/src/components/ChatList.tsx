@@ -858,6 +858,7 @@ export function ChatList({
                   placeholder="1234" 
                   value={newChatPin}
                   onChange={e => setNewChatPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  autoComplete="new-password"
                   autoFocus
                   required
                 />

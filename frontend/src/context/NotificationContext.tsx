@@ -192,8 +192,9 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Fetch notifications from server
   const fetchNotifications = useCallback(async () => {
+    const isAuth = localStorage.getItem('new_age_is_auth') === 'true';
     const token = localStorage.getItem('new_age_jwt_token');
-    if (!token) return;
+    if (!token || !isAuth) return;
 
     setLoading(true);
     try {

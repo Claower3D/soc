@@ -994,6 +994,7 @@ export function EditProfileModal({
                   onChange={e => setCurrentPassword(e.target.value)}
                   className="edit-input-ctrl"
                   placeholder="Введите текущий пароль"
+                  autoComplete="current-password"
                 />
               </div>
 
@@ -1005,6 +1006,7 @@ export function EditProfileModal({
                   onChange={e => setNewPassword(e.target.value)}
                   className="edit-input-ctrl"
                   placeholder="Введите новый пароль"
+                  autoComplete="new-password"
                 />
               </div>
 
@@ -1016,6 +1018,7 @@ export function EditProfileModal({
                   onChange={e => setConfirmPassword(e.target.value)}
                   className="edit-input-ctrl"
                   placeholder="Повторите новый пароль"
+                  autoComplete="new-password"
                 />
               </div>
 

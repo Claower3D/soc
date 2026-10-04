@@ -413,6 +413,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                               placeholder="••••••••" 
                               value={password} 
                               onChange={e => setPassword(e.target.value)}
+                              autoComplete="current-password"
                             />
                             <button
                               type="button"

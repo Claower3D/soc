@@ -22,11 +22,34 @@ export const getApiBaseUrl = (): string => {
 
 export const API_BASE_URL = getApiBaseUrl();
 
+function getValidJwtToken(): string | null {
+  try {
+    const token = localStorage.getItem('new_age_jwt_token');
+    if (!token || typeof token !== 'string') return null;
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      localStorage.removeItem('new_age_jwt_token');
+      return null;
+    }
+    const payload = JSON.parse(atob(parts[1]));
+    if (payload && payload.exp && typeof payload.exp === 'number') {
+      if (Date.now() >= payload.exp * 1000) {
+        localStorage.removeItem('new_age_jwt_token');
+        return null;
+      }
+    }
+    return token;
+  } catch {
+    localStorage.removeItem('new_age_jwt_token');
+    return null;
+  }
+}
+
 /**
  * Базовая функция для выполнения запросов к API с обработкой ошибок и авторизацией.
  */
 async function apiFetch<T>(endpoint: string, options: RequestInit = {}, isMultipart = false): Promise<T> {
-  const token = localStorage.getItem('new_age_jwt_token');
+  const token = getValidJwtToken();
   const headers = new Headers(options.headers || {});
   
   if (!isMultipart && !headers.has('Content-Type')) {
@@ -41,6 +64,11 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}, isMultip
     ...options,
     headers,
   });
+
+  if (response.status === 401) {
+    localStorage.removeItem('new_age_jwt_token');
+    localStorage.setItem('new_age_is_auth', 'false');
+  }
 
   let data;
   try {
@@ -68,7 +96,15 @@ export const api = {
   auth: {
     register: (data: any) => apiFetch<any>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
     login: (data: any) => apiFetch<any>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
-    me: () => apiFetch<any>('/api/auth/me'),
+    me: async () => {
+      const token = getValidJwtToken();
+      if (!token) return { status: 'unauthenticated' };
+      try {
+        return await apiFetch<any>('/api/auth/me');
+      } catch {
+        return { status: 'unauthenticated' };
+      }
+    },
     checkUsername: (username: string) => apiFetch<any>(`/api/auth/check-username?username=${encodeURIComponent(username)}`),
     sendCode: (phone: string) => apiFetch<any>('/api/auth/send-code', { method: 'POST', body: JSON.stringify({ phone }) }),
     verifyCode: (phone: string, code: string) => apiFetch<any>('/api/auth/verify-code', { method: 'POST', body: JSON.stringify({ phone, code }) })
