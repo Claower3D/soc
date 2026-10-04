@@ -134,17 +134,22 @@ function getLocalOracleFallback(text: string): string {
 }
 
 async function fetchAiReply(text: string, history: Array<{ role: string; text: string }>, voice = false): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
   try {
     const resp = await fetch(`${API_BASE_URL}/api/ai/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text, history, voice }),
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (!resp.ok) throw new Error('API error');
     const data = await resp.json();
     return String(data.reply || getLocalOracleFallback(text));
   } catch {
+    clearTimeout(timeoutId);
     return getLocalOracleFallback(text);
   }
 }
@@ -775,15 +780,31 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     }
 
     let finished = false;
+    let animFrameId: number | null = null;
+    let watchdogTimer: any = null;
+
     const finish = () => {
       if (finished) return;
       finished = true;
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+      if (animFrameId) cancelAnimationFrame(animFrameId);
       setAiSpeechCharIdx(clean.length);
       if (voiceOrbRef.current) {
         voiceOrbRef.current.style.setProperty('--lvl', '0');
       }
       if (onEnd) onEnd();
     };
+
+    // Страховочный таймер: максимум 12 секунд или по длине текста, чтобы голос никогда не зависал
+    const maxSpeechDuration = Math.max(7000, Math.min(25000, clean.length * 140));
+    watchdogTimer = setTimeout(() => {
+      console.warn('speakAloud watchdog: завершаем воспроизведение по тайм-ауту');
+      if (ttsAudioRef.current) {
+        try { ttsAudioRef.current.pause(); } catch {}
+        ttsAudioRef.current = null;
+      }
+      finish();
+    }, maxSpeechDuration);
 
     // Фронтенд воспроизводит естественный человеческий голос из нейронного TTS бэкенда
     try {
@@ -801,7 +822,6 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       };
 
       // Пульсация шара Оракула в такт речи
-      let animFrameId: number | null = null;
       let phase = 0;
       const animateSpeakingOrb = () => {
         if (!ttsAudioRef.current || ttsAudioRef.current.paused || voiceStatusRef.current !== 'speaking') {
@@ -1051,78 +1071,101 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       silenceTimerRef.current = null;
     }
 
-    // 1. Проверяем, расшифровал ли браузерный Web Speech API
-    const browserText = (finalTranscriptRef.current + ' ' + liveTranscript).trim();
-    if (browserText && browserText.length >= 2) {
-      finalTranscriptRef.current = '';
-      setLiveTranscript('');
-      hasSpokenInTurnRef.current = false;
-      setIsUserTalking(false);
-      isProcessingSTTRef.current = false;
-      handleVoiceQuerySubmit(browserText);
-      return;
-    }
+    try {
+      // 1. Проверяем, расшифровал ли браузерный Web Speech API
+      const browserText = (finalTranscriptRef.current + ' ' + liveTranscript).trim();
+      if (browserText && browserText.length >= 2) {
+        finalTranscriptRef.current = '';
+        setLiveTranscript('');
+        hasSpokenInTurnRef.current = false;
+        setIsUserTalking(false);
+        handleVoiceQuerySubmit(browserText);
+        return;
+      }
 
-    // 2. Если браузерный Web Speech API пустой (ошибка сети/WebView) — отправляем аудио в нейронный STT бэкенда
-    if (voiceRecorderRef.current && recordedVoiceChunksRef.current.length > 0) {
-      try {
+      // 2. Если браузерный Web Speech API пустой (ошибка сети/Android WebView) — отправляем аудио в нейронный STT бэкенда
+      const currentRec = voiceRecorderRef.current;
+      if (currentRec && recordedVoiceChunksRef.current.length > 0) {
         voiceStatusRef.current = 'thinking';
         setVoiceStatus('thinking');
 
-        // Запрашиваем последний кусочек и останавливаем
-        try {
-          if (voiceRecorderRef.current.state === 'recording') {
-            voiceRecorderRef.current.requestData();
-            voiceRecorderRef.current.stop();
+        // Корректно завершаем текущую запись с ожиданием финального чанка
+        await new Promise<void>((resolve) => {
+          let resolved = false;
+          const done = () => {
+            if (!resolved) {
+              resolved = true;
+              resolve();
+            }
+          };
+          currentRec.onstop = done;
+          try {
+            if (currentRec.state === 'recording') {
+              currentRec.requestData();
+              currentRec.stop();
+            } else {
+              done();
+            }
+          } catch {
+            done();
           }
-        } catch {}
-
-        await new Promise(r => setTimeout(r, 120));
+          setTimeout(done, 250);
+        });
 
         const chunks = [...recordedVoiceChunksRef.current];
         recordedVoiceChunksRef.current = [];
 
-        // Перезапускаем рекордер для следующей реплики
+        // Сразу перезапускаем рекордер для микрофона
         if (isVoiceChatActiveRef.current && micStreamRef.current) {
           startVoiceRecorder(micStreamRef.current);
         }
 
-        const mime = voiceRecorderRef.current?.mimeType || 'audio/webm';
+        const mime = currentRec.mimeType || 'audio/webm';
         const audioBlob = new Blob(chunks, { type: mime });
 
-        if (audioBlob.size > 800) {
+        if (audioBlob.size > 500) {
           const formData = new FormData();
           const ext = mime.includes('ogg') ? 'speech.ogg' : mime.includes('mp4') ? 'speech.mp4' : 'speech.webm';
           formData.append('audio', audioBlob, ext);
 
-          const resp = await fetch(`${API_BASE_URL}/api/ai/stt`, {
-            method: 'POST',
-            body: formData,
-          });
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-          if (resp.ok) {
-            const data = await resp.json();
-            const recognized = String(data.text || '').trim();
-            if (recognized) {
-              setLiveTranscript('');
-              hasSpokenInTurnRef.current = false;
-              setIsUserTalking(false);
-              isProcessingSTTRef.current = false;
-              handleVoiceQuerySubmit(recognized);
-              return;
+          try {
+            const resp = await fetch(`${API_BASE_URL}/api/ai/stt`, {
+              method: 'POST',
+              body: formData,
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+
+            if (resp.ok) {
+              const data = await resp.json();
+              const recognized = String(data.text || '').trim();
+              if (recognized) {
+                setLiveTranscript('');
+                hasSpokenInTurnRef.current = false;
+                setIsUserTalking(false);
+                handleVoiceQuerySubmit(recognized);
+                return;
+              }
             }
+          } catch (fetchErr) {
+            clearTimeout(timeoutId);
+            console.warn('STT request timed out or network error:', fetchErr);
           }
         }
-      } catch (e) {
-        console.warn('Backend STT failed:', e);
       }
+    } catch (e) {
+      console.warn('commitVoicePhrase error:', e);
+    } finally {
+      isProcessingSTTRef.current = false;
     }
 
     // Если в аудио была тишина/шум — возвращаемся в режим прослушивания
     setLiveTranscript('');
     hasSpokenInTurnRef.current = false;
     setIsUserTalking(false);
-    isProcessingSTTRef.current = false;
     if (isVoiceChatActiveRef.current) {
       voiceStatusRef.current = 'listening';
       setVoiceStatus('listening');

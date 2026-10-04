@@ -5346,33 +5346,13 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	type sttAttempt struct {
-		model string
-		body  map[string]interface{}
-	}
-	attempts := []sttAttempt{
-		{
-			// Специализированная модель распознавания речи
-			model: "gemini-3.5-transcribe",
-			body: map[string]interface{}{
-				"contents": []map[string]interface{}{
-					{"parts": []interface{}{audioPart}},
-				},
-				"generationConfig": map[string]interface{}{
-					"audioTranscriptionConfig": map[string]interface{}{
-						"languageCodes": []string{"ru-RU"},
-					},
-				},
-			},
-		},
-	}
 	promptBody := map[string]interface{}{
 		"contents": []map[string]interface{}{
 			{
 				"role": "user",
 				"parts": []interface{}{
 					map[string]string{
-						"text": "Транскрибируй эту русскую речь дословно. Выведи ТОЛЬКО сказанный текст, без кавычек, пояснений и форматирования. Если речи нет (тишина или шум) — выведи пустую строку.",
+						"text": "Транскрибируй эту русскую речь дословно. Напиши в точности сказанные слова. Выведи ТОЛЬКО текст речи, без кавычек, пояснений, префиксов и форматирования. Если в аудио тишина или шум без членораздельной речи — выведи пустую строку.",
 					},
 					audioPart,
 				},
@@ -5383,15 +5363,35 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 			"maxOutputTokens": 512,
 		},
 	}
-	for _, m := range []string{"gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.6-flash"} {
-		attempts = append(attempts, sttAttempt{model: m, body: promptBody})
+
+	type sttAttempt struct {
+		model string
+		body  map[string]interface{}
+	}
+	attempts := []sttAttempt{
+		{model: "gemini-2.5-flash", body: promptBody},
+		{model: "gemini-3.5-flash", body: promptBody},
+		{model: "gemini-3.8-flash", body: promptBody},
+		{
+			model: "gemini-3.5-transcribe",
+			body: map[string]interface{}{
+				"contents": []map[string]interface{}{
+					{"parts": []interface{}{audioPart}},
+				},
+				"generationConfig": map[string]interface{}{
+					"audioTranscriptionConfig": map[string]interface{}{
+						"mode": "SMART",
+					},
+				},
+			},
+		},
 	}
 
 	var transcript string
 	for _, at := range attempts {
 		bodyBytes, _ := json.Marshal(at.body)
 		apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", at.model, apiKey)
-		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 		httpReq, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
 		if err != nil {
 			cancel()
@@ -5403,7 +5403,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		resp, err := http.DefaultClient.Do(httpReq)
 		if err != nil {
 			cancel()
-			log.Printf("[STT] %s: %v", at.model, err)
+			log.Printf("[STT] %s error: %v", at.model, err)
 			continue
 		}
 		respBody, _ := io.ReadAll(resp.Body)
@@ -5411,7 +5411,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		cancel()
 
 		if resp.StatusCode != 200 {
-			log.Printf("[STT] %s: %d %s", at.model, resp.StatusCode, string(respBody[:min(len(respBody), 300)]))
+			log.Printf("[STT] %s HTTP %d: %s", at.model, resp.StatusCode, string(respBody[:min(len(respBody), 250)]))
 			continue
 		}
 
@@ -5425,20 +5425,48 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 			} `json:"candidates"`
 		}
 
-		if err := json.Unmarshal(respBody, &geminiResp); err == nil {
-			if len(geminiResp.Candidates) == 0 {
-				// Модель ответила, но кандидатов нет — значит речи не было
+		if err := json.Unmarshal(respBody, &geminiResp); err == nil && len(geminiResp.Candidates) > 0 {
+			var candidateText string
+			for _, p := range geminiResp.Candidates[0].Content.Parts {
+				candidateText += p.Text
+			}
+			candidateText = strings.Trim(strings.TrimSpace(candidateText), "\"«»")
+			if candidateText != "" {
+				transcript = candidateText
+				log.Printf("[STT] ✅ Успешно расшифровано моделью %s: '%s'", at.model, transcript)
 				break
 			}
-			for _, p := range geminiResp.Candidates[0].Content.Parts {
-				transcript += p.Text
-			}
-			transcript = strings.Trim(strings.TrimSpace(transcript), "\"«»")
-			break // успешный ответ модели (даже пустой = тишина)
 		}
+
+		// Попытка извлечь вложенный текст из нестандартного ответа
+		var genericMap map[string]interface{}
+		if err := json.Unmarshal(respBody, &genericMap); err == nil {
+			if candList, ok := genericMap["candidates"].([]interface{}); ok && len(candList) > 0 {
+				if firstCand, ok := candList[0].(map[string]interface{}); ok {
+					if content, ok := firstCand["content"].(map[string]interface{}); ok {
+						if parts, ok := content["parts"].([]interface{}); ok {
+							for _, partItem := range parts {
+								if partMap, ok := partItem.(map[string]interface{}); ok {
+									if txt, ok := partMap["text"].(string); ok && strings.TrimSpace(txt) != "" {
+										transcript = strings.Trim(strings.TrimSpace(txt), "\"«»")
+										log.Printf("[STT] ✅ Успешно извлечён текст %s: '%s'", at.model, transcript)
+										break
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if transcript != "" {
+			break
+		}
+		log.Printf("[STT] %s ответила 200, но текст пуст. Пробуем следующую модель...", at.model)
 	}
 
-	log.Printf("[STT] Распознано аудио (%d байт, mime %s): '%s'", len(audioBytes), cleanMime, transcript)
+	log.Printf("[STT] Итог аудио (%d байт, %s): '%s'", len(audioBytes), cleanMime, transcript)
 
 	writeJSON(w, 200, map[string]interface{}{
 		"status": "ok",
