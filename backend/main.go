@@ -1110,6 +1110,7 @@ func main() {
 	mux.HandleFunc("POST /api/oracle", handleAIChat)
 	mux.HandleFunc("GET /api/ai/tts", handleAITTS)
 	mux.HandleFunc("POST /api/ai/tts", handleAITTS)
+	mux.HandleFunc("POST /api/ai/stt", handleAISTT)
 
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
@@ -4815,7 +4816,7 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 	bodyBytes, _ := json.Marshal(geminiBody)
 
 	// Список моделей: основная + fallback
-	models := []string{"gemini-3.6-flash", "gemini-3.5-flash"}
+	models := []string{"gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"}
 	var lastErr string
 
 	for _, model := range models {
@@ -5103,6 +5104,154 @@ func handleAITTS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Accept-Ranges", "bytes")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	_, _ = w.Write(finalBytes)
+}
+
+// POST /api/ai/stt — Speech-to-Text transcription via Gemini multimodal audio
+func handleAISTT(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		writeJSON(w, 200, map[string]interface{}{
+			"status":  "ok",
+			"text":    "",
+			"warning": "GEMINI_API_KEY not configured",
+		})
+		return
+	}
+
+	var audioBytes []byte
+	mimeType := "audio/webm"
+
+	contentType := r.Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		err := r.ParseMultipartForm(15 << 20) // 15MB
+		if err == nil {
+			file, header, fErr := r.FormFile("audio")
+			if fErr == nil {
+				defer file.Close()
+				audioBytes, _ = io.ReadAll(file)
+				if ct := header.Header.Get("Content-Type"); ct != "" {
+					mimeType = ct
+				}
+			}
+		}
+	} else if strings.HasPrefix(contentType, "application/json") {
+		var req struct {
+			Audio    string `json:"audio"`
+			MimeType string `json:"mimeType"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
+			if b, bErr := base64.StdEncoding.DecodeString(req.Audio); bErr == nil {
+				audioBytes = b
+			}
+			if req.MimeType != "" {
+				mimeType = req.MimeType
+			}
+		}
+	} else if strings.HasPrefix(contentType, "audio/") {
+		mimeType = strings.Split(contentType, ";")[0]
+		audioBytes, _ = io.ReadAll(r.Body)
+	}
+
+	if len(audioBytes) == 0 {
+		writeJSON(w, 400, map[string]interface{}{
+			"status":  "error",
+			"message": "empty audio data",
+		})
+		return
+	}
+
+	cleanMime := strings.Split(mimeType, ";")[0]
+	if cleanMime == "" {
+		cleanMime = "audio/webm"
+	}
+
+	b64Audio := base64.StdEncoding.EncodeToString(audioBytes)
+
+	geminiBody := map[string]interface{}{
+		"contents": []map[string]interface{}{
+			{
+				"role": "user",
+				"parts": []interface{}{
+					map[string]string{
+						"text": "Ты система точного распознавания русской речи. Твоя задача — точно транскрибировать это аудиосообщение в русский текст. Выведи ТОЛЬКО сказанный пользователем текст без кавычек, префиксов, объяснений и форматирования. Если в аудио тишина, шум или нет внятной речи, выведи ровно пустую строку.",
+					},
+					map[string]interface{}{
+						"inlineData": map[string]string{
+							"mimeType": cleanMime,
+							"data":     b64Audio,
+						},
+					},
+				},
+			},
+		},
+		"generationConfig": map[string]interface{}{
+			"temperature":     0.1,
+			"maxOutputTokens": 1024,
+		},
+	}
+
+	bodyBytes, _ := json.Marshal(geminiBody)
+	models := []string{"gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"}
+
+	var transcript string
+	for _, model := range models {
+		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey)
+		ctx, cancel := context.WithTimeout(r.Context(), 18*time.Second)
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+		if err != nil {
+			cancel()
+			continue
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(httpReq)
+		if err != nil {
+			cancel()
+			continue
+		}
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		cancel()
+
+		if resp.StatusCode != 200 {
+			continue
+		}
+
+		var geminiResp struct {
+			Candidates []struct {
+				Content struct {
+					Parts []struct {
+						Text string `json:"text"`
+					} `json:"parts"`
+				} `json:"content"`
+			} `json:"candidates"`
+		}
+
+		if err := json.Unmarshal(respBody, &geminiResp); err == nil && len(geminiResp.Candidates) > 0 {
+			for _, p := range geminiResp.Candidates[0].Content.Parts {
+				transcript += p.Text
+			}
+			transcript = strings.TrimSpace(transcript)
+			if transcript != "" {
+				break
+			}
+		}
+	}
+
+	log.Printf("[STT] Распознано аудио (%d байт, mime %s): '%s'", len(audioBytes), cleanMime, transcript)
+
+	writeJSON(w, 200, map[string]interface{}{
+		"status": "ok",
+		"text":   transcript,
+	})
 }
 
 // GET /api/chats/{id}/messages — get messages for a chat

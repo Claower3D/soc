@@ -384,6 +384,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
+  const [isUserTalking, setIsUserTalking] = useState(false);
+  const voiceRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedVoiceChunksRef = useRef<Blob[]>([]);
+  const hasSpokenInTurnRef = useRef<boolean>(false);
+  const lastSpokenTimeRef = useRef<number>(0);
+  const isProcessingSTTRef = useRef<boolean>(false);
+
 
   
 
@@ -841,7 +848,40 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     }
   };
 
-  // Индикатор громкости микрофона — шар «дышит» в такт голосу пользователя
+  // Запись аудиодорожки пользователя для фонового серверного STT распознавания
+  const startVoiceRecorder = (stream: MediaStream) => {
+    try {
+      if (voiceRecorderRef.current && voiceRecorderRef.current.state === 'recording') {
+        try { voiceRecorderRef.current.stop(); } catch {}
+      }
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+      ];
+      let selectedMime = '';
+      for (const m of mimeTypes) {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) {
+          selectedMime = m;
+          break;
+        }
+      }
+      const rec = selectedMime ? new MediaRecorder(stream, { mimeType: selectedMime }) : new MediaRecorder(stream);
+      recordedVoiceChunksRef.current = [];
+      rec.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedVoiceChunksRef.current.push(e.data);
+        }
+      };
+      rec.start(200); // 200ms слайсы для быстрого извлечения
+      voiceRecorderRef.current = rec;
+    } catch (e) {
+      console.warn('Voice MediaRecorder error:', e);
+    }
+  };
+
+  // Индикатор громкости микрофона и Voice Activity Detection (VAD)
   const startMicLevel = (stream: MediaStream) => {
     try {
       const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -853,6 +893,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       src.connect(analyser);
       audioCtxRef.current = ctx;
       const data = new Uint8Array(analyser.frequencyBinCount);
+
       const tick = () => {
         analyser.getByteFrequencyData(data);
         let sum = 0;
@@ -860,10 +901,41 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         const avg = sum / data.length / 255;
         const status = voiceStatusRef.current;
         let level = 0;
-        if (status === 'listening' && !isMicMutedRef.current) level = Math.min(1, avg * 3.2);
-        if (voiceOrbRef.current) voiceOrbRef.current.style.setProperty('--lvl', level.toFixed(3));
+
+        if (status === 'listening' && !isMicMutedRef.current) {
+          level = Math.min(1, avg * 3.4);
+          const isSoundActive = avg > 0.035;
+
+          if (isSoundActive) {
+            hasSpokenInTurnRef.current = true;
+            lastSpokenTimeRef.current = Date.now();
+            setIsUserTalking(true);
+
+            if (silenceTimerRef.current) {
+              clearTimeout(silenceTimerRef.current);
+              silenceTimerRef.current = null;
+            }
+          } else if (hasSpokenInTurnRef.current) {
+            // Пользователь говорил и замолчал — отсчитываем паузу 1.1с
+            const silenceElapsed = Date.now() - lastSpokenTimeRef.current;
+            if (silenceElapsed > 1100 && !silenceTimerRef.current && !isProcessingSTTRef.current) {
+              silenceTimerRef.current = setTimeout(() => {
+                if (voiceStatusRef.current === 'listening' && hasSpokenInTurnRef.current) {
+                  hasSpokenInTurnRef.current = false;
+                  setIsUserTalking(false);
+                  commitVoicePhrase();
+                }
+              }, 200);
+            }
+          }
+        }
+
+        if (voiceOrbRef.current && status === 'listening') {
+          voiceOrbRef.current.style.setProperty('--lvl', level.toFixed(3));
+        }
         levelRafRef.current = requestAnimationFrame(tick);
       };
+
       tick();
     } catch (e) {
       console.warn('Mic level error', e);
@@ -879,18 +951,17 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     micStreamRef.current = null;
   };
 
+  // Браузерное распознавание речи (Web Speech API)
   const startRecognition = () => {
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRec) {
-      alert('Ваш браузер не поддерживает распознавание речи. Для голосового общения используйте Google Chrome или Яндекс Браузер.');
-      stopVoiceChat();
+      // Если браузер не поддерживает SpeechRecognition (Firefox, WebView, Safari) —
+      // работает параллельный аудиопоток MediaRecorder + серверный Gemini STT
       return;
     }
 
     if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch {}
+      try { recognitionRef.current.abort(); } catch {}
     }
 
     try {
@@ -904,9 +975,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       };
 
       rec.onresult = (event: any) => {
-        if (isMicMutedRef.current) return;
-        // Пока Оракул думает/говорит — не слушаем (иначе на громкой связи микрофон ловит его голос)
-        if (voiceStatusRef.current !== 'listening') return;
+        if (isMicMutedRef.current || voiceStatusRef.current !== 'listening') return;
 
         let interim = '';
         let newFinal = '';
@@ -929,39 +998,137 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
         const currentCombined = (finalTranscriptRef.current + ' ' + interim).trim();
         if (currentCombined) {
+          hasSpokenInTurnRef.current = true;
+          lastSpokenTimeRef.current = Date.now();
           setLiveTranscript(currentCombined);
+          setIsUserTalking(true);
 
           if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = setTimeout(() => {
-            const queryToSend = (finalTranscriptRef.current + ' ' + interim).trim();
-            if (queryToSend && isVoiceChatActiveRef.current && voiceStatusRef.current === 'listening') {
-              finalTranscriptRef.current = '';
-              setLiveTranscript('');
-              handleVoiceQuerySubmit(queryToSend);
+            if (isVoiceChatActiveRef.current && voiceStatusRef.current === 'listening') {
+              hasSpokenInTurnRef.current = false;
+              setIsUserTalking(false);
+              commitVoicePhrase();
             }
-          }, 1100); // ~1 секунда паузы — фраза фиксируется и уходит Оракулу, как в живом разговоре
+          }, 1100);
         }
       };
 
       rec.onerror = (event: any) => {
+        console.warn('SpeechRecognition notice (backend STT is active fallback):', event.error);
         if (event.error === 'not-allowed') {
-          alert('Доступ к микрофону заблокирован. Разрешите микрофон в настройках браузера.');
+          alert('Доступ к микрофону заблокирован в настройках браузера.');
           stopVoiceChat();
         }
       };
 
       rec.onend = () => {
         if (isVoiceChatActiveRef.current && !isMicMutedRef.current && voiceStatusRef.current === 'listening') {
-          try {
-            rec.start();
-          } catch {}
+          setTimeout(() => {
+            try {
+              if (isVoiceChatActiveRef.current && voiceStatusRef.current === 'listening') {
+                rec.start();
+              }
+            } catch {}
+          }, 200);
         }
       };
 
       recognitionRef.current = rec;
       rec.start();
     } catch (err) {
-      console.error('Recognition start error:', err);
+      console.warn('SpeechRecognition initialization note:', err);
+    }
+  };
+
+  // Фиксация и отправка сказанной фразы (с автопереходом на серверный Gemini STT если браузер не расшифровал)
+  const commitVoicePhrase = async () => {
+    if (voiceStatusRef.current !== 'listening' || isProcessingSTTRef.current) return;
+    isProcessingSTTRef.current = true;
+
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+
+    // 1. Проверяем, расшифровал ли браузерный Web Speech API
+    const browserText = (finalTranscriptRef.current + ' ' + liveTranscript).trim();
+    if (browserText && browserText.length >= 2) {
+      finalTranscriptRef.current = '';
+      setLiveTranscript('');
+      hasSpokenInTurnRef.current = false;
+      setIsUserTalking(false);
+      isProcessingSTTRef.current = false;
+      handleVoiceQuerySubmit(browserText);
+      return;
+    }
+
+    // 2. Если браузерный Web Speech API пустой (ошибка сети/WebView) — отправляем аудио в нейронный STT бэкенда
+    if (voiceRecorderRef.current && recordedVoiceChunksRef.current.length > 0) {
+      try {
+        voiceStatusRef.current = 'thinking';
+        setVoiceStatus('thinking');
+        setLiveTranscript('Обрабатываю голос… ⚡');
+
+        // Запрашиваем последний кусочек и останавливаем
+        try {
+          if (voiceRecorderRef.current.state === 'recording') {
+            voiceRecorderRef.current.requestData();
+            voiceRecorderRef.current.stop();
+          }
+        } catch {}
+
+        await new Promise(r => setTimeout(r, 120));
+
+        const chunks = [...recordedVoiceChunksRef.current];
+        recordedVoiceChunksRef.current = [];
+
+        // Перезапускаем рекордер для следующей реплики
+        if (isVoiceChatActiveRef.current && micStreamRef.current) {
+          startVoiceRecorder(micStreamRef.current);
+        }
+
+        const mime = voiceRecorderRef.current?.mimeType || 'audio/webm';
+        const audioBlob = new Blob(chunks, { type: mime });
+
+        if (audioBlob.size > 800) {
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'speech.webm');
+
+          const resp = await fetch(`${API_BASE_URL}/api/ai/stt`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (resp.ok) {
+            const data = await resp.json();
+            const recognized = String(data.text || '').trim();
+            if (recognized) {
+              setLiveTranscript('');
+              hasSpokenInTurnRef.current = false;
+              setIsUserTalking(false);
+              isProcessingSTTRef.current = false;
+              handleVoiceQuerySubmit(recognized);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Backend STT failed:', e);
+      }
+    }
+
+    // Если в аудио была тишина/шум — возвращаемся в режим прослушивания
+    setLiveTranscript('');
+    hasSpokenInTurnRef.current = false;
+    setIsUserTalking(false);
+    isProcessingSTTRef.current = false;
+    if (isVoiceChatActiveRef.current) {
+      voiceStatusRef.current = 'listening';
+      setVoiceStatus('listening');
+      if (micStreamRef.current && (!voiceRecorderRef.current || voiceRecorderRef.current.state === 'inactive')) {
+        startVoiceRecorder(micStreamRef.current);
+      }
     }
   };
 
@@ -975,6 +1142,8 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
     finalTranscriptRef.current = '';
     setLiveTranscript('');
+    hasSpokenInTurnRef.current = false;
+    setIsUserTalking(false);
 
     const newMsg: Message = {
       id: `msg_${Date.now()}`,
@@ -1024,6 +1193,11 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
             setVoiceStatus('listening');
             finalTranscriptRef.current = '';
             setLiveTranscript('');
+            hasSpokenInTurnRef.current = false;
+            setIsUserTalking(false);
+            if (micStreamRef.current) {
+              startVoiceRecorder(micStreamRef.current);
+            }
             if (!isMicMutedRef.current) {
               startRecognition();
             }
@@ -1035,9 +1209,15 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     } catch (err) {
       setIsAiTyping(false);
       if (isVoiceChatActiveRef.current) {
+        voiceStatusRef.current = 'listening';
         setVoiceStatus('listening');
         finalTranscriptRef.current = '';
         setLiveTranscript('');
+        hasSpokenInTurnRef.current = false;
+        setIsUserTalking(false);
+        if (micStreamRef.current) {
+          startVoiceRecorder(micStreamRef.current);
+        }
         startRecognition();
       }
     }
@@ -1051,14 +1231,23 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
   const startVoiceChat = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       micStreamRef.current = stream;
       startMicLevel(stream);
+      startVoiceRecorder(stream);
       isVoiceChatActiveRef.current = true;
       setIsVoiceChatActive(true);
       setLiveTranscript('');
       finalTranscriptRef.current = '';
       currentVoiceQueryRef.current = '';
+      hasSpokenInTurnRef.current = false;
+      setIsUserTalking(false);
 
       // Оракул сам начинает живой разговор — приветствие голосом + в текст
       const greeting = VOICE_GREETINGS[Math.floor(Math.random() * VOICE_GREETINGS.length)];
@@ -1081,6 +1270,11 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         if (!isVoiceChatActiveRef.current) return;
         setVoiceStatus('listening');
         voiceStatusRef.current = 'listening';
+        hasSpokenInTurnRef.current = false;
+        setIsUserTalking(false);
+        if (micStreamRef.current) {
+          startVoiceRecorder(micStreamRef.current);
+        }
         if (!isMicMutedRef.current) startRecognition();
       });
     } catch (err) {
@@ -1098,6 +1292,10 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     setAiSpeechCharIdx(0);
     finalTranscriptRef.current = '';
     currentVoiceQueryRef.current = '';
+    hasSpokenInTurnRef.current = false;
+    isProcessingSTTRef.current = false;
+    setIsUserTalking(false);
+
     if (silenceTimerRef.current) {
       clearTimeout(silenceTimerRef.current);
       silenceTimerRef.current = null;
@@ -1108,6 +1306,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       } catch {}
       recognitionRef.current = null;
     }
+    if (voiceRecorderRef.current) {
+      try {
+        voiceRecorderRef.current.stop();
+      } catch {}
+      voiceRecorderRef.current = null;
+    }
+    recordedVoiceChunksRef.current = [];
     if (ttsAudioRef.current) {
       try {
         ttsAudioRef.current.pause();
@@ -1143,6 +1348,11 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     }
     setAiSpeechCharIdx(aiSpeechText.length);
     setVoiceStatus('listening');
+    hasSpokenInTurnRef.current = false;
+    setIsUserTalking(false);
+    if (micStreamRef.current) {
+      startVoiceRecorder(micStreamRef.current);
+    }
     if (!isMicMuted) {
       startRecognition();
     }
@@ -2063,9 +2273,9 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           <div className="cw-live-center">
             <div
               ref={voiceOrbRef}
-              className="cw-live-orb"
-              onClick={voiceStatus === 'speaking' ? interruptAiSpeech : undefined}
-              title={voiceStatus === 'speaking' ? 'Нажмите, чтобы перебить и говорить самому' : ''}
+              className={`cw-live-orb ${isUserTalking ? 'user-talking' : ''}`}
+              onClick={voiceStatus === 'speaking' ? interruptAiSpeech : (voiceStatus === 'listening' ? commitVoicePhrase : undefined)}
+              title={voiceStatus === 'speaking' ? 'Нажмите, чтобы перебить' : 'Нажмите на шар, чтобы отправить фразу'}
             >
               <span className="cw-live-ring r1" />
               <span className="cw-live-ring r2" />
@@ -2076,17 +2286,19 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
             </div>
 
             <div className="cw-live-status">
-              {voiceStatus === 'listening' && (isMicMuted ? 'Микрофон выключен' : 'Слушаю тебя…')}
-              {voiceStatus === 'thinking' && 'Оракул размышляет…'}
+              {voiceStatus === 'listening' && (isMicMuted ? 'Микрофон выключен' : isUserTalking ? 'Слышу вас… 🎙️' : 'Слушаю вас…')}
+              {voiceStatus === 'thinking' && 'Оракул думает… ⚡'}
               {voiceStatus === 'speaking' && 'Оракул говорит'}
               {voiceStatus === 'idle' && 'Подключение…'}
             </div>
             <div className="cw-live-hint">
               {voiceStatus === 'speaking'
-                ? 'Нажми на шар, чтобы перебить'
-                : voiceStatus === 'listening' && !isMicMuted
-                  ? 'Просто говори — пауза отправит фразу'
-                  : '\u00A0'}
+                ? 'Нажмите на шар, чтобы перебить'
+                : voiceStatus === 'thinking'
+                  ? 'Подбираю мудрый ответ…'
+                  : voiceStatus === 'listening' && !isMicMuted
+                    ? (isUserTalking ? 'Говорите — пауза или кнопка «Отправить» передаст фразу' : 'Говорите свободно — пауза автоматически отправит фразу')
+                    : '\u00A0'}
             </div>
           </div>
 
@@ -2133,6 +2345,30 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               {isMicMuted ? <MicOff size={22} /> : <Mic size={22} />}
               <span>{isMicMuted ? 'Вкл. микрофон' : 'Микрофон'}</span>
             </button>
+
+            {voiceStatus === 'listening' && !isMicMuted && (
+              <button
+                type="button"
+                className="cw-live-btn send-now"
+                onClick={commitVoicePhrase}
+                title="Отправить фразу Оракулу прямо сейчас"
+              >
+                <Send size={22} />
+                <span>Отправить</span>
+              </button>
+            )}
+
+            {voiceStatus === 'speaking' && (
+              <button
+                type="button"
+                className="cw-live-btn send-now"
+                onClick={interruptAiSpeech}
+                title="Перебить и сказать самому"
+              >
+                <Sparkles size={22} />
+                <span>Перебить</span>
+              </button>
+            )}
 
             <button type="button" className="cw-live-btn end" onClick={stopVoiceChat} title="Закончить разговор">
               <VolumeX size={24} />
