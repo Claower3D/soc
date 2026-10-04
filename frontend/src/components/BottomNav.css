@@ -20,14 +20,40 @@
   gap: 2px;
   color: var(--color-text-tertiary);
   text-decoration: none;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 500;
   transition: all var(--transition-fast);
+  min-width: 0;
+  padding: 4px 1px;
 }
 
 .bottom-nav-item.active {
   color: var(--color-accent);
   font-weight: 600;
+}
+
+.bottom-nav-item.bottom-nav-spiritual.active {
+  color: #a855f7;
+}
+
+.bottom-nav-item.bottom-nav-spiritual .spiritual-star-icon {
+  color: inherit;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.bottom-nav-item.bottom-nav-spiritual.active .spiritual-star-icon {
+  color: #a855f7;
+  filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.7));
+  transform: scale(1.1);
+}
+
+.bottom-nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  letter-spacing: -0.2px;
+  line-height: 1.1;
 }
 
 .bottom-nav-btn-guest {

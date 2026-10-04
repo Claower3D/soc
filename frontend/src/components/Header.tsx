@@ -4,7 +4,7 @@ import {
   Video, Headphones,
   Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
   Users, Film, LogIn, Sun, Moon, Sparkles, Wind, Heart, BellRing, Globe, ChevronDown,
-  MessageCircle, UserPlus, Trash2, X, Settings
+  MessageCircle, UserPlus, Trash2, X, Settings, Search
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -223,6 +223,15 @@ export function Header() {
           <Sparkles size={14} className="ai-oracle-icon" />
           <span className="ai-oracle-text">Оракул</span>
           <span className="ai-oracle-dot" title="Онлайн" />
+        </button>
+
+        {/* Search Shortcut */}
+        <button
+          className="header-action-btn header-search-btn"
+          onClick={() => navigate('/search')}
+          title="Поиск людей, публикаций, музыки"
+        >
+          <Search size={15} />
         </button>
 
         {/* Combined Locale (Language & Currency) Selector */}
