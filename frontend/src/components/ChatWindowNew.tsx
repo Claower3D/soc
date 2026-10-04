@@ -1936,7 +1936,11 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         )}
 
         {messages.length === 0 ? (
-          <div className="cw-no-messages">Выберите диалог для начала общения</div>
+          <div className="cw-no-messages">
+            <div className="cw-no-messages-icon">💬</div>
+            <div className="cw-no-messages-title">Здесь пока нет сообщений</div>
+            <div className="cw-no-messages-sub">Отправьте первое сообщение, чтобы начать диалог</div>
+          </div>
         ) : (
 
 

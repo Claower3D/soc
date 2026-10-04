@@ -603,7 +603,199 @@ export function MessengerPage() {
     }).catch(() => {});
   }, [activeChatId]);
 
+  // Живая синхронизация сообщений активного чата с сервером (каждые 3 секунды)
+  useEffect(() => {
+    if (!activeChatId || activeChatId === 'chat_ai_oracle' || activeChatId === 'ai_guru_bot' || !isAuthenticated) return;
+
+    let isMounted = true;
+
+    const syncMessages = async () => {
+      try {
+        const res = await api.chats.messages(activeChatId);
+        const serverMsgs = res?.data || (Array.isArray(res) ? res : []);
+        if (!isMounted || !Array.isArray(serverMsgs)) return;
+
+        const mapped: any[] = serverMsgs.map((m: any) => ({
+          id: String(m.id || `msg_${Date.now()}_${Math.random()}`),
+          text: String(m.text || ''),
+          fromMe: Boolean(m.fromMe !== undefined ? m.fromMe : (m.sender_id === currentUserId || m.senderId === currentUserId)),
+          time: m.time || (m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Сейчас'),
+          status: (m.is_read || m.isRead || m.status === 'read') ? 'read' : (m.status || 'delivered'),
+          mediaUrl: m.media_url || m.mediaUrl,
+          mediaType: m.media_type || m.mediaType,
+        }));
+
+        setChatList(prev => {
+          const target = prev.find(c => c.id === activeChatId);
+          if (!target) return prev;
+
+          // Объединяем сообщения без дубликатов
+          const msgMap = new Map<string, any>();
+          for (const m of target.messages || []) {
+            msgMap.set(m.id, m);
+          }
+          let hasNewOrUpdated = false;
+          for (const m of mapped) {
+            const existing = msgMap.get(m.id);
+            if (!existing || existing.status !== m.status || existing.text !== m.text) {
+              hasNewOrUpdated = true;
+            }
+            msgMap.set(m.id, m);
+          }
+
+          if (!hasNewOrUpdated && (target.messages || []).length >= mapped.length) {
+            return prev;
+          }
+
+          const merged = Array.from(msgMap.values()).sort((a, b) => {
+            return (a.id > b.id ? 1 : -1);
+          });
+
+          const lastMsg = mapped.length > 0 ? mapped[mapped.length - 1] : undefined;
+          const updated = prev.map(c => {
+            if (c.id === activeChatId) {
+              return {
+                ...c,
+                messages: merged,
+                lastMessage: lastMsg ? (lastMsg.text || 'Вложение') : c.lastMessage,
+                time: lastMsg ? lastMsg.time : c.time,
+                unread: 0,
+              };
+            }
+            return c;
+          });
+
+          localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updated));
+          return updated;
+        });
+      } catch (err) {
+        // network error / offline
+      }
+    };
+
+    syncMessages();
+    const interval = setInterval(syncMessages, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [activeChatId, currentUserId, isAuthenticated]);
+
+  // Периодическое обновление списка чатов с сервера (новые диалоги и счетчики)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let isMounted = true;
+
+    const refreshChats = async () => {
+      try {
+        const data = await api.chats.list();
+        const serverChats = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+        if (!isMounted || !serverChats.length) return;
+
+        setChatList(prev => {
+          let hasChanges = false;
+          const prevMap = new Map(prev.map(c => [c.id, c]));
+
+          for (const sc of serverChats) {
+            if (!sc || !sc.id) continue;
+            const existing = prevMap.get(sc.id);
+            if (!existing) {
+              hasChanges = true;
+              const newChat: Chat = {
+                id: sc.id,
+                isGroup: Boolean(sc.isGroup),
+                groupTitle: sc.isGroup ? sc.name : undefined,
+                groupAvatar: sc.isGroup ? sc.avatar : undefined,
+                user: sc.user ? {
+                  id: sc.user.id,
+                  name: sc.user.name,
+                  username: sc.user.username,
+                  avatar: sc.user.avatar,
+                  online: Boolean(sc.user.online),
+                  lastSeen: sc.user.lastSeen,
+                  lastSeenText: sc.user.lastSeenText,
+                  followersCount: 0,
+                  followingCount: 0,
+                  postsCount: 0,
+                } : {
+                  id: sc.id,
+                  name: sc.name || 'Чат',
+                  username: sc.id,
+                  avatar: sc.avatar || '',
+                  online: false,
+                  followersCount: 0,
+                  followingCount: 0,
+                  postsCount: 0,
+                },
+                lastMessage: sc.lastMessage || '',
+                time: sc.time || 'Сейчас',
+                unread: sc.unread || 0,
+                messages: [],
+              };
+              prevMap.set(sc.id, newChat);
+            } else {
+              if (sc.lastMessage && existing.lastMessage !== sc.lastMessage) {
+                existing.lastMessage = sc.lastMessage;
+                existing.time = sc.time || existing.time;
+                hasChanges = true;
+              }
+              if (sc.unread !== undefined && existing.unread !== sc.unread && activeChatId !== sc.id) {
+                existing.unread = sc.unread;
+                hasChanges = true;
+              }
+            }
+          }
+
+          if (hasChanges) {
+            const updated = Array.from(prevMap.values());
+            localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updated));
+            return updated;
+          }
+          return prev;
+        });
+      } catch {}
+    };
+
+    const interval = setInterval(refreshChats, 10000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isAuthenticated, activeChatId]);
+
   const handleUpdateChat = (chatId: string, updates: Partial<Chat>) => {
+    // Синхронизируем отправленное сообщение с сервером
+    if (
+      updates.messages &&
+      updates.messages.length > 0 &&
+      chatId !== 'chat_ai_oracle' &&
+      chatId !== 'ai_guru_bot'
+    ) {
+      const currentChat = chatList.find(c => c.id === chatId);
+      const oldLen = currentChat?.messages ? currentChat.messages.length : 0;
+      const newLen = updates.messages.length;
+      if (newLen > oldLen) {
+        const latestMsg = updates.messages[newLen - 1];
+        if (latestMsg && latestMsg.fromMe) {
+          api.chats.send(chatId, latestMsg.text || '', {
+            mediaUrl: latestMsg.mediaUrl,
+            mediaType: latestMsg.mediaType,
+            replyToId: latestMsg.replyToId,
+          }).then((res: any) => {
+            const canonicalChatId = res?.data?.chatId;
+            if (canonicalChatId && canonicalChatId !== chatId) {
+              setChatList(prev => prev.map(c => c.id === chatId ? { ...c, id: canonicalChatId } : c));
+              if (activeChatId === chatId) {
+                setActiveChatId(canonicalChatId);
+              }
+            }
+          }).catch(err => {
+            console.warn('Failed to send message to server:', err);
+          });
+        }
+      }
+    }
+
     setChatList(prev => {
       const updated = prev.map(c => {
         if (c.id === chatId) {
@@ -659,11 +851,9 @@ export function MessengerPage() {
           let recChats: Chat[] = recRaw ? JSON.parse(recRaw) : [];
           if (!Array.isArray(recChats)) recChats = [];
 
-          // Для получателя собеседник — это currentUser
           const partnerChatId = `chat_direct_${currentUser.id}`;
           const existingInRec = recChats.find(c => c.id === partnerChatId || c.user?.id === currentUser.id);
 
-          // Инвертируем флаг fromMe, чтобы отправленные сообщения отображались у получателя как входящие
           const invertedMsgs = (targetChat.messages || []).map(m => ({
             ...m,
             fromMe: !m.fromMe,

@@ -540,12 +540,41 @@ func initDB() {
 }
 
 // Хранилище аккаунтов и данных с постоянным сохранением на диск
+type StoredChat struct {
+	ID            string    `json:"id"`
+	IsGroup       bool      `json:"is_group"`
+	Title         string    `json:"title"`
+	Avatar        string    `json:"avatar"`
+	OwnerID       string    `json:"owner_id"`
+	Members       []string  `json:"members"`
+	LastMessage   string    `json:"last_message"`
+	LastMessageAt time.Time `json:"last_message_at"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type StoredMessage struct {
+	ID        string    `json:"id"`
+	ChatID    string    `json:"chat_id"`
+	SenderID  string    `json:"sender_id"`
+	ReplyToID string    `json:"reply_to_id,omitempty"`
+	Text      string    `json:"text"`
+	MediaURL  string    `json:"media_url,omitempty"`
+	MediaType string    `json:"media_type,omitempty"`
+	Status    string    `json:"status"`
+	IsRead    bool      `json:"is_read"`
+	CreatedAt time.Time `json:"created_at"`
+	Name      string    `json:"name,omitempty"`
+	AvatarURL string    `json:"avatar_url,omitempty"`
+}
+
 type UserStore struct {
 	mu            sync.RWMutex
 	accounts      map[string]AccountStoreEntry // key: userID
 	relationships map[string][]string          // key: followerID -> []targetID
 	posts         []Post                       // persistent list of posts
 	stories       []Story                      // persistent list of stories
+	chats         map[string]StoredChat        // key: chatID
+	messages      map[string][]StoredMessage   // key: chatID -> []StoredMessage
 }
 
 type PersistentData struct {
@@ -553,6 +582,8 @@ type PersistentData struct {
 	Relationships map[string][]string          `json:"relationships"`
 	Posts         []Post                       `json:"posts"`
 	Stories       []Story                      `json:"stories,omitempty"`
+	Chats         map[string]StoredChat        `json:"chats,omitempty"`
+	Messages      map[string][]StoredMessage   `json:"messages,omitempty"`
 }
 
 const storeFilePath = "data/social_network_store.json"
@@ -565,6 +596,8 @@ func (s *UserStore) saveToDisk() {
 		Relationships: make(map[string][]string, len(s.relationships)),
 		Posts:         make([]Post, len(s.posts)),
 		Stories:       make([]Story, len(s.stories)),
+		Chats:         make(map[string]StoredChat, len(s.chats)),
+		Messages:      make(map[string][]StoredMessage, len(s.messages)),
 	}
 	for k, v := range s.accounts {
 		data.Accounts[k] = v
@@ -576,6 +609,14 @@ func (s *UserStore) saveToDisk() {
 	}
 	copy(data.Posts, s.posts)
 	copy(data.Stories, s.stories)
+	for k, v := range s.chats {
+		data.Chats[k] = v
+	}
+	for k, v := range s.messages {
+		msgCopy := make([]StoredMessage, len(v))
+		copy(msgCopy, v)
+		data.Messages[k] = msgCopy
+	}
 
 	// Асинхронная запись на диск в фоновой горутине — не блокирует s.mu для других запросов
 	go func(d PersistentData) {
@@ -642,7 +683,13 @@ func (s *UserStore) loadFromDisk() {
 	if data.Stories != nil {
 		s.stories = data.Stories
 	}
-	log.Printf("📦 Успешно загружено из локального хранилища %s: %d аккаунтов, %d постов, %d историй", storeFilePath, len(s.accounts), len(s.posts), len(s.stories))
+	if data.Chats != nil {
+		s.chats = data.Chats
+	}
+	if data.Messages != nil {
+		s.messages = data.Messages
+	}
+	log.Printf("📦 Успешно загружено из локального хранилища %s: %d аккаунтов, %d постов, %d историй, %d чатов", storeFilePath, len(s.accounts), len(s.posts), len(s.stories), len(s.chats))
 }
 
 var store = &UserStore{
@@ -650,6 +697,8 @@ var store = &UserStore{
 	relationships: make(map[string][]string),
 	posts:         make([]Post, 0),
 	stories:       make([]Story, 0),
+	chats:         make(map[string]StoredChat),
+	messages:      make(map[string][]StoredMessage),
 }
 
 // mockUsers защищён мьютексом от конкурентного доступа
@@ -1897,32 +1946,153 @@ func handleChats(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Авторизация требуется"})
 		return
 	}
+
 	chats := make([]map[string]interface{}, 0)
-	if db != nil {
-		rows, err := db.Query(`
-			SELECT c.id,
+	chatIDsSeen := make(map[string]bool)
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+
+	if dbConn != nil {
+		rows, err := dbConn.Query(`
+			SELECT 
+				c.id,
 				CASE WHEN c.is_channel THEN 'channel' WHEN c.is_group THEN 'group' ELSE 'direct' END as chat_type,
-				c.title,
-				COALESCE(NULLIF(c.last_message, ''), (SELECT content FROM messages WHERE chat_id = c.id ORDER BY created_at DESC LIMIT 1), '') as last_msg,
-				COALESCE((SELECT COUNT(*) FROM messages WHERE chat_id = c.id AND sender_id != $1 AND is_read = false), 0) as unread
+				c.is_group,
+				COALESCE(NULLIF(c.title, ''), other_u.name, 'Чат') as title,
+				COALESCE(NULLIF(c.avatar, ''), other_u.avatar, '') as avatar,
+				COALESCE(NULLIF(c.last_message, ''), (SELECT text FROM messages WHERE chat_id = c.id ORDER BY created_at DESC LIMIT 1), '') as last_msg,
+				COALESCE(c.last_message_at, c.created_at, NOW()) as last_msg_at,
+				COALESCE((SELECT COUNT(*) FROM messages WHERE chat_id = c.id AND sender_id != $1 AND is_read = false), 0) as unread,
+				COALESCE(other_u.id, '') as other_id,
+				COALESCE(other_u.name, '') as other_name,
+				COALESCE(other_u.username, '') as other_username,
+				COALESCE(other_u.avatar, '') as other_avatar,
+				COALESCE(other_u.online, false) as other_online,
+				other_u.last_seen as other_last_seen
 			FROM chats c
-			JOIN chat_members cm ON c.id = cm.chat_id
-			WHERE cm.user_id = $1
-			ORDER BY c.last_message_at DESC
+			JOIN chat_members cm ON c.id = cm.chat_id AND cm.user_id = $1
+			LEFT JOIN chat_members other_cm ON c.id = other_cm.chat_id AND other_cm.user_id != $1 AND c.is_group = false
+			LEFT JOIN users other_u ON other_cm.user_id = other_u.id
+			ORDER BY COALESCE(c.last_message_at, c.created_at) DESC
 		`, claims.UserID)
+
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
-				var id, chatType, name, lastMsg string
-				var unread int
-				if err := rows.Scan(&id, &chatType, &name, &lastMsg, &unread); err == nil {
-					chats = append(chats, map[string]interface{}{"id": id, "type": chatType, "name": name, "lastMessage": lastMsg, "unread": unread})
+				var (
+					id, chatType, title, avatar, lastMsg string
+					isGroup                              bool
+					lastMsgAt                            time.Time
+					unread                               int
+					otherID, otherName, otherUsername, otherAvatar string
+					otherOnline                          bool
+					otherLastSeen                        sql.NullTime
+				)
+				if err := rows.Scan(&id, &chatType, &isGroup, &title, &avatar, &lastMsg, &lastMsgAt, &unread, &otherID, &otherName, &otherUsername, &otherAvatar, &otherOnline, &otherLastSeen); err == nil {
+					chatIDsSeen[id] = true
+					var ls time.Time
+					if otherLastSeen.Valid {
+						ls = otherLastSeen.Time
+					}
+					isOnline := isUserOnline(otherID, otherOnline, ls)
+
+					chatObj := map[string]interface{}{
+						"id":          id,
+						"type":        chatType,
+						"isGroup":     isGroup,
+						"name":        title,
+						"avatar":      avatar,
+						"lastMessage": lastMsg,
+						"time":        formatTimeAgo(lastMsgAt),
+						"unread":      unread,
+					}
+					if otherID != "" {
+						chatObj["user"] = map[string]interface{}{
+							"id":           otherID,
+							"name":         otherName,
+							"username":     otherUsername,
+							"avatar":       otherAvatar,
+							"online":       isOnline,
+							"lastSeen":     ls,
+							"lastSeenText": formatLastSeen(ls, isOnline),
+						}
+					}
+					chats = append(chats, chatObj)
 				}
 			}
-			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: chats})
-			return
 		}
 	}
+
+	// Дополняем данными из store (для чатов в памяти / резервной копии)
+	store.mu.RLock()
+	for cID, sc := range store.chats {
+		if chatIDsSeen[cID] {
+			continue
+		}
+		isMember := false
+		var otherID string
+		for _, m := range sc.Members {
+			if m == claims.UserID {
+				isMember = true
+			} else {
+				otherID = m
+			}
+		}
+		if !isMember && sc.OwnerID != claims.UserID {
+			continue
+		}
+
+		chatIDsSeen[cID] = true
+		otherUser := User{ID: otherID, Name: sc.Title, Avatar: sc.Avatar}
+		if acc, ok := store.accounts[otherID]; ok {
+			otherUser = acc.User
+		}
+
+		// Вычисляем непрочитанные
+		unread := 0
+		lastMsg := sc.LastMessage
+		lastTime := sc.LastMessageAt
+		if msgs, ok := store.messages[cID]; ok && len(msgs) > 0 {
+			lm := msgs[len(msgs)-1]
+			lastMsg = lm.Text
+			lastTime = lm.CreatedAt
+			for _, m := range msgs {
+				if m.SenderID != claims.UserID && !m.IsRead {
+					unread++
+				}
+			}
+		}
+
+		var parsedLastSeen time.Time
+		if otherUser.LastSeen != "" {
+			parsedLastSeen, _ = time.Parse(time.RFC3339, otherUser.LastSeen)
+		}
+		isOnline := isUserOnline(otherUser.ID, otherUser.Online, parsedLastSeen)
+		chatObj := map[string]interface{}{
+			"id":          cID,
+			"type":        "direct",
+			"isGroup":     sc.IsGroup,
+			"name":        otherUser.Name,
+			"avatar":      otherUser.Avatar,
+			"lastMessage": lastMsg,
+			"time":        formatTimeAgo(lastTime),
+			"unread":      unread,
+			"user": map[string]interface{}{
+				"id":           otherUser.ID,
+				"name":         otherUser.Name,
+				"username":     otherUser.Username,
+				"avatar":       otherUser.Avatar,
+				"online":       isOnline,
+				"lastSeen":     otherUser.LastSeen,
+				"lastSeenText": formatLastSeen(parsedLastSeen, isOnline),
+			},
+		}
+		chats = append(chats, chatObj)
+	}
+	store.mu.RUnlock()
+
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: chats})
 }
 
@@ -5580,6 +5750,132 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// resolveDirectChat находит или создает детерминированный диалог между двумя пользователями
+func resolveDirectChat(currentUserID, targetUserOrID string) (canonicalChatID string, realTargetID string, targetName string, targetAvatar string, targetUsername string) {
+	currentUserID = strings.TrimSpace(currentUserID)
+	targetUserOrID = strings.TrimPrefix(strings.TrimSpace(targetUserOrID), "@")
+	if currentUserID == "" || targetUserOrID == "" {
+		return "", "", "", "", ""
+	}
+
+	realTargetID = targetUserOrID
+	targetName = targetUserOrID
+	targetUsername = targetUserOrID
+
+	// 1. Поиск профиля собеседника в PostgreSQL или store.accounts
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+
+	if dbConn != nil {
+		var (
+			uID, uName, uUsername, uAvatar sql.NullString
+		)
+		err := dbConn.QueryRow(`
+			SELECT id, name, username, avatar 
+			FROM users 
+			WHERE id = $1 OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($1, '@', '')) 
+			LIMIT 1
+		`, targetUserOrID).Scan(&uID, &uName, &uUsername, &uAvatar)
+		if err == nil {
+			if uID.Valid && uID.String != "" {
+				realTargetID = uID.String
+			}
+			if uName.Valid && uName.String != "" {
+				targetName = uName.String
+			}
+			if uUsername.Valid && uUsername.String != "" {
+				targetUsername = uUsername.String
+			}
+			if uAvatar.Valid && uAvatar.String != "" {
+				targetAvatar = uAvatar.String
+			}
+		}
+	}
+
+	if realTargetID == targetUserOrID {
+		store.mu.RLock()
+		for id, acc := range store.accounts {
+			if id == targetUserOrID || strings.EqualFold(strings.TrimPrefix(acc.User.Username, "@"), targetUserOrID) {
+				realTargetID = acc.User.ID
+				if acc.User.Name != "" {
+					targetName = acc.User.Name
+				}
+				if acc.User.Username != "" {
+					targetUsername = acc.User.Username
+				}
+				if acc.User.Avatar != "" {
+					targetAvatar = acc.User.Avatar
+				}
+				break
+			}
+		}
+		store.mu.RUnlock()
+	}
+
+	// 2. Детерминированный ID чата (гарантирует одинаковый ID для обоих собеседников)
+	u1, u2 := currentUserID, realTargetID
+	if u1 > u2 {
+		u1, u2 = u2, u1
+	}
+	canonicalChatID = "direct_" + u1 + "_" + u2
+
+	// 3. Синхронизация в PostgreSQL
+	if dbConn != nil {
+		var existingID string
+		err := dbConn.QueryRow(`
+			SELECT c.id FROM chats c
+			JOIN chat_members m1 ON c.id = m1.chat_id AND m1.user_id = $1
+			JOIN chat_members m2 ON c.id = m2.chat_id AND m2.user_id = $2
+			WHERE c.is_group = false LIMIT 1
+		`, currentUserID, realTargetID).Scan(&existingID)
+
+		if err == nil && existingID != "" {
+			canonicalChatID = existingID
+		} else {
+			_, _ = dbConn.Exec(`
+				INSERT INTO chats (id, is_group, is_channel, title, avatar, owner_id, last_message_at, created_at)
+				VALUES ($1, false, false, '', '', $2, NOW(), NOW())
+				ON CONFLICT (id) DO NOTHING
+			`, canonicalChatID, currentUserID)
+
+			_, _ = dbConn.Exec(`
+				INSERT INTO chat_members (chat_id, user_id, role)
+				VALUES ($1, $2, 'member')
+				ON CONFLICT (chat_id, user_id) DO NOTHING
+			`, canonicalChatID, currentUserID)
+
+			_, _ = dbConn.Exec(`
+				INSERT INTO chat_members (chat_id, user_id, role)
+				VALUES ($1, $2, 'member')
+				ON CONFLICT (chat_id, user_id) DO NOTHING
+			`, canonicalChatID, realTargetID)
+		}
+	}
+
+	// 4. Синхронизация в памяти (store)
+	store.mu.Lock()
+	if store.chats == nil {
+		store.chats = make(map[string]StoredChat)
+	}
+	if _, ok := store.chats[canonicalChatID]; !ok {
+		store.chats[canonicalChatID] = StoredChat{
+			ID:            canonicalChatID,
+			IsGroup:       false,
+			Title:         targetName,
+			Avatar:        targetAvatar,
+			OwnerID:       currentUserID,
+			Members:       []string{currentUserID, realTargetID},
+			LastMessageAt: time.Now(),
+			CreatedAt:     time.Now(),
+		}
+		store.saveToDisk()
+	}
+	store.mu.Unlock()
+
+	return canonicalChatID, realTargetID, targetName, targetAvatar, targetUsername
+}
+
 // GET /api/chats/{id}/messages — get messages for a chat
 func handleGetMessages(w http.ResponseWriter, r *http.Request) {
 	token := extractBearerToken(r)
@@ -5595,63 +5891,95 @@ func handleGetMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Если передан direct-чат (например chat_direct_dair или chat_direct_user123)
+	if strings.HasPrefix(chatID, "chat_direct_") {
+		target := strings.TrimPrefix(chatID, "chat_direct_")
+		canonicalID, _, _, _, _ := resolveDirectChat(claims.UserID, target)
+		if canonicalID != "" {
+			chatID = canonicalID
+		}
+	}
+
+	messages := make([]map[string]interface{}, 0)
+
 	dbMu.RLock()
 	dbConn := db
 	dbMu.RUnlock()
-	if dbConn == nil {
-		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
-		return
-	}
 
-	var isMember bool
-	err = dbConn.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2)`, chatID, claims.UserID).Scan(&isMember)
-	if err != nil || !isMember {
-		var isOwner bool
-		_ = dbConn.QueryRow(`SELECT EXISTS(SELECT 1 FROM chats WHERE id = $1 AND owner_id = $2)`, chatID, claims.UserID).Scan(&isOwner)
-		if !isOwner {
-			writeJSON(w, 403, Response{Status: "error", Message: "access denied: not a chat member"})
-			return
+	if dbConn != nil {
+		rows, err := dbConn.Query(`
+			SELECT m.id, m.text, COALESCE(m.media_url, ''), COALESCE(m.media_type, 'text'), 
+			       m.sender_id, m.created_at, m.is_read, COALESCE(m.status, 'delivered'),
+			       COALESCE(u.name, ''), COALESCE(u.avatar, '')
+			FROM messages m 
+			LEFT JOIN users u ON m.sender_id = u.id 
+			WHERE m.chat_id = $1 
+			ORDER BY m.created_at ASC LIMIT 300`, chatID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var (
+					id, text, mediaUrl, mediaType, senderId, status, name, avatarUrl string
+					createdAt                                                        time.Time
+					isRead                                                           bool
+				)
+				if err := rows.Scan(&id, &text, &mediaUrl, &mediaType, &senderId, &createdAt, &isRead, &status, &name, &avatarUrl); err == nil {
+					isMe := senderId == claims.UserID
+					if isRead {
+						status = "read"
+					}
+					messages = append(messages, map[string]interface{}{
+						"id":         id,
+						"text":       text,
+						"mediaUrl":   mediaUrl,
+						"mediaType":  mediaType,
+						"senderId":   senderId,
+						"fromMe":     isMe,
+						"time":       createdAt.Format("15:04"),
+						"created_at": createdAt,
+						"isRead":     isRead,
+						"status":     status,
+						"user": map[string]interface{}{
+							"name":   name,
+							"avatar": avatarUrl,
+						},
+					})
+				}
+			}
+
+			// Помечаем прочитанными в Postgres
+			_, _ = dbConn.Exec(`UPDATE messages SET is_read = true, status = 'read' WHERE chat_id = $1 AND sender_id != $2 AND is_read = false`, chatID, claims.UserID)
+			_, _ = dbConn.Exec(`UPDATE chat_members SET unread_count = 0 WHERE chat_id = $1 AND user_id = $2`, chatID, claims.UserID)
 		}
 	}
 
-	rows, err := dbConn.Query(`
-		SELECT m.id, m.text, m.media_url, m.media_type, m.sender_id, m.created_at, m.is_read, u.name, u.avatar
-		FROM messages m 
-		JOIN users u ON m.sender_id = u.id 
-		WHERE m.chat_id = $1 
-		ORDER BY m.created_at ASC LIMIT 100`, chatID)
-	if err != nil {
-		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
-		return
-	}
-	defer rows.Close()
-
-	messages := make([]map[string]interface{}, 0)
-	for rows.Next() {
-		var (
-			id, text, mediaUrl, mediaType, senderId, name, avatarUrl sql.NullString
-			createdAt                                                  time.Time
-			isRead                                                     bool
-		)
-		if err := rows.Scan(&id, &text, &mediaUrl, &mediaType, &senderId, &createdAt, &isRead, &name, &avatarUrl); err != nil {
-			continue
+	// Если сообщений в Postgres нет (или db == nil), берем из store
+	if len(messages) == 0 {
+		store.mu.Lock()
+		if msgs, ok := store.messages[chatID]; ok {
+			for i := range msgs {
+				if msgs[i].SenderID != claims.UserID {
+					msgs[i].IsRead = true
+					msgs[i].Status = "read"
+				}
+				isMe := msgs[i].SenderID == claims.UserID
+				messages = append(messages, map[string]interface{}{
+					"id":         msgs[i].ID,
+					"text":       msgs[i].Text,
+					"mediaUrl":   msgs[i].MediaURL,
+					"mediaType":  msgs[i].MediaType,
+					"senderId":   msgs[i].SenderID,
+					"fromMe":     isMe,
+					"time":       msgs[i].CreatedAt.Format("15:04"),
+					"created_at": msgs[i].CreatedAt,
+					"isRead":     msgs[i].IsRead,
+					"status":     msgs[i].Status,
+				})
+			}
+			store.messages[chatID] = msgs
 		}
-		messages = append(messages, map[string]interface{}{
-			"id":         id.String,
-			"text":       text.String,
-			"media_url":  mediaUrl.String,
-			"media_type": mediaType.String,
-			"sender_id":  senderId.String,
-			"created_at": createdAt,
-			"is_read":    isRead,
-			"name":       name.String,
-			"avatar_url": avatarUrl.String,
-		})
+		store.mu.Unlock()
 	}
-
-	// Mark messages as read where sender_id != currentUser
-	dbConn.Exec(`UPDATE messages SET is_read = true, status = 'read' WHERE chat_id = $1 AND sender_id != $2 AND is_read = false`, chatID, claims.UserID)
-	dbConn.Exec(`UPDATE chat_members SET unread_count = 0 WHERE chat_id = $1 AND user_id = $2`, chatID, claims.UserID)
 
 	writeJSON(w, 200, Response{Status: "ok", Data: messages})
 }
@@ -5666,6 +5994,10 @@ func handleSendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chatID := r.PathValue("id")
+	if chatID == "" {
+		writeJSON(w, 400, Response{Status: "error", Message: "chat id required"})
+		return
+	}
 
 	var req struct {
 		Text      string `json:"text"`
@@ -5678,39 +6010,85 @@ func handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbMu.RLock()
-	dbConn := db
-	dbMu.RUnlock()
-	if dbConn == nil {
-		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
-		return
-	}
-
-	var isMember bool
-	err = dbConn.QueryRow(`SELECT EXISTS(SELECT 1 FROM chat_members WHERE chat_id = $1 AND user_id = $2)`, chatID, claims.UserID).Scan(&isMember)
-	if err != nil || !isMember {
-		var isOwner bool
-		_ = dbConn.QueryRow(`SELECT EXISTS(SELECT 1 FROM chats WHERE id = $1 AND owner_id = $2)`, chatID, claims.UserID).Scan(&isOwner)
-		if !isOwner {
-			writeJSON(w, 403, Response{Status: "error", Message: "access denied: not a chat member"})
-			return
+	// Если передан direct-чат (например chat_direct_dair)
+	if strings.HasPrefix(chatID, "chat_direct_") {
+		target := strings.TrimPrefix(chatID, "chat_direct_")
+		canonicalID, _, _, _, _ := resolveDirectChat(claims.UserID, target)
+		if canonicalID != "" {
+			chatID = canonicalID
 		}
 	}
 
 	msgID := uuid.New().String()
-	_, err = dbConn.Exec(`
-		INSERT INTO messages (id, chat_id, sender_id, reply_to_id, text, media_url, media_type, status, is_read, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, 'sent', false, NOW())
-	`, msgID, chatID, claims.UserID, req.ReplyToId, req.Text, req.MediaUrl, req.MediaType)
-	if err != nil {
-		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
-		return
+	now := time.Now()
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+
+	if dbConn != nil {
+		// Убедимся, что чат и участники существуют
+		_, _ = dbConn.Exec(`
+			INSERT INTO chats (id, is_group, owner_id, last_message, last_message_at, created_at)
+			VALUES ($1, false, $2, $3, NOW(), NOW())
+			ON CONFLICT (id) DO UPDATE SET last_message = $3, last_message_at = NOW()
+		`, chatID, claims.UserID, req.Text)
+
+		_, _ = dbConn.Exec(`
+			INSERT INTO chat_members (chat_id, user_id, role)
+			VALUES ($1, $2, 'member')
+			ON CONFLICT (chat_id, user_id) DO NOTHING
+		`, chatID, claims.UserID)
+
+		_, _ = dbConn.Exec(`
+			INSERT INTO messages (id, chat_id, sender_id, reply_to_id, text, media_url, media_type, status, is_read, created_at)
+			VALUES ($1, $2, $3, NULLIF($4, ''), $5, $6, $7, 'delivered', false, NOW())
+		`, msgID, chatID, claims.UserID, req.ReplyToId, req.Text, req.MediaUrl, req.MediaType)
+
+		_, _ = dbConn.Exec(`UPDATE chat_members SET unread_count = unread_count + 1 WHERE chat_id = $1 AND user_id != $2`, chatID, claims.UserID)
 	}
 
-	dbConn.Exec(`UPDATE chats SET last_message = $1, last_message_at = NOW() WHERE id = $2`, req.Text, chatID)
-	dbConn.Exec(`UPDATE chat_members SET unread_count = unread_count + 1 WHERE chat_id = $1 AND user_id != $2`, chatID, claims.UserID)
+	// Сохраняем в in-memory store для мгновенного доступа
+	store.mu.Lock()
+	if store.messages == nil {
+		store.messages = make(map[string][]StoredMessage)
+	}
+	newStoredMsg := StoredMessage{
+		ID:        msgID,
+		ChatID:    chatID,
+		SenderID:  claims.UserID,
+		ReplyToID: req.ReplyToId,
+		Text:      req.Text,
+		MediaURL:  req.MediaUrl,
+		MediaType: req.MediaType,
+		Status:    "delivered",
+		IsRead:    false,
+		CreatedAt: now,
+	}
+	store.messages[chatID] = append(store.messages[chatID], newStoredMsg)
 
-	writeJSON(w, 200, Response{Status: "ok", Data: map[string]string{"id": msgID}})
+	if c, ok := store.chats[chatID]; ok {
+		c.LastMessage = req.Text
+		c.LastMessageAt = now
+		store.chats[chatID] = c
+	}
+	store.saveToDisk()
+	store.mu.Unlock()
+
+	writeJSON(w, 200, Response{
+		Status: "ok",
+		Data: map[string]interface{}{
+			"id":        msgID,
+			"chatId":    chatID,
+			"text":      req.Text,
+			"mediaUrl":  req.MediaUrl,
+			"mediaType": req.MediaType,
+			"senderId":  claims.UserID,
+			"fromMe":    true,
+			"time":      now.Format("15:04"),
+			"status":    "delivered",
+		},
+	})
 }
 
 // POST /api/chats/direct — create or get direct chat
@@ -5725,46 +6103,29 @@ func handleCreateDirectChat(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		UserId string `json:"userId"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.UserId == "" {
+		writeJSON(w, 400, Response{Status: "error", Message: "userId required"})
 		return
 	}
 
-	dbMu.RLock()
-	dbConn := db
-	dbMu.RUnlock()
-	if dbConn == nil {
-		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+	canonicalID, targetID, targetName, targetAvatar, targetUsername := resolveDirectChat(claims.UserID, req.UserId)
+	if canonicalID == "" {
+		writeJSON(w, 400, Response{Status: "error", Message: "cannot create chat with this user"})
 		return
 	}
 
-	var chatID string
-	err = dbConn.QueryRow(`
-		SELECT c.id 
-		FROM chats c
-		JOIN chat_members m1 ON c.id = m1.chat_id
-		JOIN chat_members m2 ON c.id = m2.chat_id
-		WHERE c.is_group = false AND m1.user_id = $1 AND m2.user_id = $2
-		LIMIT 1
-	`, claims.UserID, req.UserId).Scan(&chatID)
-
-	if err == sql.ErrNoRows {
-		chatID = uuid.New().String()
-		_, err = dbConn.Exec(`INSERT INTO chats (id, is_group, owner_id) VALUES ($1, false, $2)`, chatID, claims.UserID)
-		if err != nil {
-			writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
-			return
-		}
-		dbConn.Exec(`INSERT INTO chat_members (chat_id, user_id, role) VALUES ($1, $2, 'member')`, chatID, claims.UserID)
-		if claims.UserID != req.UserId {
-			dbConn.Exec(`INSERT INTO chat_members (chat_id, user_id, role) VALUES ($1, $2, 'member')`, chatID, req.UserId)
-		}
-	} else if err != nil {
-		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
-		return
-	}
-
-	writeJSON(w, 200, Response{Status: "ok", Data: map[string]string{"id": chatID}})
+	writeJSON(w, 200, Response{
+		Status: "ok",
+		Data: map[string]interface{}{
+			"id": canonicalID,
+			"user": map[string]interface{}{
+				"id":       targetID,
+				"name":     targetName,
+				"username": targetUsername,
+				"avatar":   targetAvatar,
+			},
+		},
+	})
 }
 
 // POST /api/chats/{id}/read — mark messages as read  
@@ -5777,17 +6138,34 @@ func handleMarkRead(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chatID := r.PathValue("id")
+	if strings.HasPrefix(chatID, "chat_direct_") {
+		target := strings.TrimPrefix(chatID, "chat_direct_")
+		canonicalID, _, _, _, _ := resolveDirectChat(claims.UserID, target)
+		if canonicalID != "" {
+			chatID = canonicalID
+		}
+	}
 
 	dbMu.RLock()
 	dbConn := db
 	dbMu.RUnlock()
-	if dbConn == nil {
-		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
-		return
+
+	if dbConn != nil {
+		_, _ = dbConn.Exec(`UPDATE messages SET is_read = true, status = 'read' WHERE chat_id = $1 AND sender_id != $2`, chatID, claims.UserID)
+		_, _ = dbConn.Exec(`UPDATE chat_members SET unread_count = 0 WHERE chat_id = $1 AND user_id = $2`, chatID, claims.UserID)
 	}
 
-	dbConn.Exec(`UPDATE messages SET is_read = true, status = 'read' WHERE chat_id = $1 AND sender_id != $2`, chatID, claims.UserID)
-	dbConn.Exec(`UPDATE chat_members SET unread_count = 0 WHERE chat_id = $1 AND user_id = $2`, chatID, claims.UserID)
+	store.mu.Lock()
+	if msgs, ok := store.messages[chatID]; ok {
+		for i := range msgs {
+			if msgs[i].SenderID != claims.UserID {
+				msgs[i].IsRead = true
+				msgs[i].Status = "read"
+			}
+		}
+		store.messages[chatID] = msgs
+	}
+	store.mu.Unlock()
 
 	writeJSON(w, 200, Response{Status: "ok"})
 }

@@ -124,7 +124,9 @@ export const api = {
   chats: {
     list: () => apiFetch<any>('/api/chats'),
     messages: (id: string) => apiFetch<any>(`/api/chats/${id}/messages`),
-    send: (id: string, text: string) => apiFetch<any>(`/api/chats/${id}/messages`, { method: 'POST', body: JSON.stringify({ text }) })
+    send: (id: string, text: string, extra?: any) => apiFetch<any>(`/api/chats/${id}/messages`, { method: 'POST', body: JSON.stringify({ text, ...extra }) }),
+    direct: (userId: string) => apiFetch<any>('/api/chats/direct', { method: 'POST', body: JSON.stringify({ userId }) }),
+    read: (id: string) => apiFetch<any>(`/api/chats/${id}/read`, { method: 'POST' }),
   },
   podcasts: {
     list: () => apiFetch<any>('/api/podcasts')
