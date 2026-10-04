@@ -4748,10 +4748,11 @@ type aiChatRequest struct {
 // Дополнение к системному промпту для живого голосового разговора
 const oracleVoicePrompt = `
 
-ВАЖНО: сейчас идёт ЖИВОЙ ГОЛОСОВОЙ разговор, твой ответ будет озвучен вслух.
-- Отвечай коротко и по-человечески: 1–3 предложения, как в настоящей беседе.
-- Никакого markdown, списков, заголовков, эмодзи и ссылок.
-- Говори тепло, естественно, разговорным языком, можно задать встречный вопрос.`
+ВАЖНО: сейчас идёт ЖИВОЙ ГОЛОСОВОЙ диалог, твой ответ озвучивается пользователю вслух через динамик.
+- Отвечай МГНОВЕННО и КРАТКО: строго 1–2 живых предложения (до 20-25 слов максимум).
+- Сразу к сути мысли, без вводных фраз и пауз.
+- Категорически запрещены любые списки, markdown, спецсимволы, смайлы, латиница.
+- Общайся тепло, дружелюбно, как настоящий чуткий собеседник.`
 
 func handleAIChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -4821,9 +4822,25 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 
 	sysPrompt := oracleSystemPrompt
 	maxTokens := 8192
+	models := []string{"gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.8-flash"}
+	var thinkingConfig map[string]interface{}
+
 	if req.Voice {
 		sysPrompt += oracleVoicePrompt
-		maxTokens = 1024
+		maxTokens = 200 // Короткие ответы: минимальное время генерации и мгновенный TTS
+		thinkingConfig = map[string]interface{}{
+			"thinkingBudget": 0, // Без задержки на длительное размышление
+		}
+		models = []string{"gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.8-flash"} // Сверхбыстрая flash модель
+	}
+
+	genConfig := map[string]interface{}{
+		"temperature":     0.7,
+		"topP":            0.9,
+		"maxOutputTokens": maxTokens,
+	}
+	if thinkingConfig != nil {
+		genConfig["thinkingConfig"] = thinkingConfig
 	}
 
 	geminiBody := map[string]interface{}{
@@ -4831,23 +4848,19 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		"systemInstruction": map[string]interface{}{
 			"parts": []map[string]string{{"text": sysPrompt}},
 		},
-		"generationConfig": map[string]interface{}{
-			"temperature":     0.8,
-			"topP":            0.95,
-			"maxOutputTokens": maxTokens,
-		},
+		"generationConfig": genConfig,
 	}
 
 	bodyBytes, _ := json.Marshal(geminiBody)
-
-	// Список моделей: основная + fallback
-	models := []string{"gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.8-flash"}
 	var lastErr string
 
 	for _, model := range models {
 		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey)
-
-		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		reqTimeout := 25 * time.Second
+		if req.Voice {
+			reqTimeout = 10 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), reqTimeout)
 
 		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
 		if err != nil {
@@ -5352,7 +5365,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 				"role": "user",
 				"parts": []interface{}{
 					map[string]string{
-						"text": "Транскрибируй эту русскую речь дословно. Напиши в точности сказанные слова. Выведи ТОЛЬКО текст речи, без кавычек, пояснений, префиксов и форматирования. Если в аудио тишина или шум без членораздельной речи — выведи пустую строку.",
+						"text": "Транскрибируй русскую речь из аудио. Напиши только распознанные слова без кавычек, префиксов и комментариев. Если звуков членораздельной речи нет — выведи пустую строку.",
 					},
 					audioPart,
 				},
@@ -5360,7 +5373,10 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		},
 		"generationConfig": map[string]interface{}{
 			"temperature":     0.0,
-			"maxOutputTokens": 512,
+			"maxOutputTokens": 128,
+			"thinkingConfig": map[string]interface{}{
+				"thinkingBudget": 0,
+			},
 		},
 	}
 
@@ -5391,7 +5407,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 	for _, at := range attempts {
 		bodyBytes, _ := json.Marshal(at.body)
 		apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", at.model, apiKey)
-		ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 7*time.Second)
 		httpReq, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
 		if err != nil {
 			cancel()

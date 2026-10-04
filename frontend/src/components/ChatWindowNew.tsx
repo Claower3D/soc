@@ -811,6 +811,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       const ttsUrl = `${API_BASE_URL}/api/ai/tts?text=${encodeURIComponent(clean)}&lang=ru&voice=Sulafat`;
       const audio = new Audio(ttsUrl);
       audio.volume = isSpeakerLoudRef.current ? 1.0 : 0.45;
+      audio.playbackRate = 1.06;
       ttsAudioRef.current = audio;
 
       // Синхронизация караоке-субтитров по прогрессу реального аудио
@@ -894,7 +895,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           recordedVoiceChunksRef.current.push(e.data);
         }
       };
-      rec.start(200); // 200ms слайсы для быстрого извлечения
+      rec.start(80); // 80ms слайсы для мгновенного сбора аудио
       voiceRecorderRef.current = rec;
     } catch (e) {
       console.warn('Voice MediaRecorder error:', e);
@@ -924,7 +925,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
         if (status === 'listening' && !isMicMutedRef.current) {
           level = Math.min(1, avg * 3.4);
-          const isSoundActive = avg > 0.035;
+          const isSoundActive = avg > 0.032;
 
           if (isSoundActive) {
             hasSpokenInTurnRef.current = true;
@@ -936,16 +937,16 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               silenceTimerRef.current = null;
             }
           } else if (hasSpokenInTurnRef.current) {
-            // Пользователь говорил и замолчал — отсчитываем паузу 1.1с
+            // Пользователь закончил говорить — быстрая реакция на паузу (650мс)
             const silenceElapsed = Date.now() - lastSpokenTimeRef.current;
-            if (silenceElapsed > 1100 && !silenceTimerRef.current && !isProcessingSTTRef.current) {
+            if (silenceElapsed > 650 && !silenceTimerRef.current && !isProcessingSTTRef.current) {
               silenceTimerRef.current = setTimeout(() => {
                 if (voiceStatusRef.current === 'listening' && hasSpokenInTurnRef.current) {
                   hasSpokenInTurnRef.current = false;
                   setIsUserTalking(false);
                   commitVoicePhrase();
                 }
-              }, 200);
+              }, 50);
             }
           }
         }
@@ -1030,7 +1031,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               setIsUserTalking(false);
               commitVoicePhrase();
             }
-          }, 1100);
+          }, 650);
         }
       };
 
@@ -1089,7 +1090,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         voiceStatusRef.current = 'thinking';
         setVoiceStatus('thinking');
 
-        // Корректно завершаем текущую запись с ожиданием финального чанка
+        // Корректно завершаем текущую запись с быстрым сбросом финального чанка
         await new Promise<void>((resolve) => {
           let resolved = false;
           const done = () => {
@@ -1109,7 +1110,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           } catch {
             done();
           }
-          setTimeout(done, 250);
+          setTimeout(done, 100);
         });
 
         const chunks = [...recordedVoiceChunksRef.current];
@@ -1123,13 +1124,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         const mime = currentRec.mimeType || 'audio/webm';
         const audioBlob = new Blob(chunks, { type: mime });
 
-        if (audioBlob.size > 500) {
+        if (audioBlob.size > 250) {
           const formData = new FormData();
           const ext = mime.includes('ogg') ? 'speech.ogg' : mime.includes('mp4') ? 'speech.mp4' : 'speech.webm';
           formData.append('audio', audioBlob, ext);
 
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000);
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
 
           try {
             const resp = await fetch(`${API_BASE_URL}/api/ai/stt`, {
