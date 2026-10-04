@@ -4738,11 +4738,20 @@ const oracleSystemPrompt = `Ты — ИИ Оракул, мудрый цифро�
 
 type aiChatRequest struct {
 	Message string `json:"message"`
+	Voice   bool   `json:"voice"`
 	History []struct {
 		Role string `json:"role"`
 		Text string `json:"text"`
 	} `json:"history"`
 }
+
+// Дополнение к системному промпту для живого голосового разговора
+const oracleVoicePrompt = `
+
+ВАЖНО: сейчас идёт ЖИВОЙ ГОЛОСОВОЙ разговор, твой ответ будет озвучен вслух.
+- Отвечай коротко и по-человечески: 1–3 предложения, как в настоящей беседе.
+- Никакого markdown, списков, заголовков, эмодзи и ссылок.
+- Говори тепло, естественно, разговорным языком, можно задать встречный вопрос.`
 
 func handleAIChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -4779,12 +4788,21 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 	contents := []map[string]interface{}{}
 
 	// Добавляем историю диалога (последние 10 сообщений)
+	history := req.History
+	// Фронтенд иногда кладёт текущее сообщение и в историю — убираем дубль
+	if n := len(history); n > 0 && history[n-1].Role != "assistant" && history[n-1].Role != "model" &&
+		strings.TrimSpace(history[n-1].Text) == strings.TrimSpace(req.Message) {
+		history = history[:n-1]
+	}
 	historyLimit := 10
 	startIdx := 0
-	if len(req.History) > historyLimit {
-		startIdx = len(req.History) - historyLimit
+	if len(history) > historyLimit {
+		startIdx = len(history) - historyLimit
 	}
-	for _, h := range req.History[startIdx:] {
+	for _, h := range history[startIdx:] {
+		if strings.TrimSpace(h.Text) == "" {
+			continue
+		}
 		role := "user"
 		if h.Role == "assistant" || h.Role == "model" {
 			role = "model"
@@ -4801,22 +4819,29 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		"parts": []map[string]string{{"text": req.Message}},
 	})
 
+	sysPrompt := oracleSystemPrompt
+	maxTokens := 8192
+	if req.Voice {
+		sysPrompt += oracleVoicePrompt
+		maxTokens = 1024
+	}
+
 	geminiBody := map[string]interface{}{
 		"contents": contents,
 		"systemInstruction": map[string]interface{}{
-			"parts": []map[string]string{{"text": oracleSystemPrompt}},
+			"parts": []map[string]string{{"text": sysPrompt}},
 		},
 		"generationConfig": map[string]interface{}{
 			"temperature":     0.8,
 			"topP":            0.95,
-			"maxOutputTokens": 8192,
+			"maxOutputTokens": maxTokens,
 		},
 	}
 
 	bodyBytes, _ := json.Marshal(geminiBody)
 
 	// Список моделей: основная + fallback
-	models := []string{"gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"}
+	models := []string{"gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.8-flash"}
 	var lastErr string
 
 	for _, model := range models {
@@ -5051,47 +5076,54 @@ func handleAITTS(w http.ResponseWriter, r *http.Request) {
 		clean = string([]rune(clean)[:600])
 	}
 
-	cacheKey := lang + ":" + clean
+	voice := strings.TrimSpace(r.URL.Query().Get("voice"))
+	if voice == "" {
+		voice = "Sulafat" // тёплый, мягкий живой голос
+	}
+
+	cacheKey := lang + ":" + voice + ":" + clean
 	ttsCacheMu.RLock()
 	cachedAudio, exists := ttsCache[cacheKey]
 	ttsCacheMu.RUnlock()
 
 	if exists && len(cachedAudio) > 0 {
-		w.Header().Set("Content-Type", "audio/mpeg")
-		w.Header().Set("Content-Length", strconv.Itoa(len(cachedAudio)))
-		w.Header().Set("Accept-Ranges", "bytes")
-		w.Header().Set("Cache-Control", "public, max-age=86400")
-		_, _ = w.Write(cachedAudio)
+		writeTTSAudio(w, cachedAudio)
 		return
 	}
 
-	chunks := splitTextIntoTTSChunks(clean, 130)
-	var combined bytes.Buffer
-	for _, chunk := range chunks {
-		if strings.TrimSpace(chunk) == "" {
-			continue
+	// 1) Нейронный Gemini TTS — живой, естественный голос с интонациями
+	finalBytes, err := synthesizeGeminiTTS(r.Context(), clean, voice)
+	if err != nil {
+		log.Printf("[TTS] Gemini TTS недоступен: %v — используем резервный синтез", err)
+		// 2) Резерв: Google Translate TTS
+		chunks := splitTextIntoTTSChunks(clean, 130)
+		var combined bytes.Buffer
+		for _, chunk := range chunks {
+			if strings.TrimSpace(chunk) == "" {
+				continue
+			}
+			b, cErr := fetchGoogleTTSChunk(chunk, lang)
+			if cErr != nil {
+				log.Printf("[TTS Error] chunk '%s': %v", chunk, cErr)
+				continue
+			}
+			combined.Write(b)
 		}
-		b, err := fetchGoogleTTSChunk(chunk, lang)
-		if err != nil {
-			log.Printf("[TTS Error] chunk '%s': %v", chunk, err)
-			continue
-		}
-		combined.Write(b)
+		finalBytes = combined.Bytes()
 	}
 
-	finalBytes := combined.Bytes()
 	if len(finalBytes) == 0 {
 		http.Error(w, "failed to synthesize speech", http.StatusBadGateway)
 		return
 	}
 
 	ttsCacheMu.Lock()
-	if len(ttsCache) > 500 {
+	if len(ttsCache) > 300 {
 		count := 0
 		for k := range ttsCache {
 			delete(ttsCache, k)
 			count++
-			if count > 250 {
+			if count > 150 {
 				break
 			}
 		}
@@ -5099,11 +5131,144 @@ func handleAITTS(w http.ResponseWriter, r *http.Request) {
 	ttsCache[cacheKey] = finalBytes
 	ttsCacheMu.Unlock()
 
-	w.Header().Set("Content-Type", "audio/mpeg")
-	w.Header().Set("Content-Length", strconv.Itoa(len(finalBytes)))
+	writeTTSAudio(w, finalBytes)
+}
+
+func writeTTSAudio(w http.ResponseWriter, data []byte) {
+	ct := "audio/mpeg"
+	if len(data) > 12 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WAVE" {
+		ct = "audio/wav"
+	}
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.Header().Set("Accept-Ranges", "bytes")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
-	_, _ = w.Write(finalBytes)
+	_, _ = w.Write(data)
+}
+
+// pcmToWAV оборачивает сырой PCM (s16le) в WAV-контейнер
+func pcmToWAV(pcm []byte, sampleRate, channels, bitsPerSample int) []byte {
+	byteRate := sampleRate * channels * bitsPerSample / 8
+	blockAlign := channels * bitsPerSample / 8
+	var buf bytes.Buffer
+	le32 := func(v int) { buf.Write([]byte{byte(v), byte(v >> 8), byte(v >> 16), byte(v >> 24)}) }
+	le16 := func(v int) { buf.Write([]byte{byte(v), byte(v >> 8)}) }
+	buf.WriteString("RIFF")
+	le32(36 + len(pcm))
+	buf.WriteString("WAVE")
+	buf.WriteString("fmt ")
+	le32(16)
+	le16(1)
+	le16(channels)
+	le32(sampleRate)
+	le32(byteRate)
+	le16(blockAlign)
+	le16(bitsPerSample)
+	buf.WriteString("data")
+	le32(len(pcm))
+	buf.Write(pcm)
+	return buf.Bytes()
+}
+
+// synthesizeGeminiTTS — естественная человеческая речь через Gemini TTS, возвращает WAV
+func synthesizeGeminiTTS(parent context.Context, text, voice string) ([]byte, error) {
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return nil, errors.New("GEMINI_API_KEY not set")
+	}
+
+	if voice == "" {
+		voice = "Sulafat"
+	}
+
+	body := map[string]interface{}{
+		"contents": []map[string]interface{}{
+			{"parts": []map[string]string{{"text": text}}},
+		},
+		"generationConfig": map[string]interface{}{
+			"responseModalities": []string{"AUDIO"},
+			"speechConfig": map[string]interface{}{
+				"voiceConfig": map[string]interface{}{
+					"prebuiltVoiceConfig": map[string]string{"voiceName": voice},
+				},
+			},
+		},
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	models := []string{"gemini-3.1-flash-tts-preview", "gemini-2.5-flash-preview-tts"}
+	var lastErr error
+	for _, model := range models {
+		apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey)
+		ctx, cancel := context.WithTimeout(parent, 25*time.Second)
+		req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
+		if err != nil {
+			cancel()
+			lastErr = err
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("x-goog-api-key", apiKey)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			cancel()
+			lastErr = err
+			continue
+		}
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		cancel()
+
+		if resp.StatusCode != 200 {
+			lastErr = fmt.Errorf("%s: %d %s", model, resp.StatusCode, string(respBody[:min(len(respBody), 300)]))
+			continue
+		}
+
+		var gr struct {
+			Candidates []struct {
+				Content struct {
+					Parts []struct {
+						InlineData struct {
+							MimeType string `json:"mimeType"`
+							Data     string `json:"data"`
+						} `json:"inlineData"`
+					} `json:"parts"`
+				} `json:"content"`
+			} `json:"candidates"`
+		}
+		if err := json.Unmarshal(respBody, &gr); err != nil || len(gr.Candidates) == 0 {
+			lastErr = fmt.Errorf("%s: bad response", model)
+			continue
+		}
+		var pcm []byte
+		mime := ""
+		for _, p := range gr.Candidates[0].Content.Parts {
+			if p.InlineData.Data == "" {
+				continue
+			}
+			b, dErr := base64.StdEncoding.DecodeString(p.InlineData.Data)
+			if dErr != nil {
+				continue
+			}
+			pcm = append(pcm, b...)
+			mime = p.InlineData.MimeType
+		}
+		if len(pcm) == 0 {
+			lastErr = fmt.Errorf("%s: empty audio", model)
+			continue
+		}
+
+		rate := 24000
+		if m := regexp.MustCompile(`rate=(\d+)`).FindStringSubmatch(mime); len(m) == 2 {
+			if v, e := strconv.Atoi(m[1]); e == nil && v > 0 {
+				rate = v
+			}
+		}
+		log.Printf("[TTS] Gemini %s, голос %s: %d байт PCM (%d Hz)", model, voice, len(pcm), rate)
+		return pcmToWAV(pcm, rate, 1, 16), nil
+	}
+	return nil, lastErr
 }
 
 // POST /api/ai/stt — Speech-to-Text transcription via Gemini multimodal audio
@@ -5174,47 +5339,71 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 	}
 
 	b64Audio := base64.StdEncoding.EncodeToString(audioBytes)
+	audioPart := map[string]interface{}{
+		"inlineData": map[string]string{
+			"mimeType": cleanMime,
+			"data":     b64Audio,
+		},
+	}
 
-	geminiBody := map[string]interface{}{
+	type sttAttempt struct {
+		model string
+		body  map[string]interface{}
+	}
+	attempts := []sttAttempt{
+		{
+			// Специализированная модель распознавания речи
+			model: "gemini-3.5-transcribe",
+			body: map[string]interface{}{
+				"contents": []map[string]interface{}{
+					{"parts": []interface{}{audioPart}},
+				},
+				"generationConfig": map[string]interface{}{
+					"audioTranscriptionConfig": map[string]interface{}{
+						"languageCodes": []string{"ru-RU"},
+					},
+				},
+			},
+		},
+	}
+	promptBody := map[string]interface{}{
 		"contents": []map[string]interface{}{
 			{
 				"role": "user",
 				"parts": []interface{}{
 					map[string]string{
-						"text": "Ты система точного распознавания русской речи. Твоя задача — точно транскрибировать это аудиосообщение в русский текст. Выведи ТОЛЬКО сказанный пользователем текст без кавычек, префиксов, объяснений и форматирования. Если в аудио тишина, шум или нет внятной речи, выведи ровно пустую строку.",
+						"text": "Транскрибируй эту русскую речь дословно. Выведи ТОЛЬКО сказанный текст, без кавычек, пояснений и форматирования. Если речи нет (тишина или шум) — выведи пустую строку.",
 					},
-					map[string]interface{}{
-						"inlineData": map[string]string{
-							"mimeType": cleanMime,
-							"data":     b64Audio,
-						},
-					},
+					audioPart,
 				},
 			},
 		},
 		"generationConfig": map[string]interface{}{
-			"temperature":     0.1,
-			"maxOutputTokens": 1024,
+			"temperature":     0.0,
+			"maxOutputTokens": 512,
 		},
 	}
-
-	bodyBytes, _ := json.Marshal(geminiBody)
-	models := []string{"gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"}
+	for _, m := range []string{"gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.6-flash"} {
+		attempts = append(attempts, sttAttempt{model: m, body: promptBody})
+	}
 
 	var transcript string
-	for _, model := range models {
-		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey)
-		ctx, cancel := context.WithTimeout(r.Context(), 18*time.Second)
-		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+	for _, at := range attempts {
+		bodyBytes, _ := json.Marshal(at.body)
+		apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", at.model, apiKey)
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
 		if err != nil {
 			cancel()
 			continue
 		}
 		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("x-goog-api-key", apiKey)
 
 		resp, err := http.DefaultClient.Do(httpReq)
 		if err != nil {
 			cancel()
+			log.Printf("[STT] %s: %v", at.model, err)
 			continue
 		}
 		respBody, _ := io.ReadAll(resp.Body)
@@ -5222,6 +5411,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		cancel()
 
 		if resp.StatusCode != 200 {
+			log.Printf("[STT] %s: %d %s", at.model, resp.StatusCode, string(respBody[:min(len(respBody), 300)]))
 			continue
 		}
 
@@ -5235,14 +5425,16 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 			} `json:"candidates"`
 		}
 
-		if err := json.Unmarshal(respBody, &geminiResp); err == nil && len(geminiResp.Candidates) > 0 {
+		if err := json.Unmarshal(respBody, &geminiResp); err == nil {
+			if len(geminiResp.Candidates) == 0 {
+				// Модель ответила, но кандидатов нет — значит речи не было
+				break
+			}
 			for _, p := range geminiResp.Candidates[0].Content.Parts {
 				transcript += p.Text
 			}
-			transcript = strings.TrimSpace(transcript)
-			if transcript != "" {
-				break
-			}
+			transcript = strings.Trim(strings.TrimSpace(transcript), "\"«»")
+			break // успешный ответ модели (даже пустой = тишина)
 		}
 	}
 

@@ -133,12 +133,12 @@ function getLocalOracleFallback(text: string): string {
   return '✨ Интересный и глубокий вопрос! Каждый жизненный вызов — это возможность для духовного и личного роста. Расскажи подробнее, и мы найдём ответ 🙏';
 }
 
-async function fetchAiReply(text: string, history: Array<{ role: string; text: string }>): Promise<string> {
+async function fetchAiReply(text: string, history: Array<{ role: string; text: string }>, voice = false): Promise<string> {
   try {
     const resp = await fetch(`${API_BASE_URL}/api/ai/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history }),
+      body: JSON.stringify({ message: text, history, voice }),
     });
 
     if (!resp.ok) throw new Error('API error');
@@ -787,7 +787,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
     // Фронтенд воспроизводит естественный человеческий голос из нейронного TTS бэкенда
     try {
-      const ttsUrl = `${API_BASE_URL}/api/ai/tts?text=${encodeURIComponent(clean)}&lang=ru`;
+      const ttsUrl = `${API_BASE_URL}/api/ai/tts?text=${encodeURIComponent(clean)}&lang=ru&voice=Sulafat`;
       const audio = new Audio(ttsUrl);
       audio.volume = isSpeakerLoudRef.current ? 1.0 : 0.45;
       ttsAudioRef.current = audio;
@@ -1068,7 +1068,6 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       try {
         voiceStatusRef.current = 'thinking';
         setVoiceStatus('thinking');
-        setLiveTranscript('Обрабатываю голос… ⚡');
 
         // Запрашиваем последний кусочек и останавливаем
         try {
@@ -1093,7 +1092,8 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
         if (audioBlob.size > 800) {
           const formData = new FormData();
-          formData.append('audio', audioBlob, 'speech.webm');
+          const ext = mime.includes('ogg') ? 'speech.ogg' : mime.includes('mp4') ? 'speech.mp4' : 'speech.webm';
+          formData.append('audio', audioBlob, ext);
 
           const resp = await fetch(`${API_BASE_URL}/api/ai/stt`, {
             method: 'POST',
@@ -1168,7 +1168,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     }));
 
     try {
-      const replyText = await fetchAiReply(spokenText, history);
+      const replyText = await fetchAiReply(spokenText, history, true);
       setIsAiTyping(false);
 
       const reply: Message = {
@@ -1429,7 +1429,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     };
 
     try {
-      const ttsUrl = `${API_BASE_URL}/api/ai/tts?text=${encodeURIComponent(clean)}&lang=ru`;
+      const ttsUrl = `${API_BASE_URL}/api/ai/tts?text=${encodeURIComponent(clean)}&lang=ru&voice=Sulafat`;
       const audio = new Audio(ttsUrl);
       audio.volume = isSpeakerLoud ? 1.0 : 0.5;
       ttsAudioRef.current = audio;
