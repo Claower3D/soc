@@ -162,19 +162,38 @@ export interface ToggleFollowResult {
 export function toggleUserFollow(targetUserId: string, currentUserId?: string, targetUser?: User): boolean {
   if (!targetUserId) return false;
 
+  const cleanTarget = targetUserId.replace(/^@+/, '').trim().toLowerCase();
+  const cleanUsername = targetUser?.username ? targetUser.username.replace(/^@+/, '').trim().toLowerCase() : '';
+
+  const isCurrentlyFollowing = isUserFollowed(targetUserId, currentUserId) || 
+                               (cleanUsername ? isUserFollowed(cleanUsername, currentUserId) : false);
+
   const followingIds = getStoredFollowingIds(currentUserId);
-  const isCurrentlyFollowing = followingIds.includes(targetUserId);
   let isNowFollowing: boolean;
 
   // 1. Обновляем свой список подписок (following)
   if (isCurrentlyFollowing) {
-    setStoredFollowingIds(followingIds.filter(id => id !== targetUserId), currentUserId);
+    const updated = followingIds.filter(id => {
+      const cleanId = id.replace(/^@+/, '').trim().toLowerCase();
+      return cleanId !== cleanTarget && (!cleanUsername || cleanId !== cleanUsername);
+    });
+    setStoredFollowingIds(updated, currentUserId);
     isNowFollowing = false;
     api.users.unfollow(targetUserId).catch(() => {});
+    if (cleanUsername && cleanUsername !== cleanTarget) {
+      api.users.unfollow(cleanUsername).catch(() => {});
+    }
   } else {
-    setStoredFollowingIds([...followingIds, targetUserId], currentUserId);
+    const toAdd = [targetUserId];
+    if (cleanUsername && cleanUsername !== cleanTarget) {
+      toAdd.push(cleanUsername);
+    }
+    setStoredFollowingIds([...followingIds, ...toAdd], currentUserId);
     isNowFollowing = true;
     api.users.follow(targetUserId).catch(() => {});
+    if (cleanUsername && cleanUsername !== cleanTarget) {
+      api.users.follow(cleanUsername).catch(() => {});
+    }
   }
 
   // 2. Обновляем список подписчиков цели (followers map)
@@ -210,8 +229,13 @@ export async function toggleUserFollowAsync(
 ): Promise<ToggleFollowResult> {
   if (!targetUserId) return { isFollowed: false, isFriend: false, status: 'none' };
 
+  const cleanTarget = targetUserId.replace(/^@+/, '').trim().toLowerCase();
+  const cleanUsername = targetUser?.username ? targetUser.username.replace(/^@+/, '').trim().toLowerCase() : '';
+
+  const isCurrentlyFollowing = isUserFollowed(targetUserId, currentUserId) || 
+                               (cleanUsername ? isUserFollowed(cleanUsername, currentUserId) : false);
+
   const followingIds = getStoredFollowingIds(currentUserId);
-  const isCurrentlyFollowing = followingIds.includes(targetUserId);
   let isNowFollowing: boolean;
 
   let backendData: any = null;
@@ -226,10 +250,18 @@ export async function toggleUserFollowAsync(
   }
 
   if (isCurrentlyFollowing) {
-    setStoredFollowingIds(followingIds.filter(id => id !== targetUserId), currentUserId);
+    const updated = followingIds.filter(id => {
+      const cleanId = id.replace(/^@+/, '').trim().toLowerCase();
+      return cleanId !== cleanTarget && (!cleanUsername || cleanId !== cleanUsername);
+    });
+    setStoredFollowingIds(updated, currentUserId);
     isNowFollowing = false;
   } else {
-    setStoredFollowingIds([...followingIds, targetUserId], currentUserId);
+    const toAdd = [targetUserId];
+    if (cleanUsername && cleanUsername !== cleanTarget) {
+      toAdd.push(cleanUsername);
+    }
+    setStoredFollowingIds([...followingIds, ...toAdd], currentUserId);
     isNowFollowing = true;
   }
 

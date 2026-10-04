@@ -11,6 +11,8 @@ import { useAuth } from '../context/AuthContext';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { 
   getStoredFollowingIds, 
+  setStoredFollowingIds,
+  isUserFollowed,
   toggleUserFollow,
   cacheUser
 } from '../utils/followStorage';
@@ -31,7 +33,7 @@ export function SearchPage() {
   const [query, setQuery] = useState(queryParam);
   const [activeTab, setActiveTab] = useState<SearchTab>(tabParam);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds());
+  const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds(currentUser?.id));
 
   const [poolUsers, setPoolUsers] = useState<any[]>([]);
   const [videos, setVideos] = useState<any[]>([]);
@@ -39,10 +41,29 @@ export function SearchPage() {
 
   // Listen to follow updates
   useEffect(() => {
-    const handleSync = () => setFollowingIds(getStoredFollowingIds());
+    const handleSync = () => setFollowingIds(getStoredFollowingIds(currentUser?.id));
     window.addEventListener('follow_change', handleSync);
     return () => window.removeEventListener('follow_change', handleSync);
-  }, []);
+  }, [currentUser?.id]);
+
+  // Load following list from backend to synchronize across devices
+  useEffect(() => {
+    if (currentUser?.id && currentUser.id !== 'guest') {
+      api.users.following(currentUser.id).then((res: any) => {
+        const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+        if (Array.isArray(list) && list.length > 0) {
+          const ids: string[] = [];
+          list.forEach((u: any) => {
+            if (u.id) ids.push(String(u.id));
+            if (u.username) ids.push(String(u.username).replace(/^@+/, ''));
+          });
+          const merged = Array.from(new Set([...getStoredFollowingIds(currentUser.id), ...ids]));
+          setStoredFollowingIds(merged, currentUser.id);
+          setFollowingIds(merged);
+        }
+      }).catch(console.warn);
+    }
+  }, [currentUser?.id]);
 
   useEffect(() => {
     api.posts.list().then((d: any) => Array.isArray(d) && setPosts(d)).catch(console.warn);
@@ -109,14 +130,26 @@ export function SearchPage() {
     });
   };
 
+  const checkIsSubscribed = (user: any) => {
+    if (!user) return false;
+    const cleanId = String(user.id || '');
+    const cleanUsername = String(user.username || '').replace(/^@+/, '');
+    return isUserFollowed(cleanId, currentUser?.id) ||
+           (cleanUsername ? isUserFollowed(cleanUsername, currentUser?.id) : false) ||
+           followingIds.includes(cleanId) ||
+           (cleanUsername && followingIds.includes(cleanUsername)) ||
+           Boolean(user.isFollowed);
+  };
+
   const handleToggleFollow = (targetUser: any, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isAuthenticated) {
       openAuthModal('register');
       return;
     }
-    toggleUserFollow(targetUser.id, currentUser?.id, targetUser);
-    setFollowingIds(getStoredFollowingIds());
+    const targetKey = targetUser.id || targetUser.username;
+    toggleUserFollow(targetKey, currentUser?.id, targetUser);
+    setFollowingIds(getStoredFollowingIds(currentUser?.id));
   };
 
 
@@ -246,7 +279,7 @@ export function SearchPage() {
               ) : (
                 <div className="search-accounts-grid">
                   {filteredUsers.slice(0, 4).map(user => {
-                    const isSubscribed = followingIds.includes(user.id);
+                    const isSubscribed = checkIsSubscribed(user);
                     const isMe = user.id === currentUser?.id;
                     const isOnline = isMe ? true : Boolean(user.online);
                     return (
@@ -386,7 +419,7 @@ export function SearchPage() {
             ) : (
               <div className="accounts-list-rows">
                 {filteredUsers.map(user => {
-                  const isSubscribed = followingIds.includes(user.id);
+                  const isSubscribed = checkIsSubscribed(user);
                   const isMe = user.id === currentUser?.id;
                   const isOnline = isMe ? true : Boolean(user.online);
                   return (
