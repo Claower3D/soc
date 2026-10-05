@@ -1519,6 +1519,68 @@
   animation-duration: 2.2s;
 }
 
+/* Кольцо обратного отсчета паузы перед отправкой */
+.cw-live-countdown-svg {
+  position: absolute;
+  inset: -14px;
+  width: calc(100% + 28px);
+  height: calc(100% + 28px);
+  transform: rotate(-90deg);
+  pointer-events: none;
+  z-index: 8;
+  filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.75));
+}
+
+.cw-countdown-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 3.5;
+}
+
+.cw-countdown-bar {
+  fill: none;
+  stroke: #c084fc;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 295.3;
+  transition: stroke-dashoffset 0.05s linear;
+}
+
+.cw-live-orb.silence-pending {
+  filter: drop-shadow(0 0 28px rgba(168, 85, 247, 0.85));
+}
+
+.cw-live-orb.silence-pending .cw-live-ring.r1 {
+  border-color: #c084fc;
+  box-shadow: 0 0 26px rgba(192, 132, 252, 0.6);
+}
+
+/* Кнопка сброса/очистки произнесённого текста */
+.cw-live-btn.clear-btn {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #fca5a5;
+  animation: cwFadeIn 0.2s ease;
+}
+
+.cw-live-btn.clear-btn:hover {
+  background: rgba(239, 68, 68, 0.38);
+  border-color: #ef4444;
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
+.cw-live-btn.send-now.ready {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-color: #34d399;
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.55);
+}
+
+.cw-live-btn.send-now.ready:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  box-shadow: 0 6px 26px rgba(16, 185, 129, 0.7);
+}
+
 
 
 

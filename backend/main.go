@@ -5134,10 +5134,8 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 	if req.Voice {
 		sysPrompt += oracleVoicePrompt
 		maxTokens = 200 // Короткие ответы: минимальное время генерации и мгновенный TTS
-		thinkingConfig = map[string]interface{}{
-			"thinkingBudget": 0, // Без задержки на длительное размышление
-		}
-		models = []string{"gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.8-flash"} // Сверхбыстрая flash модель
+		thinkingConfig = nil // Без задержки на thinkingBudget
+		models = []string{"gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-3.5-flash", "gemini-3.8-flash"} // Сверхбыстрая flash модель
 	}
 
 	genConfig := map[string]interface{}{
@@ -5671,7 +5669,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 				"role": "user",
 				"parts": []interface{}{
 					map[string]string{
-						"text": "Транскрибируй русскую речь из аудио. Напиши только распознанные слова без кавычек, префиксов и комментариев. Если звуков членораздельной речи нет — выведи пустую строку.",
+						"text": "Ты высокоточная система распознавания речи (STT). Точно транскрибируй русскую речь из аудиозаписи (или на языке говорящего, если это другой язык). Напиши только распознанные слова с правильной орфографией и пунктуацией, без кавычек, префиксов и комментариев. Если звуков членораздельной речи нет (только тишина, дыхание или фоновый шум) — верни пустую строку.",
 					},
 					audioPart,
 				},
@@ -5679,10 +5677,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		},
 		"generationConfig": map[string]interface{}{
 			"temperature":     0.0,
-			"maxOutputTokens": 128,
-			"thinkingConfig": map[string]interface{}{
-				"thinkingBudget": 0,
-			},
+			"maxOutputTokens": 256,
 		},
 	}
 
@@ -5692,6 +5687,9 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 	}
 	attempts := []sttAttempt{
 		{model: "gemini-2.5-flash", body: promptBody},
+		{model: "gemini-2.0-flash", body: promptBody},
+		{model: "gemini-1.5-flash", body: promptBody},
+		{model: "gemini-2.5-flash-lite", body: promptBody},
 		{model: "gemini-3.5-flash", body: promptBody},
 		{model: "gemini-3.8-flash", body: promptBody},
 		{
