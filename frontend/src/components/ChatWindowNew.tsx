@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles } from 'lucide-react';
 import { type Chat, type Message } from '../data/mock';
 import { formatLastSeen } from '../utils/onlineStatus';
 import { API_BASE_URL } from '../api';
@@ -974,25 +974,6 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     }, delayMs);
   };
 
-  // Очистка текущей произнесённой фразы (если оговорился или передумал)
-  const clearVoicePhrase = () => {
-    cancelSilenceCommit();
-    liveTranscriptRef.current = '';
-    finalTranscriptRef.current = '';
-    setLiveTranscript('');
-    hasSpokenInTurnRef.current = false;
-    setIsUserTalking(false);
-    recordedVoiceChunksRef.current = [];
-    if (recognitionRef.current) {
-      try { recognitionRef.current.abort(); } catch {}
-    }
-    setTimeout(() => {
-      if (isVoiceChatActiveRef.current && voiceStatusRef.current === 'listening' && !isMicMutedRef.current) {
-        startRecognition();
-      }
-    }, 120);
-  };
-
   // Индикатор громкости микрофона и Voice Activity Detection (VAD)
   const startMicLevel = (stream: MediaStream) => {
     try {
@@ -1025,7 +1006,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
             // Если пользователь продолжает говорить или вздохнул — продлеваем паузу (не перебиваем мысль!)
             if (liveTranscriptRef.current && silenceTimerRef.current) {
-              scheduleSilenceCommit(1500);
+              scheduleSilenceCommit(1200);
             }
           }
         }
@@ -1116,9 +1097,9 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           setIsUserTalking(true);
 
           // Интеллектуальный тайм-аут паузы:
-          // Если мысль не закончена (интерим-фрагмент) — даём 1600мс для спокойного обдумывания без обрыва слов!
-          // Если фраза финализирована движком — пауза 1100мс перед автоматической отправкой
-          const pauseDelay = sessionInterim ? 1600 : 1100;
+          // Если мысль не закончена (интерим-фрагмент) — 1200мс для паузы без обрыва
+          // Если фраза финализирована движком — быстрая естественная пауза 850мс
+          const pauseDelay = sessionInterim ? 1200 : 850;
           scheduleSilenceCommit(pauseDelay);
         }
       };
@@ -2480,13 +2461,11 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               {voiceStatus === 'speaking'
                 ? 'Нажмите на шар, чтобы перебить'
                 : voiceStatus === 'thinking'
-                  ? 'Подбираю мудрый ответ…'
+                  ? 'Оракул читает и отвечает…'
                   : voiceStatus === 'listening' && !isMicMuted
-                    ? silenceProgress > 0
-                      ? 'Пауза: отправка через мгновение • Нажмите на шар для быстрой отправки'
-                      : isUserTalking
-                        ? 'Говорите спокойно — пауза автоматически отправит фразу'
-                        : 'Говорите свободно — чистое распознавание без прерываний'
+                    ? isUserTalking
+                      ? 'Слышу вас… Говорите свободно 🎙️'
+                      : 'Говорите свободно — слова сразу переносятся в текст и передаются Оракулу'
                     : '\u00A0'}
             </div>
           </div>
@@ -2534,30 +2513,6 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               {isMicMuted ? <MicOff size={22} /> : <Mic size={22} />}
               <span>{isMicMuted ? 'Вкл. микрофон' : 'Микрофон'}</span>
             </button>
-
-            {voiceStatus === 'listening' && !isMicMuted && liveTranscript && (
-              <button
-                type="button"
-                className="cw-live-btn clear-btn"
-                onClick={clearVoicePhrase}
-                title="Стереть фразу и начать заново"
-              >
-                <RotateCcw size={20} />
-                <span>Очистить</span>
-              </button>
-            )}
-
-            {voiceStatus === 'listening' && !isMicMuted && (
-              <button
-                type="button"
-                className={`cw-live-btn send-now ${liveTranscript ? 'ready' : ''}`}
-                onClick={commitVoicePhrase}
-                title="Отправить фразу Оракулу прямо сейчас"
-              >
-                <Send size={22} />
-                <span>Отправить</span>
-              </button>
-            )}
 
             {voiceStatus === 'speaking' && (
               <button
