@@ -516,7 +516,7 @@ export function Header() {
             </button>
 
             <button
-              className="header-profile-badge"
+              className="header-action-btn header-profile-badge"
               onClick={() => navigate(currentUser.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser.id}`)}
               title={`Мой профиль: ${currentUser.name} (@${currentUser.username})`}
             >
