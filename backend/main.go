@@ -1173,6 +1173,7 @@ func main() {
 	mux.HandleFunc("POST /api/cache/sync", handleCacheSync)
 
 	// ИИ Оракул
+	mux.HandleFunc("GET /api/ai/models", handleAIModels)
 	mux.HandleFunc("POST /api/ai/chat", handleAIChat)
 	mux.HandleFunc("POST /api/ai/oracle", handleAIChat)
 	mux.HandleFunc("GET /api/ai/oracle", handleAIChat)
@@ -5263,6 +5264,24 @@ func getGeminiAPIKeys(r *http.Request, directKey string) []string {
 	return keys
 }
 
+func handleAIModels(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	apiKeys := getGeminiAPIKeys(r, "")
+	if len(apiKeys) == 0 {
+		writeJSON(w, 200, map[string]interface{}{"error": "no api keys configured"})
+		return
+	}
+	resp, err := http.Get(fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models?key=%s", apiKeys[0]))
+	if err != nil {
+		writeJSON(w, 500, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	w.WriteHeader(resp.StatusCode)
+	w.Write(body)
+}
+
 func handleAIChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -5444,7 +5463,18 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 
 			if resp.StatusCode != 200 {
 				log.Printf("[AI] Gemini API (%s) %d: %s", model, resp.StatusCode, string(respBody[:min(len(respBody), 500)]))
-				errDetails = append(errDetails, fmt.Sprintf("%s: %d", model, resp.StatusCode))
+				var gErr struct {
+					Error struct {
+						Message string `json:"message"`
+					} `json:"error"`
+				}
+				msg := ""
+				if err := json.Unmarshal(respBody, &gErr); err == nil && gErr.Error.Message != "" {
+					msg = gErr.Error.Message
+				} else {
+					msg = string(respBody[:min(len(respBody), 80)])
+				}
+				errDetails = append(errDetails, fmt.Sprintf("%s: %d (%s)", model, resp.StatusCode, msg))
 				continue
 			}
 

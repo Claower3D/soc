@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles, Key } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles } from 'lucide-react';
 import { type Chat, type Message } from '../data/mock';
 import { formatLastSeen } from '../utils/onlineStatus';
 import { API_BASE_URL } from '../api';
@@ -149,9 +149,9 @@ function getLocalOracleFallback(text: string, voice = false): string {
   }
 
   if (voice) {
-    return `Я услышал: «${text.trim()}». Сервер нейросети временно перегружен лимитом Google (429). Попробуй повторить через минуту.`;
+    return `Я услышал: «${text.trim()}». Сервер нейросети сейчас обрабатывает много запросов. Попробуй повторить через минуту.`;
   }
-  return `Я услышал твой вопрос: «${text.trim()}». Сервер нейросети сейчас временно перегружен лимитом запросов Google API (429). Пожалуйста, повтори через минуту или укажи свой API-ключ в настройках.`;
+  return `Я услышал твой вопрос: «${text.trim()}». Сервер нейросети временно перегружен. Пожалуйста, повтори через минуту.`;
 }
 
 async function fetchAiReply(text: string, history: Array<{ role: string; text: string }>, voice = false): Promise<string> {
@@ -160,21 +160,15 @@ async function fetchAiReply(text: string, history: Array<{ role: string; text: s
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), voice ? 12000 : 20000);
-  const userApiKey = localStorage.getItem('user_gemini_api_key') || '';
 
   try {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (userApiKey) {
-      headers['X-Gemini-Key'] = userApiKey;
-    }
     const resp = await fetch(`${API_BASE_URL}/api/ai/chat`, {
       method: 'POST',
-      headers,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: text,
         history,
         voice,
-        apiKey: userApiKey || undefined,
       }),
       signal: controller.signal,
     });
@@ -2146,41 +2140,19 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
         <div className="cw-header-actions">
           {isAi ? (
-            <>
-              <button
-                type="button"
-                className="cw-action-btn"
-                onClick={() => {
-                  const current = localStorage.getItem('user_gemini_api_key') || '';
-                  const entered = prompt('Ваш Gemini API ключ (из Google AI Studio):', current);
-                  if (entered !== null) {
-                    if (entered.trim()) {
-                      localStorage.setItem('user_gemini_api_key', entered.trim());
-                      alert('API ключ сохранён! Теперь запросы направляются через ваш персональный ключ.');
-                    } else {
-                      localStorage.removeItem('user_gemini_api_key');
-                      alert('Пользовательский ключ сброшен.');
-                    }
-                  }
-                }}
-                title="Указать свой Gemini API ключ"
-              >
-                <Key size={18} />
-              </button>
-              <button 
-                className={`cw-voice-header-btn ${isVoiceChatActive ? 'active' : ''}`}
-                onClick={toggleVoiceChat}
-                title={isVoiceChatActive ? "Закончить разговор" : "Начать разговор на громкой связи"}
-              >
-                {isVoiceChatActive ? <VolumeX size={16} /> : <Volume2 size={16} className="pulse-anim" />}
-                <div className="cw-voice-header-text">
-                  <span className="cw-voice-header-title">
-                    {isVoiceChatActive ? 'Закончить разговор' : 'Начать разговор'}
-                  </span>
-                  <span className="cw-voice-header-sub">Громкая связь • Текст</span>
-                </div>
-              </button>
-            </>
+            <button 
+              className={`cw-voice-header-btn ${isVoiceChatActive ? 'active' : ''}`}
+              onClick={toggleVoiceChat}
+              title={isVoiceChatActive ? "Закончить разговор" : "Начать разговор на громкой связи"}
+            >
+              {isVoiceChatActive ? <VolumeX size={16} /> : <Volume2 size={16} className="pulse-anim" />}
+              <div className="cw-voice-header-text">
+                <span className="cw-voice-header-title">
+                  {isVoiceChatActive ? 'Закончить разговор' : 'Начать разговор'}
+                </span>
+                <span className="cw-voice-header-sub">Громкая связь • Текст</span>
+              </div>
+            </button>
           ) : (
             <>
               <button className="cw-action-btn"><Phone size={18} /></button>
@@ -2592,31 +2564,9 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               <span className="cw-live-rec-dot" />
               <span className="cw-live-top-title">Живой разговор • {chatName}</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                className="cw-live-close"
-                onClick={() => {
-                  const current = localStorage.getItem('user_gemini_api_key') || '';
-                  const entered = prompt('Ваш личный Gemini API ключ (Google AI Studio):', current);
-                  if (entered !== null) {
-                    if (entered.trim()) {
-                      localStorage.setItem('user_gemini_api_key', entered.trim());
-                      alert('Ключ сохранён! Теперь запросы обрабатываются с вашим лимитом квоты.');
-                    } else {
-                      localStorage.removeItem('user_gemini_api_key');
-                      alert('Личный ключ удалён. Используется серверный пул.');
-                    }
-                  }
-                }}
-                title="Настроить Gemini API ключ (снять лимит 429)"
-              >
-                <Key size={18} />
-              </button>
-              <button type="button" className="cw-live-close" onClick={stopVoiceChat} title="Закончить разговор">
-                <X size={20} />
-              </button>
-            </div>
+            <button type="button" className="cw-live-close" onClick={stopVoiceChat} title="Закончить разговор">
+              <X size={20} />
+            </button>
           </div>
 
           <div className="cw-live-center">

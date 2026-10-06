@@ -605,13 +605,10 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
       const sendOracleReply = async () => {
         let oracleAnswer = '';
         try {
-          const userKey = localStorage.getItem('user_gemini_api_key') || '';
-          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-          if (userKey) headers['X-Gemini-Key'] = userKey;
           const resp = await fetch('/api/ai/chat', {
             method: 'POST',
-            headers,
-            body: JSON.stringify({ message: userText, history: [], apiKey: userKey || undefined }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: userText, history: [] }),
           });
           if (resp.ok) {
             const data = await resp.json();
@@ -628,7 +625,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
           } else if (lower.includes('кто ты')) {
             oracleAnswer = '🤖 Я ИИ Оракул — твой цифровой наставник и собеседник.';
           } else {
-            oracleAnswer = `Я услышал твой вопрос: «${userText.trim()}». Сервер нейросети временно перегружен лимитом Google (429). Повтори через минуту или укажи свой API-ключ в настройках.`;
+            oracleAnswer = `Я услышал твой вопрос: «${userText.trim()}». Сервер нейросети временно перегружен. Пожалуйста, повтори через минуту.`;
           }
         }
 
