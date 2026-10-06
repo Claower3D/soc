@@ -5752,7 +5752,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 				"role": "user",
 				"parts": []interface{}{
 					map[string]string{
-						"text": "Ты высокоточная система распознавания русской речи (STT). Внимательно прослушай аудиозапись и дословно транскрибируй произнесенные слова в текст. Расставь правильные знаки препинания и заглавные буквы. Выведи ТОЛЬКО распознанный текст без кавычек, префиксов и комментариев. Если в записи только тишина, дыхание, вздох или фоновый шум без членораздельной речи — верни пустую строку.",
+						"text": "Транскрибируй русскую речь из этой аудиозаписи в текст. Выведи только произнесённые слова с правильной пунктуацией и заглавными буквами, без каких-либо комментариев и кавычек. Если в записи только шум или тишина, выведи пустую строку.",
 					},
 					audioPart,
 				},
@@ -5760,7 +5760,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		},
 		"generationConfig": map[string]interface{}{
 			"temperature":     0.0,
-			"maxOutputTokens": 512,
+			"maxOutputTokens": 256,
 		},
 	}
 
@@ -5770,17 +5770,15 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 	}
 	attempts := []sttAttempt{
 		{model: "gemini-2.0-flash", body: promptBody},
-		{model: "gemini-2.5-flash", body: promptBody},
 		{model: "gemini-1.5-flash", body: promptBody},
-		{model: "gemini-2.5-flash-lite", body: promptBody},
-		{model: "gemini-3.5-flash", body: promptBody},
 	}
 
 	var transcript string
+	var usedModel string
 	for _, at := range attempts {
 		bodyBytes, _ := json.Marshal(at.body)
 		apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", at.model, apiKey)
-		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		httpReq, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
 		if err != nil {
 			cancel()
@@ -5804,6 +5802,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		usedModel = at.model
 		var geminiResp struct {
 			Candidates []struct {
 				Content struct {
@@ -5852,17 +5851,17 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if transcript != "" {
-			break
-		}
-		log.Printf("[STT] %s ответила 200, но текст пуст. Пробуем следующую модель...", at.model)
+		// Если модель вернула 200 OK — запрос выполнен штатно (даже если запись содержала только тишину)
+		log.Printf("[STT] %s ответила 200 (распознано: '%s')", at.model, transcript)
+		break
 	}
 
-	log.Printf("[STT] Итог аудио (%d байт, %s): '%s'", len(audioBytes), cleanMime, transcript)
+	log.Printf("[STT] Итог аудио (%d байт, %s): '%s' [%s]", len(audioBytes), cleanMime, transcript, usedModel)
 
 	writeJSON(w, 200, map[string]interface{}{
 		"status": "ok",
 		"text":   transcript,
+		"model":  usedModel,
 	})
 }
 

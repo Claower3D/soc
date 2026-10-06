@@ -1005,6 +1005,10 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       rec.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
           recordedVoiceChunksRef.current.push(e.data);
+          // Ограничиваем буфер последними ~12 секундами (150 слайсов по 80мс)
+          if (recordedVoiceChunksRef.current.length > 150) {
+            recordedVoiceChunksRef.current.splice(0, recordedVoiceChunksRef.current.length - 150);
+          }
         }
       };
       rec.start(80); // 80ms слайсы для мгновенного сбора аудио
@@ -1112,9 +1116,12 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
             hasSpokenInTurnRef.current = true;
             setIsUserTalking(true);
 
-            // Мгновенный переход без задержек: 550 мс тишины отправят аудио на распознавание
-            scheduleSilenceCommit(550);
-          } else if (Date.now() - lastSpokenTimeRef.current > 300) {
+            // Если браузерный Web Speech уже выдал распознанный текст — его собственный таймер управляет отправкой!
+            // А если Web Speech еще не выдал текст (или не поддерживается), даём 1200мс тишины для отправки в серверный STT:
+            if (!liveTranscriptRef.current && !finalTranscriptRef.current) {
+              scheduleSilenceCommit(1200);
+            }
+          } else if (Date.now() - lastSpokenTimeRef.current > 350) {
             setIsUserTalking(false);
           }
         }
@@ -1204,10 +1211,10 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           lastSpokenTimeRef.current = Date.now();
           setIsUserTalking(true);
 
-          // Мгновенный естественный переход:
-          // Если фраза финализирована движком — мгновенно 300мс
-          // Если интерим-фрагмент — 600мс
-          const pauseDelay = sessionInterim ? 600 : 300;
+          // Комфортный и живой переход без прерывания на полуслове:
+          // Если фраза финализирована движком — быстрая естественная пауза 450мс
+          // Если мысль продолжается (интерим-фрагмент) — 850мс
+          const pauseDelay = sessionInterim ? 850 : 450;
           scheduleSilenceCommit(pauseDelay);
         }
       };
@@ -1278,19 +1285,18 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         voiceStatusRef.current = 'thinking';
         setVoiceStatus('thinking');
 
-        // Корректно завершаем текущую запись с быстрым сбросом финального чанка
+        // Корректно завершаем текущую запись с сохранением всех чанков
         await new Promise<void>((resolve) => {
           let resolved = false;
           const done = () => {
             if (!resolved) {
               resolved = true;
-              resolve();
+              setTimeout(resolve, 60);
             }
           };
           currentRec.onstop = done;
           try {
             if (currentRec.state === 'recording') {
-              currentRec.requestData();
               currentRec.stop();
             } else {
               done();
@@ -1298,7 +1304,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           } catch {
             done();
           }
-          setTimeout(done, 150);
+          setTimeout(done, 250);
         });
 
         const chunks = [...recordedVoiceChunksRef.current];
@@ -1318,7 +1324,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           formData.append('audio', audioBlob, ext);
 
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 9000);
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
 
           try {
             const resp = await fetch(`${API_BASE_URL}/api/ai/stt`, {
@@ -1356,7 +1362,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       isProcessingSTTRef.current = false;
     }
 
-    // Если в аудио была тишина/шум — возвращаемся в режим прослушивания
+    // Если в аудио была тишина/шум или распознавание не удалось — возвращаемся в режим прослушивания
     liveTranscriptRef.current = '';
     finalTranscriptRef.current = '';
     setLiveTranscript('');
@@ -1370,6 +1376,11 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         startVoiceRecorder(micStreamRef.current);
       }
       if (!isMicMutedRef.current) {
+        if (recognitionRef.current) {
+          try { recognitionRef.current.abort(); } catch {}
+          recognitionRef.current = null;
+          isRecognitionRunningRef.current = false;
+        }
         startRecognition();
       }
     }
