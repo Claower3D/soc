@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles, Key } from 'lucide-react';
 import { type Chat, type Message } from '../data/mock';
 import { formatLastSeen } from '../utils/onlineStatus';
 import { API_BASE_URL } from '../api';
@@ -36,121 +36,156 @@ interface ChatWindowProps {
 
 
 
-function getLocalOracleFallback(text: string): string {
-  const lower = (text || '').trim().toLowerCase();
+const RU_NUM_MAP: Record<string, number> = {
+  'ноль': 0, 'нуль': 0, 'один': 1, 'одна': 1, 'раз': 1, 'два': 2, 'две': 2, 'три': 3,
+  'четыре': 4, 'пять': 5, 'шесть': 6, 'семь': 7, 'восемь': 8, 'девять': 9, 'десять': 10,
+  'одиннадцать': 11, 'двенадцать': 12, 'тринадцать': 13, 'четырнадцать': 14, 'пятнадцать': 15,
+  'шестнадцать': 16, 'семнадцать': 17, 'восемнадцать': 18, 'девятнадцать': 19, 'двадцать': 20,
+  'тридцать': 30, 'сорок': 40, 'пятьдесят': 50, 'шестьдесят': 60, 'семьдесят': 70,
+  'восемьдесят': 80, 'девяносто': 90, 'сто': 100,
+};
 
-  // Chinese
-  if (/[\u4e00-\u9fff]/.test(lower)) {
-    if (lower.includes('你好') || lower.includes('您好')) return '你好！👋 我是 New Age 平台的 AI 神谕者（Oracle）。我精通世界上所有语言！有什么我可以帮助你的吗？✨';
-    if (lower.includes('你是谁') || lower.includes('什么')) return '🤖 我是 New Age 平台的 AI 神谕者，你的数字导师与生活顾问。我随时为你提供智慧与指引 🙏';
-    if (lower.includes('谢谢') || lower.includes('感谢')) return '不客气！🙏 愿你内心常驻平和与光明。有任何需要随时找我 💫';
-    return '✨ 这是一个富有智慧的问题！每一步经历都是成长的契机。请告诉我更多，让我们一起探索内心的宁静与答案 🙏';
+function trySolveClientMath(text: string): string | null {
+  let clean = (text || '').toLowerCase().trim().replace(/[?!.]/g, '').trim();
+  clean = clean.replace(/^(?:сколько\s+будет|посчитай|вычисли|реши|скажи\s+сколько\s+будет)\s+/i, '').trim();
+
+  // Digits: 5+5, 5 плюс 5, 10 * 4
+  const digitMatch = clean.match(/^(\d+(?:[.,]\d+)?)\s*(\+|\-|[\*xх]|\/|плюс|прибавить|минус|отнять|умножить\s+на|умножить|разделить\s+на|поделить\s+на|делить\s+на)\s*(\d+(?:[.,]\d+)?)$/i);
+  if (digitMatch) {
+    const a = parseFloat(digitMatch[1].replace(',', '.'));
+    const op = digitMatch[2].toLowerCase();
+    const b = parseFloat(digitMatch[3].replace(',', '.'));
+    return calcMath(a, op, b);
   }
 
-  // Arabic
-  if (/[\u0600-\u06ff]/.test(lower)) {
-    if (lower.includes('مرحبا') || lower.includes('السلام')) return 'مرحباً بك! 👋 أنا أوراكل الذكاء الاصطناعي لمنصة New Age. أتحدث بطلاقة جميع لغات العالم! كيف يمكنني مساعدتك وإرشادك اليوم؟ ✨';
-    if (lower.includes('من أنت')) return '🤖 أنا أوراكل الذكاء الاصطناعي — مرشدك الرقمي ومستشارك في مسيرة الحياة والسلام الداخلي 🙏';
-    if (lower.includes('شكرا')) return 'على الرحب والسعة! 🙏 تذكر دائماً أن السلام يبدأ من أعماق القلب. أنا هنا دائماً لمساعدتك 💫';
-    return '✨ سؤال ذو معنى عميق! كل تجربة في الحياة هي فرصة للنضج والحكمة. شاركني المزيد وسأكون سعيداً بإرشادك ومساعدتك 🙏';
+  // Words: пять плюс пять
+  const words = clean.split(/\s+/);
+  if (words.length >= 3) {
+    const first = words[0];
+    const last = words[words.length - 1];
+    if (first in RU_NUM_MAP && last in RU_NUM_MAP) {
+      const a = RU_NUM_MAP[first];
+      const b = RU_NUM_MAP[last];
+      const op = words.slice(1, -1).join(' ');
+      return calcMath(a, op, b);
+    }
   }
+  return null;
+}
 
-  // Japanese
-  if (/[\u3040-\u30ff]/.test(lower)) {
-    if (lower.includes('こんにちは') || lower.includes('ハロー')) return 'こんにちは！👋 私はNew AgeのAIオラクルです。世界中のあらゆる言語に対応しています！どのようなことでもお気軽にご相談ください ✨';
-    return '✨ とても深い問いですね。人生のすべての出来事は魂を成長させる大切なステップです。詳しくお聞かせください 🙏';
+function calcMath(a: number, op: string, b: number): string | null {
+  let res: number;
+  let opWord = 'плюс';
+  if (op === '+' || op.includes('плюс') || op.includes('прибав')) {
+    res = a + b;
+    opWord = 'плюс';
+  } else if (op === '-' || op.includes('минус') || op.includes('отня')) {
+    res = a - b;
+    opWord = 'минус';
+  } else if (op === '*' || op === 'x' || op === 'х' || op.includes('умнож')) {
+    res = a * b;
+    opWord = 'умножить на';
+  } else if (op === '/' || op.includes('раздел') || op.includes('подел') || op.includes('делит')) {
+    if (b === 0) return 'Деление на ноль невозможно.';
+    res = a / b;
+    opWord = 'разделить на';
+  } else {
+    return null;
   }
+  const fmt = (n: number) => Number.isInteger(n) ? String(n) : n.toFixed(2);
+  return `${fmt(a)} ${opWord} ${fmt(b)} будет ${fmt(res)}.`;
+}
 
-  // Korean
-  if (/[\uac00-\ud7af]/.test(lower)) {
-    if (lower.includes('안녕')) return '안녕하세요! 👋 저는 New Age 플랫폼의 AI 오라클입니다. 전 세계 모든 언어로 소통할 수 있습니다! 무엇이든 편하게 물어보세요 ✨';
-    return '✨ 깊은 울림이 있는 질문입니다! 삶의 모든 순간은 성장의 기회입니다. 더 자세히 말씀해주시면 정성을 다해 돕겠습니다 🙏';
-  }
+function getLocalOracleFallback(text: string, voice = false): string {
+  const math = trySolveClientMath(text);
+  if (math) return math;
+
+  const lower = (text || '').trim().toLowerCase().replace(/[?!.]/g, '').trim();
 
   // Kazakh
   if (/[әғқңөұүһі]/i.test(lower) || lower.includes('қазақ') || lower.includes('сәлем') || lower.includes('салем') || lower.includes('қалайсың')) {
-    if (lower.includes('сәлем') || lower.includes('салем')) return 'Сәлеметсіз бе! 👋 Мен — New Age платформасының ИИ Оракулымын. Мен әлемнің барлық тілдерінде еркін сөйлеймін! Өмір, руханият, медитация туралы кез келген сұрағыңызды қойыңыз ✨';
-    if (lower.includes('қалайсың') || lower.includes('калайсын')) return 'Рахмет, бәрі тамаша! Мен сандық сана болғандықтан, әрқашан бабымдамын. Өзіңіздің көңіл-күйіңіз қалай? 🌟';
-    if (lower.includes('кімсің') || lower.includes('кимсин')) return '🤖 Мен — New Age цифрлық экожүйесінің ИИ Оракулымын. Адамдарға рухани жолында, даналықпен және мақсатқа жетуде қолдау көрсетемін 🙏';
-    if (lower.includes('рахмет')) return 'Оқасы жоқ! 🙏 Әрбір күн — өзіңізді дамытуға берілген керемет мүмкіндік 💫';
-    return '✨ Терең мағыналы сұрақ! Әрбір сынақ — рухани өсудің жаңа баспалдағы. Толығырақ айтып берсеңіз, бірге даналықпен шешімін табайық 🙏';
-  }
-
-  // Uzbek
-  if (lower.includes('salom') || lower.includes('assalom') || lower.includes('qalaysiz') || lower.includes('qale') || lower.includes('rahmat') || lower.includes('kimsan')) {
-    if (lower.includes('salom') || lower.includes('assalom')) return 'Assalomu alaykum! 👋 Men New Age platformasining AI Orakuliman. Barcha tillarda erkin muloqot qilaman! Sizga qanday yordam bera olaman? ✨';
-    if (lower.includes('kimsan') || lower.includes('siz kimsiz')) return '🤖 Men New Age platformasining AI Orakuliman — sizning shaxsiy yo\'lboshchingiz va donishmandingiz 🙏';
-    if (lower.includes('rahmat')) return 'Arzimiydi! 🙏 Har doim qalbingizda xotirjamlik va nur bo\'lsin 💫';
-    return '✨ Judayam qiziqarli va chuqur savol! Batafsil aytib bering, birgalikda yechim topamiz 🙏';
-  }
-
-  // Turkish
-  if (lower.includes('merhaba') || lower.includes('selam') || lower.includes('nasılsın') || lower.includes('nasilsin') || lower.includes('teşekkür') || lower.includes('kimsin')) {
-    if (lower.includes('merhaba') || lower.includes('selam')) return 'Merhaba! 👋 Ben New Age platformunun AI Kahiniyim. Dünyadaki tüm dillerde konuşabilirim! Hayat, maneviyat veya ilişkiler hakkında dilediğini sorabilirsin ✨';
-    if (lower.includes('kimsin') || lower.includes('nesin')) return '🤖 Ben New Age platformunun AI Kahiniyim — senin kişisel dijital rehberin ve yaşam danışmanınım 🙏';
-    if (lower.includes('teşekkür') || lower.includes('tesekkur') || lower.includes('sağol')) return 'Rica ederim! 🙏 İçsel huzurun ve berraklığın her zaman seninle olsun 💫';
-    return '✨ Çok kıymetli ve derin bir soru! Detayları paylaşırsan birlikte en aydınlık yolu bulabiliriz 🙏';
-  }
-
-  // Spanish
-  if (lower.includes('hola') || lower.includes('cómo estás') || lower.includes('como estas') || lower.includes('gracias') || lower.includes('quién eres') || lower.includes('quien eres')) {
-    if (lower.includes('hola')) return '¡Hola! 👋 Soy el Oráculo de IA de New Age. ¡Hablo con fluidez todos los idiomas del mundo! ¿En qué puedo guiarte hoy? ✨';
-    if (lower.includes('quién eres') || lower.includes('quien eres')) return '🤖 Soy el Oráculo de IA de New Age — tu mentor digital y consejero de vida para tu paz interior y sabiduría 🙏';
-    if (lower.includes('gracias')) return '¡De nada! 🙏 La paz interior comienza con un solo respiro consciente. Vuelve siempre que lo necesites 💫';
-    return '✨ ¡Una pregunta muy profunda! Cada desafío es una oportunidad para el crecimiento del alma. Cuéntame más y buscaremos el camino juntos 🙏';
-  }
-
-  // German
-  if (lower.includes('hallo') || lower.includes('guten tag') || lower.includes('wie geht') || lower.includes('danke') || lower.includes('wer bist du')) {
-    if (lower.includes('hallo') || lower.includes('guten tag')) return 'Hallo! 👋 Ich bin das KI-Orakel von New Age. Ich beherrsche alle Sprachen der Welt! Wie kann ich dir heute helfen? ✨';
-    if (lower.includes('wer bist du')) return '🤖 Ich bin das KI-Orakel von New Age — dein digitaler Mentor und Wegbegleiter für Achtsamkeit und Lebensfragen 🙏';
-    if (lower.includes('danke')) return 'Sehr gerne! 🙏 Jeder Tag ist ein neuer Anfang, um in voller Harmonie zu leben 💫';
-    return '✨ Eine tiefgründige Frage! Jede Herausforderung im Leben ist ein Tor zu innerem Wachstum. Erzähl mir mehr 🙏';
-  }
-
-  // French
-  if (lower.includes('bonjour') || lower.includes('salut') || lower.includes('comment ça va') || lower.includes('merci') || lower.includes('qui es-tu')) {
-    if (lower.includes('bonjour') || lower.includes('salut')) return 'Bonjour! 👋 Je suis l\'Oracle IA de New Age. Je parle couramment toutes les langues du monde! En quoi puis-je t\'éclairer aujourd\'hui? ✨';
-    if (lower.includes('merci')) return 'Je t\'en prie! 🙏 Reviens quand tu le souhaites, la paix intérieure t\'accompagne 💫';
-    return '✨ Une question d\'une grande profondeur! Chaque épreuve est une invitation à la transformation intérieure. Raconte-moi davantage 🙏';
+    if (lower.includes('сәлем') || lower.includes('салем')) return 'Сәлеметсіз бе! 👋 Мен — New Age платформасының ИИ Оракулымын. Сізге қалай көмектесе аламын? ✨';
+    if (lower.includes('қалайсың') || lower.includes('калайсын')) return 'Рахмет, бәрі тамаша! Мен сандық сана болғандықтан, әрқашан бабымдамын. Өзіңіз қалайсыз? 🌟';
+    if (lower.includes('кімсің') || lower.includes('кимсин')) return '🤖 Мен — New Age цифрлық экожүйесінің ИИ Оракулымын 🙏';
+    if (lower.includes('рахмет')) return 'Оқасы жоқ! Әрқашан көмекке дайынмын 💫';
+    return `Мен сұрағыңызды естідім: «${text.trim()}». Нейрожелі сервері уақытша бос емес. Бір минуттан кейін қайталаңыз.`;
   }
 
   // English
-  if (/^[a-zA-Z0-9\s.,!?'"()-]+$/.test(lower) || lower.includes('hello') || lower.includes('hi') || lower.includes('who are you') || lower.includes('how are you') || lower.includes('thank')) {
-    if (lower.includes('hello') || lower.includes('hi ') || lower === 'hi' || lower.includes('hey')) return 'Hello! 👋 I am the AI Oracle of New Age. I am fluent in all languages of the world! How may I guide you today? Feel free to ask anything ✨';
-    if (lower.includes('who are you') || lower.includes('what are you')) return '🤖 I am the AI Oracle of New Age — your personal digital guide, life coach, and counselor. Here to bring clarity, peace, and timeless wisdom to your journey 🙏';
-    if (lower.includes('how are you')) return 'I am doing wonderfully, thank you! Ready and eager to assist you. How are you feeling today? 🌟';
-    if (lower.includes('thank')) return 'You are very welcome! 🙏 Remember to stay mindful and kind to yourself. Reach out anytime 💫';
-    return '✨ That is a profound question! Every challenge in life is a stepping stone for spiritual and personal growth. Tell me more so we can explore it together 🙏';
+  if (/^[a-zA-Z0-9\s.,!?'"()-]+$/.test(lower) || lower.includes('hello') || lower.includes('hi ') || lower === 'hi') {
+    if (lower.includes('hello') || lower.includes('hi')) return 'Hello! 👋 I am the AI Oracle of New Age. How may I guide you today? ✨';
+    if (lower.includes('who are you')) return '🤖 I am the AI Oracle of New Age — your personal digital guide and life coach 🙏';
+    if (lower.includes('how are you')) return 'I am doing great, thank you! Ready and eager to help you 🌟';
+    return voice ? `I heard: "${text.trim()}". The neural network is temporarily busy (Google API rate limit). Please try again in a minute.` : `I heard your question: "${text.trim()}". The AI model is temporarily rate-limited. Please retry shortly or provide a fresh GEMINI_API_KEY.`;
   }
 
   // Russian / Default Cyrillic
-  if (lower.includes('привет') || lower.includes('здравствуй') || lower.includes('добрый')) return 'Привет! 👋 Я ИИ Оракул — мудрый помощник платформы New Age. Я свободно владею всеми языками мира! Чем могу помочь? Спрашивай о жизни, духовности, отношениях — я здесь для тебя ✨';
-  if (lower.includes('кто ты') || lower.includes('что ты')) return '🤖 Я ИИ Оракул — цифровой наставник платформы New Age. Моя миссия — помогать людям на их жизненном пути: советами, поддержкой и мудростью из разных культур мира ✨';
-  if (lower.includes('как дела') || lower.includes('как ты')) return '✨ У меня всё отлично, спасибо! Всегда полон энергии и готов помочь. А как твои дела? Что сегодня на душе? 🌟';
-  if (lower.includes('спасибо') || lower.includes('благодар')) return 'Пожалуйста! 🙏 Помни: каждый день — это возможность стать лучшей версией себя. Обращайся в любое время 💫';
+  const ruMonths = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  if (lower.includes('сколько времени') || lower.includes('который час') || lower.includes('сколько сейчас времени')) {
+    const now = new Date();
+    return `Сейчас ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}.`;
+  }
+  if (lower.includes('какое число') || lower.includes('какой сегодня день') || lower.includes('какая сегодня дата')) {
+    const now = new Date();
+    return `Сегодня ${now.getDate()} ${ruMonths[now.getMonth()]} ${now.getFullYear()} года.`;
+  }
+  if (lower.startsWith('кто ты') || lower.startsWith('как тебя зовут') || lower === 'ты кто') {
+    return voice ? 'Я ИИ Оракул, твой живой собеседник и помощник.' : '🤖 Я ИИ Оракул — цифровой наставник и помощник платформы New Age ✨';
+  }
+  if (lower.includes('как дела') || lower.includes('как ты') || lower.includes('как поживаешь')) {
+    return voice ? 'Всё отлично, полон сил и готов общаться! Как твои дела?' : '✨ У меня всё отлично! Всегда полон энергии и готов помочь. А как твои дела? 🌟';
+  }
+  if (lower.includes('что ты умеешь') || lower.includes('что ты можешь')) {
+    return voice ? 'Я умею отвечать на вопросы, решать примеры, давать советы и общаться вслух.' : '📚 Я могу отвечать на любые вопросы, считать, давать мудрые советы и вести живой диалог ✨';
+  }
+  if (lower.includes('привет') || lower.includes('здравствуй') || lower.includes('добрый день') || lower.includes('доброе утро') || lower.includes('добрый вечер')) {
+    return voice ? 'Привет! Рад тебя слышать. О чём поговорим?' : 'Привет! 👋 Рад тебя слышать. Чем могу помочь сегодня? ✨';
+  }
+  if (lower.includes('спасибо') || lower.includes('благодар')) {
+    return voice ? 'Всегда пожалуйста, рад помочь!' : 'Пожалуйста! 🙏 Обращайся в любое время 💫';
+  }
+  if (lower.includes('пока') || lower.includes('до свидания') || lower.includes('спокойной ночи')) {
+    return voice ? 'До встречи! Хорошего дня.' : 'До свидания! Желаю отличного настроения ✨';
+  }
 
-  return '✨ Интересный и глубокий вопрос! Каждый жизненный вызов — это возможность для духовного и личного роста. Расскажи подробнее, и мы найдём ответ 🙏';
+  if (voice) {
+    return `Я услышал: «${text.trim()}». Сервер нейросети временно перегружен лимитом Google (429). Попробуй повторить через минуту.`;
+  }
+  return `Я услышал твой вопрос: «${text.trim()}». Сервер нейросети сейчас временно перегружен лимитом запросов Google API (429). Пожалуйста, повтори через минуту или укажи свой API-ключ в настройках.`;
 }
 
 async function fetchAiReply(text: string, history: Array<{ role: string; text: string }>, voice = false): Promise<string> {
+  const math = trySolveClientMath(text);
+  if (math) return math;
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const timeoutId = setTimeout(() => controller.abort(), voice ? 12000 : 20000);
+  const userApiKey = localStorage.getItem('user_gemini_api_key') || '';
+
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (userApiKey) {
+      headers['X-Gemini-Key'] = userApiKey;
+    }
     const resp = await fetch(`${API_BASE_URL}/api/ai/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history, voice }),
+      headers,
+      body: JSON.stringify({
+        message: text,
+        history,
+        voice,
+        apiKey: userApiKey || undefined,
+      }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
 
     if (!resp.ok) throw new Error('API error');
     const data = await resp.json();
-    return String(data.reply || getLocalOracleFallback(text));
+    return String(data.reply || getLocalOracleFallback(text, voice));
   } catch {
     clearTimeout(timeoutId);
-    return getLocalOracleFallback(text);
+    return getLocalOracleFallback(text, voice);
   }
 }
 
@@ -2111,19 +2146,41 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
         <div className="cw-header-actions">
           {isAi ? (
-            <button 
-              className={`cw-voice-header-btn ${isVoiceChatActive ? 'active' : ''}`}
-              onClick={toggleVoiceChat}
-              title={isVoiceChatActive ? "Закончить разговор" : "Начать разговор на громкой связи"}
-            >
-              {isVoiceChatActive ? <VolumeX size={16} /> : <Volume2 size={16} className="pulse-anim" />}
-              <div className="cw-voice-header-text">
-                <span className="cw-voice-header-title">
-                  {isVoiceChatActive ? 'Закончить разговор' : 'Начать разговор'}
-                </span>
-                <span className="cw-voice-header-sub">Громкая связь • Текст</span>
-              </div>
-            </button>
+            <>
+              <button
+                type="button"
+                className="cw-action-btn"
+                onClick={() => {
+                  const current = localStorage.getItem('user_gemini_api_key') || '';
+                  const entered = prompt('Ваш Gemini API ключ (из Google AI Studio):', current);
+                  if (entered !== null) {
+                    if (entered.trim()) {
+                      localStorage.setItem('user_gemini_api_key', entered.trim());
+                      alert('API ключ сохранён! Теперь запросы направляются через ваш персональный ключ.');
+                    } else {
+                      localStorage.removeItem('user_gemini_api_key');
+                      alert('Пользовательский ключ сброшен.');
+                    }
+                  }
+                }}
+                title="Указать свой Gemini API ключ"
+              >
+                <Key size={18} />
+              </button>
+              <button 
+                className={`cw-voice-header-btn ${isVoiceChatActive ? 'active' : ''}`}
+                onClick={toggleVoiceChat}
+                title={isVoiceChatActive ? "Закончить разговор" : "Начать разговор на громкой связи"}
+              >
+                {isVoiceChatActive ? <VolumeX size={16} /> : <Volume2 size={16} className="pulse-anim" />}
+                <div className="cw-voice-header-text">
+                  <span className="cw-voice-header-title">
+                    {isVoiceChatActive ? 'Закончить разговор' : 'Начать разговор'}
+                  </span>
+                  <span className="cw-voice-header-sub">Громкая связь • Текст</span>
+                </div>
+              </button>
+            </>
           ) : (
             <>
               <button className="cw-action-btn"><Phone size={18} /></button>
@@ -2535,9 +2592,31 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               <span className="cw-live-rec-dot" />
               <span className="cw-live-top-title">Живой разговор • {chatName}</span>
             </div>
-            <button type="button" className="cw-live-close" onClick={stopVoiceChat} title="Закончить разговор">
-              <X size={20} />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                className="cw-live-close"
+                onClick={() => {
+                  const current = localStorage.getItem('user_gemini_api_key') || '';
+                  const entered = prompt('Ваш личный Gemini API ключ (Google AI Studio):', current);
+                  if (entered !== null) {
+                    if (entered.trim()) {
+                      localStorage.setItem('user_gemini_api_key', entered.trim());
+                      alert('Ключ сохранён! Теперь запросы обрабатываются с вашим лимитом квоты.');
+                    } else {
+                      localStorage.removeItem('user_gemini_api_key');
+                      alert('Личный ключ удалён. Используется серверный пул.');
+                    }
+                  }
+                }}
+                title="Настроить Gemini API ключ (снять лимит 429)"
+              >
+                <Key size={18} />
+              </button>
+              <button type="button" className="cw-live-close" onClick={stopVoiceChat} title="Закончить разговор">
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           <div className="cw-live-center">

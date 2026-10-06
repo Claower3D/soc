@@ -605,10 +605,13 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
       const sendOracleReply = async () => {
         let oracleAnswer = '';
         try {
+          const userKey = localStorage.getItem('user_gemini_api_key') || '';
+          const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+          if (userKey) headers['X-Gemini-Key'] = userKey;
           const resp = await fetch('/api/ai/chat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: userText, history: [] }),
+            headers,
+            body: JSON.stringify({ message: userText, history: [], apiKey: userKey || undefined }),
           });
           if (resp.ok) {
             const data = await resp.json();
@@ -620,28 +623,12 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
 
         if (!oracleAnswer) {
           const lower = userText.toLowerCase();
-          if (/[\u4e00-\u9fff]/.test(lower)) {
-            oracleAnswer = '你好！👋 我是 New Age 平台的 AI 神谕者（Oracle）。我精通世界上所有语言！有什么我可以帮助你的吗？✨';
-          } else if (/[\u0600-\u06ff]/.test(lower)) {
-            oracleAnswer = 'مرحباً بك! 👋 أنا أوراكل الذكاء الاصطناعي لمنصة New Age. أتحدث بطلاقة جميع لغات العالم! كيف يمكنني مساعدتك اليوم؟ ✨';
-          } else if (/[әғқңөұүһі]/i.test(lower) || lower.includes('сәлем') || lower.includes('қалайсың')) {
-            oracleAnswer = 'Сәлеметсіз бе! 👋 Мен — New Age платформасының ИИ Оракулымын. Мен әлемнің барлық тілдерінде еркін сөйлеймін! Сізге қалай көмектесе аламын? ✨';
-          } else if (lower.includes('salom') || lower.includes('qalaysiz')) {
-            oracleAnswer = 'Assalomu alaykum! 👋 Men New Age platformasining AI Orakuliman. Barcha tillarda erkin muloqot qilaman! Sizga qanday yordam bera olaman? ✨';
-          } else if (lower.includes('merhaba') || lower.includes('selam')) {
-            oracleAnswer = 'Merhaba! 👋 Ben New Age platformunun AI Kahiniyim. Dünyadaki tüm dillerde konuşabilirim! Size nasıl yardımcı olabilirim? ✨';
-          } else if (lower.includes('hola') || lower.includes('como estas')) {
-            oracleAnswer = '¡Hola! 👋 Soy el Oráculo de IA de New Age. ¡Hablo con fluidez todos los idiomas del mundo! ¿En qué puedo guiarte hoy? ✨';
-          } else if (lower.includes('hallo') || lower.includes('guten tag')) {
-            oracleAnswer = 'Hallo! 👋 Ich bin das KI-Orakel von New Age. Ich beherrsche alle Sprachen der Welt! Wie kann ich dir heute helfen? ✨';
-          } else if (lower.includes('bonjour') || lower.includes('salut')) {
-            oracleAnswer = 'Bonjour! 👋 Je suis l\'Oracle IA de New Age. Je parle couramment toutes les langues du monde! En quoi puis-je t\'éclairer aujourd\'hui? ✨';
-          } else if (/^[a-zA-Z0-9\s.,!?'"()-]+$/.test(lower) || lower.includes('hello') || lower.includes('hi')) {
-            oracleAnswer = 'Hello! 👋 I am the AI Oracle of New Age. I am fluent in all languages of the world! How may I guide you today? Feel free to ask anything ✨';
-          } else if (lower.includes('привет') || lower.includes('здравствуй') || lower.includes('хай')) {
-            oracleAnswer = '👋 Привет! Я ИИ Оракул — говорю на всех языках мира! Чем могу помочь? ✨';
+          if (lower.includes('привет') || lower.includes('здравствуй')) {
+            oracleAnswer = 'Привет! 👋 Рад тебя слышать. Чем могу помочь? ✨';
+          } else if (lower.includes('кто ты')) {
+            oracleAnswer = '🤖 Я ИИ Оракул — твой цифровой наставник и собеседник.';
           } else {
-            oracleAnswer = '✨ Мудрость и гармония всегда рядом. Задай любой вопрос на любом удобном для тебя языке мира! 🙏';
+            oracleAnswer = `Я услышал твой вопрос: «${userText.trim()}». Сервер нейросети временно перегружен лимитом Google (429). Повтори через минуту или укажи свой API-ключ в настройках.`;
           }
         }
 

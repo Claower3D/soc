@@ -5045,6 +5045,7 @@ const oracleSystemPrompt = `Ты — ИИ Оракул, мудрый цифро�
 type aiChatRequest struct {
 	Message string `json:"message"`
 	Voice   bool   `json:"voice"`
+	ApiKey  string `json:"apiKey,omitempty"`
 	History []struct {
 		Role string `json:"role"`
 		Text string `json:"text"`
@@ -5060,6 +5061,208 @@ const oracleVoicePrompt = `
 - Категорически запрещены любые списки, markdown, спецсимволы, смайлы, латиница.
 - Общайся тепло, дружелюбно, как настоящий чуткий собеседник.`
 
+var ruNumWords = map[string]float64{
+	"ноль": 0, "нуль": 0, "один": 1, "одна": 1, "раз": 1, "два": 2, "две": 2, "три": 3,
+	"четыре": 4, "пять": 5, "шесть": 6, "семь": 7, "восемь": 8, "девять": 9, "десять": 10,
+	"одиннадцать": 11, "двенадцать": 12, "тринадцать": 13, "четырнадцать": 14, "пятнадцать": 15,
+	"шестнадцать": 16, "семнадцать": 17, "восемнадцать": 18, "девятнадцать": 19, "двадцать": 20,
+	"тридцать": 30, "сорок": 40, "пятьдесят": 50, "шестьдесят": 60, "семьдесят": 70,
+	"восемьдесят": 80, "девяносто": 90, "сто": 100,
+}
+
+func solveSimpleMath(text string) (string, bool) {
+	clean := strings.ToLower(strings.TrimSpace(text))
+	clean = strings.TrimSuffix(clean, "?")
+	clean = strings.TrimSuffix(clean, ".")
+	clean = strings.TrimSuffix(clean, "!")
+	clean = strings.TrimSpace(clean)
+
+	rePrefix := regexp.MustCompile(`(?i)^(?:сколько\s+будет|посчитай|вычисли|реши|скажи\s+сколько\s+будет)\s+`)
+	clean = rePrefix.ReplaceAllString(clean, "")
+	clean = strings.TrimSpace(clean)
+
+	// Числовой шаблон: "5 + 5", "5 плюс 5", "10 * 4", "5*5", etc.
+	reDigit := regexp.MustCompile(`^(\d+(?:[.,]\d+)?)\s*(\+|\-|[\*xх]|/|плюс|прибавить|минус|отнять|умножить\s+на|умножить|разделить\s+на|поделить\s+на|делить\s+на)\s*(\d+(?:[.,]\d+)?)$`)
+	if m := reDigit.FindStringSubmatch(clean); len(m) == 4 {
+		aStr := strings.ReplaceAll(m[1], ",", ".")
+		bStr := strings.ReplaceAll(m[3], ",", ".")
+		a, err1 := strconv.ParseFloat(aStr, 64)
+		b, err2 := strconv.ParseFloat(bStr, 64)
+		if err1 == nil && err2 == nil {
+			return calculateMathResult(a, m[2], b)
+		}
+	}
+
+	// Словесный шаблон: "пять плюс пять", "два умножить на три"
+	words := strings.Fields(clean)
+	if len(words) >= 3 {
+		firstWord := words[0]
+		lastWord := words[len(words)-1]
+		if a, ok1 := ruNumWords[firstWord]; ok1 {
+			if b, ok2 := ruNumWords[lastWord]; ok2 {
+				middleOp := strings.Join(words[1:len(words)-1], " ")
+				return calculateMathResult(a, middleOp, b)
+			}
+		}
+	}
+
+	return "", false
+}
+
+func calculateMathResult(a float64, op string, b float64) (string, bool) {
+	op = strings.ToLower(strings.TrimSpace(op))
+	var res float64
+	var opText string
+
+	switch {
+	case op == "+" || op == "плюс" || op == "прибавить":
+		res = a + b
+		opText = "плюс"
+	case op == "-" || op == "минус" || op == "отнять":
+		res = a - b
+		opText = "минус"
+	case op == "*" || op == "x" || op == "х" || strings.HasPrefix(op, "умнож"):
+		res = a * b
+		opText = "умножить на"
+	case op == "/" || strings.HasPrefix(op, "раздел") || strings.HasPrefix(op, "подел") || strings.HasPrefix(op, "делит"):
+		if b == 0 {
+			return "Деление на ноль невозможно.", true
+		}
+		res = a / b
+		opText = "разделить на"
+	default:
+		return "", false
+	}
+
+	formatNum := func(n float64) string {
+		if n == float64(int64(n)) {
+			return fmt.Sprintf("%d", int64(n))
+		}
+		return fmt.Sprintf("%.2f", n)
+	}
+
+	return fmt.Sprintf("%s %s %s будет %s.", formatNum(a), opText, formatNum(b), formatNum(res)), true
+}
+
+func solveQuickAnswer(text string, isVoice bool) (string, bool) {
+	lower := strings.ToLower(strings.TrimSpace(text))
+	lower = strings.TrimSuffix(lower, "?")
+	lower = strings.TrimSuffix(lower, ".")
+	lower = strings.TrimSuffix(lower, "!")
+	lower = strings.TrimSpace(lower)
+
+	ruMonths := []string{"января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"}
+
+	if strings.Contains(lower, "сколько времени") || strings.Contains(lower, "который час") || strings.Contains(lower, "сколько сейчас времени") {
+		now := time.Now()
+		return fmt.Sprintf("Сейчас %02d:%02d.", now.Hour(), now.Minute()), true
+	}
+
+	if strings.Contains(lower, "какое сегодня число") || strings.Contains(lower, "какой сегодня день") || strings.Contains(lower, "какая сегодня дата") || lower == "число сегодня" {
+		now := time.Now()
+		m := int(now.Month()) - 1
+		if m >= 0 && m < 12 {
+			return fmt.Sprintf("Сегодня %d %s %d года.", now.Day(), ruMonths[m], now.Year()), true
+		}
+		return fmt.Sprintf("Сегодня %d.%02d.%d.", now.Day(), now.Month(), now.Year()), true
+	}
+
+	if lower == "кто ты" || lower == "как тебя зовут" || lower == "ты кто" || strings.HasPrefix(lower, "кто ты") || strings.HasPrefix(lower, "ты кто такой") {
+		if isVoice {
+			return "Я ИИ Оракул, твой живой собеседник и помощник.", true
+		}
+		return "🤖 Я ИИ Оракул — цифровой наставник и помощник платформы New Age ✨", true
+	}
+
+	if lower == "как дела" || lower == "как ты" || lower == "как поживаешь" || lower == "как жизнь" {
+		if isVoice {
+			return "Всё отлично, полон сил и готов общаться! Как твои дела?", true
+		}
+		return "✨ У меня всё отлично! Всегда полон энергии и готов помочь. А как твои дела? Что на душе? 🌟", true
+	}
+
+	if lower == "что ты умеешь" || lower == "что ты можешь" || lower == "какие твои функции" {
+		if isVoice {
+			return "Я умею отвечать на вопросы, считать примеры, давать советы и общаться вслух в реальном времени.", true
+		}
+		return "📚 Я могу отвечать на любые вопросы, считать, давать мудрые советы, поддерживать живую беседу и свободно говорить на всех языках ✨", true
+	}
+
+	if lower == "привет" || lower == "здравствуй" || lower == "здравствуйте" || lower == "добрый день" || lower == "доброе утро" || lower == "добрый вечер" || lower == "салют" {
+		if isVoice {
+			return "Привет! Рад тебя слышать. О чём поговорим?", true
+		}
+		return "Привет! 👋 Рад тебя слышать. Чем могу помочь сегодня? ✨", true
+	}
+
+	if lower == "спасибо" || lower == "благодарю" || lower == "большое спасибо" {
+		if isVoice {
+			return "Всегда пожалуйста, рад помочь!", true
+		}
+		return "Пожалуйста! 🙏 Обращайся в любое время 💫", true
+	}
+
+	if lower == "пока" || lower == "до свидания" || lower == "спокойной ночи" || lower == "до встречи" {
+		if isVoice {
+			return "До встречи! Хорошего дня.", true
+		}
+		return "До свидания! Желаю отличного настроения и душевного спокойствия ✨", true
+	}
+
+	return "", false
+}
+
+func getSmartFallbackReply(text string, isVoice bool, lastErr string) string {
+	clean := strings.TrimSpace(text)
+	if clean == "" {
+		if isVoice {
+			return "Я вас слушаю, говорите."
+		}
+		return "Я готов ответить на любой ваш вопрос."
+	}
+
+	is429 := strings.Contains(lastErr, "429")
+	if is429 {
+		if isVoice {
+			return fmt.Sprintf("Я услышал: «%s». Сервер нейросети временно перегружен лимитом Google (429). Попробуй повторить через минуту.", clean)
+		}
+		return fmt.Sprintf("Я услышал твой вопрос: «%s». Сервер нейросети временно перегружен лимитом запросов Google API (ошибка 429). Пожалуйста, повтори через минуту или укажи рабочий API-ключ в настройках.", clean)
+	}
+
+	if isVoice {
+		return fmt.Sprintf("Я услышал: «%s». Связь с нейросетью временно недоступна. Попробуй повторить через минуту.", clean)
+	}
+	return fmt.Sprintf("Я услышал твой вопрос: «%s». Сервер нейросети временно недоступен (%s). Пожалуйста, попробуй позже.", clean, lastErr)
+}
+
+func getGeminiAPIKeys(r *http.Request, directKey string) []string {
+	var keys []string
+	seen := make(map[string]bool)
+	addKey := func(k string) {
+		k = strings.TrimSpace(k)
+		if k != "" && !seen[k] {
+			seen[k] = true
+			keys = append(keys, k)
+		}
+	}
+
+	if directKey != "" {
+		addKey(directKey)
+	}
+	if r != nil {
+		if k := r.Header.Get("X-Gemini-Key"); k != "" {
+			addKey(k)
+		}
+	}
+	envKeys := os.Getenv("GEMINI_API_KEY")
+	for _, k := range strings.Split(envKeys, ",") {
+		for _, part := range strings.Split(k, ";") {
+			addKey(part)
+		}
+	}
+	return keys
+}
+
 func handleAIChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -5074,19 +5277,42 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.TrimSpace(req.Message) == "" {
+	msgClean := strings.TrimSpace(req.Message)
+	if msgClean == "" {
 		writeJSON(w, 400, map[string]string{"error": "empty message"})
 		return
 	}
 
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		// Без API ключа — используем встроенные ответы
-		reply := getLocalAIReply(req.Message)
+	// 1. Мгновенное решение арифметики (0ms latency, точный ответ)
+	if mathAns, ok := solveSimpleMath(msgClean); ok {
+		log.Printf("[AI] Мгновенный расчёт: «%s» -> «%s»", msgClean, mathAns)
+		writeJSON(w, 200, map[string]interface{}{
+			"status": "ok",
+			"reply":  mathAns,
+			"source": "local_math",
+		})
+		return
+	}
+
+	// 2. Мгновенные ответы на частые вопросы (время, дата, кто ты, как дела)
+	if quickAns, ok := solveQuickAnswer(msgClean, req.Voice); ok {
+		log.Printf("[AI] Мгновенный ответ: «%s» -> «%s»", msgClean, quickAns)
+		writeJSON(w, 200, map[string]interface{}{
+			"status": "ok",
+			"reply":  quickAns,
+			"source": "local_quick",
+		})
+		return
+	}
+
+	apiKeys := getGeminiAPIKeys(r, req.ApiKey)
+	if len(apiKeys) == 0 {
+		reply := getSmartFallbackReply(msgClean, req.Voice, "GEMINI_API_KEY not configured")
 		writeJSON(w, 200, map[string]interface{}{
 			"status": "ok",
 			"reply":  reply,
 			"source": "local",
+			"debug":  "no api keys",
 		})
 		return
 	}
@@ -5127,9 +5353,11 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 	sysPrompt := oracleSystemPrompt
 	maxTokens := 8192
 	models := []string{
-		"gemini-2.5-flash",
 		"gemini-2.0-flash",
+		"gemini-2.0-flash-lite",
 		"gemini-1.5-flash",
+		"gemini-1.5-flash-8b",
+		"gemini-2.5-flash",
 		"gemini-3.6-flash",
 		"gemini-3.5-flash",
 		"gemini-3.8-flash",
@@ -5147,9 +5375,11 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		maxTokens = 4096
 		thinkingConfig = nil
 		models = []string{
-			"gemini-2.5-flash",
 			"gemini-2.0-flash",
+			"gemini-2.0-flash-lite",
 			"gemini-1.5-flash",
+			"gemini-1.5-flash-8b",
+			"gemini-2.5-flash",
 			"gemini-3.6-flash",
 			"gemini-3.5-flash",
 			"gemini-3.8-flash",
@@ -5174,97 +5404,101 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bodyBytes, _ := json.Marshal(geminiBody)
-	var lastErr string
+	var errDetails []string
 
-	for _, model := range models {
-		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey)
-		reqTimeout := 25 * time.Second
-		if req.Voice {
-			reqTimeout = 20 * time.Second
-		}
-		ctx, cancel := context.WithTimeout(r.Context(), reqTimeout)
+	for _, apiKey := range apiKeys {
+		for _, model := range models {
+			url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey)
+			reqTimeout := 25 * time.Second
+			if req.Voice {
+				reqTimeout = 12 * time.Second
+			}
+			ctx, cancel := context.WithTimeout(r.Context(), reqTimeout)
 
-		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
-		if err != nil {
+			httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(bodyBytes))
+			if err != nil {
+				cancel()
+				log.Printf("[AI] Ошибка создания запроса для %s: %v", model, err)
+				errDetails = append(errDetails, fmt.Sprintf("%s: req err", model))
+				continue
+			}
+			httpReq.Header.Set("Content-Type", "application/json")
+
+			resp, err := http.DefaultClient.Do(httpReq)
+			if err != nil {
+				cancel()
+				log.Printf("[AI] Gemini API (%s) ошибка: %v", model, err)
+				errDetails = append(errDetails, fmt.Sprintf("%s: net err", model))
+				continue
+			}
+
+			respBody, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
 			cancel()
-			log.Printf("[AI] Ошибка создания запроса для %s: %v", model, err)
-			lastErr = fmt.Sprintf("req create error %s: %v", model, err)
-			continue
+
+			if resp.StatusCode == 503 || resp.StatusCode == 429 {
+				log.Printf("[AI] Модель %s перегружена (%d), пробуем следующую...", model, resp.StatusCode)
+				errDetails = append(errDetails, fmt.Sprintf("%s: %d", model, resp.StatusCode))
+				continue
+			}
+
+			if resp.StatusCode != 200 {
+				log.Printf("[AI] Gemini API (%s) %d: %s", model, resp.StatusCode, string(respBody[:min(len(respBody), 500)]))
+				errDetails = append(errDetails, fmt.Sprintf("%s: %d", model, resp.StatusCode))
+				continue
+			}
+
+			// Parse Gemini response
+			var geminiResp struct {
+				Candidates []struct {
+					Content struct {
+						Parts []struct {
+							Text string `json:"text"`
+						} `json:"parts"`
+					} `json:"content"`
+				} `json:"candidates"`
+			}
+
+			if err := json.Unmarshal(respBody, &geminiResp); err != nil || len(geminiResp.Candidates) == 0 {
+				log.Printf("[AI] Parse error (%s): %v, body: %s", model, err, string(respBody[:min(len(respBody), 300)]))
+				errDetails = append(errDetails, fmt.Sprintf("%s: parse err", model))
+				continue
+			}
+
+			reply := ""
+			for _, p := range geminiResp.Candidates[0].Content.Parts {
+				reply += p.Text
+			}
+
+			if strings.TrimSpace(reply) == "" {
+				errDetails = append(errDetails, fmt.Sprintf("%s: empty reply", model))
+				continue
+			}
+
+			if req.Voice {
+				reply = cleanVoiceReply(reply)
+			}
+
+			log.Printf("[AI] Успешный ответ от модели %s (длина %d)", model, len(reply))
+			writeJSON(w, 200, map[string]interface{}{
+				"status": "ok",
+				"reply":  reply,
+				"source": "gemini",
+				"model":  model,
+			})
+			return
 		}
-		httpReq.Header.Set("Content-Type", "application/json")
-
-		resp, err := http.DefaultClient.Do(httpReq)
-		if err != nil {
-			cancel()
-			log.Printf("[AI] Gemini API (%s) ошибка: %v", model, err)
-			lastErr = fmt.Sprintf("do error %s: %v", model, err)
-			continue
-		}
-
-		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		cancel()
-
-		if resp.StatusCode == 503 || resp.StatusCode == 429 {
-			log.Printf("[AI] Модель %s перегружена (%d), пробуем следующую...", model, resp.StatusCode)
-			lastErr = fmt.Sprintf("model %s: %d", model, resp.StatusCode)
-			continue
-		}
-
-		if resp.StatusCode != 200 {
-			log.Printf("[AI] Gemini API (%s) %d: %s", model, resp.StatusCode, string(respBody[:min(len(respBody), 500)]))
-			lastErr = fmt.Sprintf("model %s: %d %s", model, resp.StatusCode, string(respBody[:min(len(respBody), 250)]))
-			continue
-		}
-
-		// Parse Gemini response
-		var geminiResp struct {
-			Candidates []struct {
-				Content struct {
-					Parts []struct {
-						Text string `json:"text"`
-					} `json:"parts"`
-				} `json:"content"`
-			} `json:"candidates"`
-		}
-
-		if err := json.Unmarshal(respBody, &geminiResp); err != nil || len(geminiResp.Candidates) == 0 {
-			log.Printf("[AI] Parse error (%s): %v, body: %s", model, err, string(respBody[:min(len(respBody), 300)]))
-			lastErr = fmt.Sprintf("parse error %s: %v", model, err)
-			continue
-		}
-
-		reply := ""
-		for _, p := range geminiResp.Candidates[0].Content.Parts {
-			reply += p.Text
-		}
-
-		if strings.TrimSpace(reply) == "" {
-			lastErr = fmt.Sprintf("empty reply %s, raw: %s", model, string(respBody[:min(len(respBody), 200)]))
-			continue
-		}
-
-		if req.Voice {
-			reply = cleanVoiceReply(reply)
-		}
-
-		log.Printf("[AI] Ответ от модели %s (длина %d)", model, len(reply))
-		writeJSON(w, 200, map[string]interface{}{
-			"status": "ok",
-			"reply":  reply,
-			"source": "gemini",
-			"model":  model,
-		})
-		return
 	}
 
-	// Все модели отказали — fallback
-	log.Printf("[AI] Все модели недоступны: %s — используем локальные ответы", lastErr)
+	// Все модели и ключи отказали
+	allErrStr := strings.Join(errDetails, "; ")
+	log.Printf("[AI] Все модели недоступны: %s", allErrStr)
+	smartReply := getSmartFallbackReply(msgClean, req.Voice, allErrStr)
 	writeJSON(w, 200, map[string]interface{}{
 		"status": "ok",
-		"reply":  getLocalAIReply(req.Message),
-		"source": "local",
-		"debug":  lastErr,
+		"reply":  smartReply,
+		"source": "local_fallback",
+		"debug":  allErrStr,
 	})
 }
 
@@ -5316,12 +5550,6 @@ func cleanVoiceReply(t string) string {
 
 	if len(sentences) > 0 {
 		t = strings.Join(sentences, " ")
-	}
-
-	// Ограничение по объёму речи: до ~25 слов
-	words := strings.Fields(t)
-	if len(words) > 25 {
-		t = strings.Join(words[:25], " ") + "."
 	}
 
 	return strings.TrimSpace(t)
@@ -5680,8 +5908,8 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
+	apiKeys := getGeminiAPIKeys(r, "")
+	if len(apiKeys) == 0 {
 		writeJSON(w, 200, map[string]interface{}{
 			"status":  "ok",
 			"text":    "",
@@ -5777,100 +6005,74 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	type sttAttempt struct {
-		model string
-		body  map[string]interface{}
-	}
-	attempts := []sttAttempt{
-		{model: "gemini-2.5-flash", body: promptBody},
-		{model: "gemini-2.0-flash", body: promptBody},
-		{model: "gemini-1.5-flash", body: promptBody},
-		{model: "gemini-3.5-flash", body: promptBody},
-		{model: "gemini-3.6-flash", body: promptBody},
+	sttModels := []string{
+		"gemini-2.0-flash-lite",
+		"gemini-1.5-flash-8b",
+		"gemini-2.0-flash",
+		"gemini-1.5-flash",
+		"gemini-2.5-flash",
+		"gemini-3.5-flash",
+		"gemini-3.6-flash",
 	}
 
 	var transcript string
 	var usedModel string
-	for _, at := range attempts {
-		bodyBytes, _ := json.Marshal(at.body)
-		apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", at.model, apiKey)
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		httpReq, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
-		if err != nil {
-			cancel()
-			continue
-		}
-		httpReq.Header.Set("Content-Type", "application/json")
-		httpReq.Header.Set("x-goog-api-key", apiKey)
-
-		resp, err := http.DefaultClient.Do(httpReq)
-		if err != nil {
-			cancel()
-			log.Printf("[STT] %s error: %v", at.model, err)
-			continue
-		}
-		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		cancel()
-
-		if resp.StatusCode != 200 {
-			log.Printf("[STT] %s HTTP %d: %s", at.model, resp.StatusCode, string(respBody[:min(len(respBody), 250)]))
-			continue
-		}
-
-		usedModel = at.model
-		var geminiResp struct {
-			Candidates []struct {
-				Content struct {
-					Parts []struct {
-						Text string `json:"text"`
-					} `json:"parts"`
-				} `json:"content"`
-			} `json:"candidates"`
-		}
-
-		if err := json.Unmarshal(respBody, &geminiResp); err == nil && len(geminiResp.Candidates) > 0 {
-			var candidateText string
-			for _, p := range geminiResp.Candidates[0].Content.Parts {
-				candidateText += p.Text
+outerLoop:
+	for _, apiKey := range apiKeys {
+		for _, model := range sttModels {
+			bodyBytes, _ := json.Marshal(promptBody)
+			apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey)
+			ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
+			httpReq, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
+			if err != nil {
+				cancel()
+				continue
 			}
-			cleaned := cleanSTTTranscript(candidateText)
-			if cleaned != "" {
-				transcript = cleaned
-				log.Printf("[STT] ✅ Успешно расшифровано моделью %s: '%s'", at.model, transcript)
-				break
-			}
-		}
+			httpReq.Header.Set("Content-Type", "application/json")
+			httpReq.Header.Set("x-goog-api-key", apiKey)
 
-		// Попытка извлечь вложенный текст из структуры ответа
-		var genericMap map[string]interface{}
-		if err := json.Unmarshal(respBody, &genericMap); err == nil {
-			if candList, ok := genericMap["candidates"].([]interface{}); ok && len(candList) > 0 {
-				if firstCand, ok := candList[0].(map[string]interface{}); ok {
-					if content, ok := firstCand["content"].(map[string]interface{}); ok {
-						if parts, ok := content["parts"].([]interface{}); ok {
-							for _, partItem := range parts {
-								if partMap, ok := partItem.(map[string]interface{}); ok {
-									if txt, ok := partMap["text"].(string); ok && strings.TrimSpace(txt) != "" {
-										cleaned := cleanSTTTranscript(txt)
-										if cleaned != "" {
-											transcript = cleaned
-											log.Printf("[STT] ✅ Успешно извлечён текст %s: '%s'", at.model, transcript)
-											break
-										}
-									}
-								}
-							}
-						}
-					}
+			resp, err := http.DefaultClient.Do(httpReq)
+			if err != nil {
+				cancel()
+				log.Printf("[STT] %s error: %v", model, err)
+				continue
+			}
+			respBody, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			cancel()
+
+			if resp.StatusCode != 200 {
+				log.Printf("[STT] %s HTTP %d: %s", model, resp.StatusCode, string(respBody[:min(len(respBody), 250)]))
+				continue
+			}
+
+			usedModel = model
+			var geminiResp struct {
+				Candidates []struct {
+					Content struct {
+						Parts []struct {
+							Text string `json:"text"`
+						} `json:"parts"`
+					} `json:"content"`
+				} `json:"candidates"`
+			}
+
+			if err := json.Unmarshal(respBody, &geminiResp); err == nil && len(geminiResp.Candidates) > 0 {
+				var candidateText string
+				for _, p := range geminiResp.Candidates[0].Content.Parts {
+					candidateText += p.Text
+				}
+				cleaned := cleanSTTTranscript(candidateText)
+				if cleaned != "" {
+					transcript = cleaned
+					log.Printf("[STT] ✅ Успешно расшифровано моделью %s: '%s'", model, transcript)
+					break outerLoop
 				}
 			}
 		}
-
-		// Если модель вернула 200 OK — запрос выполнен штатно (даже если запись содержала только тишину)
-		log.Printf("[STT] %s ответила 200 (распознано: '%s')", at.model, transcript)
-		break
 	}
+
+
 
 	log.Printf("[STT] Итог аудио (%d байт, %s): '%s' [%s]", len(audioBytes), cleanMime, transcript, usedModel)
 
