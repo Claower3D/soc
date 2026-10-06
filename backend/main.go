@@ -5093,62 +5093,36 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 
 	// Формируем Gemini API запрос
 	contents := []map[string]interface{}{}
-
-	// Добавляем историю диалога (последние 10 сообщений)
 	history := req.History
-	// Фронтенд иногда кладёт текущее сообщение и в историю — убираем дубль
-	if n := len(history); n > 0 && history[n-1].Role != "assistant" && history[n-1].Role != "model" &&
-		strings.TrimSpace(history[n-1].Text) == strings.TrimSpace(req.Message) {
-		history = history[:n-1]
-	}
-	historyLimit := 10
+	historyLimit := 8
 	startIdx := 0
 	if len(history) > historyLimit {
 		startIdx = len(history) - historyLimit
 	}
 	for _, h := range history[startIdx:] {
-		if strings.TrimSpace(h.Text) == "" {
+		text := strings.TrimSpace(h.Text)
+		if text == "" {
 			continue
 		}
 		role := "user"
 		if h.Role == "assistant" || h.Role == "model" {
 			role = "model"
 		}
+		if len(contents) > 0 && contents[len(contents)-1]["role"] == role {
+			continue
+		}
 		contents = append(contents, map[string]interface{}{
 			"role":  role,
-			"parts": []map[string]string{{"text": h.Text}},
+			"parts": []map[string]string{{"text": text}},
 		})
 	}
-
-	// Текущее сообщение
+	if len(contents) > 0 && contents[len(contents)-1]["role"] == "user" {
+		contents = contents[:len(contents)-1]
+	}
 	contents = append(contents, map[string]interface{}{
 		"role":  "user",
 		"parts": []map[string]string{{"text": req.Message}},
 	})
-
-	// Гарантируем строгое чередование ролей user <-> model для Gemini API
-	var sanitizedContents []map[string]interface{}
-	for _, c := range contents {
-		role, _ := c["role"].(string)
-		if len(sanitizedContents) > 0 {
-			prevRole, _ := sanitizedContents[len(sanitizedContents)-1]["role"].(string)
-			if prevRole == role {
-				// Объединяем подряд идущие сообщения одной роли
-				prevParts, ok1 := sanitizedContents[len(sanitizedContents)-1]["parts"].([]map[string]string)
-				currParts, ok2 := c["parts"].([]map[string]string)
-				if ok1 && ok2 && len(prevParts) > 0 && len(currParts) > 0 {
-					prevParts[0]["text"] += "\n" + currParts[0]["text"]
-					sanitizedContents[len(sanitizedContents)-1]["parts"] = prevParts
-					continue
-				}
-			}
-		}
-		sanitizedContents = append(sanitizedContents, c)
-	}
-	if len(sanitizedContents) > 0 && sanitizedContents[0]["role"] != "user" {
-		sanitizedContents = sanitizedContents[1:]
-	}
-	contents = sanitizedContents
 
 	sysPrompt := oracleSystemPrompt
 	maxTokens := 8192
@@ -5159,11 +5133,11 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		sysPrompt = `Ты — ИИ Оракул в режиме ЖИВОГО ГОЛОСОВОГО РАЗГОВОРА.
 Твой ответ сразу озвучивается через динамик в реальном времени.
 ПРАВИЛА ДЛЯ ГОЛОСОВОГО ДИАЛОГА:
-1. Внимательно вслушайся в слова пользователя и ответь строго по теме его вопроса.
-2. Отвечай кратко, ёмко и понятно: 1–2 живых предложения (до 25–30 слов максимум).
+1. Внимательно вслушайся в вопрос и ответь строго по существу того, о чём говорит пользователь.
+2. Отвечай кратко, мудро и понятно: ровно 1–2 живых предложения.
 3. Общайся тепло, дружелюбно, как настоящий живой собеседник.
-4. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО: выдавать списки, нумерацию, перечисления, markdown (звёздочки, решётки), английские слова.`
-		maxTokens = 4096 // Достаточно токенов для thinking и ответа модели
+4. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО: выдавать списки, нумерацию, markdown (звёздочки, решётки), английские слова.`
+		maxTokens = 4096
 		thinkingConfig = nil
 		models = []string{"gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.8-flash"}
 	}
@@ -5200,7 +5174,7 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			cancel()
 			log.Printf("[AI] Ошибка создания запроса для %s: %v", model, err)
-			lastErr = err.Error()
+			lastErr = fmt.Sprintf("req create error %s: %v", model, err)
 			continue
 		}
 		httpReq.Header.Set("Content-Type", "application/json")
@@ -5209,7 +5183,7 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			cancel()
 			log.Printf("[AI] Gemini API (%s) ошибка: %v", model, err)
-			lastErr = err.Error()
+			lastErr = fmt.Sprintf("do error %s: %v", model, err)
 			continue
 		}
 
@@ -5225,7 +5199,7 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 
 		if resp.StatusCode != 200 {
 			log.Printf("[AI] Gemini API (%s) %d: %s", model, resp.StatusCode, string(respBody[:min(len(respBody), 500)]))
-			lastErr = fmt.Sprintf("model %s: %d", model, resp.StatusCode)
+			lastErr = fmt.Sprintf("model %s: %d %s", model, resp.StatusCode, string(respBody[:min(len(respBody), 250)]))
 			continue
 		}
 
@@ -5241,8 +5215,8 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := json.Unmarshal(respBody, &geminiResp); err != nil || len(geminiResp.Candidates) == 0 {
-			log.Printf("[AI] Parse error (%s): %v", model, err)
-			lastErr = "parse error"
+			log.Printf("[AI] Parse error (%s): %v, body: %s", model, err, string(respBody[:min(len(respBody), 300)]))
+			lastErr = fmt.Sprintf("parse error %s: %v", model, err)
 			continue
 		}
 
@@ -5252,7 +5226,7 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if strings.TrimSpace(reply) == "" {
-			lastErr = "empty reply"
+			lastErr = fmt.Sprintf("empty reply %s, raw: %s", model, string(respBody[:min(len(respBody), 200)]))
 			continue
 		}
 
@@ -5276,6 +5250,7 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		"status": "ok",
 		"reply":  getLocalAIReply(req.Message),
 		"source": "local",
+		"debug":  lastErr,
 	})
 }
 
