@@ -2231,29 +2231,23 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
         <div className="cw-header-info">
           <div className="cw-header-name">
-            {chatName}
-            {isAi && <span className="cw-ai-badge"></span>}
+            <span className="cw-header-name-text">{chatName}</span>
+            {isAi && <span className="cw-ai-badge">AI</span>}
           </div>
           <div className={`cw-header-status ${isOnline ? 'online' : ''}`}>
             {isAi ? (isAiTyping ? 'печатает...' : 'на связи') : isOnline ? 'в сети' : (chat.user?.lastSeenText || formatLastSeen(chat.user?.lastSeen, false, chat.user?.lastSeenText))}
           </div>
         </div>
 
-
         <div className="cw-header-actions">
           {isAi ? (
             <button 
               className={`cw-voice-header-btn ${isVoiceChatActive ? 'active' : ''}`}
               onClick={toggleVoiceChat}
-              title={isVoiceChatActive ? "Закончить разговор" : "Начать разговор на громкой связи"}
+              title={isVoiceChatActive ? "Закончить голосовой разговор" : "Голосовой разговор на громкой связи"}
             >
-              {isVoiceChatActive ? <VolumeX size={16} /> : <Volume2 size={16} className="pulse-anim" />}
-              <div className="cw-voice-header-text">
-                <span className="cw-voice-header-title">
-                  {isVoiceChatActive ? 'Закончить разговор' : 'Начать разговор'}
-                </span>
-                <span className="cw-voice-header-sub">Громкая связь • Текст</span>
-              </div>
+              {isVoiceChatActive ? <VolumeX size={17} /> : <Volume2 size={17} className="pulse-anim" />}
+              <span className="cw-voice-header-label">{isVoiceChatActive ? 'Стоп' : 'Голос'}</span>
             </button>
           ) : (
             <>
@@ -2921,10 +2915,9 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
             type="button"
             className={`cw-voice-input-btn ${isVoiceChatActive ? 'active' : ''}`}
             onClick={toggleVoiceChat}
-            title={isVoiceChatActive ? "Закончить разговор" : "Начать разговор на громкой связи"}
+            title={isVoiceChatActive ? "Закончить голосовой разговор" : "Голосовой диалог на громкой связи"}
           >
-            {isVoiceChatActive ? <VolumeX size={18} /> : <Mic size={18} />}
-            <span>{isVoiceChatActive ? 'Закончить разговор' : 'Начать разговор'}</span>
+            {isVoiceChatActive ? <VolumeX size={20} /> : <Mic size={20} />}
           </button>
         ) : (
           <>
