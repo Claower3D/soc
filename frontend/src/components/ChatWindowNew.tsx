@@ -480,6 +480,97 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const lastSpokenTimeRef = useRef<number>(0);
   const isProcessingSTTRef = useRef<boolean>(false);
   const [isTranscribingVoice, setIsTranscribingVoice] = useState(false);
+  const wavPcmChunksRef = useRef<Float32Array[]>([]);
+  const wavScriptNodeRef = useRef<ScriptProcessorNode | null>(null);
+
+  // Сборка 16-битного моно WAV с точной частотой 16 000 Гц для Google Speech Engine v2
+  const buildWav16kBlob = (pcmFloatSamples: Float32Array[], sourceSampleRate: number): Blob => {
+    let totalLen = 0;
+    for (const c of pcmFloatSamples) totalLen += c.length;
+    const merged = new Float32Array(totalLen);
+    let offset = 0;
+    for (const c of pcmFloatSamples) {
+      merged.set(c, offset);
+      offset += c.length;
+    }
+
+    const targetRate = 16000;
+    let downsampled: Float32Array;
+    if (sourceSampleRate === targetRate) {
+      downsampled = merged;
+    } else {
+      const ratio = sourceSampleRate / targetRate;
+      const newLen = Math.round(merged.length / ratio);
+      downsampled = new Float32Array(newLen);
+      for (let i = 0; i < newLen; i++) {
+        const pos = i * ratio;
+        const index = Math.floor(pos);
+        const frac = pos - index;
+        const nextIndex = Math.min(index + 1, merged.length - 1);
+        downsampled[i] = merged[index] * (1 - frac) + merged[nextIndex] * frac;
+      }
+    }
+
+    const numSamples = downsampled.length;
+    const pcm16 = new Int16Array(numSamples);
+    for (let i = 0; i < numSamples; i++) {
+      const s = Math.max(-1, Math.min(1, downsampled[i]));
+      pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+
+    const wavBuffer = new ArrayBuffer(44 + numSamples * 2);
+    const view = new DataView(wavBuffer);
+    const writeStr = (off: number, str: string) => {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(off + i, str.charCodeAt(i));
+      }
+    };
+
+    writeStr(0, 'RIFF');
+    view.setUint32(4, 36 + numSamples * 2, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true); // Linear PCM
+    view.setUint16(22, 1, true); // Mono
+    view.setUint32(24, targetRate, true); // 16000 Hz
+    view.setUint32(28, targetRate * 2, true); // Byte rate: 32000
+    view.setUint16(32, 2, true); // Block align: 2
+    view.setUint16(34, 16, true); // 16 bits
+    writeStr(36, 'data');
+    view.setUint32(40, numSamples * 2, true);
+
+    const pcmBytes = new Int16Array(wavBuffer, 44, numSamples);
+    pcmBytes.set(pcm16);
+
+    return new Blob([wavBuffer], { type: 'audio/wav' });
+  };
+
+  const startPcmCapture = (stream: MediaStream) => {
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return null;
+      const ctx = new Ctx();
+      const src = ctx.createMediaStreamSource(stream);
+      const proc = ctx.createScriptProcessor(4096, 1, 1);
+      const chunks: Float32Array[] = [];
+      proc.onaudioprocess = (e: AudioProcessingEvent) => {
+        chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      };
+      src.connect(proc);
+      proc.connect(ctx.destination);
+      return {
+        stop: (): Blob | null => {
+          try { proc.disconnect(); } catch {}
+          try { src.disconnect(); } catch {}
+          try { ctx.close(); } catch {}
+          return chunks.length > 0 ? buildWav16kBlob(chunks, ctx.sampleRate) : null;
+        }
+      };
+    } catch {
+      return null;
+    }
+  };
 
 
   
@@ -564,6 +655,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const pcmCapture = startPcmCapture(stream);
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -575,8 +667,10 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        const audioUrl = URL.createObjectURL(audioBlob);
+        const wavBlob = pcmCapture ? pcmCapture.stop() : null;
+        const mediaBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const finalAudioBlob = (wavBlob && wavBlob.size > 800) ? wavBlob : mediaBlob;
+        const audioUrl = URL.createObjectURL(finalAudioBlob);
 
         setIsRecording(false);
         stream.getTracks().forEach(track => track.stop());
@@ -597,12 +691,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         setMessages(updatedMessages);
         saveMessages(updatedMessages);
 
-        // Автоматическое фоновое распознавание речи пользователя
-        if (audioBlob.size > 400) {
+        // Автоматическое фоновое распознавание речи пользователя через Google Speech Engine v2
+        if (finalAudioBlob.size > 400) {
           try {
             const formData = new FormData();
-            formData.append('audio', audioBlob, 'speech.webm');
-            const resp = await fetch(`${API_BASE_URL}/api/ai/stt`, {
+            const fileName = finalAudioBlob.type.includes('wav') ? 'speech.wav' : 'speech.webm';
+            formData.append('audio', finalAudioBlob, fileName);
+            const resp = await fetch(`${API_BASE_URL}/api/v1/speech/recognize`, {
               method: 'POST',
               body: formData,
             });
@@ -1125,6 +1220,34 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.35;
       src.connect(analyser);
+
+      // Захват чистого PCM для 16 kHz WAV Google Speech Engine v2
+      try {
+        const processor = ctx.createScriptProcessor(4096, 1, 1);
+        wavPcmChunksRef.current = [];
+        processor.onaudioprocess = (e: AudioProcessingEvent) => {
+          if (voiceStatusRef.current === 'listening' && !isMicMutedRef.current) {
+            const data = e.inputBuffer.getChannelData(0);
+            wavPcmChunksRef.current.push(new Float32Array(data));
+            // Храним буфер последних ~10 секунд звука
+            const maxSamples = ctx.sampleRate * 10;
+            let total = 0;
+            for (let i = wavPcmChunksRef.current.length - 1; i >= 0; i--) {
+              total += wavPcmChunksRef.current[i].length;
+              if (total > maxSamples) {
+                wavPcmChunksRef.current.splice(0, i);
+                break;
+              }
+            }
+          }
+        };
+        src.connect(processor);
+        processor.connect(ctx.destination);
+        wavScriptNodeRef.current = processor;
+      } catch (procErr) {
+        console.warn('ScriptProcessor note:', procErr);
+      }
+
       audioCtxRef.current = ctx;
       const data = new Uint8Array(analyser.frequencyBinCount);
 
@@ -1145,10 +1268,9 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
             hasSpokenInTurnRef.current = true;
             setIsUserTalking(true);
 
-            // Если браузерный Web Speech уже выдал распознанный текст — его собственный таймер управляет отправкой!
-            // А если Web Speech еще не выдал текст (или не поддерживается), даём 1200мс тишины для отправки в серверный STT:
+            // Если Web Speech еще не выдал текст, даём быструю естественную паузу 600мс:
             if (!liveTranscriptRef.current && !finalTranscriptRef.current) {
-              scheduleSilenceCommit(1200);
+              scheduleSilenceCommit(600);
             }
           } else if (Date.now() - lastSpokenTimeRef.current > 350) {
             setIsUserTalking(false);
@@ -1170,6 +1292,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const stopMicLevel = () => {
     if (levelRafRef.current) cancelAnimationFrame(levelRafRef.current);
     levelRafRef.current = null;
+    if (wavScriptNodeRef.current) {
+      try {
+        wavScriptNodeRef.current.disconnect();
+        wavScriptNodeRef.current.onaudioprocess = null;
+      } catch {}
+      wavScriptNodeRef.current = null;
+    }
     try { audioCtxRef.current?.close(); } catch {}
     audioCtxRef.current = null;
     micStreamRef.current?.getTracks().forEach(t => t.stop());
@@ -1181,7 +1310,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRec) {
       // Если браузер не поддерживает SpeechRecognition (Firefox, некоторые WebView) —
-      // работает параллельный аудиопоток MediaRecorder + серверный Gemini STT
+      // работает параллельный аудиопоток 16 kHz WAV + серверный Google Speech Engine v2
       return;
     }
 
@@ -1240,10 +1369,8 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           lastSpokenTimeRef.current = Date.now();
           setIsUserTalking(true);
 
-          // Комфортный и живой переход без прерывания на полуслове:
-          // Если фраза финализирована движком — быстрая естественная пауза 450мс
-          // Если мысль продолжается (интерим-фрагмент) — 850мс
-          const pauseDelay = sessionInterim ? 850 : 450;
+          // Быстрый живой переход без задержек: 350мс для готовой фразы, 600мс для паузы в речи
+          const pauseDelay = sessionInterim ? 600 : 350;
           scheduleSilenceCommit(pauseDelay);
         }
       };
@@ -1286,7 +1413,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     }
   };
 
-  // Фиксация и отправка сказанной фразы (с автопереходом на серверный Gemini STT если браузер не расшифровал)
+  // Фиксация и отправка сказанной фразы (с автопереходом на серверный Google Speech Engine v2)
   const commitVoicePhrase = async () => {
     if (voiceStatusRef.current !== 'listening' || isProcessingSTTRef.current) return;
     isProcessingSTTRef.current = true;
@@ -1307,80 +1434,55 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         return;
       }
 
-      // 2. Если браузерный Web Speech API пустой (ошибка сети/Android WebView) — отправляем аудио в нейронный STT бэкенда
-      const currentRec = voiceRecorderRef.current;
-      if (currentRec && recordedVoiceChunksRef.current.length > 0 && hasSpokenInTurnRef.current) {
+      // 2. Если браузерный Web Speech API пустой (ошибка сети/Android WebView) — отправляем 16 kHz WAV в Google Speech Engine v2 бэкенда!
+      let audioBlob: Blob | null = null;
+      if (wavPcmChunksRef.current.length > 0 && audioCtxRef.current) {
+        audioBlob = buildWav16kBlob(wavPcmChunksRef.current, audioCtxRef.current.sampleRate);
+        wavPcmChunksRef.current = [];
+      } else if (recordedVoiceChunksRef.current.length > 0) {
+        const currentRec = voiceRecorderRef.current;
+        const mime = currentRec?.mimeType || 'audio/webm';
+        audioBlob = new Blob(recordedVoiceChunksRef.current, { type: mime });
+        recordedVoiceChunksRef.current = [];
+      }
+
+      if (audioBlob && audioBlob.size > 400 && hasSpokenInTurnRef.current) {
         setIsTranscribingVoice(true);
         voiceStatusRef.current = 'thinking';
         setVoiceStatus('thinking');
 
-        // Корректно завершаем текущую запись с сохранением всех чанков
-        await new Promise<void>((resolve) => {
-          let resolved = false;
-          const done = () => {
-            if (!resolved) {
-              resolved = true;
-              setTimeout(resolve, 60);
+        const formData = new FormData();
+        const ext = audioBlob.type.includes('wav') ? 'speech.wav' : 'speech.webm';
+        formData.append('audio', audioBlob, ext);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+        try {
+          const resp = await fetch(`${API_BASE_URL}/api/v1/speech/recognize`, {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          if (resp.ok) {
+            const data = await resp.json();
+            const recognized = cleanAndFormatTranscript(String(data.text || ''));
+            if (recognized && recognized.length >= 2 && !isNoiseOnly(recognized)) {
+              setIsTranscribingVoice(false);
+              liveTranscriptRef.current = '';
+              finalTranscriptRef.current = '';
+              setLiveTranscript('');
+              hasSpokenInTurnRef.current = false;
+              setIsUserTalking(false);
+              handleVoiceQuerySubmit(recognized);
+              return;
             }
-          };
-          currentRec.onstop = done;
-          try {
-            if (currentRec.state === 'recording') {
-              currentRec.stop();
-            } else {
-              done();
-            }
-          } catch {
-            done();
           }
-          setTimeout(done, 250);
-        });
-
-        const chunks = [...recordedVoiceChunksRef.current];
-        recordedVoiceChunksRef.current = [];
-
-        // Сразу перезапускаем рекордер для микрофона
-        if (isVoiceChatActiveRef.current && micStreamRef.current) {
-          startVoiceRecorder(micStreamRef.current);
-        }
-
-        const mime = currentRec.mimeType || 'audio/webm';
-        const audioBlob = new Blob(chunks, { type: mime });
-
-        if (audioBlob.size > 400) {
-          const formData = new FormData();
-          const ext = mime.includes('ogg') ? 'speech.ogg' : mime.includes('mp4') ? 'speech.mp4' : 'speech.webm';
-          formData.append('audio', audioBlob, ext);
-
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-          try {
-            const resp = await fetch(`${API_BASE_URL}/api/ai/stt`, {
-              method: 'POST',
-              body: formData,
-              signal: controller.signal,
-            });
-            clearTimeout(timeoutId);
-
-            if (resp.ok) {
-              const data = await resp.json();
-              const recognized = cleanAndFormatTranscript(String(data.text || ''));
-              if (recognized && recognized.length >= 2 && !isNoiseOnly(recognized)) {
-                setIsTranscribingVoice(false);
-                liveTranscriptRef.current = '';
-                finalTranscriptRef.current = '';
-                setLiveTranscript('');
-                hasSpokenInTurnRef.current = false;
-                setIsUserTalking(false);
-                handleVoiceQuerySubmit(recognized);
-                return;
-              }
-            }
-          } catch (fetchErr) {
-            clearTimeout(timeoutId);
-            console.warn('STT request timed out or network error:', fetchErr);
-          }
+        } catch (fetchErr) {
+          clearTimeout(timeoutId);
+          console.warn('STT request error:', fetchErr);
         }
         setIsTranscribingVoice(false);
       }

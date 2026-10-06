@@ -1181,6 +1181,8 @@ func main() {
 	mux.HandleFunc("GET /api/ai/tts", handleAITTS)
 	mux.HandleFunc("POST /api/ai/tts", handleAITTS)
 	mux.HandleFunc("POST /api/ai/stt", handleAISTT)
+	mux.HandleFunc("POST /api/v1/speech/recognize", handleAISTT)
+	mux.HandleFunc("POST /api/speech/recognize", handleAISTT)
 
 	// Раздача статики фронтенда (SPA fallback для продакшена на Railway)
 	distDir := os.Getenv("STATIC_DIR")
@@ -5393,7 +5395,7 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 2. Отвечай кратко, мудро и понятно: ровно 1–2 живых предложения.
 3. Общайся тепло, дружелюбно, как настоящий живой собеседник.
 4. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО: выдавать списки, нумерацию, markdown (звёздочки, решётки), английские слова.`
-		maxTokens = 4096
+		maxTokens = 150
 		thinkingConfig = nil
 		models = []string{
 			"gemini-flash-lite-latest",
@@ -5932,23 +5934,156 @@ func synthesizeGeminiTTS(parent context.Context, text, voice string) ([]byte, er
 	return nil, lastErr
 }
 
-// POST /api/ai/stt — Speech-to-Text transcription via Gemini multimodal audio
+// extractWAVPCM извлекает чистый Linear PCM 16-bit и частоту дискретизации из WAV-файла (RIFF контейнера)
+func extractWAVPCM(data []byte) (pcm []byte, sampleRate int, channels int, err error) {
+	if len(data) < 12 {
+		return data, 16000, 1, nil
+	}
+	if string(data[0:4]) != "RIFF" || string(data[8:12]) != "WAVE" {
+		return data, 16000, 1, nil
+	}
+
+	sampleRate = 16000
+	channels = 1
+	offset := 12
+
+	for offset+8 <= len(data) {
+		chunkID := string(data[offset : offset+4])
+		chunkSize := int(uint32(data[offset+4]) | uint32(data[offset+5])<<8 | uint32(data[offset+6])<<16 | uint32(data[offset+7])<<24)
+		offset += 8
+
+		if chunkSize < 0 || offset+chunkSize > len(data) {
+			chunkSize = len(data) - offset
+		}
+
+		if chunkID == "fmt " && chunkSize >= 16 {
+			channels = int(uint16(data[offset+2]) | uint16(data[offset+3])<<8)
+			sampleRate = int(uint32(data[offset+4]) | uint32(data[offset+5])<<8 | uint32(data[offset+6])<<16 | uint32(data[offset+7])<<24)
+		} else if chunkID == "data" {
+			pcm = data[offset : offset+chunkSize]
+			break
+		}
+
+		offset += chunkSize
+		if chunkSize%2 != 0 {
+			offset++
+		}
+	}
+
+	if len(pcm) == 0 {
+		if len(data) > 44 {
+			pcm = data[44:]
+		} else {
+			return nil, 0, 0, errors.New("empty WAV data chunk")
+		}
+	}
+
+	// Если стерео — микшируем в моно для идеального распознавания речи
+	if channels > 1 && len(pcm) >= 4 {
+		mono := make([]byte, len(pcm)/channels)
+		for i := 0; i+channels*2 <= len(pcm); i += channels * 2 {
+			var sum int32
+			for ch := 0; ch < channels; ch++ {
+				s := int16(uint16(pcm[i+ch*2]) | uint16(pcm[i+ch*2+1])<<8)
+				sum += int32(s)
+			}
+			avg := int16(sum / int32(channels))
+			idx := (i / channels)
+			mono[idx] = byte(avg)
+			mono[idx+1] = byte(avg >> 8)
+		}
+		pcm = mono
+		channels = 1
+	}
+
+	if sampleRate <= 0 {
+		sampleRate = 16000
+	}
+
+	return pcm, sampleRate, channels, nil
+}
+
+// recognizeWithGoogleSpeechV2 отправляет чистый Linear PCM 16-bit в Google Speech Engine v2
+func recognizeWithGoogleSpeechV2(pcm []byte, sampleRate int) (string, float64, error) {
+	if len(pcm) < 1600 {
+		return "", 0, errors.New("audio too short")
+	}
+	if sampleRate <= 0 {
+		sampleRate = 16000
+	}
+
+	url := "https://www.google.com/speech-api/v2/recognize?client=chromium&lang=ru-RU&key=AIzaSyBOti4mM-6x9WDnZIjIeyEU21OpBXqWBgw&pFilter=0"
+	req, err := http.NewRequest("POST", url, bytes.NewReader(pcm))
+	if err != nil {
+		return "", 0, err
+	}
+	req.Header.Set("Content-Type", fmt.Sprintf("audio/l16; rate=%d", sampleRate))
+
+	client := &http.Client{Timeout: 6 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", 0, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", 0, err
+	}
+
+	if resp.StatusCode != 200 {
+		return "", 0, fmt.Errorf("google speech API returned %d: %s", resp.StatusCode, string(body[:min(len(body), 150)]))
+	}
+
+	lines := strings.Split(string(body), "\n")
+	var bestTranscript string
+	var highestConfidence float64
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var gr struct {
+			Result []struct {
+				Alternative []struct {
+					Transcript string  `json:"transcript"`
+					Confidence float64 `json:"confidence"`
+				} `json:"alternative"`
+				Final bool `json:"final"`
+			} `json:"result"`
+		}
+		if err := json.Unmarshal([]byte(line), &gr); err != nil {
+			continue
+		}
+		for _, res := range gr.Result {
+			for _, alt := range res.Alternative {
+				clean := cleanSTTTranscript(alt.Transcript)
+				if clean == "" {
+					continue
+				}
+				if res.Final || alt.Confidence > highestConfidence || bestTranscript == "" {
+					bestTranscript = clean
+					if alt.Confidence > 0 {
+						highestConfidence = alt.Confidence
+					}
+				}
+			}
+		}
+	}
+
+	return bestTranscript, highestConfidence, nil
+}
+
+// POST /api/v1/speech/recognize & POST /api/ai/stt — распознавание речи
+// 1. Google Speech Recognition Engine v2 (Content-Type: audio/l16, lang: ru-RU)
+// 2. Фолбэк на Gemini Multimodal Audio STT
 func handleAISTT(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
-		return
-	}
-
-	apiKeys := getGeminiAPIKeys(r, "")
-	if len(apiKeys) == 0 {
-		writeJSON(w, 200, map[string]interface{}{
-			"status":  "ok",
-			"text":    "",
-			"warning": "GEMINI_API_KEY not configured",
-		})
 		return
 	}
 
@@ -6011,6 +6146,44 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 	}
 	if cleanMime == "" || cleanMime == "application/octet-stream" {
 		cleanMime = "audio/webm"
+	}
+
+	// =========================================================================
+	// Шаг 1 (Основной): Google Speech Recognition Engine v2 (audio/l16; rate=16000, lang=ru-RU)
+	// =========================================================================
+	isWav := bytes.HasPrefix(audioBytes, []byte("RIFF")) || cleanMime == "audio/wav"
+	if isWav {
+		pcm, sampleRate, _, err := extractWAVPCM(audioBytes)
+		if err == nil && len(pcm) >= 1600 {
+			googleTranscript, conf, gErr := recognizeWithGoogleSpeechV2(pcm, sampleRate)
+			if gErr == nil && googleTranscript != "" {
+				log.Printf("[STT] 🚀 Google Speech Engine v2 (%d Hz, conf: %.2f): '%s'", sampleRate, conf, googleTranscript)
+				writeJSON(w, 200, map[string]interface{}{
+					"status":     "ok",
+					"text":       googleTranscript,
+					"engine":     "google_speech_v2",
+					"model":      "google-speech-v2",
+					"sampleRate": sampleRate,
+				})
+				return
+			}
+			if gErr != nil {
+				log.Printf("[STT] Google Speech v2 note: %v", gErr)
+			}
+		}
+	}
+
+	// =========================================================================
+	// Шаг 2 (Каскадный фолбэк): Gemini Multimodal Audio STT
+	// =========================================================================
+	apiKeys := getGeminiAPIKeys(r, "")
+	if len(apiKeys) == 0 {
+		writeJSON(w, 200, map[string]interface{}{
+			"status": "ok",
+			"text":   "",
+			"engine": "none",
+		})
+		return
 	}
 
 	b64Audio := base64.StdEncoding.EncodeToString(audioBytes)
@@ -6106,13 +6279,12 @@ outerLoop:
 		}
 	}
 
-
-
 	log.Printf("[STT] Итог аудио (%d байт, %s): '%s' [%s]", len(audioBytes), cleanMime, transcript, usedModel)
 
 	writeJSON(w, 200, map[string]interface{}{
 		"status": "ok",
 		"text":   transcript,
+		"engine": "gemini",
 		"model":  usedModel,
 	})
 }
