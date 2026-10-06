@@ -1112,9 +1112,9 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
             hasSpokenInTurnRef.current = true;
             setIsUserTalking(true);
 
-            // Продлеваем паузу ожидания окончания мысли: 1150 мс тишины отправят аудио на распознавание
-            scheduleSilenceCommit(1150);
-          } else if (Date.now() - lastSpokenTimeRef.current > 400) {
+            // Мгновенный переход без задержек: 550 мс тишины отправят аудио на распознавание
+            scheduleSilenceCommit(550);
+          } else if (Date.now() - lastSpokenTimeRef.current > 300) {
             setIsUserTalking(false);
           }
         }
@@ -1204,10 +1204,10 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           lastSpokenTimeRef.current = Date.now();
           setIsUserTalking(true);
 
-          // Интеллектуальный тайм-аут паузы:
-          // Если мысль не закончена (интерим-фрагмент) — 1200мс для паузы без обрыва
-          // Если фраза финализирована движком — быстрая естественная пауза 850мс
-          const pauseDelay = sessionInterim ? 1200 : 850;
+          // Мгновенный естественный переход:
+          // Если фраза финализирована движком — мгновенно 300мс
+          // Если интерим-фрагмент — 600мс
+          const pauseDelay = sessionInterim ? 600 : 300;
           scheduleSilenceCommit(pauseDelay);
         }
       };
@@ -2539,18 +2539,6 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               <span className="cw-live-ring r1" />
               <span className="cw-live-ring r2" />
               <span className="cw-live-ring r3" />
-              {silenceProgress > 0 && voiceStatus === 'listening' && (
-                <svg className="cw-live-countdown-svg" viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="47" className="cw-countdown-bg" />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="47"
-                    className="cw-countdown-bar"
-                    style={{ strokeDashoffset: `${295.3 - (295.3 * silenceProgress) / 100}px` }}
-                  />
-                </svg>
-              )}
               <div className="cw-live-orb-core">
                 <img src={chatAvatar || '/ai_avatar.jpg'} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
               </div>
@@ -2561,11 +2549,9 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               {!isTranscribingVoice && voiceStatus === 'listening' && (
                 isMicMuted
                   ? 'Микрофон выключен'
-                  : silenceProgress > 0
-                    ? 'Слушаю вас… (пауза)'
-                    : isUserTalking
-                      ? 'Слышу вас… 🎙️'
-                      : 'Слушаю вас…'
+                  : isUserTalking
+                    ? 'Слышу вас… 🎙️'
+                    : 'Слушаю вас…'
               )}
               {!isTranscribingVoice && voiceStatus === 'thinking' && 'Оракул думает… ⚡'}
               {!isTranscribingVoice && voiceStatus === 'speaking' && 'Оракул говорит'}

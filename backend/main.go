@@ -5132,10 +5132,16 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 	var thinkingConfig map[string]interface{}
 
 	if req.Voice {
-		sysPrompt += oracleVoicePrompt
-		maxTokens = 200 // Короткие ответы: минимальное время генерации и мгновенный TTS
-		thinkingConfig = nil // Без задержки на thinkingBudget
-		models = []string{"gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-3.5-flash", "gemini-3.8-flash"} // Сверхбыстрая flash модель
+		sysPrompt = `Ты — ИИ Оракул в режиме ЖИВОГО ГОЛОСОВОГО РАЗГОВОРА.
+Твой ответ сразу озвучивается через динамик в реальном времени.
+ПРАВИЛА ДЛЯ ГОЛОСОВОГО ДИАЛОГА:
+1. Отвечай МОЛНИЕНОСНО и КРАТКО: ровно 1–2 лаконичных предложения (не более 15–20 слов).
+2. Выдавай сразу саму суть, тепло, мудро и по-человечески, как близкий друг в живой беседе.
+3. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО: выдавать длинные тексты, списки, нумерацию, перечисления, markdown (звёздочки, решётки), английские слова (например "Idea 1/2").
+4. Общайся только на чистом русском разговорном языке.`
+		maxTokens = 90 // Строгий лимит для моментальной генерации (sub-300ms)
+		thinkingConfig = nil // Никакого thinking budget
+		models = []string{"gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"} // Сверхбыстрая 2.0-flash первой
 	}
 
 	genConfig := map[string]interface{}{
@@ -5162,7 +5168,7 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, apiKey)
 		reqTimeout := 25 * time.Second
 		if req.Voice {
-			reqTimeout = 10 * time.Second
+			reqTimeout = 8 * time.Second
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), reqTimeout)
 
@@ -5226,6 +5232,10 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		if req.Voice {
+			reply = cleanVoiceReply(reply)
+		}
+
 		log.Printf("[AI] Ответ от модели %s (длина %d)", model, len(reply))
 		writeJSON(w, 200, map[string]interface{}{
 			"status": "ok",
@@ -5243,6 +5253,65 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		"reply":  getLocalAIReply(req.Message),
 		"source": "local",
 	})
+}
+
+func cleanVoiceReply(t string) string {
+	t = strings.TrimSpace(t)
+	if t == "" {
+		return ""
+	}
+	// Убираем markdown звёздочки, решётки, обратные кавычки
+	t = strings.ReplaceAll(t, "**", "")
+	t = strings.ReplaceAll(t, "*", "")
+	t = strings.ReplaceAll(t, "`", "")
+	t = strings.ReplaceAll(t, "#", "")
+
+	// Убираем паттерны типа "Idea 1:", "Пункт 1:", "Вариант 2:", "1. ", "- "
+	rePrefix := regexp.MustCompile(`(?i)(?:idea|вариант|пункт|шаг|мысль)\s*\d+[:.]?\s*`)
+	t = rePrefix.ReplaceAllString(t, "")
+	reList := regexp.MustCompile(`(?m)^\s*[\d+\-\*•]\.?\s+`)
+	t = reList.ReplaceAllString(t, "")
+
+	// Убираем переводы строк и множественные пробелы
+	reSpace := regexp.MustCompile(`\s+`)
+	t = reSpace.ReplaceAllString(t, " ")
+	t = strings.TrimSpace(t)
+
+	// Ограничиваем первыми 2 предложениями для мгновенного и естественного синтеза
+	sentences := make([]string, 0, 2)
+	runes := []rune(t)
+	var cur strings.Builder
+	for i, r := range runes {
+		cur.WriteRune(r)
+		if (r == '.' || r == '!' || r == '?') && i+1 < len(runes) && (unicode.IsSpace(runes[i+1]) || runes[i+1] == '"' || runes[i+1] == '»') {
+			s := strings.TrimSpace(cur.String())
+			if s != "" {
+				sentences = append(sentences, s)
+				cur.Reset()
+			}
+			if len(sentences) >= 2 {
+				break
+			}
+		}
+	}
+	if len(sentences) < 2 && cur.Len() > 0 {
+		s := strings.TrimSpace(cur.String())
+		if s != "" {
+			sentences = append(sentences, s)
+		}
+	}
+
+	if len(sentences) > 0 {
+		t = strings.Join(sentences, " ")
+	}
+
+	// Ограничение по объёму речи: до ~25 слов
+	words := strings.Fields(t)
+	if len(words) > 25 {
+		t = strings.Join(words[:25], " ") + "."
+	}
+
+	return strings.TrimSpace(t)
 }
 
 // ==================== NEURAL TEXT-TO-SPEECH (TTS) ====================
