@@ -5126,6 +5126,30 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		"parts": []map[string]string{{"text": req.Message}},
 	})
 
+	// Гарантируем строгое чередование ролей user <-> model для Gemini API
+	var sanitizedContents []map[string]interface{}
+	for _, c := range contents {
+		role, _ := c["role"].(string)
+		if len(sanitizedContents) > 0 {
+			prevRole, _ := sanitizedContents[len(sanitizedContents)-1]["role"].(string)
+			if prevRole == role {
+				// Объединяем подряд идущие сообщения одной роли
+				prevParts, ok1 := sanitizedContents[len(sanitizedContents)-1]["parts"].([]map[string]string)
+				currParts, ok2 := c["parts"].([]map[string]string)
+				if ok1 && ok2 && len(prevParts) > 0 && len(currParts) > 0 {
+					prevParts[0]["text"] += "\n" + currParts[0]["text"]
+					sanitizedContents[len(sanitizedContents)-1]["parts"] = prevParts
+					continue
+				}
+			}
+		}
+		sanitizedContents = append(sanitizedContents, c)
+	}
+	if len(sanitizedContents) > 0 && sanitizedContents[0]["role"] != "user" {
+		sanitizedContents = sanitizedContents[1:]
+	}
+	contents = sanitizedContents
+
 	sysPrompt := oracleSystemPrompt
 	maxTokens := 8192
 	models := []string{"gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.8-flash"}
@@ -5135,13 +5159,13 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		sysPrompt = `Ты — ИИ Оракул в режиме ЖИВОГО ГОЛОСОВОГО РАЗГОВОРА.
 Твой ответ сразу озвучивается через динамик в реальном времени.
 ПРАВИЛА ДЛЯ ГОЛОСОВОГО ДИАЛОГА:
-1. Отвечай МОЛНИЕНОСНО и КРАТКО: ровно 1–2 лаконичных предложения (не более 15–20 слов).
-2. Выдавай сразу саму суть, тепло, мудро и по-человечески, как близкий друг в живой беседе.
-3. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО: выдавать длинные тексты, списки, нумерацию, перечисления, markdown (звёздочки, решётки), английские слова (например "Idea 1/2").
-4. Общайся только на чистом русском разговорном языке.`
-		maxTokens = 90 // Строгий лимит для моментальной генерации (sub-300ms)
-		thinkingConfig = nil // Никакого thinking budget
-		models = []string{"gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"} // Сверхбыстрая 2.0-flash первой
+1. Внимательно вслушайся в слова пользователя и ответь строго по теме его вопроса.
+2. Отвечай кратко, ёмко и понятно: 1–2 живых предложения (до 25–30 слов максимум).
+3. Общайся тепло, дружелюбно, как настоящий живой собеседник.
+4. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО: выдавать списки, нумерацию, перечисления, markdown (звёздочки, решётки), английские слова.`
+		maxTokens = 220 // Достаточно токенов для 2 полных русских предложений без обрыва
+		thinkingConfig = nil // Без задержки на thinking
+		models = []string{"gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.8-flash"}
 	}
 
 	genConfig := map[string]interface{}{
@@ -5769,8 +5793,9 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		body  map[string]interface{}
 	}
 	attempts := []sttAttempt{
-		{model: "gemini-2.0-flash", body: promptBody},
-		{model: "gemini-1.5-flash", body: promptBody},
+		{model: "gemini-3.5-flash", body: promptBody},
+		{model: "gemini-3.6-flash", body: promptBody},
+		{model: "gemini-3.8-flash", body: promptBody},
 	}
 
 	var transcript string
