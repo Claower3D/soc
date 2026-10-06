@@ -5372,10 +5372,12 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 	sysPrompt := oracleSystemPrompt
 	maxTokens := 8192
 	models := []string{
-		"gemini-2.0-flash",
-		"gemini-2.0-flash-lite",
-		"gemini-1.5-flash",
-		"gemini-1.5-flash-8b",
+		"gemini-flash-lite-latest",
+		"gemini-2.5-flash-lite",
+		"gemini-3.1-flash-lite",
+		"gemini-3.5-flash-lite",
+		"gemini-flash-latest",
+		"gemini-3.7-flash",
 		"gemini-2.5-flash",
 		"gemini-3.6-flash",
 		"gemini-3.5-flash",
@@ -5394,10 +5396,12 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 		maxTokens = 4096
 		thinkingConfig = nil
 		models = []string{
-			"gemini-2.0-flash",
-			"gemini-2.0-flash-lite",
-			"gemini-1.5-flash",
-			"gemini-1.5-flash-8b",
+			"gemini-flash-lite-latest",
+			"gemini-2.5-flash-lite",
+			"gemini-3.1-flash-lite",
+			"gemini-3.5-flash-lite",
+			"gemini-flash-latest",
+			"gemini-3.7-flash",
 			"gemini-2.5-flash",
 			"gemini-3.6-flash",
 			"gemini-3.5-flash",
@@ -6036,13 +6040,13 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sttModels := []string{
-		"gemini-2.0-flash-lite",
-		"gemini-1.5-flash-8b",
-		"gemini-2.0-flash",
-		"gemini-1.5-flash",
+		"gemini-3.5-transcribe",
+		"gemini-flash-lite-latest",
+		"gemini-2.5-flash-lite",
+		"gemini-3.1-flash-lite",
+		"gemini-flash-latest",
 		"gemini-2.5-flash",
 		"gemini-3.5-flash",
-		"gemini-3.6-flash",
 	}
 
 	var transcript string
