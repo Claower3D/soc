@@ -210,12 +210,22 @@ type CtxMenu = { visible: boolean; x: number; y: number; msg: Message | null };
 
 
 
-function VoiceMessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
+function VoiceMessageBubble({ msg, isMe, onUpdateText }: { msg: Message; isMe: boolean; onUpdateText?: (t: string) => void }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [showText, setShowText] = useState(false);
+  const [showText, setShowText] = useState(Boolean(msg.text && !msg.text.includes('Это тестовое голосовое сообщение')));
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcribedText, setTranscribedText] = useState(
+    msg.text && !msg.text.includes('Это тестовое голосовое сообщение') ? msg.text : ''
+  );
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (msg.text && !msg.text.includes('Это тестовое голосовое сообщение')) {
+      setTranscribedText(msg.text);
+    }
+  }, [msg.text]);
 
   useEffect(() => {
     if (msg.mediaUrl) {
@@ -225,7 +235,7 @@ function VoiceMessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
         setProgress(0);
       };
       audioRef.current.ontimeupdate = () => {
-        if (audioRef.current) {
+        if (audioRef.current && audioRef.current.duration > 0) {
           setProgress((audioRef.current.currentTime / audioRef.current.duration) * 100);
         }
       };
@@ -234,7 +244,6 @@ function VoiceMessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
 
   useEffect(() => {
     if (!msg.mediaUrl) {
-      // Fake interval for old messages without mediaUrl
       let interval: any;
       if (isPlaying) {
         interval = setInterval(() => {
@@ -253,7 +262,7 @@ function VoiceMessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
 
   const togglePlay = () => {
     if (!isPlaying) {
-      if (audioRef.current) audioRef.current.play();
+      if (audioRef.current) audioRef.current.play().catch(() => {});
       setIsPlaying(true);
     } else {
       if (audioRef.current) audioRef.current.pause();
@@ -261,7 +270,41 @@ function VoiceMessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
     }
   };
   
-  const toggleText = () => setShowText(!showText);
+  const toggleText = async () => {
+    const nextState = !showText;
+    setShowText(nextState);
+
+    // Если открыли и текст еще не распознан — отправляем в нейросеть
+    if (nextState && !transcribedText && msg.mediaUrl) {
+      setIsTranscribing(true);
+      try {
+        const audioRes = await fetch(msg.mediaUrl);
+        const blob = await audioRes.blob();
+        const fd = new FormData();
+        fd.append('audio', blob, 'speech.webm');
+        const resp = await fetch(`${API_BASE_URL}/api/ai/stt`, {
+          method: 'POST',
+          body: fd,
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const clean = String(data.text || '').trim();
+          if (clean) {
+            setTranscribedText(clean);
+            if (onUpdateText) onUpdateText(clean);
+          } else {
+            setTranscribedText('Звук не распознан или запись пуста.');
+          }
+        } else {
+          setTranscribedText('Не удалось расшифровать запись.');
+        }
+      } catch {
+        setTranscribedText('Ошибка соединения при распознавании.');
+      } finally {
+        setIsTranscribing(false);
+      }
+    }
+  };
 
   return (
     <div style={{display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '220px', marginBottom: '4px'}}>
@@ -284,35 +327,42 @@ function VoiceMessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             <span style={{fontSize: '11px', opacity: 0.8}}>{isPlaying ? `0:0${Math.floor((progress||0)/20)}` : '0:05'}</span>
             <button 
+              type="button"
               onClick={toggleText}
+              title="Перевести речь в текст"
               style={{
                 background: showText ? (isMe ? 'rgba(255,255,255,0.3)' : 'var(--color-accent)') : 'transparent',
                 color: showText ? '#fff' : (isMe ? 'rgba(255,255,255,0.8)' : 'var(--color-text-secondary)'),
                 border: '1px solid ' + (isMe ? 'rgba(255,255,255,0.4)' : 'var(--color-border)'),
                 borderRadius: '6px',
-                padding: '2px 6px',
-                fontSize: '11px',
-                fontWeight: 'bold',
+                padding: '2px 7px',
+                fontSize: '11.5px',
+                fontWeight: 700,
                 cursor: 'pointer',
                 transition: '0.2s'
               }}
             >
-              T
+              {isTranscribing ? '…' : 'T'}
             </button>
           </div>
         </div>
       </div>
       {showText && (
         <div style={{
-          background: isMe ? 'rgba(255,255,255,0.1)' : 'var(--color-bg-card)', 
+          background: isMe ? 'rgba(255,255,255,0.12)' : 'var(--color-bg-card)', 
           padding: '8px 12px', 
           borderRadius: '8px', 
-          fontSize: '14px',
+          fontSize: '13.5px',
           color: isMe ? '#fff' : 'inherit',
           marginTop: '4px',
-          border: isMe ? 'none' : '1px solid var(--color-border)'
+          border: isMe ? 'none' : '1px solid var(--color-border)',
+          lineHeight: '1.45',
         }}>
-          {msg.text || 'Распознанный текст: Это голосовое сообщение.'}
+          {isTranscribing ? (
+            <span style={{ fontStyle: 'italic', opacity: 0.85 }}>⚡ Распознавание речи...</span>
+          ) : (
+            transcribedText || 'Звук не распознан или запись пуста.'
+          )}
         </div>
       )}
     </div>
@@ -400,6 +450,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const hasSpokenInTurnRef = useRef<boolean>(false);
   const lastSpokenTimeRef = useRef<number>(0);
   const isProcessingSTTRef = useRef<boolean>(false);
+  const [isTranscribingVoice, setIsTranscribingVoice] = useState(false);
 
 
   
@@ -494,25 +545,81 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         }
       };
 
-      mediaRecorder.onstop = () => {
+      mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
 
         setIsRecording(false);
+        stream.getTracks().forEach(track => track.stop());
+
+        const msgId = `msg_${Date.now()}`;
         const newMsg: Message = {
-          id: `msg_${Date.now()}`,
-          text: 'Распознанный текст: Это тестовое голосовое сообщение.',
+          id: msgId,
+          text: '',
           fromMe: true,
           time: formatTime(),
           status: 'sent',
           mediaType: 'voice',
-          mediaUrl: audioUrl, // Pass real audio URL
+          mediaUrl: audioUrl,
         };
-        const updatedMessages = [...messages, newMsg];
+        const currentMsgs = messagesRef.current;
+        const updatedMessages = [...currentMsgs, newMsg];
+        messagesRef.current = updatedMessages;
         setMessages(updatedMessages);
         saveMessages(updatedMessages);
 
-        stream.getTracks().forEach(track => track.stop());
+        // Автоматическое фоновое распознавание речи пользователя
+        if (audioBlob.size > 400) {
+          try {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'speech.webm');
+            const resp = await fetch(`${API_BASE_URL}/api/ai/stt`, {
+              method: 'POST',
+              body: formData,
+            });
+            if (resp.ok) {
+              const data = await resp.json();
+              const recognized = String(data.text || '').trim();
+              if (recognized) {
+                setMessages(prev => {
+                  const mapped = prev.map(m => m.id === msgId ? { ...m, text: recognized } : m);
+                  messagesRef.current = mapped;
+                  saveMessages(mapped);
+                  return mapped;
+                });
+
+                // Если диалог с ИИ Оракулом — генерируем ответ на распознанный голос
+                if (chat && (chat.id === 'chat_ai_oracle' || chat.id === 'ai_guru_bot')) {
+                  const history = [...messagesRef.current].map(m => ({
+                    role: m.fromMe ? 'user' : 'assistant',
+                    text: String(m.text || ''),
+                  }));
+                  setIsAiTyping(true);
+                  fetchAiReply(recognized, history).then(replyText => {
+                    setIsAiTyping(false);
+                    const reply: Message = {
+                      id: `msg_ai_${Date.now()}`,
+                      text: replyText,
+                      fromMe: false,
+                      time: formatTime(),
+                      status: 'read',
+                    };
+                    setMessages(curr => {
+                      const withReply = [...curr, reply];
+                      messagesRef.current = withReply;
+                      saveMessages(withReply);
+                      return withReply;
+                    });
+                  }).catch(() => {
+                    setIsAiTyping(false);
+                  });
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('Voice message auto-STT error:', e);
+          }
+        }
       };
 
       mediaRecorder.start();
@@ -998,16 +1105,17 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
         if (status === 'listening' && !isMicMutedRef.current) {
           level = Math.min(1, avg * 3.6);
-          const isSoundActive = avg > 0.042;
+          const isSoundActive = avg > 0.040;
 
           if (isSoundActive) {
             lastSpokenTimeRef.current = Date.now();
+            hasSpokenInTurnRef.current = true;
             setIsUserTalking(true);
 
-            // Если пользователь продолжает говорить или вздохнул — продлеваем паузу (не перебиваем мысль!)
-            if (liveTranscriptRef.current && silenceTimerRef.current) {
-              scheduleSilenceCommit(1200);
-            }
+            // Продлеваем паузу ожидания окончания мысли: 1150 мс тишины отправят аудио на распознавание
+            scheduleSilenceCommit(1150);
+          } else if (Date.now() - lastSpokenTimeRef.current > 400) {
+            setIsUserTalking(false);
           }
         }
 
@@ -1166,6 +1274,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
       // 2. Если браузерный Web Speech API пустой (ошибка сети/Android WebView) — отправляем аудио в нейронный STT бэкенда
       const currentRec = voiceRecorderRef.current;
       if (currentRec && recordedVoiceChunksRef.current.length > 0 && hasSpokenInTurnRef.current) {
+        setIsTranscribingVoice(true);
         voiceStatusRef.current = 'thinking';
         setVoiceStatus('thinking');
 
@@ -1203,13 +1312,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         const mime = currentRec.mimeType || 'audio/webm';
         const audioBlob = new Blob(chunks, { type: mime });
 
-        if (audioBlob.size > 500) {
+        if (audioBlob.size > 400) {
           const formData = new FormData();
           const ext = mime.includes('ogg') ? 'speech.ogg' : mime.includes('mp4') ? 'speech.mp4' : 'speech.webm';
           formData.append('audio', audioBlob, ext);
 
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000);
+          const timeoutId = setTimeout(() => controller.abort(), 9000);
 
           try {
             const resp = await fetch(`${API_BASE_URL}/api/ai/stt`, {
@@ -1223,6 +1332,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               const data = await resp.json();
               const recognized = cleanAndFormatTranscript(String(data.text || ''));
               if (recognized && recognized.length >= 2 && !isNoiseOnly(recognized)) {
+                setIsTranscribingVoice(false);
                 liveTranscriptRef.current = '';
                 finalTranscriptRef.current = '';
                 setLiveTranscript('');
@@ -1237,9 +1347,11 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
             console.warn('STT request timed out or network error:', fetchErr);
           }
         }
+        setIsTranscribingVoice(false);
       }
     } catch (e) {
       console.warn('commitVoicePhrase error:', e);
+      setIsTranscribingVoice(false);
     } finally {
       isProcessingSTTRef.current = false;
     }
@@ -1250,6 +1362,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     setLiveTranscript('');
     hasSpokenInTurnRef.current = false;
     setIsUserTalking(false);
+    setIsTranscribingVoice(false);
     if (isVoiceChatActiveRef.current) {
       voiceStatusRef.current = 'listening';
       setVoiceStatus('listening');
@@ -2444,7 +2557,8 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
             </div>
 
             <div className="cw-live-status">
-              {voiceStatus === 'listening' && (
+              {isTranscribingVoice && 'Распознаю голос… ⚡'}
+              {!isTranscribingVoice && voiceStatus === 'listening' && (
                 isMicMuted
                   ? 'Микрофон выключен'
                   : silenceProgress > 0
@@ -2453,20 +2567,22 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                       ? 'Слышу вас… 🎙️'
                       : 'Слушаю вас…'
               )}
-              {voiceStatus === 'thinking' && 'Оракул думает… ⚡'}
-              {voiceStatus === 'speaking' && 'Оракул говорит'}
-              {voiceStatus === 'idle' && 'Подключение…'}
+              {!isTranscribingVoice && voiceStatus === 'thinking' && 'Оракул думает… ⚡'}
+              {!isTranscribingVoice && voiceStatus === 'speaking' && 'Оракул говорит'}
+              {!isTranscribingVoice && voiceStatus === 'idle' && 'Подключение…'}
             </div>
             <div className="cw-live-hint">
-              {voiceStatus === 'speaking'
-                ? 'Нажмите на шар, чтобы перебить'
-                : voiceStatus === 'thinking'
-                  ? 'Оракул читает и отвечает…'
-                  : voiceStatus === 'listening' && !isMicMuted
-                    ? isUserTalking
-                      ? 'Слышу вас… Говорите свободно 🎙️'
-                      : 'Говорите свободно — слова сразу переносятся в текст и передаются Оракулу'
-                    : '\u00A0'}
+              {isTranscribingVoice
+                ? 'Нейросеть переводит речь в текст…'
+                : voiceStatus === 'speaking'
+                  ? 'Нажмите на шар, чтобы перебить'
+                  : voiceStatus === 'thinking'
+                    ? 'Оракул читает и отвечает…'
+                    : voiceStatus === 'listening' && !isMicMuted
+                      ? isUserTalking
+                        ? 'Слышу вас… Говорите свободно 🎙️'
+                        : 'Говорите свободно — слова сразу переносятся в текст и передаются Оракулу'
+                      : '\u00A0'}
             </div>
           </div>
 
@@ -2488,7 +2604,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                 </div>
               );
             })}
-            {voiceStatus === 'thinking' && (
+            {isTranscribingVoice && (
+              <div className="cw-live-line me live">
+                <span className="cw-live-who">Вы</span>
+                <span className="cw-live-text" style={{ fontStyle: 'italic', opacity: 0.85 }}>⚡ Распознаю речь...</span>
+              </div>
+            )}
+            {!isTranscribingVoice && voiceStatus === 'thinking' && (
               <div className="cw-live-line ai">
                 <span className="cw-live-who">Оракул</span>
                 <span className="cw-live-text"><span className="cw-live-thinking"><i /><i /><i /></span></span>

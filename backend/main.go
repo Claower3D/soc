@@ -4985,7 +4985,7 @@ func handleClips(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		log.Printf("Ошибка записи JSON: %v", err)
@@ -5651,7 +5651,21 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cleanMime := strings.Split(mimeType, ";")[0]
-	if cleanMime == "" {
+	if len(audioBytes) >= 4 {
+		// Определение формата по сигнатуре файла (magic bytes)
+		if bytes.HasPrefix(audioBytes, []byte("RIFF")) {
+			cleanMime = "audio/wav"
+		} else if bytes.HasPrefix(audioBytes, []byte("\x1a\x45\xdf\xa3")) {
+			cleanMime = "audio/webm"
+		} else if bytes.HasPrefix(audioBytes, []byte("OggS")) {
+			cleanMime = "audio/ogg"
+		} else if bytes.HasPrefix(audioBytes, []byte("ID3")) || (len(audioBytes) >= 2 && audioBytes[0] == 0xff && (audioBytes[1]&0xe0) == 0xe0) {
+			cleanMime = "audio/mp3"
+		} else if bytes.Contains(audioBytes[:min(len(audioBytes), 32)], []byte("ftyp")) {
+			cleanMime = "audio/mp4"
+		}
+	}
+	if cleanMime == "" || cleanMime == "application/octet-stream" {
 		cleanMime = "audio/webm"
 	}
 
@@ -5669,7 +5683,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 				"role": "user",
 				"parts": []interface{}{
 					map[string]string{
-						"text": "Ты высокоточная система распознавания речи (STT). Точно транскрибируй русскую речь из аудиозаписи (или на языке говорящего, если это другой язык). Напиши только распознанные слова с правильной орфографией и пунктуацией, без кавычек, префиксов и комментариев. Если звуков членораздельной речи нет (только тишина, дыхание или фоновый шум) — верни пустую строку.",
+						"text": "Ты высокоточная система распознавания русской речи (STT). Внимательно прослушай аудиозапись и дословно транскрибируй произнесенные слова в текст. Расставь правильные знаки препинания и заглавные буквы. Выведи ТОЛЬКО распознанный текст без кавычек, префиксов и комментариев. Если в записи только тишина, дыхание, вздох или фоновый шум без членораздельной речи — верни пустую строку.",
 					},
 					audioPart,
 				},
@@ -5677,7 +5691,7 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		},
 		"generationConfig": map[string]interface{}{
 			"temperature":     0.0,
-			"maxOutputTokens": 256,
+			"maxOutputTokens": 512,
 		},
 	}
 
@@ -5686,32 +5700,18 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		body  map[string]interface{}
 	}
 	attempts := []sttAttempt{
-		{model: "gemini-2.5-flash", body: promptBody},
 		{model: "gemini-2.0-flash", body: promptBody},
+		{model: "gemini-2.5-flash", body: promptBody},
 		{model: "gemini-1.5-flash", body: promptBody},
 		{model: "gemini-2.5-flash-lite", body: promptBody},
 		{model: "gemini-3.5-flash", body: promptBody},
-		{model: "gemini-3.8-flash", body: promptBody},
-		{
-			model: "gemini-3.5-transcribe",
-			body: map[string]interface{}{
-				"contents": []map[string]interface{}{
-					{"parts": []interface{}{audioPart}},
-				},
-				"generationConfig": map[string]interface{}{
-					"audioTranscriptionConfig": map[string]interface{}{
-						"mode": "SMART",
-					},
-				},
-			},
-		},
 	}
 
 	var transcript string
 	for _, at := range attempts {
 		bodyBytes, _ := json.Marshal(at.body)
 		apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", at.model, apiKey)
-		ctx, cancel := context.WithTimeout(r.Context(), 7*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 		httpReq, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
 		if err != nil {
 			cancel()
@@ -5750,15 +5750,15 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 			for _, p := range geminiResp.Candidates[0].Content.Parts {
 				candidateText += p.Text
 			}
-			candidateText = strings.Trim(strings.TrimSpace(candidateText), "\"«»")
-			if candidateText != "" {
-				transcript = candidateText
+			cleaned := cleanSTTTranscript(candidateText)
+			if cleaned != "" {
+				transcript = cleaned
 				log.Printf("[STT] ✅ Успешно расшифровано моделью %s: '%s'", at.model, transcript)
 				break
 			}
 		}
 
-		// Попытка извлечь вложенный текст из нестандартного ответа
+		// Попытка извлечь вложенный текст из структуры ответа
 		var genericMap map[string]interface{}
 		if err := json.Unmarshal(respBody, &genericMap); err == nil {
 			if candList, ok := genericMap["candidates"].([]interface{}); ok && len(candList) > 0 {
@@ -5768,9 +5768,12 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 							for _, partItem := range parts {
 								if partMap, ok := partItem.(map[string]interface{}); ok {
 									if txt, ok := partMap["text"].(string); ok && strings.TrimSpace(txt) != "" {
-										transcript = strings.Trim(strings.TrimSpace(txt), "\"«»")
-										log.Printf("[STT] ✅ Успешно извлечён текст %s: '%s'", at.model, transcript)
-										break
+										cleaned := cleanSTTTranscript(txt)
+										if cleaned != "" {
+											transcript = cleaned
+											log.Printf("[STT] ✅ Успешно извлечён текст %s: '%s'", at.model, transcript)
+											break
+										}
 									}
 								}
 							}
@@ -5792,6 +5795,59 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		"status": "ok",
 		"text":   transcript,
 	})
+}
+
+// cleanSTTTranscript очищает результат от служебных фраз нейросети и кавычек
+func cleanSTTTranscript(t string) string {
+	t = strings.TrimSpace(t)
+	t = strings.Trim(t, "\"`'«»“”*")
+	t = strings.TrimSpace(t)
+	low := strings.ToLower(t)
+
+	// Отсекаем фразы-галлюцинации когда в аудио тишина или нет речи
+	hallucinations := []string{
+		"в аудиозаписи нет речи",
+		"в аудиозаписи отсутствует речь",
+		"в аудио нет речи",
+		"нет речи",
+		"звуков речи нет",
+		"звуки речи отсутствуют",
+		"звук отсутствует",
+		"тишина",
+		"пустая аудиозапись",
+		"запись пустая",
+		"фоновый шум",
+		"неразборчиво",
+		"речь не обнаружена",
+		"речь отсутствует",
+		"аудио не содержит речи",
+		"в записи только шум",
+		"голос не обнаружен",
+		"не слышно речи",
+		"ничего не слышно",
+		"no speech",
+		"silence",
+		"empty audio",
+		"[тишина]",
+		"(тишина)",
+	}
+	for _, h := range hallucinations {
+		if low == h || strings.HasPrefix(low, h) {
+			return ""
+		}
+	}
+	// Проверяем наличие хотя бы одного печатного слова/цифры
+	hasWord := false
+	for _, r := range t {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			hasWord = true
+			break
+		}
+	}
+	if !hasWord {
+		return ""
+	}
+	return t
 }
 
 // resolveDirectChat находит или создает детерминированный диалог между двумя пользователями
