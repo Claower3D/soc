@@ -5126,7 +5126,14 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 
 	sysPrompt := oracleSystemPrompt
 	maxTokens := 8192
-	models := []string{"gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.8-flash"}
+	models := []string{
+		"gemini-2.5-flash",
+		"gemini-2.0-flash",
+		"gemini-1.5-flash",
+		"gemini-3.6-flash",
+		"gemini-3.5-flash",
+		"gemini-3.8-flash",
+	}
 	var thinkingConfig map[string]interface{}
 
 	if req.Voice {
@@ -5139,7 +5146,14 @@ func handleAIChat(w http.ResponseWriter, r *http.Request) {
 4. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО: выдавать списки, нумерацию, markdown (звёздочки, решётки), английские слова.`
 		maxTokens = 4096
 		thinkingConfig = nil
-		models = []string{"gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.8-flash"}
+		models = []string{
+			"gemini-2.5-flash",
+			"gemini-2.0-flash",
+			"gemini-1.5-flash",
+			"gemini-3.6-flash",
+			"gemini-3.5-flash",
+			"gemini-3.8-flash",
+		}
 	}
 
 	genConfig := map[string]interface{}{
@@ -5768,9 +5782,11 @@ func handleAISTT(w http.ResponseWriter, r *http.Request) {
 		body  map[string]interface{}
 	}
 	attempts := []sttAttempt{
+		{model: "gemini-2.5-flash", body: promptBody},
+		{model: "gemini-2.0-flash", body: promptBody},
+		{model: "gemini-1.5-flash", body: promptBody},
 		{model: "gemini-3.5-flash", body: promptBody},
 		{model: "gemini-3.6-flash", body: promptBody},
-		{model: "gemini-3.8-flash", body: promptBody},
 	}
 
 	var transcript string
