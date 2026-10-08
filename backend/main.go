@@ -1180,6 +1180,10 @@ func main() {
 	mux.HandleFunc("POST /api/oracle", handleAIChat)
 	mux.HandleFunc("GET /api/ai/tts", handleAITTS)
 	mux.HandleFunc("POST /api/ai/tts", handleAITTS)
+	mux.HandleFunc("GET /api/ai/translate", handleAITranslate)
+	mux.HandleFunc("POST /api/ai/translate", handleAITranslate)
+	mux.HandleFunc("GET /api/translate", handleAITranslate)
+	mux.HandleFunc("POST /api/translate", handleAITranslate)
 	mux.HandleFunc("POST /api/ai/stt", handleAISTT)
 	mux.HandleFunc("POST /api/v1/speech/recognize", handleAISTT)
 	mux.HandleFunc("POST /api/speech/recognize", handleAISTT)
@@ -5754,11 +5758,12 @@ func handleAITTS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 1) Нейронный Gemini TTS — живой, естественный голос с интонациями
-	finalBytes, err := synthesizeGeminiTTS(r.Context(), clean, voice)
-	if err != nil {
-		log.Printf("[TTS] Gemini TTS недоступен: %v — используем резервный синтез", err)
-		// 2) Резерв: Google Translate TTS
+	var finalBytes []byte
+	var err error
+
+	// Для языков мира, отличных от русского (en, es, kk, de, fr, zh, tr, ja, ar, it и т.д.),
+	// используем прямой синтез Google Translate TTS с аутентичным произношением носителей языка
+	if lang != "" && !strings.HasPrefix(strings.ToLower(lang), "ru") {
 		chunks := splitTextIntoTTSChunks(clean, 130)
 		var combined bytes.Buffer
 		for _, chunk := range chunks {
@@ -5767,12 +5772,37 @@ func handleAITTS(w http.ResponseWriter, r *http.Request) {
 			}
 			b, cErr := fetchGoogleTTSChunk(chunk, lang)
 			if cErr != nil {
-				log.Printf("[TTS Error] chunk '%s': %v", chunk, cErr)
+				log.Printf("[TTS Error] chunk '%s' (%s): %v", chunk, lang, cErr)
 				continue
 			}
 			combined.Write(b)
 		}
-		finalBytes = combined.Bytes()
+		if combined.Len() > 0 {
+			finalBytes = combined.Bytes()
+		}
+	}
+
+	if len(finalBytes) == 0 {
+		// 1) Нейронный Gemini TTS — живой, естественный голос с интонациями (для русского)
+		finalBytes, err = synthesizeGeminiTTS(r.Context(), clean, voice)
+		if err != nil {
+			log.Printf("[TTS] Gemini TTS недоступен: %v — используем резервный синтез", err)
+			// 2) Резерв: Google Translate TTS
+			chunks := splitTextIntoTTSChunks(clean, 130)
+			var combined bytes.Buffer
+			for _, chunk := range chunks {
+				if strings.TrimSpace(chunk) == "" {
+					continue
+				}
+				b, cErr := fetchGoogleTTSChunk(chunk, lang)
+				if cErr != nil {
+					log.Printf("[TTS Error] chunk '%s': %v", chunk, cErr)
+					continue
+				}
+				combined.Write(b)
+			}
+			finalBytes = combined.Bytes()
+		}
 	}
 
 	if len(finalBytes) == 0 {
@@ -5807,6 +5837,234 @@ func writeTTSAudio(w http.ResponseWriter, data []byte) {
 	w.Header().Set("Accept-Ranges", "bytes")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	_, _ = w.Write(data)
+}
+
+// ==================== MULTI-LANGUAGE TRANSLATION ====================
+
+var (
+	translateCacheMu sync.RWMutex
+	translateCache   = make(map[string]string)
+	translateClient  = &http.Client{Timeout: 8 * time.Second}
+)
+
+func translateGoogleGTX(text, sourceLang, targetLang string) (string, string, error) {
+	if sourceLang == "" {
+		sourceLang = "auto"
+	}
+	apiURL := fmt.Sprintf("https://translate.googleapis.com/translate_a/single?client=gtx&sl=%s&tl=%s&dt=t&q=%s",
+		url.QueryEscape(sourceLang),
+		url.QueryEscape(targetLang),
+		url.QueryEscape(text),
+	)
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return "", "", err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "*/*")
+
+	resp, err := translateClient.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("upstream status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", err
+	}
+
+	var parsed []interface{}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return "", "", err
+	}
+	if len(parsed) == 0 {
+		return "", "", errors.New("empty response from translate")
+	}
+
+	var sb strings.Builder
+	if sentences, ok := parsed[0].([]interface{}); ok {
+		for _, s := range sentences {
+			if parts, ok := s.([]interface{}); ok && len(parts) > 0 {
+				if t, ok := parts[0].(string); ok {
+					sb.WriteString(t)
+				}
+			}
+		}
+	}
+	result := sb.String()
+	if result == "" {
+		return "", "", errors.New("no translated text parsed")
+	}
+
+	detected := sourceLang
+	if len(parsed) > 2 {
+		if d, ok := parsed[2].(string); ok && d != "" {
+			detected = d
+		}
+	}
+
+	return result, detected, nil
+}
+
+func translateGeminiFallback(ctx context.Context, text, targetLang string) (string, error) {
+	apiKeys := getGeminiAPIKeys(nil, "")
+	if len(apiKeys) == 0 {
+		return "", errors.New("no gemini api key")
+	}
+	prompt := fmt.Sprintf("Translate the following text accurately into target language code '%s'. Output ONLY the raw translated text, without markdown, without quotes, without explanations:\n\n%s", targetLang, text)
+
+	body := map[string]interface{}{
+		"contents": []map[string]interface{}{
+			{"parts": []map[string]string{{"text": prompt}}},
+		},
+		"generationConfig": map[string]interface{}{
+			"temperature":     0.2,
+			"maxOutputTokens": 1000,
+		},
+	}
+	bodyBytes, _ := json.Marshal(body)
+
+	for _, key := range apiKeys {
+		apiURL := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=%s", key)
+		req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(bodyBytes))
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			continue
+		}
+		respBytes, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			var gr struct {
+				Candidates []struct {
+					Content struct {
+						Parts []struct {
+							Text string `json:"text"`
+						} `json:"parts"`
+					} `json:"content"`
+				} `json:"candidates"`
+			}
+			if err := json.Unmarshal(respBytes, &gr); err == nil && len(gr.Candidates) > 0 && len(gr.Candidates[0].Content.Parts) > 0 {
+				return strings.TrimSpace(gr.Candidates[0].Content.Parts[0].Text), nil
+			}
+		}
+	}
+	return "", errors.New("gemini translation failed")
+}
+
+func handleAITranslate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	var text, targetLang, sourceLang string
+	if r.Method == "POST" {
+		var req struct {
+			Text   string `json:"text"`
+			Target string `json:"target"`
+			Source string `json:"source"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		text = req.Text
+		targetLang = req.Target
+		sourceLang = req.Source
+	}
+	if text == "" {
+		text = r.URL.Query().Get("text")
+		if text == "" {
+			text = r.URL.Query().Get("q")
+		}
+	}
+	if targetLang == "" {
+		targetLang = r.URL.Query().Get("to")
+		if targetLang == "" {
+			targetLang = r.URL.Query().Get("target")
+			if targetLang == "" {
+				targetLang = "en"
+			}
+		}
+	}
+	if sourceLang == "" {
+		sourceLang = r.URL.Query().Get("from")
+		if sourceLang == "" {
+			sourceLang = r.URL.Query().Get("source")
+			if sourceLang == "" {
+				sourceLang = "auto"
+			}
+		}
+	}
+
+	text = strings.TrimSpace(text)
+	if text == "" {
+		http.Error(w, "empty text", http.StatusBadRequest)
+		return
+	}
+
+	cacheKey := sourceLang + "->" + targetLang + ":" + text
+	translateCacheMu.RLock()
+	cached, exists := translateCache[cacheKey]
+	translateCacheMu.RUnlock()
+	if exists && cached != "" {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":  true,
+			"text":     cached,
+			"original": text,
+			"target":   targetLang,
+			"source":   sourceLang,
+			"cached":   true,
+		})
+		return
+	}
+
+	// 1) Google Translate API (130+ языков)
+	translated, detected, err := translateGoogleGTX(text, sourceLang, targetLang)
+	if err != nil || strings.TrimSpace(translated) == "" {
+		log.Printf("[Translate] Google GTX failed: %v, trying Gemini fallback...", err)
+		// 2) Резерв: Gemini 2.5 Flash
+		translated, err = translateGeminiFallback(r.Context(), text, targetLang)
+	}
+
+	if err != nil || strings.TrimSpace(translated) == "" {
+		log.Printf("[Translate] all translation engines failed: %v", err)
+		http.Error(w, fmt.Sprintf("translation failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	translateCacheMu.Lock()
+	if len(translateCache) > 1000 {
+		count := 0
+		for k := range translateCache {
+			delete(translateCache, k)
+			count++
+			if count > 500 {
+				break
+			}
+		}
+	}
+	translateCache[cacheKey] = translated
+	translateCacheMu.Unlock()
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"text":     translated,
+		"original": text,
+		"target":   targetLang,
+		"source":   detected,
+	})
 }
 
 // pcmToWAV оборачивает сырой PCM (s16le) в WAV-контейнер

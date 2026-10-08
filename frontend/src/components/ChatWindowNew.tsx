@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles, Globe, Languages, Check, ChevronDown } from 'lucide-react';
 import { type Chat, type Message } from '../data/mock';
 import { formatLastSeen } from '../utils/onlineStatus';
 import { API_BASE_URL } from '../api';
+import { WORLD_LANGUAGES, POPULAR_LANG_CODES, translateText, playVoiceSpeech } from '../utils/translator';
 import './ChatWindowNew.css';
 
 
@@ -444,6 +445,31 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  interface MsgTranslationState {
+    targetLang: string;
+    translatedText: string;
+    sourceLang?: string;
+    isLoading: boolean;
+    isOpen: boolean;
+    isSpeaking: boolean;
+    copied?: boolean;
+    showAllLangs?: boolean;
+  }
+  const [msgTranslations, setMsgTranslations] = useState<Record<string, MsgTranslationState>>({});
+  const stopTransSpeechRef = useRef<(() => void) | null>(null);
+  const [speakingTransId, setSpeakingTransId] = useState<string | null>(null);
+  const [userPreferredLang, setUserPreferredLang] = useState<string>('en');
+
+  // Быстрый переводчик
+  const [showQuickTranslator, setShowQuickTranslator] = useState(false);
+  const [quickTransText, setQuickTransText] = useState('');
+  const [quickTransTarget, setQuickTransTarget] = useState('en');
+  const [quickTransResult, setQuickTransResult] = useState('');
+  const [quickTransLoading, setQuickTransLoading] = useState(false);
+  const [quickTransSpeaking, setQuickTransSpeaking] = useState(false);
+  const [quickTransCopied, setQuickTransCopied] = useState(false);
+  const stopQuickSpeechRef = useRef<(() => void) | null>(null);
 
   const recognitionRef = useRef<any>(null);
   const silenceTimerRef = useRef<any>(null);
@@ -1854,6 +1880,193 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
     }
   };
 
+  // --- Перевод сообщений и озвучка на разных языках мира ---
+  const toggleTranslateMessage = async (msgId: string, text: string, targetLang?: string) => {
+    const current = msgTranslations[msgId];
+    const lang = targetLang || current?.targetLang || userPreferredLang || 'en';
+
+    if (current?.isOpen && (!targetLang || targetLang === current.targetLang)) {
+      if (speakingTransId === msgId && stopTransSpeechRef.current) {
+        stopTransSpeechRef.current();
+        stopTransSpeechRef.current = null;
+        setSpeakingTransId(null);
+      }
+      setMsgTranslations(prev => ({
+        ...prev,
+        [msgId]: { ...prev[msgId], isOpen: false }
+      }));
+      return;
+    }
+
+    setMsgTranslations(prev => ({
+      ...prev,
+      [msgId]: {
+        targetLang: lang,
+        translatedText: prev[msgId]?.targetLang === lang ? prev[msgId].translatedText : '',
+        isLoading: prev[msgId]?.targetLang !== lang || !prev[msgId]?.translatedText,
+        isOpen: true,
+        isSpeaking: false,
+        showAllLangs: false,
+      }
+    }));
+
+    try {
+      const res = await translateText(text, lang);
+      setMsgTranslations(prev => ({
+        ...prev,
+        [msgId]: {
+          targetLang: lang,
+          translatedText: res.text,
+          sourceLang: res.from,
+          isLoading: false,
+          isOpen: true,
+          isSpeaking: false,
+          showAllLangs: false,
+        }
+      }));
+      setUserPreferredLang(lang);
+    } catch {
+      setMsgTranslations(prev => ({
+        ...prev,
+        [msgId]: {
+          ...prev[msgId],
+          isLoading: false,
+          translatedText: 'Ошибка перевода. Попробуйте еще раз.',
+        }
+      }));
+    }
+  };
+
+  const toggleSpeakTranslation = (msgId: string, text: string, langCode: string) => {
+    if (speakingTransId === msgId) {
+      if (stopTransSpeechRef.current) {
+        stopTransSpeechRef.current();
+        stopTransSpeechRef.current = null;
+      }
+      setSpeakingTransId(null);
+      setMsgTranslations(prev => ({
+        ...prev,
+        [msgId]: { ...prev[msgId], isSpeaking: false }
+      }));
+      return;
+    }
+
+    if (stopTransSpeechRef.current) {
+      stopTransSpeechRef.current();
+      stopTransSpeechRef.current = null;
+    }
+    if (ttsAudioRef.current) {
+      try { ttsAudioRef.current.pause(); } catch {}
+      ttsAudioRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeakingMsgId(null);
+
+    setSpeakingTransId(msgId);
+    setMsgTranslations(prev => ({
+      ...prev,
+      [msgId]: { ...prev[msgId], isSpeaking: true }
+    }));
+
+    const cancelFn = playVoiceSpeech(text, langCode, {
+      isSpeakerLoud,
+      onStart: () => {
+        setMsgTranslations(prev => ({
+          ...prev,
+          [msgId]: { ...prev[msgId], isSpeaking: true }
+        }));
+      },
+      onEnd: () => {
+        setSpeakingTransId(null);
+        setMsgTranslations(prev => ({
+          ...prev,
+          [msgId]: { ...prev[msgId], isSpeaking: false }
+        }));
+        stopTransSpeechRef.current = null;
+      },
+      onError: () => {
+        setSpeakingTransId(null);
+        setMsgTranslations(prev => ({
+          ...prev,
+          [msgId]: { ...prev[msgId], isSpeaking: false }
+        }));
+        stopTransSpeechRef.current = null;
+      }
+    });
+
+    stopTransSpeechRef.current = cancelFn;
+  };
+
+  const handleCopyTranslation = (msgId: string, text: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setMsgTranslations(prev => ({
+      ...prev,
+      [msgId]: { ...prev[msgId], copied: true }
+    }));
+    setTimeout(() => {
+      setMsgTranslations(prev => ({
+        ...prev,
+        [msgId]: { ...prev[msgId], copied: false }
+      }));
+    }, 2000);
+  };
+
+  const handleQuickTranslate = async (langOverride?: string) => {
+    const lang = langOverride || quickTransTarget || 'en';
+    if (!quickTransText.trim()) return;
+    setQuickTransLoading(true);
+    setQuickTransTarget(lang);
+    try {
+      const res = await translateText(quickTransText, lang);
+      setQuickTransResult(res.text);
+    } catch {
+      setQuickTransResult('Ошибка перевода');
+    } finally {
+      setQuickTransLoading(false);
+    }
+  };
+
+  const handleQuickTranslateSpeak = () => {
+    if (!quickTransResult.trim()) return;
+    if (quickTransSpeaking) {
+      if (stopQuickSpeechRef.current) {
+        stopQuickSpeechRef.current();
+        stopQuickSpeechRef.current = null;
+      }
+      setQuickTransSpeaking(false);
+      return;
+    }
+
+    if (stopQuickSpeechRef.current) {
+      stopQuickSpeechRef.current();
+    }
+    if (ttsAudioRef.current) {
+      try { ttsAudioRef.current.pause(); } catch {}
+      ttsAudioRef.current = null;
+    }
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    setQuickTransSpeaking(true);
+    const cancelFn = playVoiceSpeech(quickTransResult, quickTransTarget, {
+      isSpeakerLoud,
+      onStart: () => setQuickTransSpeaking(true),
+      onEnd: () => {
+        setQuickTransSpeaking(false);
+        stopQuickSpeechRef.current = null;
+      },
+      onError: () => {
+        setQuickTransSpeaking(false);
+        stopQuickSpeechRef.current = null;
+      }
+    });
+    stopQuickSpeechRef.current = cancelFn;
+  };
+
   if (!chat) {
 
 
@@ -2405,20 +2618,178 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                     text && <div className="cw-bubble-text">{text}</div>
                   )}
 
+                  {/* Карточка перевода на разные языки мира + озвучка в виде голосового */}
+                  {text && msgTranslations[msg.id]?.isOpen && (
+                    <div className="cw-trans-box">
+                      <div className="cw-trans-header">
+                        <div className="cw-trans-lang-active">
+                          <Globe size={13} className="cw-trans-globe-icon" />
+                          <span className="cw-trans-lang-name">
+                            {WORLD_LANGUAGES.find(l => l.code === msgTranslations[msg.id].targetLang)?.flag}{' '}
+                            {WORLD_LANGUAGES.find(l => l.code === msgTranslations[msg.id].targetLang)?.name}
+                          </span>
+                        </div>
+                        <div className="cw-trans-header-actions">
+                          <button
+                            type="button"
+                            className="cw-trans-more-langs-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMsgTranslations(prev => ({
+                                ...prev,
+                                [msg.id]: { ...prev[msg.id], showAllLangs: !prev[msg.id]?.showAllLangs }
+                              }));
+                            }}
+                            title="Сменить язык перевода"
+                          >
+                            <span>{msgTranslations[msg.id].showAllLangs ? 'Скрыть список' : 'Выбрать язык'}</span>
+                            <ChevronDown size={12} className={msgTranslations[msg.id].showAllLangs ? 'cw-rot-180' : ''} />
+                          </button>
+                          <button
+                            type="button"
+                            className="cw-trans-close-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleTranslateMessage(msg.id, text);
+                            }}
+                            title="Закрыть перевод"
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                      </div>
 
+                      {/* Быстрые чипы популярных языков */}
+                      <div className="cw-trans-chips">
+                        {POPULAR_LANG_CODES.map(c => {
+                          const langObj = WORLD_LANGUAGES.find(l => l.code === c);
+                          if (!langObj) return null;
+                          const isActive = msgTranslations[msg.id].targetLang === c;
+                          return (
+                            <button
+                              key={c}
+                              type="button"
+                              className={`cw-trans-chip ${isActive ? 'active' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleTranslateMessage(msg.id, text, c);
+                              }}
+                            >
+                              <span>{langObj.flag}</span>
+                              <span>{langObj.code.toUpperCase()}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
 
+                      {/* Полный список всех языков мира */}
+                      {msgTranslations[msg.id].showAllLangs && (
+                        <div className="cw-trans-all-langs">
+                          {WORLD_LANGUAGES.map(lang => (
+                            <button
+                              key={lang.code}
+                              type="button"
+                              className={`cw-trans-lang-opt ${msgTranslations[msg.id].targetLang === lang.code ? 'active' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleTranslateMessage(msg.id, text, lang.code);
+                              }}
+                            >
+                              <span className="cw-lang-flag">{lang.flag}</span>
+                              <span className="cw-lang-name">{lang.name}</span>
+                              <span className="cw-lang-native">({lang.nativeName})</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
 
+                      {/* Текст перевода */}
+                      <div className="cw-trans-body">
+                        {msgTranslations[msg.id].isLoading ? (
+                          <div className="cw-trans-loading">
+                            <span className="cw-trans-spinner" />
+                            <span>Перевожу на {WORLD_LANGUAGES.find(l => l.code === msgTranslations[msg.id].targetLang)?.name || 'язык'}... ⚡</span>
+                          </div>
+                        ) : (
+                          <div className="cw-trans-text">{msgTranslations[msg.id].translatedText}</div>
+                        )}
+                      </div>
+
+                      {/* Нижняя панель действий: Голосовое воспроизведение + Копирование */}
+                      {!msgTranslations[msg.id].isLoading && msgTranslations[msg.id].translatedText && (
+                        <div className="cw-trans-footer">
+                          <button
+                            type="button"
+                            className={`cw-trans-voice-btn ${speakingTransId === msg.id ? 'active' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSpeakTranslation(msg.id, msgTranslations[msg.id].translatedText, msgTranslations[msg.id].targetLang);
+                            }}
+                            title={speakingTransId === msg.id ? "Остановить голосовое" : "Слушать перевод в виде голосового"}
+                          >
+                            {speakingTransId === msg.id ? (
+                              <>
+                                <VolumeX size={14} />
+                                <span>Остановить</span>
+                                <span className="cw-voice-equalizer">
+                                  <i /><i /><i /><i />
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <Volume2 size={14} />
+                                <span>Слушать голосовое ({msgTranslations[msg.id].targetLang.toUpperCase()})</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="cw-trans-copy-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyTranslation(msg.id, msgTranslations[msg.id].translatedText);
+                            }}
+                            title="Скопировать переведенный текст"
+                          >
+                            {msgTranslations[msg.id].copied ? (
+                              <>
+                                <Check size={13} style={{ color: '#10b981' }} />
+                                <span style={{ color: '#10b981' }}>Скопировано</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={13} />
+                                <span>Копия</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="cw-bubble-meta">
-                    {!isMe && isAi && text && (
-                      <button 
-                        type="button"
-                        className={`cw-bubble-speak-btn ${speakingMsgId === msg.id ? 'active' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); toggleSpeakMessage(msg.id, text); }}
-                        title={speakingMsgId === msg.id ? "Остановить озвучку" : "Озвучить на громкой связи"}
-                      >
-                        {speakingMsgId === msg.id ? <VolumeX size={13} /> : <Volume2 size={13} />}
-                      </button>
+                    {text && (
+                      <>
+                        <button 
+                          type="button"
+                          className={`cw-bubble-trans-btn ${msgTranslations[msg.id]?.isOpen ? 'active' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); toggleTranslateMessage(msg.id, text); }}
+                          title={msgTranslations[msg.id]?.isOpen ? "Скрыть перевод" : "Перевести на языки мира и послушать в виде голосового"}
+                        >
+                          <Globe size={13} />
+                        </button>
+
+                        <button 
+                          type="button"
+                          className={`cw-bubble-speak-btn ${speakingMsgId === msg.id ? 'active' : ''}`}
+                          onClick={(e) => { e.stopPropagation(); toggleSpeakMessage(msg.id, text); }}
+                          title={speakingMsgId === msg.id ? "Остановить озвучку" : "Озвучить оригинал голосом"}
+                        >
+                          {speakingMsgId === msg.id ? <VolumeX size={13} /> : <Volume2 size={13} />}
+                        </button>
+                      </>
                     )}
                     <span className="cw-bubble-time">{time}</span>
                     {isMe && (
@@ -2787,6 +3158,119 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           </div>
         </div>
       )}
+      {/* Быстрый переводчик любого текста с голосовой озвучкой */}
+      {showQuickTranslator && (
+        <div className="cw-quick-translator-panel">
+          <div className="cw-quick-trans-header">
+            <div className="cw-quick-trans-title">
+              <Languages size={17} className="cw-trans-title-icon" />
+              <span>Переводчик языков мира и голосовая озвучка</span>
+            </div>
+            <button
+              type="button"
+              className="cw-quick-trans-close"
+              onClick={() => {
+                if (stopQuickSpeechRef.current) {
+                  stopQuickSpeechRef.current();
+                  stopQuickSpeechRef.current = null;
+                }
+                setQuickTransSpeaking(false);
+                setShowQuickTranslator(false);
+              }}
+              title="Закрыть переводчик"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="cw-quick-trans-row">
+            <input
+              type="text"
+              className="cw-quick-trans-input"
+              value={quickTransText}
+              onChange={(e) => setQuickTransText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleQuickTranslate(); }}
+              placeholder="Введите или вставьте текст для перевода..."
+            />
+            <button
+              type="button"
+              className="cw-quick-trans-action-btn"
+              onClick={() => handleQuickTranslate()}
+              disabled={quickTransLoading || !quickTransText.trim()}
+            >
+              {quickTransLoading ? '...' : 'Перевести'}
+            </button>
+          </div>
+
+          <div className="cw-quick-trans-langs">
+            {POPULAR_LANG_CODES.map((c) => {
+              const langObj = WORLD_LANGUAGES.find((l) => l.code === c);
+              if (!langObj) return null;
+              const isActive = quickTransTarget === c;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  className={`cw-quick-lang-pill ${isActive ? 'active' : ''}`}
+                  onClick={() => handleQuickTranslate(c)}
+                >
+                  <span>{langObj.flag}</span>
+                  <span>{langObj.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {quickTransResult && (
+            <div className="cw-quick-trans-result-card">
+              <div className="cw-quick-trans-result-text">{quickTransResult}</div>
+              <div className="cw-quick-trans-result-actions">
+                <button
+                  type="button"
+                  className={`cw-quick-voice-btn ${quickTransSpeaking ? 'active' : ''}`}
+                  onClick={handleQuickTranslateSpeak}
+                  title={quickTransSpeaking ? 'Остановить голосовое' : 'Послушать голосовое'}
+                >
+                  {quickTransSpeaking ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                  <span>{quickTransSpeaking ? 'Остановить' : `Послушать (${quickTransTarget.toUpperCase()})`}</span>
+                  {quickTransSpeaking && (
+                    <span className="cw-voice-equalizer">
+                      <i /><i /><i /><i />
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  className="cw-quick-use-btn"
+                  onClick={() => {
+                    setInputValue(quickTransResult);
+                    setShowQuickTranslator(false);
+                    inputRef.current?.focus();
+                  }}
+                  title="Вставить перевод в поле ввода сообщения"
+                >
+                  <Send size={14} />
+                  <span>Вставить в чат</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="cw-quick-copy-btn"
+                  onClick={() => {
+                    navigator.clipboard.writeText(quickTransResult);
+                    setQuickTransCopied(true);
+                    setTimeout(() => setQuickTransCopied(false), 2000);
+                  }}
+                  title="Скопировать"
+                >
+                  {quickTransCopied ? <Check size={14} style={{ color: '#10b981' }} /> : <Copy size={14} />}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {/* Input */}
 
 
@@ -2811,6 +3295,20 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
           <Paperclip size={20} />
 
 
+        </button>
+
+        <button 
+          type="button"
+          className={`cw-input-icon ${showQuickTranslator ? 'active' : ''}`} 
+          onClick={() => {
+            if (!showQuickTranslator && inputValue.trim()) {
+              setQuickTransText(inputValue.trim());
+            }
+            setShowQuickTranslator(!showQuickTranslator);
+          }}
+          title="Переводчик на разные языки мира и голосовая озвучка"
+        >
+          <Languages size={20} />
         </button>
 
 
