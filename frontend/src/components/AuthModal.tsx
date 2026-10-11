@@ -233,11 +233,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             />
             <div className="auth-brand-badge-pill">
               <Sparkles size={12} className="sparkle-gold" />
-              <span>NEW AGE ECOSYSTEM</span>
+              <span>NEW AGE PLATFORM</span>
             </div>
-            <h2 className="auth-brand-title">Социальная экосистема нового поколения</h2>
+            <h2 className="auth-brand-title">Приветствую тебя на платформе New Age</h2>
             <p className="auth-brand-desc">
-              Общайтесь, создавайте видео, запускайте конференции, слушайте подкасты и торгуйте в едином удобном пространстве.
+              Платформа создана для духовного роста и развития ваших способностей. Познайте свой внутренний мир, поймите свою многомерную природу и высшее предназначение на планете Земля.
             </p>
           </div>
 

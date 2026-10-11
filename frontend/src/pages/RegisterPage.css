@@ -149,13 +149,13 @@
 
 .register-card {
   width: 100%;
-  max-width: 1100px;
+  max-width: 1140px;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.12);
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: 420px 1fr;
   overflow: hidden;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -165,7 +165,7 @@
 .register-side-banner {
   background: linear-gradient(150deg, rgba(99, 102, 241, 0.12), rgba(168, 85, 247, 0.16));
   border-right: 1px solid var(--color-border);
-  padding: 2.5rem;
+  padding: 2.25rem 2rem;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -174,6 +174,23 @@
 .side-banner-content {
   display: flex;
   flex-direction: column;
+}
+
+.side-banner-brand-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+.side-banner-clean-logo {
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  display: block;
 }
 
 .side-badge {
@@ -188,7 +205,7 @@
   font-size: 0.76rem;
   font-weight: 700;
   width: fit-content;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0;
 }
 
 .sparkle-icon {
@@ -196,18 +213,114 @@
 }
 
 .side-title {
-  font-size: 1.75rem;
+  font-size: 1.55rem;
   font-weight: 800;
   line-height: 1.25;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.95rem;
   color: var(--color-text);
+  background: linear-gradient(135deg, var(--color-text) 30%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.side-welcome-text-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
 }
 
 .side-desc {
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   line-height: 1.55;
   color: var(--color-text-secondary);
-  margin-bottom: 2rem;
+  margin-bottom: 0;
+}
+
+.side-desc-topics {
+  font-size: 0.83rem;
+  line-height: 1.55;
+  color: var(--color-text);
+  background: rgba(139, 92, 246, 0.08);
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border-left: 3px solid #8b5cf6;
+}
+
+.side-desc-topics strong {
+  display: block;
+  color: #8b5cf6;
+  margin-bottom: 2px;
+}
+
+[data-theme='dark'] .side-desc-topics {
+  background: rgba(139, 92, 246, 0.16);
+  color: #e2e8f0;
+}
+
+.side-knowledge-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 1.25rem;
+}
+
+.side-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.side-tag:hover {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+  transform: translateY(-1px);
+}
+
+.register-mobile-welcome {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.register-mobile-logo {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  margin-bottom: 0.6rem;
+  object-fit: cover;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
+}
+
+.register-mobile-welcome h2 {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin-bottom: 0.4rem;
+  color: var(--color-text);
+}
+
+.register-mobile-welcome p {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+  max-width: 320px;
+}
+
+@media (max-width: 960px) {
+  .register-mobile-welcome {
+    display: flex;
+  }
 }
 
 .side-benefits-list {

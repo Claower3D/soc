@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { 
   User as UserIcon, Mail, Lock, Eye, EyeOff, Shield, 
   CheckCircle2, ArrowRight, ArrowLeft, Sparkles, AlertCircle, 
-  Check, Info, Video, ShoppingBag, Globe, KeyRound, QrCode, RefreshCw, Smartphone
+  Check, Info, Video, ShoppingBag, Globe, QrCode, RefreshCw, Smartphone
 } from 'lucide-react';
 import { RELIGIONS_CATALOG, type UserRole, type BeliefPrivacy } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -325,45 +325,48 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
           {/* Left Benefit Banner */}
           <div className="register-side-banner">
             <div className="side-banner-content">
-              <div className="side-badge">
-                <Sparkles size={14} className="sparkle-icon" />
-                <span>Официальная регистрация</span>
+              <div className="side-banner-brand-header">
+                <img 
+                  src={logoImg} 
+                  alt="New Age Logo" 
+                  className="side-banner-clean-logo" 
+                />
+                <div className="side-badge">
+                  <Sparkles size={14} className="sparkle-icon" />
+                  <span>Официальная регистрация</span>
+                </div>
               </div>
-              <h1 className="side-title">Добро пожаловать в Новую Эру</h1>
-              <p className="side-desc">
-                Единый аккаунт открывает доступ ко всем возможностям платформы: HD конференциям, ИИ-наставнику, защищенному мессенджеру и духовному маркетплейсу.
-              </p>
 
-              <div className="side-benefits-list">
-                <div className="benefit-item">
-                  <div className="benefit-icon-wrapper">
-                    <KeyRound size={16} />
-                  </div>
-                  <div>
-                    <strong>JWT RFC 7519 & Salt Hash</strong>
-                    <span>Криптографическая защита учетных записей</span>
-                  </div>
-                </div>
+              <h1 className="side-title">Приветствую тебя на платформе New Age</h1>
 
-                <div className="benefit-item">
-                  <div className="benefit-icon-wrapper">
-                    <Sparkles size={16} />
-                  </div>
-                  <div>
-                    <strong>12 Мировоззрений и Символов</strong>
-                    <span>Выбирайте свою веру или нейтральный путь</span>
-                  </div>
+              <div className="side-welcome-text-box">
+                <p className="side-desc">
+                  Эта платформа создана для духовного роста и развития ваших способностей. Здесь вы можете познать свой внутренний мир, изучить новые знания и проявить себя в мир.
+                </p>
+                <p className="side-desc">
+                  Эта платформа создана для того чтобы вы могли понять свою многомерную природу и свое высшее предназначение на планете Земля.
+                </p>
+                <div className="side-desc-topics">
+                  <strong>Здесь вы можете изучить:</strong>
+                  <span> астрологию, нумерологию, гороскоп, Таро, дизайн человека (human design), эзотерику, ченнелинг, тета хилинг, гипноз, осознанные сновидения, ВсеЛенскую терапию, гипнотерапию, регресс, различные религии и философские концепции.</span>
                 </div>
+              </div>
 
-                <div className="benefit-item">
-                  <div className="benefit-icon-wrapper">
-                    <Shield size={16} />
-                  </div>
-                  <div>
-                    <strong>GDPR & ФЗ-152</strong>
-                    <span>Полный суверенитет и приватность ваших данных</span>
-                  </div>
-                </div>
+              <div className="side-knowledge-tags">
+                <span className="side-tag">✨ Астрология</span>
+                <span className="side-tag">🔢 Нумерология</span>
+                <span className="side-tag">🌟 Гороскоп</span>
+                <span className="side-tag">🃏 Таро</span>
+                <span className="side-tag">🧬 Human Design</span>
+                <span className="side-tag">🔮 Эзотерика</span>
+                <span className="side-tag">💫 Ченнелинг</span>
+                <span className="side-tag">🌿 Тета-хилинг</span>
+                <span className="side-tag">🌀 Гипноз</span>
+                <span className="side-tag">🌌 Осознанные сны</span>
+                <span className="side-tag">🪐 ВсеЛенская терапия</span>
+                <span className="side-tag">🧘 Гипнотерапия</span>
+                <span className="side-tag">⏳ Регресс</span>
+                <span className="side-tag">🕊️ Религии и философия</span>
               </div>
 
               {/* Sacred QR Code Widget */}
@@ -432,6 +435,13 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
 
           {/* Right Interactive Form */}
           <div className="register-form-container">
+            {/* Mobile-only brand welcome card */}
+            <div className="register-mobile-welcome">
+              <img src={logoImg} alt="New Age" className="register-mobile-logo" />
+              <h2>New Age</h2>
+              <p>Платформа для духовного роста, познания внутреннего мира и раскрытия способностей.</p>
+            </div>
+
             {/* Mode Switcher Tabs on top of the form */}
             <div className="auth-mode-switch-tabs">
               <button
