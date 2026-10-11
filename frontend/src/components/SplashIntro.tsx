@@ -7,7 +7,9 @@ const TOPICS = [
   'Ченнелинг', 'Тета-хилинг', 'Осознанные сны', 'ВсеЛенская терапия', 'Регресс',
 ];
 
-const TOTAL_MS = 6200;
+// Общая длительность ≈ 12 с: 10.6 с сцены + 1.4 с плавного перехода в приложение
+const TOTAL_MS = 10600;
+const EXIT_MS = 1400;
 const SESSION_KEY = 'newage_splash_shown';
 
 /** Показываем только на мобильных / в Android-приложении, один раз за сессию */
@@ -46,7 +48,7 @@ export function SplashIntro({ onFinish }: SplashIntroProps) {
     if (leaving) return;
     setLeaving(true);
     try { sessionStorage.setItem(SESSION_KEY, '1'); } catch { /* ignore */ }
-    setTimeout(onFinish, 750);
+    setTimeout(onFinish, EXIT_MS);
   };
 
   useEffect(() => {
@@ -54,8 +56,8 @@ export function SplashIntro({ onFinish }: SplashIntroProps) {
     // Направления начинают сменяться после появления основного текста
     let iv: ReturnType<typeof setInterval> | undefined;
     const startTopics = setTimeout(() => {
-      iv = setInterval(() => setTopicIdx(i => (i + 1) % TOPICS.length), 420);
-    }, 2900);
+      iv = setInterval(() => setTopicIdx(i => (i + 1) % TOPICS.length), 640);
+    }, 5600);
     return () => {
       clearTimeout(t);
       clearTimeout(startTopics);
@@ -114,7 +116,7 @@ export function SplashIntro({ onFinish }: SplashIntroProps) {
 
         <h1 className="splash-title" aria-label={title}>
           {title.split('').map((ch, i) => (
-            <span key={i} style={{ animationDelay: `${1.55 + i * 0.07}s` }}>
+            <span key={i} style={{ animationDelay: `${3.3 + i * 0.12}s` }}>
               {ch === ' ' ? '\u00A0' : ch}
             </span>
           ))}
