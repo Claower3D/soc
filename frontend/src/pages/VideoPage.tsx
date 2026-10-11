@@ -132,21 +132,38 @@ export function VideoPage() {
 
   useEffect(() => {
     let mounted = true;
+    const localVideos: Video[] = (() => {
+      try {
+        return JSON.parse(localStorage.getItem('user_uploaded_videos') || '[]');
+      } catch {
+        return [];
+      }
+    })();
+
     api.videos.list().then((data) => {
       if (mounted) {
-        if (Array.isArray(data) && data.length > 0) {
-          const existingIds = new Set(data.map((v: Video) => v.id));
-          const additions = DEFAULT_VIDEOS.filter(v => !existingIds.has(v.id));
-          setVideoList([...data, ...additions]);
-        } else {
-          setVideoList(DEFAULT_VIDEOS);
-        }
+        const raw = Array.isArray(data) && data.length > 0 ? data : DEFAULT_VIDEOS;
+        const allList = [...localVideos, ...raw];
+        const seen = new Set<string>();
+        const unique = allList.filter(v => {
+          if (!v.id || seen.has(v.id)) return false;
+          seen.add(v.id);
+          return true;
+        });
+        setVideoList(unique);
         setIsLoading(false);
       }
     }).catch((err) => {
       console.warn('Failed to load videos', err);
       if (mounted) {
-        setVideoList(DEFAULT_VIDEOS);
+        const allList = [...localVideos, ...DEFAULT_VIDEOS];
+        const seen = new Set<string>();
+        const unique = allList.filter(v => {
+          if (!v.id || seen.has(v.id)) return false;
+          seen.add(v.id);
+          return true;
+        });
+        setVideoList(unique);
         setIsLoading(false);
       }
     });
@@ -169,6 +186,12 @@ export function VideoPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const handleUploadVideo = (newVideo: Video) => {
+    try {
+      const existing: Video[] = JSON.parse(localStorage.getItem('user_uploaded_videos') || '[]');
+      localStorage.setItem('user_uploaded_videos', JSON.stringify([newVideo, ...existing]));
+    } catch (e) {
+      console.warn('Failed to cache uploaded video', e);
+    }
     setVideoList(prev => [newVideo, ...(Array.isArray(prev) ? prev : [])]);
     setSelectedVideo(newVideo);
   };

@@ -5,8 +5,10 @@ import { StoriesBar } from '../components/StoriesBar';
 import { PostCard } from '../components/PostCard';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { CreatePostModal } from '../components/CreatePostModal';
+import { UploadVideoModal } from '../components/UploadVideoModal';
+import { UploadPodcastModal } from '../components/UploadPodcastModal';
 import { AuthModal } from '../components/AuthModal';
-import { type Post, type Story } from '../data/mock';
+import { type Post, type Story, type Video as VideoType, type Podcast as PodcastType } from '../data/mock';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { cacheService } from '../utils/cacheService';
@@ -113,6 +115,8 @@ export function FeedPage() {
 
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false);
+  const [isUploadVideoOpen, setIsUploadVideoOpen] = useState(false);
+  const [isUploadPodcastOpen, setIsUploadPodcastOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds(currentUser?.id));
 
@@ -146,6 +150,74 @@ export function FeedPage() {
       cacheService.set('feed_posts_cache', updated, 3600 * 24, 'feed');
       return updated;
     });
+  };
+
+  const handleUploadVideo = (newVideo: VideoType, publishToFeed: boolean = true) => {
+    try {
+      const existing: VideoType[] = JSON.parse(localStorage.getItem('user_uploaded_videos') || '[]');
+      localStorage.setItem('user_uploaded_videos', JSON.stringify([newVideo, ...existing]));
+    } catch (e) {
+      console.warn('Failed to cache uploaded video', e);
+    }
+
+    if (publishToFeed) {
+      const postMedia = newVideo.videoUrl || newVideo.thumbnail;
+      const videoPost: Post = {
+        id: `post_vid_${Date.now()}`,
+        user: currentUser,
+        image: postMedia,
+        videoUrl: newVideo.videoUrl,
+        mediaType: 'video',
+        caption: `🎬 ${newVideo.title}\n\n${newVideo.description || ''}`,
+        likes: 1,
+        liked: true,
+        saved: false,
+        comments: [],
+        timeAgo: 'Только что',
+        location: 'Видеостудия New Age',
+      };
+      handleCreatePost(videoPost);
+      api.posts.create({
+        caption: videoPost.caption,
+        image: postMedia,
+        location: videoPost.location,
+      }).catch(() => {});
+    }
+    setIsUploadVideoOpen(false);
+  };
+
+  const handleUploadPodcast = (newPodcast: PodcastType, publishToFeed: boolean = true) => {
+    try {
+      const existing: PodcastType[] = JSON.parse(localStorage.getItem('user_uploaded_podcasts') || '[]');
+      localStorage.setItem('user_uploaded_podcasts', JSON.stringify([newPodcast, ...existing]));
+    } catch (e) {
+      console.warn('Failed to cache uploaded podcast', e);
+    }
+
+    if (publishToFeed) {
+      const ep = newPodcast.episodes[0];
+      const podcastPost: Post = {
+        id: `post_pod_${Date.now()}`,
+        user: currentUser,
+        image: newPodcast.cover,
+        audioUrl: ep?.audioUrl,
+        mediaType: 'podcast',
+        caption: `🎙️ Подкаст: «${newPodcast.title}»\nВыпуск: ${ep?.title || 'Новый выпуск'}\n\n${newPodcast.description || ''}`,
+        likes: 1,
+        liked: true,
+        saved: false,
+        comments: [],
+        timeAgo: 'Только что',
+        location: 'Аудиостудия New Age',
+      };
+      handleCreatePost(podcastPost);
+      api.posts.create({
+        caption: podcastPost.caption,
+        image: newPodcast.cover,
+        location: podcastPost.location,
+      }).catch(() => {});
+    }
+    setIsUploadPodcastOpen(false);
   };
 
   const handleLike = (postId: string) => {
@@ -245,10 +317,10 @@ export function FeedPage() {
               <button className="quick-post-action" onClick={() => setIsCreatePostOpen(true)}>
                 <ImageIcon size={15} color="#10B981" /> <span>Фото / Новость</span>
               </button>
-              <button className="quick-post-action" onClick={() => navigate('/video')}>
+              <button className="quick-post-action" onClick={() => setIsUploadVideoOpen(true)}>
                 <Video size={15} color="#EF4444" /> <span>Видео</span>
               </button>
-              <button className="quick-post-action" onClick={() => navigate('/podcasts')}>
+              <button className="quick-post-action" onClick={() => setIsUploadPodcastOpen(true)}>
                 <Headphones size={15} color="var(--color-accent)" /> <span>Подкаст</span>
               </button>
             </div>
@@ -519,6 +591,20 @@ export function FeedPage() {
         isOpen={isCreatePostOpen}
         onClose={() => setIsCreatePostOpen(false)}
         onCreatePost={handleCreatePost}
+      />
+
+      {/* Upload Video Modal */}
+      <UploadVideoModal
+        isOpen={isUploadVideoOpen}
+        onClose={() => setIsUploadVideoOpen(false)}
+        onUploadVideo={handleUploadVideo}
+      />
+
+      {/* Upload Podcast Modal */}
+      <UploadPodcastModal
+        isOpen={isUploadPodcastOpen}
+        onClose={() => setIsUploadPodcastOpen(false)}
+        onUploadPodcast={handleUploadPodcast}
       />
 
       {/* Auth Modal */}

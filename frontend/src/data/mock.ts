@@ -221,6 +221,9 @@ export interface Post {
   comments: Comment[];
   timeAgo: string;
   location?: string;
+  videoUrl?: string;
+  audioUrl?: string;
+  mediaType?: 'image' | 'video' | 'audio' | 'podcast';
 }
 
 export interface Comment {
@@ -565,6 +568,7 @@ export interface Episode {
   title: string;
   duration: string;
   date: string;
+  audioUrl?: string;
 }
 
 export interface ConferenceMessage {

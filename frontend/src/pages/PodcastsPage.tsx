@@ -77,33 +77,45 @@ export function PodcastsPage() {
 
   useEffect(() => {
     let mounted = true;
+    const localPodcasts: Podcast[] = (() => {
+      try {
+        return JSON.parse(localStorage.getItem('user_uploaded_podcasts') || '[]');
+      } catch {
+        return [];
+      }
+    })();
+
     api.podcasts.list().then((data) => {
       if (mounted) {
-        if (Array.isArray(data) && data.length > 0) {
-          const existingIds = new Set(data.map((p: Podcast) => p.id));
-          const additions = DEFAULT_PODCASTS.filter(p => !existingIds.has(p.id));
-          const combined = [...data, ...additions];
-          setPodcastList(combined);
-          setActivePodcast(combined[0]);
-          if (combined[0]?.episodes?.[0]) {
-            setActiveEpisode(combined[0].episodes[0]);
-          }
-        } else {
-          setPodcastList(DEFAULT_PODCASTS);
-          setActivePodcast(DEFAULT_PODCASTS[0]);
-          if (DEFAULT_PODCASTS[0]?.episodes?.[0]) {
-            setActiveEpisode(DEFAULT_PODCASTS[0].episodes[0]);
-          }
+        const raw = Array.isArray(data) && data.length > 0 ? data : DEFAULT_PODCASTS;
+        const allList = [...localPodcasts, ...raw];
+        const seen = new Set<string>();
+        const unique = allList.filter(p => {
+          if (!p.id || seen.has(p.id)) return false;
+          seen.add(p.id);
+          return true;
+        });
+        setPodcastList(unique);
+        setActivePodcast(unique[0] || null);
+        if (unique[0]?.episodes?.[0]) {
+          setActiveEpisode(unique[0].episodes[0]);
         }
         setIsLoading(false);
       }
     }).catch(err => {
       console.warn('Failed to load podcasts', err);
       if (mounted) {
-        setPodcastList(DEFAULT_PODCASTS);
-        setActivePodcast(DEFAULT_PODCASTS[0]);
-        if (DEFAULT_PODCASTS[0]?.episodes?.[0]) {
-          setActiveEpisode(DEFAULT_PODCASTS[0].episodes[0]);
+        const allList = [...localPodcasts, ...DEFAULT_PODCASTS];
+        const seen = new Set<string>();
+        const unique = allList.filter(p => {
+          if (!p.id || seen.has(p.id)) return false;
+          seen.add(p.id);
+          return true;
+        });
+        setPodcastList(unique);
+        setActivePodcast(unique[0] || null);
+        if (unique[0]?.episodes?.[0]) {
+          setActiveEpisode(unique[0].episodes[0]);
         }
         setIsLoading(false);
       }
@@ -122,6 +134,12 @@ export function PodcastsPage() {
   };
 
   const handleUploadPodcast = (newPodcast: Podcast) => {
+    try {
+      const existing: Podcast[] = JSON.parse(localStorage.getItem('user_uploaded_podcasts') || '[]');
+      localStorage.setItem('user_uploaded_podcasts', JSON.stringify([newPodcast, ...existing]));
+    } catch (e) {
+      console.warn('Failed to cache uploaded podcast', e);
+    }
     setPodcastList(prev => [newPodcast, ...(Array.isArray(prev) ? prev : [])]);
     setActivePodcast(newPodcast);
     if (newPodcast.episodes && newPodcast.episodes[0]) {

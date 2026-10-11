@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   X, Heart, MessageCircle, Send, Bookmark, 
-  Trash2, Reply, Smile, Check, MapPin 
+  Trash2, Reply, Smile, Check, MapPin, Headphones 
 } from 'lucide-react';
 import { type Post, type Comment } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -185,8 +185,8 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
         {/* Left Side: Photo / Video */}
         {hasMedia && (
           <div className="post-modal-media-col">
-            {post.image && (post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/')) ? (
-              <video src={post.image} controls autoPlay playsInline className="post-modal-photo" />
+            {(post.image && (post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/'))) || post.videoUrl ? (
+              <video src={post.videoUrl || post.image} controls autoPlay playsInline className="post-modal-photo" />
             ) : (
               <img 
                 src={post.image} 
@@ -266,6 +266,16 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
                   <span className="comment-body-text">{post.caption}</span>
                 </div>
                 <div className="comment-time-sub">{post.timeAgo}</div>
+
+                {post.audioUrl && (
+                  <div style={{ marginTop: '0.65rem', background: 'var(--color-bg-secondary)', padding: '0.65rem', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-accent)', marginBottom: '4px' }}>
+                      <Headphones size={14} />
+                      <span>Аудиовыпуск подкаста</span>
+                    </div>
+                    <audio src={post.audioUrl} controls style={{ width: '100%', height: '36px' }} />
+                  </div>
+                )}
               </div>
             </div>
 

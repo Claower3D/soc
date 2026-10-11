@@ -1,26 +1,30 @@
 import { useState, useRef } from 'react';
-import { X, Headphones, Image as ImageIcon, Sparkles, Mic } from 'lucide-react';
+import { X, Headphones, Image as ImageIcon, Sparkles, UploadCloud, Link as LinkIcon, Radio } from 'lucide-react';
 import { currentUser, type Podcast } from '../data/mock';
 import './UploadPodcastModal.css';
 
 interface UploadPodcastModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onUploadPodcast: (newPodcast: Podcast) => void;
+  onUploadPodcast: (newPodcast: Podcast, publishToFeed?: boolean) => void;
 }
 
 const sampleCovers = [
-  'https://images.unsplash.com/photo-1589903308904-1010c2294adc?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=400&q=80',
+  'https://images.unsplash.com/photo-1589903308904-1010c2294adc?auto=format&fit=crop&w=600&q=80',
+  'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&w=600&q=80',
+  'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=600&q=80',
+  'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=600&q=80',
+  'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?auto=format&fit=crop&w=600&q=80',
 ];
 
 const podcastCategories = [
+  'Духовный путь & Осознанность',
+  'Астрология & Эзотерика',
+  'Психология & Терапия',
+  'Медитации & Звукотерапия',
   'Технологии & IT',
-  'Дизайн & Продукт',
-  'Бизнес & Стартапы',
-  'Искусственный интеллект',
-  'Наука и жизнь',
+  'Философия & Религия',
+  'Бизнес & Саморазвитие',
 ];
 
 export function UploadPodcastModal({ isOpen, onClose, onUploadPodcast }: UploadPodcastModalProps) {
@@ -28,14 +32,41 @@ export function UploadPodcastModal({ isOpen, onClose, onUploadPodcast }: UploadP
   const [episodeTitle, setEpisodeTitle] = useState('');
   const [category, setCategory] = useState(podcastCategories[0]);
   const [description, setDescription] = useState('');
-  const [duration, setDuration] = useState('32:15');
+  const [duration, setDuration] = useState('24:30');
   const [cover, setCover] = useState(sampleCovers[0]);
+  const [audioUrl, setAudioUrl] = useState<string>('');
+  const [audioFileName, setAudioFileName] = useState<string>('');
+  const [audioInputMode, setAudioInputMode] = useState<'file' | 'url'>('file');
+  const [customAudioUrl, setCustomAudioUrl] = useState<string>('');
+  const [publishToFeed, setPublishToFeed] = useState<boolean>(true);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAudioFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAudioFileName(file.name);
+      const url = URL.createObjectURL(file);
+      setAudioUrl(url);
+
+      // Auto-detect audio duration
+      const tempAudio = new Audio();
+      tempAudio.src = url;
+      tempAudio.onloadedmetadata = () => {
+        const secs = Math.floor(tempAudio.duration);
+        if (!isNaN(secs) && secs > 0) {
+          const mins = Math.floor(secs / 60);
+          const remSecs = secs % 60;
+          setDuration(`${mins}:${remSecs < 10 ? '0' : ''}${remSecs}`);
+        }
+      };
+    }
+  };
+
+  const handleCoverFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -46,9 +77,18 @@ export function UploadPodcastModal({ isOpen, onClose, onUploadPodcast }: UploadP
     }
   };
 
+  const handleApplyAudioUrl = () => {
+    if (customAudioUrl.trim()) {
+      setAudioUrl(customAudioUrl.trim());
+      setAudioFileName('Аудио по ссылке');
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!podcastTitle.trim() || !episodeTitle.trim()) return;
+
+    const finalAudio = audioUrl || (audioInputMode === 'url' ? customAudioUrl.trim() : '') || 'https://actions.google.com/sounds/v1/ambiences/outdoor_ambience.ogg';
 
     const newPodcast: Podcast = {
       id: `pod_${Date.now()}`,
@@ -56,33 +96,45 @@ export function UploadPodcastModal({ isOpen, onClose, onUploadPodcast }: UploadP
       author: currentUser.name,
       category,
       cover,
-      description: description.trim() || 'Новый выпуск авторского подкаста.',
+      description: description.trim() || 'Новый выпуск авторского подкаста в New Age.',
       episodes: [
         {
           id: `ep_${Date.now()}`,
           title: episodeTitle.trim(),
-          duration: duration || '30:00',
+          duration: duration || '25:00',
           date: 'Сегодня',
+          audioUrl: finalAudio,
         },
       ],
     };
 
-    onUploadPodcast(newPodcast);
+    onUploadPodcast(newPodcast, publishToFeed);
     setPodcastTitle('');
     setEpisodeTitle('');
     setDescription('');
+    setAudioUrl('');
+    setAudioFileName('');
+    setCustomAudioUrl('');
     onClose();
   };
 
   return (
     <div className="upload-pod-overlay" onClick={onClose}>
       <div className="upload-pod-modal" onClick={e => e.stopPropagation()}>
+        {/* Hidden inputs */}
         <input
-          ref={fileInputRef}
+          ref={coverFileInputRef}
           type="file"
           accept="image/*"
           style={{ display: 'none' }}
-          onChange={handleFileChange}
+          onChange={handleCoverFileChange}
+        />
+        <input
+          ref={audioFileInputRef}
+          type="file"
+          accept="audio/*"
+          style={{ display: 'none' }}
+          onChange={handleAudioFileChange}
         />
 
         <div className="upload-pod-header">
@@ -92,7 +144,7 @@ export function UploadPodcastModal({ isOpen, onClose, onUploadPodcast }: UploadP
             </div>
             <div>
               <h3>Опубликовать подкаст</h3>
-              <p>Создайте новый аудио-выпуск или подкаст-шоу</p>
+              <p>Создайте новый выпуск, аудио-шоу или медитативную лекцию</p>
             </div>
           </div>
           <button className="close-btn" onClick={onClose}>
@@ -101,12 +153,81 @@ export function UploadPodcastModal({ isOpen, onClose, onUploadPodcast }: UploadP
         </div>
 
         <form onSubmit={handleSubmit} className="upload-pod-body">
+          {/* Audio Track Selector */}
+          <div className="form-row">
+            <label className="field-label">Аудиодорожка выпуска</label>
+            <div className="audio-source-switch">
+              <button 
+                type="button" 
+                className={`source-tab ${audioInputMode === 'file' ? 'active' : ''}`}
+                onClick={() => setAudioInputMode('file')}
+              >
+                <UploadCloud size={14} /> Загрузить аудиофайл
+              </button>
+              <button 
+                type="button" 
+                className={`source-tab ${audioInputMode === 'url' ? 'active' : ''}`}
+                onClick={() => setAudioInputMode('url')}
+              >
+                <LinkIcon size={14} /> Ссылка на MP3 / Поток
+              </button>
+            </div>
+
+            {audioInputMode === 'file' ? (
+              <div 
+                className={`audio-dropzone ${audioUrl ? 'has-audio' : ''}`}
+                onClick={() => audioFileInputRef.current?.click()}
+              >
+                {audioUrl ? (
+                  <div className="audio-preview-wrapper" onClick={e => e.stopPropagation()}>
+                    <div className="audio-track-info">
+                      <Radio size={16} className="track-icon" />
+                      <span className="file-name">{audioFileName || 'Аудиодорожка прикреплена'}</span>
+                      <button 
+                        type="button" 
+                        className="btn-change-audio"
+                        onClick={() => audioFileInputRef.current?.click()}
+                      >
+                        Заменить
+                      </button>
+                    </div>
+                    <audio src={audioUrl} controls className="modal-audio-preview" />
+                  </div>
+                ) : (
+                  <div className="dropzone-empty-state">
+                    <Headphones size={32} className="dropzone-icon" />
+                    <span className="dropzone-title">Нажмите для выбора аудиофайла</span>
+                    <span className="dropzone-hint">Поддерживаются MP3, WAV, AAC, OGG, M4A</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="audio-url-input-wrap">
+                <input
+                  type="url"
+                  placeholder="Вставьте ссылку на аудиофайл (https://example.com/episode.mp3)..."
+                  value={customAudioUrl}
+                  onChange={e => setCustomAudioUrl(e.target.value)}
+                  className="field-input"
+                />
+                <button 
+                  type="button" 
+                  className="btn-apply-url"
+                  onClick={handleApplyAudioUrl}
+                  disabled={!customAudioUrl.trim()}
+                >
+                  Применить
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Podcast Title */}
           <div className="form-row">
-            <label className="field-label">Название подкаста (Шоу)</label>
+            <label className="field-label">Название подкаста (Шоу) *</label>
             <input
               type="text"
-              placeholder="Например: Frontend & Architecture, Разговоры о коде..."
+              placeholder="Например: Голос Души, Космические Законы, New Age Talks..."
               value={podcastTitle}
               onChange={e => setPodcastTitle(e.target.value)}
               className="field-input"
@@ -117,10 +238,10 @@ export function UploadPodcastModal({ isOpen, onClose, onUploadPodcast }: UploadP
 
           {/* Episode Title */}
           <div className="form-row">
-            <label className="field-label">Название первого выпуска</label>
+            <label className="field-label">Название выпуска *</label>
             <input
               type="text"
-              placeholder="Например: Выпуск #1: Тренды веб-разработки 2026"
+              placeholder="Например: Выпуск #1: Как слышать интуицию и жить в потоке"
               value={episodeTitle}
               onChange={e => setEpisodeTitle(e.target.value)}
               className="field-input"
@@ -149,11 +270,11 @@ export function UploadPodcastModal({ isOpen, onClose, onUploadPodcast }: UploadP
           <div className="form-row">
             <label className="field-label">Описание выпуска</label>
             <textarea
-              placeholder="О чем данный выпуск, ключевые темы..."
+              placeholder="О чем данный выпуск, ключевые инсайты, темы и таймкоды..."
               value={description}
               onChange={e => setDescription(e.target.value)}
               className="field-textarea"
-              rows={3}
+              rows={2}
             />
           </div>
 
@@ -166,7 +287,7 @@ export function UploadPodcastModal({ isOpen, onClose, onUploadPodcast }: UploadP
                 <button 
                   type="button" 
                   className="btn-change-thumb"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => coverFileInputRef.current?.click()}
                 >
                   <ImageIcon size={14} /> Выбрать своё фото
                 </button>
@@ -177,14 +298,21 @@ export function UploadPodcastModal({ isOpen, onClose, onUploadPodcast }: UploadP
               <label className="field-label">Длительность аудио</label>
               <input
                 type="text"
-                placeholder="35:20"
+                placeholder="24:30"
                 value={duration}
                 onChange={e => setDuration(e.target.value)}
                 className="field-input"
               />
-              <div className="audio-upload-hint">
-                <Mic size={14} /> Аудиодорожка готова к трансляции
-              </div>
+              <span className="field-hint">Определяется автоматически при выборе аудиофайла</span>
+
+              <label className="checkbox-feed-label">
+                <input 
+                  type="checkbox" 
+                  checked={publishToFeed}
+                  onChange={e => setPublishToFeed(e.target.checked)}
+                />
+                <span>Опубликовать в общую ленту</span>
+              </label>
             </div>
           </div>
 

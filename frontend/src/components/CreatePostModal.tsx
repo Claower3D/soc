@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { X, Image as ImageIcon, MapPin, Sparkles, Compass } from 'lucide-react';
+import { X, Image as ImageIcon, MapPin, Sparkles, Compass, Headphones, Film } from 'lucide-react';
 import { type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api';
@@ -92,10 +92,16 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
       location: location.trim() || undefined,
     };
 
+    const isAudio = selectedImage?.startsWith('data:audio');
+    const isVideo = selectedImage?.startsWith('data:video') || selectedImage?.endsWith('.mp4');
+
     const tempPost: Post = {
       id: `post_${Date.now()}`,
       user: currentUser,
-      image: postPayload.image,
+      image: isAudio ? '' : postPayload.image,
+      audioUrl: isAudio ? postPayload.image : undefined,
+      videoUrl: isVideo ? postPayload.image : undefined,
+      mediaType: isAudio ? 'podcast' : isVideo ? 'video' : 'image',
       caption: postPayload.caption,
       likes: 1,
       liked: true,
@@ -135,7 +141,7 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,video/*"
+          accept="image/*,video/*,audio/*"
           style={{ display: 'none' }}
           onChange={handleFileChange}
         />
@@ -159,7 +165,7 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
 
           {/* Caption Textarea */}
           <textarea
-            placeholder="О чем вы думаете? Поделитесь новостью или мыслями..."
+            placeholder="О чем вы думаете? Поделитесь новостью, видео или подкастом..."
             value={caption}
             onChange={e => setCaption(e.target.value)}
             className="caption-textarea"
@@ -167,12 +173,20 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
             autoFocus
           />
 
-          {/* Image Preview / Upload Area */}
+          {/* Media Preview / Upload Area */}
           <div className="image-upload-section">
             {selectedImage ? (
               <div className="preview-container">
                 {selectedImage.startsWith('data:video') ? (
                   <video src={selectedImage} controls className="post-preview-img" />
+                ) : selectedImage.startsWith('data:audio') ? (
+                  <div className="audio-attached-box" style={{ padding: '1rem', background: 'var(--color-bg-secondary)', borderRadius: '12px', textAlign: 'center', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px', color: 'var(--color-accent)', fontWeight: 600, fontSize: '0.9rem' }}>
+                      <Headphones size={20} />
+                      <span>Аудиофайл (подкаст) прикреплен</span>
+                    </div>
+                    <audio src={selectedImage} controls style={{ width: '100%' }} />
+                  </div>
                 ) : (
                   <img src={selectedImage} alt="Медиа" className="post-preview-img" />
                 )}
@@ -181,13 +195,18 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
                   className="change-image-btn" 
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <ImageIcon size={16} /> Изменить
+                  <ImageIcon size={16} /> Изменить файл
                 </button>
               </div>
             ) : (
               <div className="upload-dropzone" onClick={() => fileInputRef.current?.click()}>
-                <ImageIcon size={32} className="dropzone-icon" />
-                <span>Нажмите, чтобы загрузить фото с компьютера</span>
+                <div style={{ display: 'flex', gap: '10px', color: 'var(--color-accent)', marginBottom: '4px' }}>
+                  <ImageIcon size={26} />
+                  <Film size={26} />
+                  <Headphones size={26} />
+                </div>
+                <span style={{ fontWeight: 600 }}>Загрузить фото, видео или аудиоподкаст</span>
+                <span style={{ fontSize: '0.76rem', color: 'var(--color-text-tertiary)' }}>Нажмите для выбора любого медиафайла</span>
               </div>
             )}
           </div>

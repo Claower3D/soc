@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Check, MapPin, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Check, MapPin, Trash2, Headphones } from 'lucide-react';
 import { type Post } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { PremiumBadge } from './PremiumBadge';
@@ -157,8 +157,8 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
           onClick={() => onOpenModal && onOpenModal(post)}
           onDoubleClick={handleDoubleClick}
         >
-          {post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/') ? (
-            <video src={post.image} controls className="post-image" />
+          {post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/') || post.videoUrl ? (
+            <video src={post.videoUrl || post.image} controls className="post-image" />
           ) : (
             <img 
               src={post.image} 
@@ -176,6 +176,19 @@ export function PostCard({ post, onLike, onOpenModal }: PostCardProps) {
           )}
         </div>
       ) : null}
+
+      {/* Audio / Podcast Player Bar */}
+      {post.audioUrl && (
+        <div className="post-audio-card-wrapper" onClick={e => e.stopPropagation()}>
+          <div className="post-audio-pill-header">
+            <div className="audio-badge-icon">
+              <Headphones size={15} />
+            </div>
+            <span className="audio-badge-title">Аудиовыпуск подкаста</span>
+          </div>
+          <audio src={post.audioUrl} controls className="post-card-audio-ctrl" />
+        </div>
+      )}
 
       {/* Content & Actions */}
       <div className="post-content">
