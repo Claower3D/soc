@@ -34,6 +34,8 @@ import { AuthModal } from './components/AuthModal';
 import './styles/theme.css';
 import './App.css';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SplashIntro, shouldShowSplash } from './components/SplashIntro';
+import { useState } from 'react';
 
 function AppContent() {
   const { isAuthModalOpen, closeAuthModal, authModalMode, isAuthenticated } = useAuth();
@@ -111,8 +113,10 @@ function AppContent() {
 }
 
 function App() {
+  const [showSplash, setShowSplash] = useState(() => shouldShowSplash());
   return (
     <BrowserRouter>
+      {showSplash && <SplashIntro onFinish={() => setShowSplash(false)} />}
       <LanguageProvider>
         <CurrencyProvider>
           <ThemeProvider>
