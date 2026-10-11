@@ -2625,8 +2625,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                         <div className="cw-trans-lang-active">
                           <Globe size={13} className="cw-trans-globe-icon" />
                           <span className="cw-trans-lang-name">
-                            {WORLD_LANGUAGES.find(l => l.code === msgTranslations[msg.id].targetLang)?.flag}{' '}
-                            {WORLD_LANGUAGES.find(l => l.code === msgTranslations[msg.id].targetLang)?.name}
+                            {WORLD_LANGUAGES.find(l => l.code === msgTranslations[msg.id].targetLang)?.name || 'Перевод'}
                           </span>
                         </div>
                         <div className="cw-trans-header-actions">
@@ -2642,7 +2641,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                             }}
                             title="Сменить язык перевода"
                           >
-                            <span>{msgTranslations[msg.id].showAllLangs ? 'Скрыть список' : 'Выбрать язык'}</span>
+                            <span>{msgTranslations[msg.id].showAllLangs ? 'Скрыть список' : 'Все языки'}</span>
                             <ChevronDown size={12} className={msgTranslations[msg.id].showAllLangs ? 'cw-rot-180' : ''} />
                           </button>
                           <button
@@ -2654,32 +2653,51 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                             }}
                             title="Закрыть перевод"
                           >
-                            <X size={13} />
+                            <X size={14} />
                           </button>
                         </div>
                       </div>
 
-                      {/* Быстрые чипы популярных языков */}
+                      {/* Быстрые чипы популярных языков - чистые названия без дублирования флагов */}
                       <div className="cw-trans-chips">
-                        {POPULAR_LANG_CODES.map(c => {
-                          const langObj = WORLD_LANGUAGES.find(l => l.code === c);
-                          if (!langObj) return null;
-                          const isActive = msgTranslations[msg.id].targetLang === c;
+                        {[
+                          { code: 'en', label: 'English' },
+                          { code: 'kk', label: 'Қазақша' },
+                          { code: 'ru', label: 'Русский' },
+                          { code: 'es', label: 'Español' },
+                          { code: 'de', label: 'Deutsch' },
+                          { code: 'zh', label: '中文' },
+                          { code: 'tr', label: 'Türkçe' },
+                        ].map(item => {
+                          const isActive = msgTranslations[msg.id].targetLang === item.code;
                           return (
                             <button
-                              key={c}
+                              key={item.code}
                               type="button"
                               className={`cw-trans-chip ${isActive ? 'active' : ''}`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                toggleTranslateMessage(msg.id, text, c);
+                                toggleTranslateMessage(msg.id, text, item.code);
                               }}
                             >
-                              <span>{langObj.flag}</span>
-                              <span>{langObj.code.toUpperCase()}</span>
+                              <span>{item.label}</span>
                             </button>
                           );
                         })}
+                        <button
+                          type="button"
+                          className={`cw-trans-chip cw-trans-chip-more ${msgTranslations[msg.id].showAllLangs ? 'active' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMsgTranslations(prev => ({
+                              ...prev,
+                              [msg.id]: { ...prev[msg.id], showAllLangs: !prev[msg.id]?.showAllLangs }
+                            }));
+                          }}
+                          title="Показать все языки мира"
+                        >
+                          <span>{msgTranslations[msg.id].showAllLangs ? '▲ Свернуть' : '⋯ Все языки'}</span>
+                        </button>
                       </div>
 
                       {/* Полный список всех языков мира */}
@@ -2695,7 +2713,6 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                                 toggleTranslateMessage(msg.id, text, lang.code);
                               }}
                             >
-                              <span className="cw-lang-flag">{lang.flag}</span>
                               <span className="cw-lang-name">{lang.name}</span>
                               <span className="cw-lang-native">({lang.nativeName})</span>
                             </button>
@@ -2738,7 +2755,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                             ) : (
                               <>
                                 <Volume2 size={14} />
-                                <span>Слушать голосовое ({msgTranslations[msg.id].targetLang.toUpperCase()})</span>
+                                <span>Слушать ({WORLD_LANGUAGES.find(l => l.code === msgTranslations[msg.id].targetLang)?.nativeName || msgTranslations[msg.id].targetLang.toUpperCase()})</span>
                               </>
                             )}
                           </button>
@@ -2754,13 +2771,13 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                           >
                             {msgTranslations[msg.id].copied ? (
                               <>
-                                <Check size={13} style={{ color: '#10b981' }} />
-                                <span style={{ color: '#10b981' }}>Скопировано</span>
+                                <Check size={13} className="cw-copy-check" />
+                                <span>Скопировано</span>
                               </>
                             ) : (
                               <>
                                 <Copy size={13} />
-                                <span>Копия</span>
+                                <span>Копировать</span>
                               </>
                             )}
                           </button>
@@ -3214,8 +3231,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                   className={`cw-quick-lang-pill ${isActive ? 'active' : ''}`}
                   onClick={() => handleQuickTranslate(c)}
                 >
-                  <span>{langObj.flag}</span>
-                  <span>{langObj.name}</span>
+                  <span>{langObj.nativeName || langObj.name}</span>
                 </button>
               );
             })}
