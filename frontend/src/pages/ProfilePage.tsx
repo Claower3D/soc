@@ -5,7 +5,7 @@ import {
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Users, Share2, Edit3, Heart, MessageSquare,
   CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogIn, Plus, Brain, Sparkles,
-  Calendar, Moon, Film, Settings, Info, ChevronDown, ChevronUp, QrCode
+  Calendar, Moon, Film, Settings, Info, ChevronDown, ChevronUp, QrCode, Briefcase
 } from 'lucide-react';
 import { 
   RELIGIONS_CATALOG, type User, type Post, type Story, type Video as VideoType, 
@@ -29,6 +29,7 @@ import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import { PremiumBadge } from '../components/PremiumBadge';
 import { ConsciousnessClassModal } from '../components/ConsciousnessClassModal';
 import { QrScannerModal } from '../components/QrScannerModal';
+import { BusinessAccountModal } from '../components/BusinessAccountModal';
 import { useCurrency } from '../context/CurrencyContext';
 import { 
   getStoredFollowingIds, 
@@ -79,6 +80,7 @@ export function ProfilePage() {
   const [isUploadVideoOpen, setIsUploadVideoOpen] = useState(false);
   const [isUploadPodcastOpen, setIsUploadPodcastOpen] = useState(false);
   const [isCreateProductOpen, setIsCreateProductOpen] = useState(false);
+  const [isBusinessModalOpen, setIsBusinessModalOpen] = useState(false);
   const [profilePosts, setProfilePosts] = useState<Post[]>(() => {
     try {
       const saved = localStorage.getItem('new_age_user_posts');
@@ -722,7 +724,12 @@ export function ProfilePage() {
                     </span>
                   )}
                   {activeUser.role === 'business' && (
-                    <span className="profile-role-badge business" title="Проверенный продавец">
+                    <span 
+                      className={`profile-role-badge business ${isMe ? 'clickable-role-badge' : ''}`} 
+                      title={isMe ? 'Управление бизнес-аккаунтом (нажмите для настроек)' : 'Проверенный продавец'}
+                      onClick={isMe ? () => setIsBusinessModalOpen(true) : undefined}
+                      style={isMe ? { cursor: 'pointer' } : undefined}
+                    >
                       <ShoppingBag size={12} /> Магазин {activeUser.businessCategory ? `• ${activeUser.businessCategory}` : ''}
                     </span>
                   )}
@@ -920,6 +927,15 @@ export function ProfilePage() {
                     window.dispatchEvent(new CustomEvent('open-profile-settings', { detail: { tab: 'general' } }));
                   }}>
                     <Edit3 size={14} /> Редактировать
+                  </button>
+                  <button 
+                    type="button"
+                    className={`btn ${activeUser.role === 'business' ? 'btn-business-active' : 'btn-business-switch'}`}
+                    onClick={() => setIsBusinessModalOpen(true)}
+                    title={activeUser.role === 'business' ? 'Управление бизнес-аккаунтом' : 'Перейти на бизнес-аккаунт New Age'}
+                  >
+                    <Briefcase size={14} />
+                    <span>{activeUser.role === 'business' ? 'Мой бизнес' : 'Бизнес-аккаунт'}</span>
                   </button>
                   <button 
                     type="button"
@@ -1291,7 +1307,29 @@ export function ProfilePage() {
 
         {/* SHOP / MARKETPLACE TAB */}
         {activeTab === 'shop' && (
-          userProducts.length > 0 ? (
+          <div className="profile-shop-container">
+            {isMe && activeUser.role !== 'business' && (
+              <div className="profile-business-promo-banner">
+                <div className="promo-banner-text">
+                  <div className="promo-badge-tag">
+                    <Sparkles size={13} />
+                    <span>Для мастеров и магазинов</span>
+                  </div>
+                  <h4>Откройте витрину в New Age</h4>
+                  <p>Перейдите на бизнес-аккаунт, чтобы размещать товары, артефакты, курсы и принимать прямые заказы от клиентов.</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn-promo-switch-business"
+                  onClick={() => setIsBusinessModalOpen(true)}
+                >
+                  <Briefcase size={15} />
+                  <span>Подключить бизнес-аккаунт</span>
+                </button>
+              </div>
+            )}
+
+            {userProducts.length > 0 ? (
             <div className="profile-products-grid">
               {userProducts.map(product => (
                 <div key={product.id} className="profile-product-card" onClick={() => navigate('/marketplace')}>
@@ -1331,8 +1369,9 @@ export function ProfilePage() {
                 </button>
               )}
             </div>
-          )
-        )}
+          )}
+        </div>
+      )}
       </div>
 
       {/* Followers / Following Modal */}
@@ -1477,6 +1516,12 @@ export function ProfilePage() {
       <QrScannerModal
         isOpen={isQrScannerOpen}
         onClose={() => setIsQrScannerOpen(false)}
+      />
+
+      {/* Business Account Switch & Management Modal */}
+      <BusinessAccountModal
+        isOpen={isBusinessModalOpen}
+        onClose={() => setIsBusinessModalOpen(false)}
       />
     </div>
   );

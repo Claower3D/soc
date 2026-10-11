@@ -178,6 +178,12 @@ type User struct {
 	IsFollowed     bool   `json:"isFollowed,omitempty"`
 	IsFriend       bool   `json:"isFriend,omitempty"`
 	Role           string `json:"role,omitempty"`
+	BusinessCategory string `json:"businessCategory,omitempty"`
+	BusinessPhone  string `json:"businessPhone,omitempty"`
+	BusinessEmail  string `json:"businessEmail,omitempty"`
+	BusinessAddress string `json:"businessAddress,omitempty"`
+	BusinessWorkingHours string `json:"businessWorkingHours,omitempty"`
+	BusinessDescription string `json:"businessDescription,omitempty"`
 	BeliefType     string `json:"beliefType,omitempty"`
 	BeliefPrivacy  string `json:"beliefPrivacy,omitempty"`
 	Verified       bool   `json:"verified,omitempty"`
@@ -440,6 +446,12 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS show_birth_date BOOLEAN DEFAULT TRUE;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS show_zodiac BOOLEAN DEFAULT TRUE;
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS business_category VARCHAR(100) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS business_phone VARCHAR(50) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS business_email VARCHAR(100) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS business_address TEXT DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS business_working_hours VARCHAR(100) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS business_description TEXT DEFAULT '';
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS belief_type VARCHAR(100) DEFAULT '';
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS belief_privacy VARCHAR(50) DEFAULT 'public';
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE;
@@ -2634,6 +2646,7 @@ func getUserFromToken(token string) (*User, error) {
 		query := `
 		SELECT id, name, username, COALESCE(avatar, ''), COALESCE(cover_image, ''), COALESCE(bio, ''), 
 		       COALESCE(location, ''), COALESCE(website, ''), COALESCE(role, 'user'), 
+		       COALESCE(business_category, ''), COALESCE(business_phone, ''), COALESCE(business_email, ''), COALESCE(business_address, ''), COALESCE(business_working_hours, ''), COALESCE(business_description, ''),
 		       COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(birth_date, ''), 
 		       COALESCE(gender, 'hidden'), COALESCE(show_birth_date, true), COALESCE(show_zodiac, true),
 		       COALESCE(zodiac_sign, ''), COALESCE(eastern_zodiac, ''), 
@@ -2644,6 +2657,7 @@ func getUserFromToken(token string) (*User, error) {
 		err := db.QueryRow(query, claims.UserID).Scan(
 			&u.ID, &u.Name, &u.Username, &u.Avatar, &u.CoverImage, &u.Bio,
 			&u.Location, &u.Website, &u.Role,
+			&u.BusinessCategory, &u.BusinessPhone, &u.BusinessEmail, &u.BusinessAddress, &u.BusinessWorkingHours, &u.BusinessDescription,
 			&u.BeliefType, &u.BeliefPrivacy, &u.BirthDate,
 			&u.Gender, &u.ShowBirthDate, &u.ShowZodiac,
 			&u.ZodiacSign, &u.EasternZodiac,
@@ -4385,6 +4399,13 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		ConsciousnessLevel *int   `json:"consciousness_level"`
 		ConsciousnessTitle string `json:"consciousness_title"`
 		CognitionVector    string `json:"cognition_vector"`
+		Role               string `json:"role"`
+		BusinessCategory   string `json:"business_category"`
+		BusinessPhone      string `json:"business_phone"`
+		BusinessEmail      string `json:"business_email"`
+		BusinessAddress    string `json:"business_address"`
+		BusinessWorkingHours string `json:"business_working_hours"`
+		BusinessDescription string `json:"business_description"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
@@ -4433,9 +4454,16 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 				eastern_zodiac = COALESCE(NULLIF($14, ''), eastern_zodiac),
 				consciousness_level = CASE WHEN $15 > 0 THEN $15 ELSE consciousness_level END,
 				consciousness_title = COALESCE(NULLIF($16, ''), consciousness_title),
-				cognition_vector = COALESCE(NULLIF($17, ''), cognition_vector)
-			WHERE id = $18 OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($18, '@', ''))
-		`, req.Name, req.Bio, req.Avatar, req.CoverImage, req.Location, req.Website, req.BeliefType, req.BeliefPrivacy, req.BirthDate, req.Gender, showBirthDate, showZodiac, req.ZodiacSign, req.EasternZodiac, consciousnessLevel, consciousnessTitle, req.CognitionVector, targetID)
+				cognition_vector = COALESCE(NULLIF($17, ''), cognition_vector),
+				role = COALESCE(NULLIF($18, ''), role),
+				business_category = $19,
+				business_phone = $20,
+				business_email = $21,
+				business_address = $22,
+				business_working_hours = $23,
+				business_description = $24
+			WHERE id = $25 OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($25, '@', ''))
+		`, req.Name, req.Bio, req.Avatar, req.CoverImage, req.Location, req.Website, req.BeliefType, req.BeliefPrivacy, req.BirthDate, req.Gender, showBirthDate, showZodiac, req.ZodiacSign, req.EasternZodiac, consciousnessLevel, consciousnessTitle, req.CognitionVector, req.Role, req.BusinessCategory, req.BusinessPhone, req.BusinessEmail, req.BusinessAddress, req.BusinessWorkingHours, req.BusinessDescription, targetID)
 		if err != nil {
 			log.Printf("⚠️ Ошибка обновления профиля в DB: %v", err)
 			writeJSON(w, http.StatusInternalServerError, Response{Status: "error", Message: "Ошибка обновления профиля: " + err.Error()})
@@ -4481,6 +4509,13 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		if req.ConsciousnessLevel != nil && *req.ConsciousnessLevel > 0 { acc.User.ConsciousnessLevel = *req.ConsciousnessLevel }
 		if req.ConsciousnessTitle != "" { acc.User.ConsciousnessTitle = req.ConsciousnessTitle }
 		if req.CognitionVector != "" { acc.User.CognitionVector = req.CognitionVector }
+		if req.Role != "" { acc.User.Role = req.Role }
+		if req.BusinessCategory != "" { acc.User.BusinessCategory = req.BusinessCategory }
+		if req.BusinessPhone != "" { acc.User.BusinessPhone = req.BusinessPhone }
+		if req.BusinessEmail != "" { acc.User.BusinessEmail = req.BusinessEmail }
+		if req.BusinessAddress != "" { acc.User.BusinessAddress = req.BusinessAddress }
+		if req.BusinessWorkingHours != "" { acc.User.BusinessWorkingHours = req.BusinessWorkingHours }
+		if req.BusinessDescription != "" { acc.User.BusinessDescription = req.BusinessDescription }
 		store.accounts[accountKey] = acc
 	}
 	store.saveToDisk()

@@ -36,6 +36,12 @@ export interface RegisteredAccount {
   gender?: 'male' | 'female' | 'other' | 'hidden';
   showBirthDate?: boolean;
   showZodiac?: boolean;
+  businessCategory?: string;
+  businessPhone?: string;
+  businessEmail?: string;
+  businessAddress?: string;
+  businessWorkingHours?: string;
+  businessDescription?: string;
   createdAt: string;
 }
 
@@ -522,6 +528,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         consciousness_level: data.consciousnessLevel,
         consciousness_title: data.consciousnessTitle,
         cognition_vector: data.cognitionVector,
+        role: data.role,
+        business_category: data.businessCategory,
+        business_phone: data.businessPhone,
+        business_email: data.businessEmail,
+        business_address: data.businessAddress,
+        business_working_hours: data.businessWorkingHours,
+        business_description: data.businessDescription,
       }).then((res: any) => {
         const u = res?.user || res?.data?.user;
         if (u) {

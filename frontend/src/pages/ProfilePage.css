@@ -1882,6 +1882,132 @@
   min-width: 0;
 }
 
+.btn-business-switch {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.16) 0%, rgba(236, 72, 153, 0.16) 100%) !important;
+  border: 1px solid rgba(236, 72, 153, 0.45) !important;
+  color: #f472b6 !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-business-switch:hover {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.3) 0%, rgba(236, 72, 153, 0.3) 100%) !important;
+  border-color: rgba(236, 72, 153, 0.75) !important;
+  color: #fff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(236, 72, 153, 0.3);
+}
+
+.btn-business-active {
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(236, 72, 153, 0.35) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.btn-business-active:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(236, 72, 153, 0.5) !important;
+}
+
+.clickable-role-badge {
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.clickable-role-badge:hover {
+  filter: brightness(1.2);
+  transform: scale(1.03);
+}
+
+/* Shop tab promo banner */
+.profile-shop-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.profile-business-promo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(236, 72, 153, 0.12) 100%);
+  border: 1px solid rgba(236, 72, 153, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.promo-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.promo-badge-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.725rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #f472b6;
+}
+
+.promo-banner-text h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main, #f8fafc);
+}
+
+.promo-banner-text p {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted, #94a3b8);
+  line-height: 1.35;
+}
+
+.btn-promo-switch-business {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+  border: none;
+  color: #fff;
+  padding: 0.65rem 1.15rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(236, 72, 153, 0.35);
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+}
+
+.btn-promo-switch-business:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(236, 72, 153, 0.5);
+}
+
+@media (max-width: 640px) {
+  .profile-business-promo-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+  .btn-promo-switch-business {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* =========================================================================
    MOBILE RESPONSIVE ENHANCEMENTS FOR PROFILE (MAX-WIDTH: 768px)
    ========================================================================= */

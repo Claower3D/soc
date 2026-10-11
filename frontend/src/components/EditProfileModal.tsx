@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { 
   type User, type UserRole, type BeliefPrivacy, 
-  RELIGIONS_CATALOG 
+  RELIGIONS_CATALOG, BUSINESS_CATEGORIES 
 } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -117,6 +117,7 @@ export function EditProfileModal({
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>(currentUser?.role || 'user');
+  const [businessCategory, setBusinessCategory] = useState<string>(currentUser?.businessCategory || BUSINESS_CATEGORIES[0]);
   const [beliefType, setBeliefType] = useState<string>(currentUser?.beliefType || 'Не указано');
   const [beliefPrivacy, setBeliefPrivacy] = useState<BeliefPrivacy>(currentUser?.beliefPrivacy || 'public');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
@@ -217,6 +218,7 @@ export function EditProfileModal({
       coverImage,
       online,
       role,
+      businessCategory: role === 'business' ? businessCategory : currentUser?.businessCategory,
       beliefType,
       beliefPrivacy,
       birthDate,
@@ -933,6 +935,26 @@ export function EditProfileModal({
                     );
                   })}
                 </div>
+
+                {role === 'business' && (
+                  <div className="business-category-subgroup" style={{ marginTop: '0.85rem', padding: '0.85rem', background: 'rgba(236, 72, 153, 0.08)', borderRadius: '12px', border: '1px solid rgba(236, 72, 153, 0.25)' }}>
+                    <label className="edit-field-label" style={{ color: '#f472b6', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <ShoppingBag size={15} /> Направление / Категория вашего магазина
+                    </label>
+                    <select
+                      className="edit-input-field"
+                      value={businessCategory}
+                      onChange={(e) => setBusinessCategory(e.target.value)}
+                      style={{ background: 'rgba(0,0,0,0.3)', color: '#fff', border: '1px solid rgba(236, 72, 153, 0.4)', borderRadius: '10px', padding: '0.55rem' }}
+                    >
+                      {BUSINESS_CATEGORIES.map(cat => (
+                        <option key={cat} value={cat} style={{ background: '#1e1b2e', color: '#fff' }}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Religious Confession / Spiritual Path Cards */}

@@ -107,6 +107,23 @@ export const RELIGIONS_CATALOG: ReligionItem[] = [
 
 export const BELIEF_OPTIONS = RELIGIONS_CATALOG.map(r => r.name);
 
+export const BUSINESS_CATEGORIES = [
+  'Эзотерика & Таро',
+  'Астрология & Нумерология',
+  'Магазин атрибутики & Амулеты',
+  'Минералы & Натуральные кристаллы',
+  'Свечи & Натуральные благовония',
+  'Книги & Духовная литература',
+  'Одежда, Текстиль & Мерч',
+  'Курсы, Обучение & Вебинары',
+  'Йога & Дыхательные практики',
+  'Психология, Коучинг & Терапия',
+  'Ченнелинг & Энергетические сессии',
+  'Ремесло, Украшения & Арт',
+  'Травы, Чай & Здоровое питание',
+  'Другое'
+];
+
 export interface User {
   id: string;
   name: string;
@@ -132,6 +149,11 @@ export interface User {
   beliefPrivacy?: BeliefPrivacy;
   verified?: boolean;
   businessCategory?: string;
+  businessPhone?: string;
+  businessEmail?: string;
+  businessAddress?: string;
+  businessWorkingHours?: string;
+  businessDescription?: string;
   rating?: number;
   salesCount?: number;
   consciousnessLevel?: number; // Класс сознания от 1 до 11
