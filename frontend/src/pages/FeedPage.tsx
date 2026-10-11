@@ -238,18 +238,18 @@ export function FeedPage() {
             <div className="create-post-trigger-top" onClick={() => setIsCreatePostOpen(true)}>
               <img src={currentUser.avatar} alt={currentUser.name} className="create-my-avatar" />
               <div className="create-post-fake-input">
-                Что у вас нового, {currentUser.name.split(' ')[0]}? Опубликовать новость...
+                <span>Что у вас нового, {currentUser.name.split(' ')[0]}?</span>
               </div>
             </div>
             <div className="create-post-quick-actions">
               <button className="quick-post-action" onClick={() => setIsCreatePostOpen(true)}>
-                <ImageIcon size={17} color="#10B981" /> <span>Фото / Новость</span>
+                <ImageIcon size={15} color="#10B981" /> <span>Фото / Новость</span>
               </button>
               <button className="quick-post-action" onClick={() => navigate('/video')}>
-                <Video size={17} color="#EF4444" /> <span>Видео</span>
+                <Video size={15} color="#EF4444" /> <span>Видео</span>
               </button>
               <button className="quick-post-action" onClick={() => navigate('/podcasts')}>
-                <Headphones size={17} color="var(--color-accent)" /> <span>Подкаст</span>
+                <Headphones size={15} color="var(--color-accent)" /> <span>Подкаст</span>
               </button>
             </div>
           </div>
