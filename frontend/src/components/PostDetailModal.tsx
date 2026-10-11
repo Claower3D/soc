@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   X, Heart, MessageCircle, Send, Bookmark, 
-  Trash2, Reply, Smile, Check, MapPin, Sparkles 
+  Trash2, Reply, Smile, Check, MapPin 
 } from 'lucide-react';
 import { type Post, type Comment } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -72,6 +72,16 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
       setSaved(post.saved ?? false);
       setReplyingTo(null);
       setCommentText('');
+
+      if (post.id) {
+        api.posts.comments(post.id)
+          .then(res => {
+            if (Array.isArray(res) && res.length > 0) {
+              setComments(res);
+            }
+          })
+          .catch(() => {});
+      }
     }
   }, [post]);
 
@@ -120,6 +130,11 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
     setCommentText('');
     setReplyingTo(null);
 
+    // Persist to backend
+    if (post.id) {
+      api.posts.comment(post.id, newCommentObj.text).catch(() => {});
+    }
+
     // Notify parent
     if (onUpdatePost) {
       onUpdatePost({
@@ -157,47 +172,33 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  const hasMedia = Boolean(post.image && post.image.trim() !== '');
+
   return (
     <div className="post-modal-backdrop" onClick={onClose}>
-      <div className="post-modal-container" onClick={e => e.stopPropagation()}>
+      <div className={`post-modal-container ${!hasMedia ? 'no-media' : ''}`} onClick={e => e.stopPropagation()}>
         {/* Close Button */}
         <button className="post-modal-exit-btn" onClick={onClose} title="Закрыть">
           <X size={20} />
         </button>
 
-        {/* Left Side: Full Image / Video / Text Card */}
-        <div className="post-modal-media-col">
-          {post.image && (post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/')) ? (
-            <video src={post.image} controls autoPlay playsInline className="post-modal-photo" />
-          ) : post.image && post.image.trim() !== '' ? (
-            <img 
-              src={post.image} 
-              alt={post.caption} 
-              className="post-modal-photo" 
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          ) : (
-            <div style={{
-              width: '100%',
-              height: '100%',
-              background: 'linear-gradient(135deg, #18181b 0%, #27272a 50%, #09090b 100%)',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: '2rem',
-              textAlign: 'center',
-              color: '#fff',
-            }}>
-              <Sparkles size={36} style={{ marginBottom: '1rem', color: '#a855f7' }} />
-              <p style={{ fontSize: '1.2rem', lineHeight: 1.6, maxWidth: '80%', fontWeight: 500 }}>
-                {post.caption || 'Публикация без изображения'}
-              </p>
-            </div>
-          )}
-        </div>
+        {/* Left Side: Photo / Video */}
+        {hasMedia && (
+          <div className="post-modal-media-col">
+            {post.image && (post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/')) ? (
+              <video src={post.image} controls autoPlay playsInline className="post-modal-photo" />
+            ) : (
+              <img 
+                src={post.image} 
+                alt={post.caption || 'Публикация'} 
+                className="post-modal-photo" 
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            )}
+          </div>
+        )}
 
         {/* Right Side: Header, Caption, Comments, Actions, Input */}
         <div className="post-modal-info-col">
