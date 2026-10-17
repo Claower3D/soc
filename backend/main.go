@@ -184,6 +184,14 @@ type User struct {
 	BusinessAddress string `json:"businessAddress,omitempty"`
 	BusinessWorkingHours string `json:"businessWorkingHours,omitempty"`
 	BusinessDescription string `json:"businessDescription,omitempty"`
+	PassportFullName       string `json:"passportFullName,omitempty"`
+	PassportSeriesNumber   string `json:"passportSeriesNumber,omitempty"`
+	PassportIssueDate      string `json:"passportIssueDate,omitempty"`
+	PassportIssuedBy       string `json:"passportIssuedBy,omitempty"`
+	PassportDepartmentCode string `json:"passportDepartmentCode,omitempty"`
+	PassportInn            string `json:"passportInn,omitempty"`
+	PassportVerified       bool   `json:"passportVerified,omitempty"`
+	PassportAgreedAt       string `json:"passportAgreedAt,omitempty"`
 	BeliefType     string `json:"beliefType,omitempty"`
 	BeliefPrivacy  string `json:"beliefPrivacy,omitempty"`
 	Verified       bool   `json:"verified,omitempty"`
@@ -452,6 +460,14 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS business_address TEXT DEFAULT '';
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS business_working_hours VARCHAR(100) DEFAULT '';
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS business_description TEXT DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS passport_full_name TEXT DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS passport_series_number VARCHAR(50) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS passport_issue_date VARCHAR(50) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS passport_issued_by TEXT DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS passport_department_code VARCHAR(50) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS passport_inn VARCHAR(50) DEFAULT '';
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS passport_verified BOOLEAN DEFAULT FALSE;
+		ALTER TABLE users ADD COLUMN IF NOT EXISTS passport_agreed_at VARCHAR(50) DEFAULT '';
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS belief_type VARCHAR(100) DEFAULT '';
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS belief_privacy VARCHAR(50) DEFAULT 'public';
 		ALTER TABLE users ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE;
@@ -2647,6 +2663,7 @@ func getUserFromToken(token string) (*User, error) {
 		SELECT id, name, username, COALESCE(avatar, ''), COALESCE(cover_image, ''), COALESCE(bio, ''), 
 		       COALESCE(location, ''), COALESCE(website, ''), COALESCE(role, 'user'), 
 		       COALESCE(business_category, ''), COALESCE(business_phone, ''), COALESCE(business_email, ''), COALESCE(business_address, ''), COALESCE(business_working_hours, ''), COALESCE(business_description, ''),
+		       COALESCE(passport_full_name, ''), COALESCE(passport_series_number, ''), COALESCE(passport_issue_date, ''), COALESCE(passport_issued_by, ''), COALESCE(passport_department_code, ''), COALESCE(passport_inn, ''), COALESCE(passport_verified, false), COALESCE(passport_agreed_at, ''),
 		       COALESCE(belief_type, ''), COALESCE(belief_privacy, 'public'), COALESCE(birth_date, ''), 
 		       COALESCE(gender, 'hidden'), COALESCE(show_birth_date, true), COALESCE(show_zodiac, true),
 		       COALESCE(zodiac_sign, ''), COALESCE(eastern_zodiac, ''), 
@@ -2658,6 +2675,7 @@ func getUserFromToken(token string) (*User, error) {
 			&u.ID, &u.Name, &u.Username, &u.Avatar, &u.CoverImage, &u.Bio,
 			&u.Location, &u.Website, &u.Role,
 			&u.BusinessCategory, &u.BusinessPhone, &u.BusinessEmail, &u.BusinessAddress, &u.BusinessWorkingHours, &u.BusinessDescription,
+			&u.PassportFullName, &u.PassportSeriesNumber, &u.PassportIssueDate, &u.PassportIssuedBy, &u.PassportDepartmentCode, &u.PassportInn, &u.PassportVerified, &u.PassportAgreedAt,
 			&u.BeliefType, &u.BeliefPrivacy, &u.BirthDate,
 			&u.Gender, &u.ShowBirthDate, &u.ShowZodiac,
 			&u.ZodiacSign, &u.EasternZodiac,
@@ -4406,6 +4424,14 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		BusinessAddress    string `json:"business_address"`
 		BusinessWorkingHours string `json:"business_working_hours"`
 		BusinessDescription string `json:"business_description"`
+		PassportFullName       string `json:"passport_full_name"`
+		PassportSeriesNumber   string `json:"passport_series_number"`
+		PassportIssueDate      string `json:"passport_issue_date"`
+		PassportIssuedBy       string `json:"passport_issued_by"`
+		PassportDepartmentCode string `json:"passport_department_code"`
+		PassportInn            string `json:"passport_inn"`
+		PassportVerified       *bool  `json:"passport_verified"`
+		PassportAgreedAt       string `json:"passport_agreed_at"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат запроса"})
@@ -4461,9 +4487,17 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 				business_email = $21,
 				business_address = $22,
 				business_working_hours = $23,
-				business_description = $24
-			WHERE id = $25 OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($25, '@', ''))
-		`, req.Name, req.Bio, req.Avatar, req.CoverImage, req.Location, req.Website, req.BeliefType, req.BeliefPrivacy, req.BirthDate, req.Gender, showBirthDate, showZodiac, req.ZodiacSign, req.EasternZodiac, consciousnessLevel, consciousnessTitle, req.CognitionVector, req.Role, req.BusinessCategory, req.BusinessPhone, req.BusinessEmail, req.BusinessAddress, req.BusinessWorkingHours, req.BusinessDescription, targetID)
+				business_description = $24,
+				passport_full_name = COALESCE(NULLIF($25, ''), passport_full_name),
+				passport_series_number = COALESCE(NULLIF($26, ''), passport_series_number),
+				passport_issue_date = COALESCE(NULLIF($27, ''), passport_issue_date),
+				passport_issued_by = COALESCE(NULLIF($28, ''), passport_issued_by),
+				passport_department_code = COALESCE(NULLIF($29, ''), passport_department_code),
+				passport_inn = COALESCE(NULLIF($30, ''), passport_inn),
+				passport_verified = CASE WHEN $31 THEN TRUE ELSE passport_verified END,
+				passport_agreed_at = COALESCE(NULLIF($32, ''), passport_agreed_at)
+			WHERE id = $33 OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($33, '@', ''))
+		`, req.Name, req.Bio, req.Avatar, req.CoverImage, req.Location, req.Website, req.BeliefType, req.BeliefPrivacy, req.BirthDate, req.Gender, showBirthDate, showZodiac, req.ZodiacSign, req.EasternZodiac, consciousnessLevel, consciousnessTitle, req.CognitionVector, req.Role, req.BusinessCategory, req.BusinessPhone, req.BusinessEmail, req.BusinessAddress, req.BusinessWorkingHours, req.BusinessDescription, req.PassportFullName, req.PassportSeriesNumber, req.PassportIssueDate, req.PassportIssuedBy, req.PassportDepartmentCode, req.PassportInn, (req.PassportVerified != nil && *req.PassportVerified) || (req.PassportSeriesNumber != ""), req.PassportAgreedAt, targetID)
 		if err != nil {
 			log.Printf("⚠️ Ошибка обновления профиля в DB: %v", err)
 			writeJSON(w, http.StatusInternalServerError, Response{Status: "error", Message: "Ошибка обновления профиля: " + err.Error()})
@@ -4516,6 +4550,18 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		if req.BusinessAddress != "" { acc.User.BusinessAddress = req.BusinessAddress }
 		if req.BusinessWorkingHours != "" { acc.User.BusinessWorkingHours = req.BusinessWorkingHours }
 		if req.BusinessDescription != "" { acc.User.BusinessDescription = req.BusinessDescription }
+		if req.PassportFullName != "" { acc.User.PassportFullName = req.PassportFullName }
+		if req.PassportSeriesNumber != "" { acc.User.PassportSeriesNumber = req.PassportSeriesNumber }
+		if req.PassportIssueDate != "" { acc.User.PassportIssueDate = req.PassportIssueDate }
+		if req.PassportIssuedBy != "" { acc.User.PassportIssuedBy = req.PassportIssuedBy }
+		if req.PassportDepartmentCode != "" { acc.User.PassportDepartmentCode = req.PassportDepartmentCode }
+		if req.PassportInn != "" { acc.User.PassportInn = req.PassportInn }
+		if req.PassportVerified != nil {
+			acc.User.PassportVerified = *req.PassportVerified
+		} else if req.PassportSeriesNumber != "" {
+			acc.User.PassportVerified = true
+		}
+		if req.PassportAgreedAt != "" { acc.User.PassportAgreedAt = req.PassportAgreedAt }
 		store.accounts[accountKey] = acc
 	}
 	store.saveToDisk()

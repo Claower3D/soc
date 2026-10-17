@@ -31,7 +31,7 @@ export function SplashIntro({ onFinish }: SplashIntroProps) {
   const [leaving, setLeaving] = useState(false);
   const [topicIdx, setTopicIdx] = useState(0);
 
-  const title = 'New Age';
+  const title = 'New Age Unity';
   const stars = useMemo(
     () => Array.from({ length: 46 }, (_, i) => ({
       id: i,
@@ -109,7 +109,7 @@ export function SplashIntro({ onFinish }: SplashIntroProps) {
             ))}
           </svg>
           <div className="splash-glow" />
-          <img src={logoImg} alt="New Age" className="splash-logo" />
+          <img src={logoImg} alt="New Age Unity" className="splash-logo" />
         </div>
 
         <div className="splash-greet">Приветствую тебя</div>

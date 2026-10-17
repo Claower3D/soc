@@ -932,7 +932,7 @@ export function ProfilePage() {
                     type="button"
                     className={`btn ${activeUser.role === 'business' ? 'btn-business-active' : 'btn-business-switch'}`}
                     onClick={() => setIsBusinessModalOpen(true)}
-                    title={activeUser.role === 'business' ? 'Управление бизнес-аккаунтом' : 'Перейти на бизнес-аккаунт New Age'}
+                    title={activeUser.role === 'business' ? 'Управление бизнес-аккаунтом' : 'Перейти на бизнес-аккаунт New Age Unity'}
                   >
                     <Briefcase size={14} />
                     <span>{activeUser.role === 'business' ? 'Мой бизнес' : 'Бизнес-аккаунт'}</span>
@@ -1315,7 +1315,7 @@ export function ProfilePage() {
                     <Sparkles size={13} />
                     <span>Для мастеров и магазинов</span>
                   </div>
-                  <h4>Откройте витрину в New Age</h4>
+                  <h4>Откройте витрину в New Age Unity</h4>
                   <p>Перейдите на бизнес-аккаунт, чтобы размещать товары, артефакты, курсы и принимать прямые заказы от клиентов.</p>
                 </div>
                 <button

@@ -290,9 +290,9 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
       {/* Top Header */}
       <header className="register-page-header">
         <Link to="/" className="register-brand-link">
-          <img src={logoImg} alt="New Age" className="register-brand-logo" />
+          <img src={logoImg} alt="New Age Unity" className="register-brand-logo" />
           <div className="register-brand-text">
-            <span className="brand-logo-title">NEW AGE</span>
+            <span className="brand-logo-title">NEW AGE UNITY</span>
             <span className="brand-logo-subtitle">Экосистема 2026</span>
           </div>
         </Link>
@@ -328,7 +328,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
               <div className="side-banner-brand-header">
                 <img 
                   src={logoImg} 
-                  alt="New Age Logo" 
+                  alt="New Age Unity Logo" 
                   className="side-banner-clean-logo" 
                 />
                 <div className="side-badge">
@@ -337,7 +337,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                 </div>
               </div>
 
-              <h1 className="side-title">Приветствую тебя на платформе New Age</h1>
+              <h1 className="side-title">Приветствую тебя на платформе New Age Unity</h1>
 
               <div className="side-welcome-text-box">
                 <p className="side-desc">
@@ -437,8 +437,8 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
           <div className="register-form-container">
             {/* Mobile-only brand welcome card */}
             <div className="register-mobile-welcome">
-              <img src={logoImg} alt="New Age" className="register-mobile-logo" />
-              <h2>New Age</h2>
+              <img src={logoImg} alt="New Age Unity" className="register-mobile-logo" />
+              <h2>New Age Unity</h2>
               <p>Платформа для духовного роста, познания внутреннего мира и раскрытия способностей.</p>
             </div>
 

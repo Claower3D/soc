@@ -225,7 +225,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="auth-brand-top">
             <img 
               src={logoImg} 
-              alt="New Age Logo" 
+              alt="New Age Unity Logo" 
               className="auth-brand-clean-logo" 
               onError={(e) => {
                 (e.target as HTMLElement).style.display = 'none';
@@ -233,9 +233,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             />
             <div className="auth-brand-badge-pill">
               <Sparkles size={12} className="sparkle-gold" />
-              <span>NEW AGE PLATFORM</span>
+              <span>NEW AGE UNITY</span>
             </div>
-            <h2 className="auth-brand-title">Приветствую тебя на платформе New Age</h2>
+            <h2 className="auth-brand-title">Приветствую тебя на платформе New Age Unity</h2>
             <p className="auth-brand-desc">
               Платформа создана для духовного роста и развития ваших способностей. Познайте свой внутренний мир, поймите свою многомерную природу и высшее предназначение на планете Земля.
             </p>
@@ -355,7 +355,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <div className="qr-instructions">
                     <div className="qr-step-item">
                       <Smartphone size={16} className="qr-step-icon" />
-                      <span>Откройте камеру на телефоне или приложение <b>New Age</b></span>
+                      <span>Откройте камеру на телефоне или приложение <b>New Age Unity</b></span>
                     </div>
                     <div className="qr-step-item">
                       <QrCode size={16} className="qr-step-icon" />

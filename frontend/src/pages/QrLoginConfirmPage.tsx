@@ -75,9 +75,9 @@ export const QrLoginConfirmPage: React.FC = () => {
         {/* Brand header */}
         <div className="qr-confirm-header">
           <div className="qr-confirm-logo-wrap">
-            <img src={logoImg} alt="New Age" className="qr-confirm-logo-img" />
+            <img src={logoImg} alt="New Age Unity" className="qr-confirm-logo-img" />
           </div>
-          <h2 className="qr-confirm-title">Вход в New Age</h2>
+          <h2 className="qr-confirm-title">Вход в New Age Unity</h2>
           <p className="qr-confirm-subtitle">Запрос авторизации на компьютере</p>
         </div>
 
@@ -106,7 +106,7 @@ export const QrLoginConfirmPage: React.FC = () => {
               <AlertCircle size={40} color="#6366F1" />
             </div>
             <h3>Требуется вход</h3>
-            <p>Чтобы подтвердить вход на компьютере, сначала авторизуйтесь в New Age на этом телефоне.</p>
+            <p>Чтобы подтвердить вход на компьютере, сначала авторизуйтесь в New Age Unity на этом телефоне.</p>
             <button className="btn btn-primary qr-state-btn" onClick={() => openAuthModal('login')}>
               Войти на телефоне
             </button>

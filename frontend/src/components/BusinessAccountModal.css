@@ -1,5 +1,5 @@
 /* =========================================================================
-   BUSINESS ACCOUNT MODAL STYLES (NEW AGE BUSINESS)
+   BUSINESS ACCOUNT MODAL STYLES (NEW AGE BUSINESS WITH PASSPORT VERIFICATION)
    ========================================================================= */
 
 .business-modal-backdrop {
@@ -23,8 +23,8 @@
 
 .business-modal-box {
   width: 100%;
-  max-width: 640px;
-  max-height: 90vh;
+  max-width: 680px;
+  max-height: 92vh;
   background: var(--bg-card, #131722);
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
   border-radius: 20px;
@@ -55,6 +55,7 @@
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
+  flex-shrink: 0;
 }
 
 .business-modal-title-wrap {
@@ -119,13 +120,28 @@
   gap: 1.25rem;
 }
 
-/* Success Banner */
+/* Success & Error Banners */
 .business-success-banner {
   margin: 0.75rem 1.5rem 0;
   padding: 0.75rem 1rem;
   background: rgba(16, 185, 129, 0.15);
   border: 1px solid rgba(16, 185, 129, 0.35);
   color: #34d399;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  animation: businessFadeIn 0.2s ease-out;
+}
+
+.business-error-banner {
+  margin: 0.75rem 1.5rem 0;
+  padding: 0.75rem 1rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
   border-radius: 12px;
   font-size: 0.875rem;
   font-weight: 600;
@@ -233,7 +249,7 @@
 .business-account-form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.15rem;
 }
 
 .business-field-group {
@@ -249,6 +265,12 @@
   display: flex;
   align-items: center;
   gap: 0.45rem;
+}
+
+.business-field-label.required::after {
+  content: '*';
+  color: #f43f5e;
+  font-weight: 700;
 }
 
 .business-field-hint {
@@ -323,7 +345,214 @@
 
 .business-textarea {
   resize: vertical;
-  min-height: 70px;
+  min-height: 60px;
+}
+
+/* =========================================================================
+   PASSPORT & LEGAL RESPONSIBILITY STYLES
+   ========================================================================= */
+.passport-verification-section {
+  background: linear-gradient(180deg, rgba(234, 88, 12, 0.06) 0%, rgba(168, 85, 247, 0.04) 100%);
+  border: 1px solid rgba(234, 88, 12, 0.3);
+  border-radius: 16px;
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.passport-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.passport-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fdba74;
+}
+
+.passport-header-icon {
+  color: #f97316;
+  flex-shrink: 0;
+}
+
+.passport-security-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.725rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+  white-space: nowrap;
+}
+
+.passport-legal-notice {
+  background: rgba(0, 0, 0, 0.3);
+  border-left: 3px solid #f97316;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0 10px 10px 0;
+}
+
+.passport-legal-notice p {
+  margin: 0;
+  font-size: 0.775rem;
+  line-height: 1.45;
+  color: #fed7aa;
+}
+
+.passport-legal-notice strong {
+  color: #fff;
+}
+
+.passport-fields-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.passport-verified-summary-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 12px;
+}
+
+.summary-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.verified-check-icon {
+  color: #34d399;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.summary-left strong {
+  display: block;
+  font-size: 0.875rem;
+  color: #f8fafc;
+}
+
+.summary-left p {
+  margin: 0.15rem 0 0.1rem;
+  font-size: 0.8125rem;
+  color: #cbd5e1;
+  font-family: monospace;
+}
+
+.summary-meta {
+  font-size: 0.725rem;
+  color: #34d399;
+  font-weight: 500;
+}
+
+.btn-change-passport {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.775rem;
+  font-weight: 550;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.btn-change-passport:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.btn-passport-toggle-view {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+  padding: 0.2rem 0;
+  margin-top: -0.25rem;
+}
+
+.btn-passport-toggle-view:hover {
+  color: #fff;
+}
+
+/* Agreement Checkboxes */
+.passport-agreements-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.25rem;
+}
+
+.agreement-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.agreement-checkbox-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.agreement-checkbox-row.checked {
+  background: rgba(168, 85, 247, 0.08);
+  border-color: rgba(168, 85, 247, 0.35);
+}
+
+.checkbox-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.check-icon-active {
+  color: #c084fc;
+}
+
+.check-icon-inactive {
+  color: var(--text-muted, #64748b);
+}
+
+.agreement-text {
+  font-size: 0.775rem;
+  line-height: 1.45;
+  color: var(--text-muted, #cbd5e1);
+  cursor: pointer;
+}
+
+.agreement-text strong {
+  color: #f8fafc;
 }
 
 /* Footer Actions */
@@ -387,8 +616,9 @@
 }
 
 .btn-business-submit:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  filter: grayscale(0.5);
 }
 
 .btn-business-revert {
@@ -416,7 +646,7 @@
   font-size: 0.75rem;
   color: var(--text-muted, #94a3b8);
   text-align: center;
-  padding-top: 0.35rem;
+  padding-top: 0.25rem;
 }
 
 /* Revert Confirm Box */
@@ -490,7 +720,7 @@
   }
 
   .business-modal-box {
-    max-height: 92vh;
+    max-height: 94vh;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }

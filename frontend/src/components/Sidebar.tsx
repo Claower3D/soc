@@ -31,7 +31,7 @@ export function Sidebar() {
           <div className="brand-logo-glow-wrapper">
             <img 
               src={logoImg} 
-              alt="New Age Logo" 
+              alt="New Age Unity Logo" 
               className="brand-logo-img" 
               onError={(e) => {
                 (e.target as HTMLElement).style.display = 'none';
@@ -39,7 +39,7 @@ export function Sidebar() {
             />
           </div>
           <div className="brand-text-block">
-            <span className="demo-badge new-age-badge">NEW AGE</span>
+            <span className="demo-badge new-age-badge">NEW AGE UNITY</span>
             <span className="demo-subtext">социальная экосистема</span>
             <span className="brand-motto-tag" title="Официальный девиз">«Спасение служба»</span>
           </div>

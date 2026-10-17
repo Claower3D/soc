@@ -42,6 +42,14 @@ export interface RegisteredAccount {
   businessAddress?: string;
   businessWorkingHours?: string;
   businessDescription?: string;
+  passportFullName?: string;
+  passportSeriesNumber?: string;
+  passportIssueDate?: string;
+  passportIssuedBy?: string;
+  passportDepartmentCode?: string;
+  passportInn?: string;
+  passportVerified?: boolean;
+  passportAgreedAt?: string;
   createdAt: string;
 }
 
@@ -535,6 +543,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         business_address: data.businessAddress,
         business_working_hours: data.businessWorkingHours,
         business_description: data.businessDescription,
+        passport_full_name: data.passportFullName,
+        passport_series_number: data.passportSeriesNumber,
+        passport_issue_date: data.passportIssueDate,
+        passport_issued_by: data.passportIssuedBy,
+        passport_department_code: data.passportDepartmentCode,
+        passport_inn: data.passportInn,
+        passport_verified: data.passportVerified,
+        passport_agreed_at: data.passportAgreedAt,
       }).then((res: any) => {
         const u = res?.user || res?.data?.user;
         if (u) {

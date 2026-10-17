@@ -154,6 +154,14 @@ export interface User {
   businessAddress?: string;
   businessWorkingHours?: string;
   businessDescription?: string;
+  passportFullName?: string;
+  passportSeriesNumber?: string;
+  passportIssueDate?: string;
+  passportIssuedBy?: string;
+  passportDepartmentCode?: string;
+  passportInn?: string;
+  passportVerified?: boolean;
+  passportAgreedAt?: string;
   rating?: number;
   salesCount?: number;
   consciousnessLevel?: number; // Класс сознания от 1 до 11

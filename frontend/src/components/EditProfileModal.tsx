@@ -252,7 +252,7 @@ export function EditProfileModal({
 
         <div className="edit-modal-sidebar">
           <div className="edit-sidebar-header">
-            <h2>NEW AGE</h2>
+            <h2>NEW AGE UNITY</h2>
             <h3>НАСТРОЙКИ</h3>
           </div>
           <nav className="edit-sidebar-nav">
@@ -906,7 +906,7 @@ export function EditProfileModal({
             <div className="edit-tab-pane">
               {/* Role in ecosystem */}
               <div className="edit-field-group">
-                <label className="edit-field-label">Ваша роль в экосистеме New Age</label>
+                <label className="edit-field-label">Ваша роль в экосистеме New Age Unity</label>
                 <div className="roles-cards-grid">
                   {[
                     { id: 'user', title: 'Личный профиль', desc: 'Участник, читатель, практик', icon: UserIcon, color: '#3B82F6' },
