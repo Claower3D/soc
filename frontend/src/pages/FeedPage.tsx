@@ -13,7 +13,8 @@ import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { cacheService } from '../utils/cacheService';
 import { syncLocalStoriesWithServer, isStoryExpired } from '../utils/syncStories';
-import { getStoredFollowingIds, isUserFollowed, toggleUserFollow, getAllUsersPool } from '../utils/followStorage';
+import { getStoredFollowingIds, isUserFollowed, toggleUserFollow, getAllUsersPool, getFollowersForUser } from '../utils/followStorage';
+import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './FeedPage.css';
 
 interface TrendingTopic {
@@ -165,14 +166,93 @@ export function FeedPage() {
   const [isUploadPodcastOpen, setIsUploadPodcastOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds(currentUser?.id));
+  const [profileData, setProfileData] = useState<Partial<any> | null>(null);
+
+  // Sync profile data and stats with backend
+  useEffect(() => {
+    if (currentUser?.id && currentUser.id !== 'guest') {
+      api.users.profile(currentUser.id).then((res) => {
+        if (res?.user) setProfileData(res.user);
+      }).catch(console.warn);
+    }
+  }, [currentUser?.id]);
 
   useEffect(() => {
     const handleFollowChange = () => {
       setFollowingIds(getStoredFollowingIds(currentUser?.id));
+      if (currentUser?.id && currentUser.id !== 'guest') {
+        api.users.profile(currentUser.id).then((res) => {
+          if (res?.user) setProfileData(res.user);
+        }).catch(console.warn);
+      }
     };
     window.addEventListener('follow_change', handleFollowChange);
     return () => window.removeEventListener('follow_change', handleFollowChange);
   }, [currentUser?.id]);
+
+  // Real-time calculated stats for current user
+  const myPostsCount = useMemo(() => {
+    if (!currentUser?.id || currentUser.id === 'guest') return 0;
+    const myId = String(currentUser.id).toLowerCase();
+    const myUsername = currentUser.username ? currentUser.username.replace(/^@+/, '').toLowerCase() : '';
+
+    let localPosts: any[] = [];
+    try {
+      const raw = localStorage.getItem('new_age_user_posts');
+      if (raw) localPosts = JSON.parse(raw);
+    } catch {}
+
+    const feedMatches = feedPosts.filter(p => {
+      const pUserId = p.user?.id ? String(p.user.id).toLowerCase() : '';
+      const pUsername = p.user?.username ? p.user.username.replace(/^@+/, '').toLowerCase() : '';
+      const fallbackUserId = (p as any).userId ? String((p as any).userId).toLowerCase() : '';
+      const pUserID = (p as any).userID ? String((p as any).userID).toLowerCase() : '';
+
+      return (myId && (pUserId === myId || fallbackUserId === myId || pUserID === myId || pUserId === 'me')) ||
+             (myUsername && (pUsername === myUsername || pUserId === myUsername));
+    });
+
+    const uniquePostIds = new Set([
+      ...localPosts.map(p => p.id).filter(Boolean),
+      ...feedMatches.map(p => p.id).filter(Boolean)
+    ]);
+
+    const backendCount = typeof profileData?.postsCount === 'number'
+      ? profileData.postsCount
+      : (typeof currentUser.postsCount === 'number' ? currentUser.postsCount : 0);
+
+    return Math.max(uniquePostIds.size, backendCount);
+  }, [currentUser, feedPosts, profileData]);
+
+  const myFollowersCount = useMemo(() => {
+    if (!currentUser?.id || currentUser.id === 'guest') return 0;
+    const pool = getAllUsersPool(currentUser, allAccounts);
+    const localFollowers = getFollowersForUser(currentUser.id, pool, currentUser.id);
+
+    const backendCount = typeof profileData?.followersCount === 'number'
+      ? profileData.followersCount
+      : (typeof currentUser.followersCount === 'number' ? currentUser.followersCount : 0);
+
+    return Math.max(localFollowers.length, backendCount);
+  }, [currentUser, allAccounts, profileData]);
+
+  const myFollowingCount = useMemo(() => {
+    if (!currentUser?.id || currentUser.id === 'guest') return 0;
+
+    const backendCount = typeof profileData?.followingCount === 'number'
+      ? profileData.followingCount
+      : (typeof currentUser.followingCount === 'number' ? currentUser.followingCount : 0);
+
+    return Math.max(followingIds.length, backendCount);
+  }, [currentUser, followingIds, profileData]);
+
+  const formatStatCount = (num: number): string => {
+    if (!num || num <= 0) return '0';
+    if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (num >= 10000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return num.toLocaleString('ru-RU');
+  };
 
   const handleAddStory = (newStory: Story) => {
     setFeedStories(prev => {
@@ -457,7 +537,12 @@ export function FeedPage() {
             />
             <div className="feed-user-hero-body">
               <div className="feed-user-avatar-wrap">
-                <img src={currentUser.avatar} alt={currentUser.name} className="feed-my-avatar" />
+                <img 
+                  src={getAvatarUrl(currentUser)} 
+                  alt={currentUser.name} 
+                  className="feed-my-avatar" 
+                  onError={handleAvatarError}
+                />
                 <span className="feed-avatar-online-pip" />
               </div>
               <div className="feed-my-meta">
@@ -465,18 +550,39 @@ export function FeedPage() {
                 <span className="feed-my-handle">@{currentUser.username}</span>
               </div>
               <div className="feed-user-stats-strip">
-                <div className="hero-stat-item">
-                  <strong>{currentUser.postsCount || 24}</strong>
+                <div 
+                  className="hero-stat-item"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(currentUser.username ? `/profile/@${currentUser.username}?tab=posts` : `/profile/${currentUser.id}`);
+                  }}
+                  title="Мои публикации"
+                >
+                  <strong>{formatStatCount(myPostsCount)}</strong>
                   <span>постов</span>
                 </div>
                 <div className="hero-stat-divider" />
-                <div className="hero-stat-item">
-                  <strong>14.2K</strong>
+                <div 
+                  className="hero-stat-item"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(currentUser.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser.id}`);
+                  }}
+                  title="Подписчики профиля"
+                >
+                  <strong>{formatStatCount(myFollowersCount)}</strong>
                   <span>подписчиков</span>
                 </div>
                 <div className="hero-stat-divider" />
-                <div className="hero-stat-item">
-                  <strong>{currentUser.followingCount || 382}</strong>
+                <div 
+                  className="hero-stat-item"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(currentUser.username ? `/profile/@${currentUser.username}` : `/profile/${currentUser.id}`);
+                  }}
+                  title="Мои подписки"
+                >
+                  <strong>{formatStatCount(myFollowingCount)}</strong>
                   <span>подписок</span>
                 </div>
               </div>

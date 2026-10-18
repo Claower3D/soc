@@ -22,6 +22,21 @@ export const getApiBaseUrl = (): string => {
 
 export const API_BASE_URL = getApiBaseUrl();
 
+export const resolveMediaUrl = (url?: string | null): string => {
+  if (!url) return '';
+  if (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('data:') ||
+    url.startsWith('blob:')
+  ) {
+    return url;
+  }
+  const base = API_BASE_URL.replace(/\/$/, '');
+  const path = url.startsWith('/') ? url : `/${url}`;
+  return `${base}${path}`;
+};
+
 function getValidJwtToken(): string | null {
   try {
     const token = localStorage.getItem('new_age_jwt_token');
@@ -149,11 +164,23 @@ export const api = {
   },
   videos: {
     list: () => apiFetch<any>('/api/videos'),
-    create: (formData: FormData) => apiFetch<any>('/api/videos', { method: 'POST', body: formData }, true)
+    create: (data: FormData | any) => {
+      if (data instanceof FormData) {
+        return apiFetch<any>('/api/videos', { method: 'POST', body: data }, true);
+      }
+      return apiFetch<any>('/api/videos', { method: 'POST', body: JSON.stringify(data) });
+    },
+    delete: (id: string) => apiFetch<any>(`/api/videos/${id}`, { method: 'DELETE' })
   },
   clips: {
     list: () => apiFetch<any>('/api/clips'),
-    create: (data: any) => apiFetch<any>('/api/clips', { method: 'POST', body: JSON.stringify(data) }),
+    create: (data: FormData | any) => {
+      if (data instanceof FormData) {
+        return apiFetch<any>('/api/clips', { method: 'POST', body: data }, true);
+      }
+      return apiFetch<any>('/api/clips', { method: 'POST', body: JSON.stringify(data) });
+    },
+    delete: (id: string) => apiFetch<any>(`/api/clips/${id}`, { method: 'DELETE' }),
     like: (id: string) => apiFetch<any>(`/api/clips/${id}/like`, { method: 'POST' }),
     view: (id: string) => apiFetch<any>(`/api/clips/${id}/view`, { method: 'POST' })
   },

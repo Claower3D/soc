@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -488,6 +489,10 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 			viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			PRIMARY KEY (story_id, user_id)
 		);
+
+		-- Очистка битых (blob:) и фейковых тестовых видео и клипов
+		DELETE FROM clips WHERE video_url LIKE 'blob:%' OR video_url LIKE '%googleapis.com/sample%';
+		DELETE FROM videos WHERE video_url LIKE 'blob:%' OR video_url LIKE '%googleapis.com/sample%';
 	`)
 
 	return conn, nil
@@ -1095,6 +1100,8 @@ func main() {
 	mux.HandleFunc("GET /api/users/{id}/posts", handleUserPosts)
 	mux.HandleFunc("GET /api/profile/{id}/posts", handleUserPosts)
 	mux.HandleFunc("GET /api/videos", handleVideos)
+	mux.HandleFunc("POST /api/videos", handleCreateVideo)
+	mux.HandleFunc("DELETE /api/videos/{id}", handleDeleteVideo)
 	mux.HandleFunc("GET /api/chats", handleChats)
 	mux.HandleFunc("GET /api/podcasts", handlePodcasts)
 	mux.HandleFunc("GET /api/profile", handleProfile)
@@ -1186,6 +1193,7 @@ func main() {
 	mux.HandleFunc("POST /api/clips", handleCreateClip)
 	mux.HandleFunc("POST /api/clips/{id}/like", handleLikeClip)
 	mux.HandleFunc("POST /api/clips/{id}/view", handleViewClip)
+	mux.HandleFunc("DELETE /api/clips/{id}", handleDeleteClip)
 
 	// DB Admin эндпоинты
 	mux.HandleFunc("GET /api/admin/db-status", handleDBStatus)
@@ -1232,7 +1240,7 @@ func main() {
 		log.Printf("📁 Раздача статических файлов фронтенда из: %s", distDir)
 	}
 
-	// Оборачиваем: API → mux, остальное → SPA static
+	// Оборачиваем: API → mux, /uploads/ → media files, остальное → SPA static
 	var rootHandler http.Handler
 	if distDir != "" {
 		fsHandler := http.FileServer(http.Dir(distDir))
@@ -1240,6 +1248,12 @@ func main() {
 			// Все /api/* запросы идут в mux (там зарегистрированы все API handlers)
 			if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api" {
 				mux.ServeHTTP(w, r)
+				return
+			}
+			// Раздача загруженных медиафайлов (/uploads/videos, /uploads/thumbnails)
+			if strings.HasPrefix(r.URL.Path, "/uploads/") {
+				uploadsDir := getUploadsDir()
+				http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadsDir))).ServeHTTP(w, r)
 				return
 			}
 			// Проверяем есть ли статический файл
@@ -1267,7 +1281,14 @@ func main() {
 			http.ServeFile(w, r, distDir+"/index.html")
 		})
 	} else {
-		rootHandler = mux
+		rootHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/uploads/") {
+				uploadsDir := getUploadsDir()
+				http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadsDir))).ServeHTTP(w, r)
+				return
+			}
+			mux.ServeHTTP(w, r)
+		})
 	}
 
 	// CORS middleware
@@ -1986,6 +2007,7 @@ func handleVideos(w http.ResponseWriter, r *http.Request) {
 			SELECT v.id, v.title, v.description, v.thumbnail, v.video_url, v.duration, v.views_count, v.likes_count, v.created_at,
 				u.id, u.name, u.username, u.avatar
 			FROM videos v JOIN users u ON v.user_id = u.id
+			WHERE v.video_url NOT LIKE 'blob:%' AND v.video_url NOT LIKE '%googleapis.com/sample%'
 			ORDER BY v.created_at DESC LIMIT 50
 		`)
 		if err == nil {
@@ -5034,6 +5056,7 @@ func handleClips(w http.ResponseWriter, r *http.Request) {
 			SELECT c.id, c.video_url, COALESCE(c.poster, ''), COALESCE(c.caption, ''), COALESCE(c.likes_count, 0), COALESCE(c.views_count, 0), COALESCE(c.comments_count, 0), c.created_at,
 				u.id, u.name, u.username, COALESCE(u.avatar, '')
 			FROM clips c JOIN users u ON c.user_id = u.id
+			WHERE c.video_url NOT LIKE 'blob:%' AND c.video_url NOT LIKE '%googleapis.com/sample%'
 			ORDER BY c.created_at DESC LIMIT 50
 		`)
 		if err == nil {
@@ -7844,7 +7867,17 @@ func handleStoryViewers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, Response{Status: "ok", Data: viewersList})
 }
 
-// POST /api/clips — create clip
+func getUploadsDir() string {
+	u := os.Getenv("UPLOADS_DIR")
+	if u == "" {
+		u = "./uploads"
+	}
+	_ = os.MkdirAll(filepath.Join(u, "videos"), 0755)
+	_ = os.MkdirAll(filepath.Join(u, "thumbnails"), 0755)
+	return u
+}
+
+// POST /api/clips — create clip (supports multipart/form-data video upload and JSON)
 func handleCreateClip(w http.ResponseWriter, r *http.Request) {
 	token := extractBearerToken(r)
 	claims, err := parseAndValidateJWT(token)
@@ -7853,14 +7886,107 @@ func handleCreateClip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		VideoUrl     string `json:"videoUrl"`
-		ThumbnailUrl string `json:"thumbnailUrl"`
-		Description  string `json:"description"`
-		SoundTitle   string `json:"soundTitle"`
+	var videoUrl, posterUrl, caption, soundTitle string
+
+	contentType := r.Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(150 << 20); err != nil {
+			writeJSON(w, 400, Response{Status: "error", Message: "Файл слишком большой (макс. 150МБ)"})
+			return
+		}
+		caption = strings.TrimSpace(r.FormValue("caption"))
+		if caption == "" {
+			caption = strings.TrimSpace(r.FormValue("description"))
+		}
+		soundTitle = strings.TrimSpace(r.FormValue("soundTitle"))
+		if soundTitle == "" {
+			soundTitle = "Оригинальный звук"
+		}
+		posterUrl = strings.TrimSpace(r.FormValue("thumbnailUrl"))
+		if posterUrl == "" {
+			posterUrl = strings.TrimSpace(r.FormValue("poster"))
+		}
+		videoUrl = strings.TrimSpace(r.FormValue("videoUrl"))
+
+		// Handle video file upload
+		file, fileHeader, fileErr := r.FormFile("video")
+		if fileErr != nil {
+			file, fileHeader, fileErr = r.FormFile("file")
+		}
+		if fileErr == nil {
+			defer file.Close()
+			ext := filepath.Ext(fileHeader.Filename)
+			if ext == "" {
+				ext = ".mp4"
+			}
+			filename := fmt.Sprintf("clip_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
+			uploadsDir := getUploadsDir()
+			destPath := filepath.Join(uploadsDir, "videos", filename)
+			out, createErr := os.Create(destPath)
+			if createErr == nil {
+				defer out.Close()
+				_, _ = io.Copy(out, file)
+				videoUrl = "/uploads/videos/" + filename
+			} else {
+				log.Printf("⚠️ Ошибка сохранения видеофайла клипа: %v", createErr)
+			}
+		}
+
+		// Handle poster/thumbnail file
+		thumbFile, thumbHeader, thumbErr := r.FormFile("poster")
+		if thumbErr != nil {
+			thumbFile, thumbHeader, thumbErr = r.FormFile("thumbnail")
+		}
+		if thumbErr == nil {
+			defer thumbFile.Close()
+			ext := filepath.Ext(thumbHeader.Filename)
+			if ext == "" {
+				ext = ".jpg"
+			}
+			thumbFilename := fmt.Sprintf("thumb_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
+			uploadsDir := getUploadsDir()
+			destPath := filepath.Join(uploadsDir, "thumbnails", thumbFilename)
+			out, createErr := os.Create(destPath)
+			if createErr == nil {
+				defer out.Close()
+				_, _ = io.Copy(out, thumbFile)
+				posterUrl = "/uploads/thumbnails/" + thumbFilename
+			}
+		}
+	} else {
+		var req struct {
+			VideoUrl     string `json:"videoUrl"`
+			ThumbnailUrl string `json:"thumbnailUrl"`
+			Poster       string `json:"poster"`
+			Caption      string `json:"caption"`
+			Description  string `json:"description"`
+			SoundTitle   string `json:"soundTitle"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+			return
+		}
+		videoUrl = strings.TrimSpace(req.VideoUrl)
+		posterUrl = strings.TrimSpace(req.ThumbnailUrl)
+		if posterUrl == "" {
+			posterUrl = strings.TrimSpace(req.Poster)
+		}
+		caption = strings.TrimSpace(req.Caption)
+		if caption == "" {
+			caption = strings.TrimSpace(req.Description)
+		}
+		soundTitle = strings.TrimSpace(req.SoundTitle)
+		if soundTitle == "" {
+			soundTitle = "Оригинальный звук"
+		}
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+
+	if strings.HasPrefix(videoUrl, "blob:") {
+		writeJSON(w, 400, Response{Status: "error", Message: "blob URL не поддерживается — передайте файл видео"})
+		return
+	}
+	if videoUrl == "" {
+		writeJSON(w, 400, Response{Status: "error", Message: "Видеофайл или ссылка обязательны"})
 		return
 	}
 
@@ -7872,18 +7998,197 @@ func handleCreateClip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clipID := "clip_" + time.Now().Format("20060102150405")
+	clipID := "clip_" + time.Now().Format("20060102150405") + "_" + uuid.New().String()[:6]
 	_, err = dbConn.Exec(`
 		INSERT INTO clips (id, user_id, video_url, poster, caption, music_title, created_at) 
 		VALUES ($1, $2, $3, $4, $5, $6, NOW())
-	`, clipID, claims.UserID, req.VideoUrl, req.ThumbnailUrl, req.Description, req.SoundTitle)
+	`, clipID, claims.UserID, videoUrl, posterUrl, caption, soundTitle)
 	if err != nil {
 		log.Printf("⚠️ Ошибка создания клипа в БД: %v", err)
 		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
 		return
 	}
 
-	writeJSON(w, 200, Response{Status: "ok", Data: map[string]string{"id": clipID}})
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
+		"id":         clipID,
+		"videoUrl":   videoUrl,
+		"poster":     posterUrl,
+		"caption":    caption,
+		"soundTitle": soundTitle,
+	}})
+}
+
+// DELETE /api/clips/{id} — delete clip
+func handleDeleteClip(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+	clipID := r.PathValue("id")
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn != nil {
+		_, _ = dbConn.Exec(`DELETE FROM clips WHERE id = $1 AND user_id = $2`, clipID, claims.UserID)
+	}
+	writeJSON(w, 200, Response{Status: "ok"})
+}
+
+// POST /api/videos — create full video (supports multipart upload & JSON)
+func handleCreateVideo(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+
+	var title, desc, category, duration, videoUrl, thumbUrl string
+
+	contentType := r.Header.Get("Content-Type")
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		if err := r.ParseMultipartForm(250 << 20); err != nil {
+			writeJSON(w, 400, Response{Status: "error", Message: "Файл слишком большой (макс. 250МБ)"})
+			return
+		}
+		title = strings.TrimSpace(r.FormValue("title"))
+		desc = strings.TrimSpace(r.FormValue("description"))
+		category = strings.TrimSpace(r.FormValue("category"))
+		duration = strings.TrimSpace(r.FormValue("duration"))
+		thumbUrl = strings.TrimSpace(r.FormValue("thumbnail"))
+		if thumbUrl == "" {
+			thumbUrl = strings.TrimSpace(r.FormValue("poster"))
+		}
+		videoUrl = strings.TrimSpace(r.FormValue("videoUrl"))
+
+		// Handle video file
+		file, fileHeader, fileErr := r.FormFile("video")
+		if fileErr != nil {
+			file, fileHeader, fileErr = r.FormFile("file")
+		}
+		if fileErr == nil {
+			defer file.Close()
+			ext := filepath.Ext(fileHeader.Filename)
+			if ext == "" {
+				ext = ".mp4"
+			}
+			filename := fmt.Sprintf("vid_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
+			uploadsDir := getUploadsDir()
+			destPath := filepath.Join(uploadsDir, "videos", filename)
+			out, createErr := os.Create(destPath)
+			if createErr == nil {
+				defer out.Close()
+				_, _ = io.Copy(out, file)
+				videoUrl = "/uploads/videos/" + filename
+			} else {
+				log.Printf("⚠️ Ошибка сохранения видеофайла: %v", createErr)
+			}
+		}
+
+		// Handle thumbnail file
+		thumbFile, thumbHeader, thumbErr := r.FormFile("thumbnail")
+		if thumbErr != nil {
+			thumbFile, thumbHeader, thumbErr = r.FormFile("poster")
+		}
+		if thumbErr == nil {
+			defer thumbFile.Close()
+			ext := filepath.Ext(thumbHeader.Filename)
+			if ext == "" {
+				ext = ".jpg"
+			}
+			thumbFilename := fmt.Sprintf("thumb_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
+			uploadsDir := getUploadsDir()
+			destPath := filepath.Join(uploadsDir, "thumbnails", thumbFilename)
+			out, createErr := os.Create(destPath)
+			if createErr == nil {
+				defer out.Close()
+				_, _ = io.Copy(out, thumbFile)
+				thumbUrl = "/uploads/thumbnails/" + thumbFilename
+			}
+		}
+	} else {
+		var req struct {
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			Category    string `json:"category"`
+			Duration    string `json:"duration"`
+			Thumbnail   string `json:"thumbnail"`
+			VideoUrl    string `json:"videoUrl"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+			return
+		}
+		title = strings.TrimSpace(req.Title)
+		desc = strings.TrimSpace(req.Description)
+		category = strings.TrimSpace(req.Category)
+		duration = strings.TrimSpace(req.Duration)
+		thumbUrl = strings.TrimSpace(req.Thumbnail)
+		videoUrl = strings.TrimSpace(req.VideoUrl)
+	}
+
+	if title == "" {
+		title = "Новое видео"
+	}
+	if duration == "" {
+		duration = "10:00"
+	}
+	if strings.HasPrefix(videoUrl, "blob:") {
+		writeJSON(w, 400, Response{Status: "error", Message: "blob URL не поддерживается — передайте файл видео"})
+		return
+	}
+	if videoUrl == "" {
+		writeJSON(w, 400, Response{Status: "error", Message: "Видеофайл или ссылка обязательны"})
+		return
+	}
+
+	videoID := "vid_" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn != nil {
+		_, err := dbConn.Exec(`
+			INSERT INTO videos (id, user_id, title, description, thumbnail, video_url, duration, views_count, likes_count, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 0, NOW())
+		`, videoID, claims.UserID, title, desc, thumbUrl, videoUrl, duration)
+		if err != nil {
+			log.Printf("⚠️ Ошибка сохранения видео в БД: %v", err)
+			writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+			return
+		}
+		globalCache.InvalidateTag("videos")
+	}
+
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
+		"id":          videoID,
+		"title":       title,
+		"description": desc,
+		"category":    category,
+		"thumbnail":   thumbUrl,
+		"videoUrl":    videoUrl,
+		"duration":    duration,
+	}})
+}
+
+// DELETE /api/videos/{id} — delete video
+func handleDeleteVideo(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+	videoID := r.PathValue("id")
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn != nil {
+		_, _ = dbConn.Exec(`DELETE FROM videos WHERE id = $1 AND user_id = $2`, videoID, claims.UserID)
+		globalCache.InvalidateTag("videos")
+	}
+	writeJSON(w, 200, Response{Status: "ok"})
 }
 
 // POST /api/clips/{id}/like — toggle like

@@ -389,17 +389,32 @@
   flex-direction: column;
   align-items: center;
   flex: 1;
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  padding: 0.2rem 0.25rem;
+  transition: all var(--transition-fast);
+}
+
+.hero-stat-item:hover {
+  background: var(--color-bg-card);
+}
+
+.hero-stat-item:hover strong {
+  color: var(--color-accent);
 }
 
 .hero-stat-item strong {
   font-size: 0.88rem;
+  font-weight: 700;
   color: var(--color-text);
+  transition: color var(--transition-fast);
 }
 
 .hero-stat-item span {
   font-size: 0.68rem;
   color: var(--color-text-tertiary);
   text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .hero-stat-divider {

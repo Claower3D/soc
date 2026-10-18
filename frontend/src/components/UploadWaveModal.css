@@ -101,3 +101,56 @@
 .wave-btn-publish:hover {
   background: rgba(233, 0, 92, 0.2);
 }
+
+.wave-btn-cancel:disabled,
+.wave-btn-publish:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.wave-preview-box {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  background: #000;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wave-preview-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wave-preview-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.wave-file-size {
+  color: #666;
+  font-size: 12px;
+}
+
+.wave-spinner {
+  animation: waveSpin 1s linear infinite;
+}
+
+@keyframes waveSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
