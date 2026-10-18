@@ -775,43 +775,18 @@ export function ClipsPage() {
               <div key={clip.id} className="clip-item-card">
                 {/* Central Video Container */}
                 <div className="clip-video-wrapper">
-                  {/* Top Floating Badge */}
-                  <div className="clip-top-bar">
-                    <div className="clip-top-bar-left">
-                      {clip.isLive ? (
-                        <div className="clip-live-brand-tag">
-                          <span className="clip-live-flashing-dot" />
-                          <span className="clip-live-text">В ЭФИРЕ • LIVE</span>
-                          {clip.viewersCount && (
-                            <span className="clip-live-viewers">
-                              <Users size={12} /> {clip.viewersCount.toLocaleString('ru-RU')}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="clip-brand-tag">
-                          <span className="clip-brand-dot" />
-                          <span>Reels • New Age</span>
-                        </div>
+                  {/* Floating Live Badge if active stream */}
+                  {clip.isLive && (
+                    <div className="clip-live-brand-tag" style={{ position: 'absolute', top: 14, left: 14, zIndex: 20 }}>
+                      <span className="clip-live-flashing-dot" />
+                      <span className="clip-live-text">В ЭФИРЕ • LIVE</span>
+                      {clip.viewersCount && (
+                        <span className="clip-live-viewers">
+                          <Users size={12} /> {clip.viewersCount.toLocaleString('ru-RU')}
+                        </span>
                       )}
-
-                      {/* Soundwave Equalizer Badge */}
-                      <div className="clip-soundwave-badge" title="Аудио резонанс 432 Гц">
-                        <div className="clip-soundwave-bars">
-                          <span className={`sw-bar sw-bar-1 ${isCurrent && isPlaying && !isMuted ? 'active' : ''}`} />
-                          <span className={`sw-bar sw-bar-2 ${isCurrent && isPlaying && !isMuted ? 'active' : ''}`} />
-                          <span className={`sw-bar sw-bar-3 ${isCurrent && isPlaying && !isMuted ? 'active' : ''}`} />
-                          <span className={`sw-bar sw-bar-4 ${isCurrent && isPlaying && !isMuted ? 'active' : ''}`} />
-                        </div>
-                        <span className="clip-soundwave-text">432 Гц</span>
-                      </div>
                     </div>
-
-                    <button type="button" className="clip-create-btn" title="Запустить волну" onClick={handleTriggerUpload}>
-                      <Plus size={15} />
-                      <span>Волна</span>
-                    </button>
-                  </div>
+                  )}
 
                   {/* Video Player */}
                   <video
