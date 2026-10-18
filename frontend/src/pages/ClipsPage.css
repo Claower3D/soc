@@ -1658,36 +1658,7 @@
   }
 
   .clips-top-header-panel {
-    top: 6px;
-    width: 100%;
-    padding: 0 8px;
-    box-sizing: border-box;
-    gap: 4px;
-  }
-
-  .clips-category-nav-bar {
-    max-width: 100%;
-    overflow-x: auto;
-    padding: 3px 6px;
-    scrollbar-width: none;
-  }
-
-  .clips-category-nav-bar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .clips-cat-tab {
-    padding: 5px 10px;
-    font-size: 11.5px;
-  }
-
-  .clips-upload-btn-header {
-    padding: 5px 12px;
-    font-size: 11.5px;
-  }
-
-  .clips-hashtag-chips-bar {
-    max-width: 100%;
+    display: none !important;
   }
 
   .clip-sacred-reactions-tray {
