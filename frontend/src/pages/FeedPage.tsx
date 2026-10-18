@@ -16,6 +16,52 @@ import { syncLocalStoriesWithServer, isStoryExpired } from '../utils/syncStories
 import { getStoredFollowingIds, isUserFollowed, toggleUserFollow, getAllUsersPool } from '../utils/followStorage';
 import './FeedPage.css';
 
+interface TrendingTopic {
+  category: string;
+  tag: string;
+  count: string;
+  path: string;
+}
+
+const TRENDING_TOPICS: TrendingTopic[] = [
+  {
+    category: 'Экосистема & Единство',
+    tag: '#NewAgeUnity',
+    count: '64.8K публикаций',
+    path: '/search?q=NewAgeUnity'
+  },
+  {
+    category: 'Духовные практики',
+    tag: '#Медитация432Гц',
+    count: '48.2K публикаций',
+    path: '/spiritual/meditation'
+  },
+  {
+    category: 'Астрология & Звезды',
+    tag: '#Астропрогноз',
+    count: '36.5K публикаций',
+    path: '/spiritual/horoscope'
+  },
+  {
+    category: 'Символы & Архетипы',
+    tag: '#ТароРасклады',
+    count: '24.1K публикаций',
+    path: '/spiritual/tarot'
+  },
+  {
+    category: 'Тело & Баланс',
+    tag: '#ЙогаПрактика',
+    count: '19.5K публикаций',
+    path: '/spiritual/yoga'
+  },
+  {
+    category: 'Саундхилинг & Дзен',
+    tag: '#ЧастотыИсцеления',
+    count: '15.2K публикаций',
+    path: '/spiritual/sounds'
+  }
+];
+
 export function FeedPage() {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated, allAccounts } = useAuth();
@@ -543,25 +589,25 @@ export function FeedPage() {
             <span className="box-title"><TrendingUp size={15} /> Актуальные темы</span>
           </div>
           <div className="trends-list">
-            <div className="trend-item" onClick={() => navigate('/video')}>
-              <span className="trend-tag">#React19</span>
-              <span className="trend-count">48.2K публикаций</span>
-            </div>
-            <div className="trend-item" onClick={() => navigate('/video')}>
-              <span className="trend-tag">#GoLang126</span>
-              <span className="trend-count">32.1K публикаций</span>
-            </div>
-            <div className="trend-item" onClick={() => navigate('/podcasts')}>
-              <span className="trend-tag">#ДизайнИнтерфейсов</span>
-              <span className="trend-count">19.5K публикаций</span>
-            </div>
+            {TRENDING_TOPICS.map((trend) => (
+              <div 
+                key={trend.tag} 
+                className="trend-item" 
+                onClick={() => navigate(trend.path)}
+                title={`Перейти к теме ${trend.tag}`}
+              >
+                <span className="trend-category">{trend.category}</span>
+                <span className="trend-tag">{trend.tag}</span>
+                <span className="trend-count">{trend.count}</span>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Mini Footer */}
         <div className="feed-mini-footer">
-          <p>© 2026 ДЕМО Социальная сеть</p>
-          <p>Светлый интерфейс · React 19 + Go</p>
+          <p>© 2026 New Age Unity</p>
+          <p>Экосистема духовности, осознанности и гармонии</p>
         </div>
       </aside>
 
