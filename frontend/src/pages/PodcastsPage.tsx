@@ -47,6 +47,12 @@ export const DEFAULT_PODCASTS: Podcast[] = [
         title: 'Выпуск #10: Привлечение инвестиций и масштабирование платформы',
         duration: '38:15',
         date: '29 сен'
+      },
+      {
+        id: 'ep_2_2',
+        title: 'Выпуск #9: Поиск Product-Market Fit и первые 10 000 пользователей',
+        duration: '42:30',
+        date: '22 сен'
       }
     ]
   },
@@ -63,6 +69,12 @@ export const DEFAULT_PODCASTS: Podcast[] = [
         title: 'Выпуск #5: Микроанимации и визуальная гармония в продуктах',
         duration: '34:40',
         date: '27 сен'
+      },
+      {
+        id: 'ep_3_2',
+        title: 'Выпуск #4: Дизайн-системы и типографика для мобильных сервисов',
+        duration: '31:15',
+        date: '19 сен'
       }
     ]
   }
@@ -128,9 +140,13 @@ export function PodcastsPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const handlePlay = (podcast: Podcast, episode: Episode) => {
-    setActivePodcast(podcast);
-    setActiveEpisode(episode);
-    setIsPlaying(true);
+    if (activeEpisode?.id === episode.id) {
+      setIsPlaying(prev => !prev);
+    } else {
+      setActivePodcast(podcast);
+      setActiveEpisode(episode);
+      setIsPlaying(true);
+    }
   };
 
   const handleUploadPodcast = (newPodcast: Podcast) => {
@@ -247,7 +263,13 @@ export function PodcastsPage() {
           </div>
         ) : (
           filteredPodcasts.map(podcast => (
-            <PodcastCard key={podcast.id} podcast={podcast} onPlay={handlePlay} />
+            <PodcastCard 
+              key={podcast.id} 
+              podcast={podcast} 
+              onPlay={handlePlay} 
+              activeEpisodeId={activeEpisode?.id}
+              isPlaying={isPlaying}
+            />
           ))
         )}
       </div>
