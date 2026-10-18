@@ -7,7 +7,7 @@ import {
   Search
 } from 'lucide-react';
 import { type Clip, type ClipComment } from '../data/mock';
-import { api } from '../api';
+import { api, resolveMediaUrl } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { UploadWaveModal } from '../components/UploadWaveModal';
 import './ClipsPage.css';
@@ -16,125 +16,80 @@ type ClipTab = 'all' | 'zen' | 'live' | 'trending' | 'my';
 
 const QUICK_HASHTAGS = ['Все', 'медитация', 'дзен', 'частота432', 'космос', 'звук', 'гармония'];
 
-export const DEFAULT_AESTHETIC_CLIPS: Clip[] = [
-  {
-    id: 'clip_zen_01',
-    user: {
-      id: 'zen_temple',
-      name: 'Храм Тишины & Медитации',
-      username: 'zen_temple',
-      avatar: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=400&q=80',
-      role: 'expert',
-      verified: true,
-      followersCount: 14200,
-      followingCount: 12,
-      criticsCount: 0,
-      postsCount: 45
-    },
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    poster: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=800&q=80',
-    caption: 'Звуковая терапия 432 Гц • Глубокое погружение в состояние осознанности и покоя. Отпустите суету дня ✨🧘 #медитация #дзен #частота432 #звук',
-    musicTitle: 'Священная Гармония • 432 Гц',
-    musicAuthor: 'Solfeggio Sound Lab',
-    audioTrackArt: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=200&q=80',
-    overlayTitle: 'Частота 432 Гц • Гармония Духа',
-    likesCount: 18420,
-    commentsCount: 342,
-    sharesCount: 1205,
-    viewsCount: 94000,
-    isLiked: false,
-    isSaved: false,
-    timeAgo: '2 ч назад',
-    tags: ['медитация', 'дзен', 'частота432', 'звук']
-  },
-  {
-    id: 'clip_zen_02',
-    user: {
-      id: 'cosmos_mind',
-      name: 'Космический Разум',
-      username: 'cosmos_flow',
-      avatar: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=400&q=80',
-      role: 'creator',
-      verified: true,
-      followersCount: 28900,
-      followingCount: 45,
-      criticsCount: 0,
-      postsCount: 88
-    },
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    poster: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
-    caption: 'Синхронизация сознания с ритмами Вселенной. Практика визуализации светового потока и расширения восприятия 🌌💫 #космос #осознанность #поток',
-    musicTitle: 'Deep Space Resonance • Alpha Waves',
-    musicAuthor: 'Ambient Cosmos',
-    audioTrackArt: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=200&q=80',
-    overlayTitle: 'Поток Сознания • Практика Света',
-    likesCount: 31200,
-    commentsCount: 512,
-    sharesCount: 2480,
-    viewsCount: 148000,
-    isLiked: true,
-    isSaved: true,
-    timeAgo: '4 ч назад',
-    tags: ['космос', 'энергия', 'альфаволны', 'осознанность']
-  },
-  {
-    id: 'clip_zen_03',
-    user: {
-      id: 'sacred_geo',
-      name: 'Сакральная Геометрия',
-      username: 'sacred_art',
-      avatar: 'https://images.unsplash.com/photo-1519638399535-1b036603ac77?auto=format&fit=crop&w=400&q=80',
-      role: 'expert',
-      verified: true,
-      followersCount: 19500,
-      followingCount: 33,
-      criticsCount: 0,
-      postsCount: 62
-    },
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-    poster: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=800&q=80',
-    caption: 'Цветок Жизни и Золотое Сечение: как фундаментальные пропорции формируют гармонию живого мира 🔮 #геометрия #мудрость #гармония',
-    musicTitle: 'Sacred Spheres • Ambient Soundscape',
-    musicAuthor: 'Golden Ratio Records',
-    audioTrackArt: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=200&q=80',
-    overlayTitle: 'Цветок Жизни • Код Гармонии',
-    likesCount: 24900,
-    commentsCount: 420,
-    sharesCount: 1890,
-    viewsCount: 112000,
-    isLiked: false,
-    isSaved: false,
-    timeAgo: 'Вчера',
-    tags: ['геометрия', 'гармония', 'цветокжизни']
-  }
-];
+function captureVideoPoster(file: File): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    try {
+      const video = document.createElement('video');
+      const tempUrl = URL.createObjectURL(file);
+      video.src = tempUrl;
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      video.onloadeddata = () => {
+        video.currentTime = Math.min(1.0, video.duration > 1 ? 1.0 : 0.1);
+      };
+      video.onseeked = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 640;
+          canvas.height = video.videoHeight || 360;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob((blob) => {
+              URL.revokeObjectURL(tempUrl);
+              resolve(blob);
+            }, 'image/jpeg', 0.85);
+            return;
+          }
+        } catch {
+          // ignore
+        }
+        URL.revokeObjectURL(tempUrl);
+        resolve(null);
+      };
+      video.onerror = () => {
+        URL.revokeObjectURL(tempUrl);
+        resolve(null);
+      };
+    } catch {
+      resolve(null);
+    }
+  });
+}
 
 export function ClipsPage() {
   const { currentUser, isAuthenticated, openAuthModal } = useAuth();
   const [clips, setClips] = useState<Clip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [failedVideoIds, setFailedVideoIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let mounted = true;
     api.clips.list().then((data) => {
       if (mounted) {
         const saved = localStorage.getItem('newage_clips_state');
-        let finalClips: Clip[] = Array.isArray(data) && data.length > 0 ? data : [];
+        let finalClips: Clip[] = Array.isArray(data) ? data : [];
         if (saved) {
           try {
             const parsed = JSON.parse(saved);
-            const ids = new Set(parsed.map((c: Clip) => c.id));
-            const missing = finalClips.filter((c: Clip) => !ids.has(c.id));
-            finalClips = [...missing, ...parsed];
+            if (Array.isArray(parsed)) {
+              const ids = new Set(finalClips.map((c: Clip) => c.id));
+              const missing = parsed.filter((c: Clip) => !ids.has(c.id));
+              finalClips = [...finalClips, ...missing];
+            }
           } catch (e) {
             console.error('Failed to parse saved clips', e);
           }
         }
         
-        // Merge with DEFAULT_AESTHETIC_CLIPS so the feed is always alive with high-quality content
-        const existingIds = new Set(finalClips.map(c => c.id));
-        const additions = DEFAULT_AESTHETIC_CLIPS.filter(c => !existingIds.has(c.id));
-        finalClips = [...finalClips, ...additions];
+        // Удаляем битые (blob:) ссылки и тестовые фейковые клипы
+        finalClips = finalClips.filter(c => 
+          c && c.videoUrl && 
+          !c.videoUrl.startsWith('blob:') && 
+          !c.videoUrl.includes('googleapis.com/sample') &&
+          !c.id.startsWith('clip_zen_')
+        );
 
         setClips(finalClips);
         setIsLoading(false);
@@ -142,7 +97,7 @@ export function ClipsPage() {
     }).catch(err => {
       console.warn('Failed to load clips', err);
       if (mounted) {
-        setClips(DEFAULT_AESTHETIC_CLIPS);
+        setClips([]);
         setIsLoading(false);
       }
     });
@@ -168,6 +123,7 @@ export function ClipsPage() {
   });
 
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [selectedVideoFile, setSelectedVideoFile] = useState<File | null>(null);
   const [waveDescription, setWaveDescription] = useState('');
   const uploadInputRef = useRef<HTMLInputElement>(null);
@@ -190,38 +146,60 @@ export function ClipsPage() {
     e.target.value = '';
   };
 
-  const handlePublishWave = () => {
-    if (!selectedVideoFile || !currentUser) return;
-    
-    const videoUrl = URL.createObjectURL(selectedVideoFile);
-    
-    const newClip: Clip = {
-      id: 'clip_' + Date.now(),
-      user: currentUser,
-      videoUrl,
-      poster: '',
-      caption: waveDescription,
-      likesCount: 0,
-      commentsCount: 0,
-      sharesCount: 0,
-      viewsCount: 0,
-      isLiked: false,
-      isSaved: false,
-      timeAgo: 'Только что'
-    };
-    
-    setClips(prev => [newClip, ...prev]);
-    setUploadModalOpen(false);
-    setSelectedVideoFile(null);
-    setActiveIndex(0);
-    if (feedRef.current) feedRef.current.scrollTop = 0;
+  const handlePublishWave = async () => {
+    if (!selectedVideoFile || !currentUser || isPublishing) return;
+    setIsPublishing(true);
 
-    api.clips.create({
-      videoUrl,
-      thumbnailUrl: '',
-      description: waveDescription,
-      soundTitle: 'Оригинальный звук'
-    }).catch((err) => console.warn('Backend clip save notice:', err));
+    try {
+      const formData = new FormData();
+      formData.append('video', selectedVideoFile);
+      formData.append('caption', waveDescription.trim());
+      formData.append('soundTitle', `Оригинальный звук • ${currentUser.name}`);
+
+      // Извлекаем постер первого кадра
+      try {
+        const posterBlob = await captureVideoPoster(selectedVideoFile);
+        if (posterBlob) {
+          formData.append('poster', posterBlob, 'poster.jpg');
+        }
+      } catch (posterErr) {
+        console.warn('Could not generate video poster', posterErr);
+      }
+
+      const res = await api.clips.create(formData);
+      const serverClipId = res?.id || ('clip_' + Date.now());
+      const serverVideoUrl = res?.videoUrl || '';
+      const serverPoster = res?.poster || '';
+
+      const newClip: Clip = {
+        id: serverClipId,
+        user: currentUser,
+        videoUrl: serverVideoUrl,
+        poster: serverPoster,
+        caption: waveDescription.trim(),
+        musicTitle: `Оригинальный звук • ${currentUser.name}`,
+        musicAuthor: currentUser.name,
+        likesCount: 0,
+        commentsCount: 0,
+        sharesCount: 0,
+        viewsCount: 0,
+        isLiked: false,
+        isSaved: false,
+        timeAgo: 'Только что'
+      };
+
+      setClips(prev => [newClip, ...prev]);
+      setUploadModalOpen(false);
+      setSelectedVideoFile(null);
+      setWaveDescription('');
+      setActiveIndex(0);
+      if (feedRef.current) feedRef.current.scrollTop = 0;
+    } catch (err: any) {
+      console.error('Ошибка загрузки видео:', err);
+      alert('Ошибка при загрузке видео: ' + (err?.message || 'Пожалуйста, попробуйте снова'));
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const feedRef = useRef<HTMLDivElement>(null);
@@ -792,14 +770,36 @@ export function ClipsPage() {
                   <video
                     ref={el => { videoRefs.current[clip.id] = el; }}
                     className="clip-video-element"
-                    src={clip.videoUrl}
-                    poster={clip.poster}
+                    src={resolveMediaUrl(clip.videoUrl)}
+                    poster={resolveMediaUrl(clip.poster)}
+                    onError={() => setFailedVideoIds(prev => ({ ...prev, [clip.id]: true }))}
                     loop
                     playsInline
                     muted={isMuted}
                     onClick={togglePlayPause}
                     onTimeUpdate={() => isCurrent && handleTimeUpdate(clip.id)}
                   />
+
+                  {failedVideoIds[clip.id] && (
+                    <div className="clip-video-error-fallback">
+                      <Video size={42} className="clip-error-icon" />
+                      <p>Видео обрабатывается или временно недоступно</p>
+                      <button 
+                        type="button" 
+                        className="clip-retry-play-btn" 
+                        onClick={() => {
+                          setFailedVideoIds(prev => ({ ...prev, [clip.id]: false }));
+                          const vid = videoRefs.current[clip.id];
+                          if (vid) {
+                            vid.load();
+                            vid.play().catch(console.warn);
+                          }
+                        }}
+                      >
+                        Повторить
+                      </button>
+                    </div>
+                  )}
 
                   {/* Big Play/Pause Center Indicator */}
                   {isCurrent && showPlayAnim && (
@@ -1158,6 +1158,7 @@ export function ClipsPage() {
         description={waveDescription}
         setDescription={setWaveDescription}
         onPublish={handlePublishWave}
+        isPublishing={isPublishing}
       />
 
       {/* Floating Action Button for quick upload */}
