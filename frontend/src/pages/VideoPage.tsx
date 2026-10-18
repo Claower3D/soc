@@ -13,128 +13,25 @@ import './VideoPage.css';
 
 type VideoCategoryTab = 'all' | 'streams' | 'videos' | 'movies' | 'series' | 'kids' | 'dev' | 'gaming' | 'music';
 
-export const DEFAULT_VIDEOS: Video[] = [
-  {
-    id: 'vid_1',
-    title: 'Архитектура современных высоконагруженных веб-систем',
-    channel: {
-      id: 'chan_tech',
-      name: 'Tech & Architecture',
-      username: 'tech_arch',
-      avatar: '/default-avatar.svg',
-      followersCount: 15400,
-      followingCount: 10,
-      postsCount: 30,
-      role: 'creator',
-      verified: true
-    },
-    thumbnail: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?auto=format&fit=crop&w=800&q=80',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    views: '42K просмотров',
-    duration: '18:45',
-    timeAgo: '2 дня назад',
-    description: 'Разбор паттернов микросервисов, кэширования и построения отказоустойчивых бэкендов.',
-    likesCount: 3200,
-    category: 'Разработка',
-    type: 'video',
-    rating: 9.2,
-    ageRating: '12+',
-    isFromSubscription: true
-  },
-  {
-    id: 'vid_2',
-    title: 'Прямой эфир: Музыка для глубокой концентрации и кодинга 432Hz',
-    channel: {
-      id: 'chan_zen',
-      name: 'Zen Sound Lab',
-      username: 'zen_sound',
-      avatar: '/default-avatar.svg',
-      followersCount: 38200,
-      followingCount: 5,
-      postsCount: 52,
-      role: 'expert',
-      verified: true
-    },
-    thumbnail: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=800&q=80',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    views: '128K просмотров',
-    duration: 'LIVE',
-    timeAgo: 'Прямо сейчас',
-    description: 'Атмосферный эмбиент и бинауральные ритмы для работы и творчества в прямом эфире.',
-    likesCount: 12400,
-    category: 'Музыка',
-    type: 'stream',
-    isStream: true,
-    viewersCount: 1420,
-    rating: 9.8,
-    ageRating: '0+'
-  },
-  {
-    id: 'vid_3',
-    title: 'Путешествие сквозь Неизведанное: Фильм о Вселенной',
-    channel: {
-      id: 'chan_space',
-      name: 'Cosmos Discovery',
-      username: 'cosmos_doc',
-      avatar: '/default-avatar.svg',
-      followersCount: 95000,
-      followingCount: 3,
-      postsCount: 120,
-      role: 'creator',
-      verified: true
-    },
-    thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-    views: '350K просмотров',
-    duration: '1:12:30',
-    timeAgo: '1 неделю назад',
-    description: 'Масштабный документальный проект об устройстве галактик, черных дыр и квантового мира.',
-    likesCount: 29500,
-    category: 'Фильмы',
-    type: 'movie',
-    isMovie: true,
-    rating: 9.5,
-    ageRating: '6+'
-  },
-  {
-    id: 'vid_4',
-    title: 'Анимация: Приключения Маленького Спутника',
-    channel: {
-      id: 'chan_kids',
-      name: 'Kids Planet',
-      username: 'kids_planet',
-      avatar: '/default-avatar.svg',
-      followersCount: 64000,
-      followingCount: 8,
-      postsCount: 85,
-      role: 'creator',
-      verified: true
-    },
-    thumbnail: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=800&q=80',
-    videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    views: '89K просмотров',
-    duration: '12:20',
-    timeAgo: '3 дня назад',
-    description: 'Добрый мультфильм для детей о дружбе и исследовании космоса.',
-    likesCount: 7800,
-    category: 'Мультфильмы',
-    type: 'cartoon',
-    isKids: true,
-    rating: 9.0,
-    ageRating: '0+'
-  }
-];
+export const DEFAULT_VIDEOS: Video[] = [];
+
 
 export function VideoPage() {
   const { isAuthenticated, openAuthModal } = useAuth();
-  const [videoList, setVideoList] = useState<Video[]>(DEFAULT_VIDEOS);
+  const [videoList, setVideoList] = useState<Video[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     const localVideos: Video[] = (() => {
       try {
-        return JSON.parse(localStorage.getItem('user_uploaded_videos') || '[]');
+        const raw = JSON.parse(localStorage.getItem('user_uploaded_videos') || '[]');
+        return Array.isArray(raw) ? raw.filter((v: Video) => 
+          v && v.videoUrl && 
+          !v.videoUrl.startsWith('blob:') && 
+          !v.videoUrl.includes('googleapis.com/sample') &&
+          !v.id.startsWith('vid_1') && !v.id.startsWith('vid_2') && !v.id.startsWith('vid_3') && !v.id.startsWith('vid_4')
+        ) : [];
       } catch {
         return [];
       }
@@ -142,8 +39,12 @@ export function VideoPage() {
 
     api.videos.list().then((data) => {
       if (mounted) {
-        const raw = Array.isArray(data) && data.length > 0 ? data : DEFAULT_VIDEOS;
-        const allList = [...localVideos, ...raw];
+        const serverVideos = Array.isArray(data) ? data.filter((v: Video) => 
+          v && v.videoUrl && 
+          !v.videoUrl.startsWith('blob:') && 
+          !v.videoUrl.includes('googleapis.com/sample')
+        ) : [];
+        const allList = [...localVideos, ...serverVideos];
         const seen = new Set<string>();
         const unique = allList.filter(v => {
           if (!v.id || seen.has(v.id)) return false;
@@ -156,14 +57,7 @@ export function VideoPage() {
     }).catch((err) => {
       console.warn('Failed to load videos', err);
       if (mounted) {
-        const allList = [...localVideos, ...DEFAULT_VIDEOS];
-        const seen = new Set<string>();
-        const unique = allList.filter(v => {
-          if (!v.id || seen.has(v.id)) return false;
-          seen.add(v.id);
-          return true;
-        });
-        setVideoList(unique);
+        setVideoList(localVideos);
         setIsLoading(false);
       }
     });

@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { X, Video, Image as ImageIcon, Sparkles, UploadCloud, Link as LinkIcon, Film } from 'lucide-react';
 import { currentUser, type Video as VideoType } from '../data/mock';
+import { api } from '../api';
 import './UploadVideoModal.css';
 
 interface UploadVideoModalProps {
@@ -9,14 +10,7 @@ interface UploadVideoModalProps {
   onUploadVideo: (newVideo: VideoType, publishToFeed?: boolean) => void;
 }
 
-const sampleThumbnails = [
-  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80',
-  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80',
-];
-
+const sampleThumbnails: string[] = [];
 const categories = [
   'Духовный рост',
   'Медитации & Практики',
@@ -38,6 +32,9 @@ export function UploadVideoModal({ isOpen, onClose, onUploadVideo }: UploadVideo
   const [videoFileName, setVideoFileName] = useState<string>('');
   const [videoInputMode, setVideoInputMode] = useState<'file' | 'url'>('file');
   const [customVideoUrl, setCustomVideoUrl] = useState<string>('');
+  const [rawVideoFile, setRawVideoFile] = useState<File | null>(null);
+  const [rawThumbFile, setRawThumbFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
   const [publishToFeed, setPublishToFeed] = useState<boolean>(true);
 
   const thumbFileInputRef = useRef<HTMLInputElement>(null);
@@ -48,7 +45,9 @@ export function UploadVideoModal({ isOpen, onClose, onUploadVideo }: UploadVideo
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setRawThumbFile(file);
       setVideoFileName(file.name);
+      setRawVideoFile(file);
       const url = URL.createObjectURL(file);
       setVideoUrl(url);
 
@@ -101,34 +100,103 @@ export function UploadVideoModal({ isOpen, onClose, onUploadVideo }: UploadVideo
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || isUploading) return;
 
-    const finalVideoUrl = videoUrl || (videoInputMode === 'url' ? customVideoUrl.trim() : '') || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    if (videoInputMode === 'file') {
+      if (!rawVideoFile) {
+        alert('Пожалуйста, выберите видеофайл для загрузки');
+        return;
+      }
+      setIsUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append('video', rawVideoFile);
+        formData.append('title', title.trim());
+        formData.append('description', description.trim());
+        formData.append('category', category);
+        formData.append('duration', duration || '10:00');
+        if (rawThumbFile) {
+          formData.append('thumbnail', rawThumbFile);
+        }
 
-    const newVideo: VideoType = {
-      id: `vid_${Date.now()}`,
-      title: title.trim(),
-      channel: currentUser,
-      thumbnail: thumbnail || sampleThumbnails[0],
-      videoUrl: finalVideoUrl,
-      views: '1 просмотр',
-      duration: duration || '10:00',
-      timeAgo: 'Только что',
-      description: `${category} · ${description.trim() || 'Новое авторское видео на платформе.'}`,
-      likesCount: 1,
-      category,
-      type: 'video',
-    };
+        const res = await api.videos.create(formData);
+        const serverVideoUrl = res?.videoUrl || '';
+        const serverThumbnail = res?.thumbnail || thumbnail || '';
 
-    onUploadVideo(newVideo, publishToFeed);
-    setTitle('');
-    setDescription('');
-    setVideoUrl('');
-    setVideoFileName('');
-    setCustomVideoUrl('');
-    onClose();
+        const newVideo: VideoType = {
+          id: res?.id || `vid_${Date.now()}`,
+          title: title.trim(),
+          channel: currentUser,
+          thumbnail: serverThumbnail,
+          videoUrl: serverVideoUrl,
+          views: '1 просмотр',
+          duration: duration || '10:00',
+          timeAgo: 'Только что',
+          description: `${category} · ${description.trim() || 'Новое авторское видео на платформе.'}`,
+          likesCount: 1,
+          category,
+          type: 'video',
+        };
+
+        onUploadVideo(newVideo, publishToFeed);
+        setTitle('');
+        setDescription('');
+        setVideoUrl('');
+        setVideoFileName('');
+        setRawVideoFile(null);
+        setRawThumbFile(null);
+        onClose();
+      } catch (err: any) {
+        console.error('Ошибка загрузки видео:', err);
+        alert('Ошибка при загрузке видео: ' + (err?.message || 'Попробуйте снова'));
+      } finally {
+        setIsUploading(false);
+      }
+    } else {
+      if (!customVideoUrl.trim()) {
+        alert('Пожалуйста, укажите ссылку на видео');
+        return;
+      }
+      setIsUploading(true);
+      try {
+        const res = await api.videos.create({
+          title: title.trim(),
+          description: description.trim(),
+          category,
+          duration: duration || '10:00',
+          videoUrl: customVideoUrl.trim(),
+          thumbnail: thumbnail || ''
+        });
+
+        const newVideo: VideoType = {
+          id: res?.id || `vid_${Date.now()}`,
+          title: title.trim(),
+          channel: currentUser,
+          thumbnail: thumbnail || '',
+          videoUrl: customVideoUrl.trim(),
+          views: '1 просмотр',
+          duration: duration || '10:00',
+          timeAgo: 'Только что',
+          description: `${category} · ${description.trim() || 'Новое авторское видео на платформе.'}`,
+          likesCount: 1,
+          category,
+          type: 'video',
+        };
+
+        onUploadVideo(newVideo, publishToFeed);
+        setTitle('');
+        setDescription('');
+        setCustomVideoUrl('');
+        onClose();
+      } catch (err: any) {
+        console.error('Ошибка создания видео:', err);
+        alert('Ошибка при сохранении видео: ' + (err?.message || 'Попробуйте снова'));
+      } finally {
+        setIsUploading(false);
+      }
+    }
   };
 
   return (

@@ -8,6 +8,7 @@ import {
 import type { Video, VideoComment, SeriesEpisode } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { StreamChat } from './StreamChat';
+import { resolveMediaUrl } from '../api';
 import './VideoPlayer.css';
 
 interface VideoPlayerProps {
@@ -137,8 +138,8 @@ export function VideoPlayer({ video, isKidsMode }: VideoPlayerProps) {
         {video.videoUrl ? (
           <video
             ref={videoRef}
-            src={video.videoUrl}
-            poster={video.thumbnail}
+            src={resolveMediaUrl(video.videoUrl)}
+            poster={resolveMediaUrl(video.thumbnail)}
             className="video-element"
             controls
             playsInline
@@ -147,7 +148,7 @@ export function VideoPlayer({ video, isKidsMode }: VideoPlayerProps) {
           />
         ) : (
           <>
-            <img src={video.thumbnail} alt={video.title} className="video-thumbnail" />
+            <img src={resolveMediaUrl(video.thumbnail)} alt={video.title} className="video-thumbnail" />
             <div className={`play-overlay ${isPlaying ? 'playing' : ''}`}>
               <button className="play-btn" onClick={togglePlay}>
                 <Play size={44} fill="currentColor" />
