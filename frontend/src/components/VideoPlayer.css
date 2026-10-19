@@ -682,3 +682,65 @@
 }
 
 
+
+
+/* 3-dots Dropdown in VideoPlayer */
+.vp-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: #1a1a24;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 6px;
+  min-width: 210px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 100;
+  animation: fadeInDropdown 0.15s ease-out;
+}
+
+@keyframes fadeInDropdown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.vp-dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.vp-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vp-dropdown-item.vp-edit-item {
+  color: #c084fc;
+}
+
+.vp-dropdown-item.vp-edit-item:hover {
+  background: rgba(192, 132, 252, 0.15);
+}
+
+.vp-dropdown-item.vp-delete-item {
+  color: #f87171;
+}
+
+.vp-dropdown-item.vp-delete-item:hover {
+  background: rgba(239, 68, 68, 0.15);
+}

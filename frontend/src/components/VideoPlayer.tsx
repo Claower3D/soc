@@ -3,21 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Play, ThumbsUp, ThumbsDown, 
   Share2, ChevronDown, ChevronUp, UserCheck, UserPlus, Check, 
-  Film, Baby, MessageSquare, Send, Bookmark, Radio, Tv
+  Film, Baby, MessageSquare, Send, Bookmark, Radio, Tv, MoreHorizontal, Edit3, Trash2, X, Flag
 } from 'lucide-react';
 import type { Video, VideoComment, SeriesEpisode } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { StreamChat } from './StreamChat';
-import { resolveMediaUrl } from '../api';
+import { resolveMediaUrl, api } from '../api';
 import './VideoPlayer.css';
 
 interface VideoPlayerProps {
   video?: Video | null;
   onSelectVideo?: (video: Video) => void;
+  onUpdateVideo?: (updated: Video) => void;
+  onDeleteVideo?: (videoId: string) => void;
   isKidsMode?: boolean;
 }
 
-export function VideoPlayer({ video, isKidsMode }: VideoPlayerProps) {
+export function VideoPlayer({ video, onUpdateVideo, onDeleteVideo, isKidsMode }: VideoPlayerProps) {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated, openAuthModal } = useAuth();
   
@@ -34,6 +36,72 @@ export function VideoPlayer({ video, isKidsMode }: VideoPlayerProps) {
   const [comments, setComments] = useState<VideoComment[]>(() => video?.comments || []);
   const [newCommentText, setNewCommentText] = useState('');
   const [likedCommentIds, setLikedCommentIds] = useState<string[]>([]);
+  // 3-dots options, edit & delete state
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editCategory, setEditCategory] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isMyVideo = Boolean(
+    currentUser && video && (
+      video.channel?.id === currentUser.id ||
+      video.channel?.username === currentUser.username ||
+      video.channel?.name === currentUser.name
+    )
+  );
+
+  const handleOpenEdit = () => {
+    if (!video) return;
+    setEditTitle(video.title || '');
+    setEditDesc(video.description || '');
+    setEditCategory(video.category || '');
+    setMenuOpen(false);
+    setEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!video || isSavingEdit) return;
+    setIsSavingEdit(true);
+    try {
+      await api.videos.update(video.id, {
+        title: editTitle.trim(),
+        description: editDesc.trim(),
+        category: editCategory.trim()
+      });
+      const updatedVideo = {
+        ...video,
+        title: editTitle.trim(),
+        description: editDesc.trim(),
+        category: editCategory.trim()
+      };
+      onUpdateVideo?.(updatedVideo);
+      setEditModalOpen(false);
+    } catch (err: any) {
+      alert('Ошибка при сохранении видео: ' + (err?.message || 'Попробуйте снова'));
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!video || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await api.videos.delete(video.id);
+      onDeleteVideo?.(video.id);
+      setDeleteConfirmOpen(false);
+      setMenuOpen(false);
+    } catch (err: any) {
+      alert('Ошибка при удалении: ' + (err?.message || 'Попробуйте снова'));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
 
   // Update comments when video prop changes
   useEffect(() => {
@@ -268,6 +336,69 @@ export function VideoPlayer({ video, isKidsMode }: VideoPlayerProps) {
               {copied ? <Check size={16} color="var(--color-success)" /> : <Share2 size={16} />}
               <span>{copied ? 'Скопировано!' : 'Поделиться'}</span>
             </button>
+
+            {/* 3 dots action menu */}
+            <div style={{ position: 'relative' }}>
+              <button 
+                type="button" 
+                className="action-btn-pill" 
+                onClick={() => setMenuOpen(!menuOpen)}
+                title="Опции видео"
+              >
+                <MoreHorizontal size={17} />
+              </button>
+
+              {menuOpen && (
+                <div className="vp-dropdown-menu">
+                  {isMyVideo ? (
+                    <>
+                      <button 
+                        type="button" 
+                        className="vp-dropdown-item vp-edit-item" 
+                        onClick={handleOpenEdit}
+                      >
+                        <Edit3 size={16} />
+                        <span>Редактировать видео</span>
+                      </button>
+                      <button 
+                        type="button" 
+                        className="vp-dropdown-item vp-delete-item" 
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setDeleteConfirmOpen(true);
+                        }}
+                      >
+                        <Trash2 size={16} />
+                        <span>Удалить видео</span>
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      type="button" 
+                      className="vp-dropdown-item" 
+                      onClick={() => {
+                        alert('Жалоба принята модератором');
+                        setMenuOpen(false);
+                      }}
+                    >
+                      <Flag size={16} />
+                      <span>Пожаловаться</span>
+                    </button>
+                  )}
+                  <button 
+                    type="button" 
+                    className="vp-dropdown-item" 
+                    onClick={() => {
+                      handleShare();
+                      setMenuOpen(false);
+                    }}
+                  >
+                    <Share2 size={16} />
+                    <span>Скопировать ссылку</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -413,6 +544,121 @@ export function VideoPlayer({ video, isKidsMode }: VideoPlayerProps) {
         </div>
         )}
       </div>
+
+      {/* Edit Video Modal */}
+      {editModalOpen && (
+        <div className="clip-edit-modal-backdrop" onClick={() => !isSavingEdit && setEditModalOpen(false)}>
+          <div className="clip-edit-modal" onClick={e => e.stopPropagation()}>
+            <div className="clip-edit-header">
+              <div className="clip-edit-title">
+                <Edit3 size={20} color="var(--color-accent, #a855f7)" />
+                <span>Редактировать видео</span>
+              </div>
+              <button 
+                type="button" 
+                className="clip-edit-close" 
+                onClick={() => !isSavingEdit && setEditModalOpen(false)}
+                disabled={isSavingEdit}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="clip-edit-body">
+              <div className="clip-edit-preview-row">
+                <img 
+                  src={resolveMediaUrl(video.thumbnail)} 
+                  alt="Превью" 
+                  className="clip-edit-thumb" 
+                />
+                <div className="clip-edit-preview-meta">
+                  <span className="clip-edit-author">{video.channel?.name}</span>
+                  <span className="clip-edit-note">Изменения названия и описания обновятся мгновенно</span>
+                </div>
+              </div>
+
+              <div className="clip-edit-field">
+                <label className="clip-edit-label">Название видео</label>
+                <input
+                  type="text"
+                  className="clip-edit-input"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  placeholder="Введите название..."
+                  maxLength={150}
+                  disabled={isSavingEdit}
+                />
+              </div>
+
+              <div className="clip-edit-field">
+                <label className="clip-edit-label">Описание</label>
+                <textarea
+                  className="clip-edit-textarea"
+                  value={editDesc}
+                  onChange={e => setEditDesc(e.target.value)}
+                  placeholder="Добавьте подробное описание видео..."
+                  rows={4}
+                  maxLength={1000}
+                  disabled={isSavingEdit}
+                />
+                <span className="clip-edit-counter">{editDesc.length} / 1000</span>
+              </div>
+            </div>
+
+            <div className="clip-edit-footer">
+              <button 
+                type="button" 
+                className="clip-edit-btn-cancel" 
+                onClick={() => setEditModalOpen(false)}
+                disabled={isSavingEdit}
+              >
+                Отмена
+              </button>
+              <button 
+                type="button" 
+                className="clip-edit-btn-save" 
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
+              >
+                {isSavingEdit ? 'Сохранение...' : 'Сохранить изменения'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmOpen && (
+        <div className="clip-menu-backdrop" onClick={() => !isDeleting && setDeleteConfirmOpen(false)}>
+          <div className="clip-confirm-dialog" onClick={e => e.stopPropagation()}>
+            <div className="clip-confirm-icon-wrap">
+              <Trash2 size={28} color="#ef4444" />
+            </div>
+            <h3 className="clip-confirm-title">Удалить видео?</h3>
+            <p className="clip-confirm-text">
+              Видео «{video.title}» будет безвозвратно удалено с сервера и из каталога.
+            </p>
+            <div className="clip-confirm-actions">
+              <button 
+                type="button" 
+                className="clip-confirm-btn-delete"
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Удаление...' : 'Да, удалить видео'}
+              </button>
+              <button 
+                type="button" 
+                className="clip-confirm-btn-cancel"
+                onClick={() => setDeleteConfirmOpen(false)}
+                disabled={isDeleting}
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

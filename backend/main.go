@@ -1194,6 +1194,8 @@ func main() {
 	mux.HandleFunc("POST /api/clips/{id}/like", handleLikeClip)
 	mux.HandleFunc("POST /api/clips/{id}/view", handleViewClip)
 	mux.HandleFunc("DELETE /api/clips/{id}", handleDeleteClip)
+	mux.HandleFunc("PUT /api/clips/{id}", handleUpdateClip)
+	mux.HandleFunc("PUT /api/videos/{id}", handleUpdateVideo)
 
 	// DB Admin эндпоинты
 	mux.HandleFunc("GET /api/admin/db-status", handleDBStatus)
@@ -8015,6 +8017,90 @@ func handleCreateClip(w http.ResponseWriter, r *http.Request) {
 		"poster":     posterUrl,
 		"caption":    caption,
 		"soundTitle": soundTitle,
+	}})
+}
+
+// PUT /api/clips/{id} — edit clip
+func handleUpdateClip(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+	clipID := r.PathValue("id")
+	var req struct {
+		Caption    string `json:"caption"`
+		SoundTitle string `json:"soundTitle"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+		return
+	}
+
+	caption := strings.TrimSpace(req.Caption)
+	soundTitle := strings.TrimSpace(req.SoundTitle)
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn != nil {
+		if soundTitle != "" {
+			_, err = dbConn.Exec(`UPDATE clips SET caption = $1, music_title = $2 WHERE id = $3 AND user_id = $4`, caption, soundTitle, clipID, claims.UserID)
+		} else {
+			_, err = dbConn.Exec(`UPDATE clips SET caption = $1 WHERE id = $2 AND user_id = $3`, caption, clipID, claims.UserID)
+		}
+		if err != nil {
+			writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+			return
+		}
+	}
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
+		"id": clipID,
+		"caption": caption,
+		"soundTitle": soundTitle,
+	}})
+}
+
+// PUT /api/videos/{id} — edit video
+func handleUpdateVideo(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+	videoID := r.PathValue("id")
+	var req struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Category    string `json:"category"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+		return
+	}
+
+	title := strings.TrimSpace(req.Title)
+	desc := strings.TrimSpace(req.Description)
+	category := strings.TrimSpace(req.Category)
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn != nil {
+		_, err = dbConn.Exec(`UPDATE videos SET title = $1, description = $2, category = $3 WHERE id = $4 AND user_id = $5`, title, desc, category, videoID, claims.UserID)
+		if err != nil {
+			writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+			return
+		}
+		globalCache.InvalidateTag("videos")
+	}
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
+		"id": videoID,
+		"title": title,
+		"description": desc,
+		"category": category,
 	}})
 }
 

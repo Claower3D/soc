@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Grid, Video as VideoIcon, Headphones, Bookmark, 
+  Grid, Video as VideoIcon, Headphones, 
   MapPin, Link as LinkIcon, MessageCircle, Phone, 
   UserCheck, UserPlus, Users, Share2, Edit3, Heart, MessageSquare,
   CheckCircle2, ChevronRight, Tv, ShoppingBag, Compass, Shield, Flame, LogIn, Plus, Brain, Sparkles,
@@ -9,9 +9,9 @@ import {
 } from 'lucide-react';
 import { 
   RELIGIONS_CATALOG, type User, type Post, type Story, type Video as VideoType, 
-  type Podcast, type Product 
+  type Podcast, type Product, type Clip 
 } from '../data/mock';
-import { api } from '../api';
+import { api, resolveMediaUrl } from '../api';
 import { syncLocalStoriesWithServer, isStoryExpired } from '../utils/syncStories';
 import { calculateZodiacProfile } from '../utils/astrology';
 import { ReligionSymbol } from '../components/ReligionSymbols';
@@ -96,6 +96,7 @@ export function ProfilePage() {
   const [profileVideos, setProfileVideos] = useState<VideoType[]>([]);
   const [profilePodcasts, setProfilePodcasts] = useState<Podcast[]>([]);
   const [profileProducts, setProfileProducts] = useState<Product[]>([]);
+  const [profileClips, setProfileClips] = useState<Clip[]>([]);
 
   useEffect(() => {
     const safeSet = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>) => (data: any) => {
@@ -156,6 +157,29 @@ export function ProfilePage() {
     api.videos.list().then(safeSet(setProfileVideos)).catch(console.warn);
     api.podcasts.list().then(safeSet(setProfilePodcasts)).catch(console.warn);
     api.marketplace.products().then(safeSet(setProfileProducts)).catch(console.warn);
+    api.clips.list().then((data: any) => {
+      let finalClips: Clip[] = Array.isArray(data) ? data : (data?.data || []);
+      try {
+        const saved = localStorage.getItem('newage_clips_state');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            const ids = new Set(finalClips.map((c: Clip) => c.id));
+            const missing = parsed.filter((c: Clip) => !ids.has(c.id));
+            finalClips = [...finalClips, ...missing];
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse saved clips', e);
+      }
+      finalClips = finalClips.filter(c => 
+        c && c.videoUrl && 
+        !c.videoUrl.startsWith('blob:') && 
+        !c.videoUrl.includes('googleapis.com/sample') &&
+        !c.id.startsWith('clip_zen_')
+      );
+      setProfileClips(finalClips);
+    }).catch(console.warn);
   }, [cleanParam]);
 
   useEffect(() => {
@@ -192,6 +216,27 @@ export function ProfilePage() {
     };
     window.addEventListener('post_deleted', handlePostDeleted);
     return () => window.removeEventListener('post_deleted', handlePostDeleted);
+  }, []);
+
+  useEffect(() => {
+    const handleClipCreated = (e: any) => {
+      const c = e.detail;
+      if (c && c.id) {
+        setProfileClips(prev => [c, ...prev.filter(item => item.id !== c.id)]);
+      }
+    };
+    const handleClipDeleted = (e: any) => {
+      const id = e.detail?.id;
+      if (id) {
+        setProfileClips(prev => prev.filter(c => c.id !== id));
+      }
+    };
+    window.addEventListener('clip_created', handleClipCreated);
+    window.addEventListener('clip_deleted', handleClipDeleted);
+    return () => {
+      window.removeEventListener('clip_created', handleClipCreated);
+      window.removeEventListener('clip_deleted', handleClipDeleted);
+    };
   }, []);
 
   useEffect(() => {
@@ -368,7 +413,7 @@ export function ProfilePage() {
     }
   }, [activeUser?.id, isMe, currentUser?.id]);
 
-  const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'podcasts' | 'saved' | 'shop'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'videos' | 'clips' | 'podcasts' | 'saved' | 'shop'>('posts');
   const [modalType, setModalType] = useState<'Подписчики' | 'Подписки' | 'Критики' | 'Друзья' | null>(null);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -473,9 +518,30 @@ export function ProfilePage() {
     });
   }, [profilePosts, activeUser, isMe, currentUser, cleanParam]);
 
-  const savedPosts = useMemo(() => {
-    return profilePosts.filter(p => p.saved);
-  }, [profilePosts]);
+  const userClips = useMemo(() => {
+    if (!activeUser) return [];
+    const targetId = activeUser.id ? String(activeUser.id).toLowerCase() : '';
+    const targetUsername = activeUser.username ? activeUser.username.replace(/^@+/, '').toLowerCase() : '';
+    const myId = currentUser?.id ? String(currentUser.id).toLowerCase() : '';
+    const myUsername = currentUser?.username ? currentUser.username.replace(/^@+/, '').toLowerCase() : '';
+    const cleanP = cleanParam ? cleanParam.replace(/^@+/, '').toLowerCase() : '';
+
+    return profileClips.filter(c => {
+      const cUserId = c.user?.id ? String(c.user.id).toLowerCase() : '';
+      const cUsername = c.user?.username ? c.user.username.replace(/^@+/, '').toLowerCase() : '';
+      const fallbackUserId = (c as any).userId ? String((c as any).userId).toLowerCase() : '';
+
+      if (targetId && (cUserId === targetId || fallbackUserId === targetId)) return true;
+      if (targetUsername && (cUsername === targetUsername || cUserId === targetUsername)) return true;
+      if (cleanP && (cUsername === cleanP || cUserId === cleanP)) return true;
+      if (isMe) {
+        if (cUserId === 'me' || (myId && (cUserId === myId || fallbackUserId === myId))) return true;
+        if (myUsername && (cUsername === myUsername || cUserId === myUsername)) return true;
+      }
+      return false;
+    });
+  }, [profileClips, activeUser, isMe, currentUser, cleanParam]);
+
 
   const userVideos = useMemo(() => {
     if (!activeUser) return [];
@@ -1056,6 +1122,14 @@ export function ProfilePage() {
               <span className="tab-count">{userVideos.length}</span>
             </button>
             <button
+              className={`tab-btn ${activeTab === 'clips' ? 'active' : ''}`}
+              onClick={() => setActiveTab('clips')}
+            >
+              <Film size={17} />
+              <span>Клипы</span>
+              <span className="tab-count">{userClips.length}</span>
+            </button>
+            <button
               className={`tab-btn ${activeTab === 'podcasts' ? 'active' : ''}`}
               onClick={() => setActiveTab('podcasts')}
             >
@@ -1071,16 +1145,6 @@ export function ProfilePage() {
                 <ShoppingBag size={17} />
                 <span>Товары & Магазин</span>
                 <span className="tab-count">{userProducts.length}</span>
-              </button>
-            )}
-            {isMe && (
-              <button
-                className={`tab-btn ${activeTab === 'saved' ? 'active' : ''}`}
-                onClick={() => setActiveTab('saved')}
-              >
-                <Bookmark size={17} />
-                <span>Сохранённое</span>
-                <span className="tab-count">{savedPosts.length}</span>
               </button>
             )}
           </div>
@@ -1265,42 +1329,73 @@ export function ProfilePage() {
           )
         )}
 
-        {/* SAVED TAB */}
-        {activeTab === 'saved' && (
-          savedPosts.length > 0 ? (
-            <div className="posts-grid">
-              {savedPosts.map(post => (
-                <div
-                  key={post.id}
-                  className="grid-post-item"
-                  onClick={() => setSelectedPost(post)}
-                >
-                  <img src={post.image} alt={post.caption} className="grid-post-img" />
-                  <div className="grid-post-overlay">
-                    <div className="overlay-stat">
-                      <Heart size={18} fill="white" />
-                      <span>{post.likes}</span>
+        {/* CLIPS TAB */}
+        {activeTab === 'clips' && (
+          userClips.length > 0 ? (
+            <div className="profile-clips-grid">
+              {userClips.map((clip, index) => {
+                const videoSrc = resolveMediaUrl(clip.videoUrl);
+                const posterSrc = clip.poster ? resolveMediaUrl(clip.poster) : '';
+                return (
+                  <div
+                    key={clip.id || `clip_${index}`}
+                    className="profile-clip-item"
+                    onClick={() => navigate(`/clips?id=${clip.id}`)}
+                  >
+                    {posterSrc ? (
+                      <img 
+                        src={posterSrc} 
+                        alt={clip.caption || 'Клип'} 
+                        className="profile-clip-poster" 
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    ) : null}
+                    <video
+                      src={videoSrc}
+                      className="profile-clip-video-preview"
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
+                    <div className="profile-clip-badge">
+                      <Film size={12} />
+                      <span>Клип</span>
                     </div>
-                    <div className="overlay-stat">
-                      <MessageSquare size={18} fill="white" />
-                      <span>{post.comments?.length || 0}</span>
+                    <div className="profile-clip-overlay">
+                      <div className="profile-clip-stat">
+                        <Heart size={16} fill="white" />
+                        <span>{clip.likesCount || 0}</span>
+                      </div>
+                      <div className="profile-clip-stat">
+                        <MessageSquare size={16} fill="white" />
+                        <span>{clip.commentsCount || 0}</span>
+                      </div>
                     </div>
+                    {clip.caption && (
+                      <div className="profile-clip-caption-tag">
+                        <p>{clip.caption}</p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="empty-tab-state">
-              <Bookmark size={40} className="empty-icon" />
-              <h3>Сохранённых постов пока нет</h3>
-              <p>Сохраняйте интересные публикации из ленты с помощью иконки закладки.</p>
-              <button 
-                className="btn btn-primary" 
-                style={{ marginTop: '1rem' }} 
-                onClick={() => navigate('/')}
-              >
-                <Compass size={16} /> Перейти в ленту
-              </button>
+              <Film size={40} className="empty-icon" />
+              <h3>Клипов пока нет</h3>
+              <p>{isMe ? 'Создавайте и публикуйте авторские вертикальные клипы, чтобы привлечь больше единомышленников.' : 'У этого пользователя пока нет опубликованных клипов.'}</p>
+              {isMe && (
+                <button 
+                  className="btn btn-primary" 
+                  style={{ marginTop: '1rem' }} 
+                  onClick={() => navigate('/clips')}
+                >
+                  <Plus size={16} /> Создать клип
+                </button>
+              )}
             </div>
           )
         )}

@@ -170,7 +170,8 @@ export const api = {
       }
       return apiFetch<any>('/api/videos', { method: 'POST', body: JSON.stringify(data) });
     },
-    delete: (id: string) => apiFetch<any>(`/api/videos/${id}`, { method: 'DELETE' })
+    delete: (id: string) => apiFetch<any>(`/api/videos/${id}`, { method: 'DELETE' }),
+    update: (id: string, data: { title?: string; description?: string; category?: string }) => apiFetch<any>(`/api/videos/${id}`, { method: 'PUT', body: JSON.stringify(data) })
   },
   clips: {
     list: () => apiFetch<any>('/api/clips'),
@@ -181,6 +182,7 @@ export const api = {
       return apiFetch<any>('/api/clips', { method: 'POST', body: JSON.stringify(data) });
     },
     delete: (id: string) => apiFetch<any>(`/api/clips/${id}`, { method: 'DELETE' }),
+    update: (id: string, data: { caption?: string; soundTitle?: string }) => apiFetch<any>(`/api/clips/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     like: (id: string) => apiFetch<any>(`/api/clips/${id}/like`, { method: 'POST' }),
     view: (id: string) => apiFetch<any>(`/api/clips/${id}/view`, { method: 'POST' })
   },

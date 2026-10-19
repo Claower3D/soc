@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { 
   Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, 
   Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send, Smile,
   Radio, Users, Sparkles, Flame, Video, Activity, Hash, Disc3,
-  Search
+  Search, Edit3, Trash2, Flag, Link2
 } from 'lucide-react';
 import { type Clip, type ClipComment } from '../data/mock';
 import { api, resolveMediaUrl } from '../api';
@@ -60,6 +60,7 @@ function captureVideoPoster(file: File): Promise<Blob | null> {
 
 export function ClipsPage() {
   const { currentUser, isAuthenticated, openAuthModal } = useAuth();
+  const [searchParams] = useSearchParams();
   const [clips, setClips] = useState<Clip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [failedVideoIds, setFailedVideoIds] = useState<Record<string, boolean>>({});
@@ -93,6 +94,23 @@ export function ClipsPage() {
 
         setClips(finalClips);
         setIsLoading(false);
+
+        // Автоскролл к конкретному клипу при переходе из профиля / по ссылке ?id=...
+        const targetId = searchParams.get('id');
+        if (targetId) {
+          const targetIndex = finalClips.findIndex(c => c.id === targetId);
+          if (targetIndex !== -1) {
+            setActiveIndex(targetIndex);
+            setTimeout(() => {
+              if (feedRef.current) {
+                feedRef.current.scrollTo({
+                  top: targetIndex * feedRef.current.clientHeight,
+                  behavior: 'auto'
+                });
+              }
+            }, 150);
+          }
+        }
       }
     }).catch(err => {
       console.warn('Failed to load clips', err);
@@ -102,7 +120,65 @@ export function ClipsPage() {
       }
     });
     return () => { mounted = false; };
-  }, []);
+  }, [searchParams]);
+
+  // Options menu & Edit Clip state
+  const [menuClip, setMenuClip] = useState<Clip | null>(null);
+  const [editingClip, setEditingClip] = useState<Clip | null>(null);
+  const [editCaption, setEditCaption] = useState('');
+  const [editSoundTitle, setEditSoundTitle] = useState('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deleteConfirmClip, setDeleteConfirmClip] = useState<Clip | null>(null);
+  const [isDeletingClip, setIsDeletingClip] = useState(false);
+
+  const isMyClip = (clip: Clip) => {
+    if (!currentUser || !clip) return false;
+    return clip.user?.id === currentUser.id || clip.user?.username === currentUser.username;
+  };
+
+  const handleOpenEdit = (clip: Clip) => {
+    setMenuClip(null);
+    setEditingClip(clip);
+    setEditCaption(clip.caption || '');
+    setEditSoundTitle(clip.musicTitle || '');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingClip || isSavingEdit) return;
+    setIsSavingEdit(true);
+    try {
+      await api.clips.update(editingClip.id, {
+        caption: editCaption.trim(),
+        soundTitle: editSoundTitle.trim()
+      });
+      setClips(prev => prev.map(c => c.id === editingClip.id ? {
+        ...c,
+        caption: editCaption.trim(),
+        musicTitle: editSoundTitle.trim() || c.musicTitle
+      } : c));
+      setEditingClip(null);
+    } catch (err: any) {
+      alert('Ошибка при сохранении: ' + (err?.message || 'Попробуйте снова'));
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeleteClip = async (clip: Clip) => {
+    if (isDeletingClip) return;
+    setIsDeletingClip(true);
+    try {
+      await api.clips.delete(clip.id);
+      setClips(prev => prev.filter(c => c.id !== clip.id));
+      window.dispatchEvent(new CustomEvent('clip_deleted', { detail: { id: clip.id } }));
+      setDeleteConfirmClip(null);
+      setMenuClip(null);
+    } catch (err: any) {
+      alert('Ошибка при удалении: ' + (err?.message || 'Попробуйте снова'));
+    } finally {
+      setIsDeletingClip(false);
+    }
+  };
 
   const [activeTab, setActiveTab] = useState<ClipTab>('all');
   const [selectedTag, setSelectedTag] = useState<string>('Все');
@@ -189,6 +265,7 @@ export function ClipsPage() {
       };
 
       setClips(prev => [newClip, ...prev]);
+      window.dispatchEvent(new CustomEvent('clip_created', { detail: newClip }));
       setUploadModalOpen(false);
       setSelectedVideoFile(null);
       setWaveDescription('');
@@ -1000,8 +1077,8 @@ export function ClipsPage() {
                     <button 
                       type="button"
                       className="clip-action-btn"
-                      onClick={() => handleShare(clip)}
-                      title="Параметры"
+                      onClick={() => setMenuClip(clip)}
+                      title="Параметры видео"
                     >
                       <span className="clip-dots-icon">•••</span>
                     </button>
@@ -1160,6 +1237,193 @@ export function ClipsPage() {
         onPublish={handlePublishWave}
         isPublishing={isPublishing}
       />
+
+      {/* Action Sheet / 3-dots Options Modal */}
+      {menuClip && (
+        <div className="clip-menu-backdrop" onClick={() => setMenuClip(null)}>
+          <div className="clip-menu-sheet" onClick={e => e.stopPropagation()}>
+            <div className="clip-menu-header">
+              <span className="clip-menu-drag-handle" />
+              <div className="clip-menu-title">Параметры волны</div>
+            </div>
+
+            <div className="clip-menu-options">
+              {isMyClip(menuClip) ? (
+                <>
+                  <button 
+                    type="button" 
+                    className="clip-menu-item edit-item"
+                    onClick={() => handleOpenEdit(menuClip)}
+                  >
+                    <Edit3 size={19} />
+                    <span>Редактировать описание и звук</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    className="clip-menu-item delete-item"
+                    onClick={() => {
+                      setDeleteConfirmClip(menuClip);
+                      setMenuClip(null);
+                    }}
+                  >
+                    <Trash2 size={19} />
+                    <span>Удалить видео</span>
+                  </button>
+                </>
+              ) : (
+                <button 
+                  type="button" 
+                  className="clip-menu-item report-item"
+                  onClick={() => {
+                    alert('Жалоба отправлена модераторам');
+                    setMenuClip(null);
+                  }}
+                >
+                  <Flag size={19} />
+                  <span>Пожаловаться</span>
+                </button>
+              )}
+
+              <button 
+                type="button" 
+                className="clip-menu-item"
+                onClick={() => {
+                  handleShare(menuClip);
+                  setMenuClip(null);
+                }}
+              >
+                <Link2 size={19} />
+                <span>Скопировать ссылку</span>
+              </button>
+
+              <button 
+                type="button" 
+                className="clip-menu-item cancel-item"
+                onClick={() => setMenuClip(null)}
+              >
+                <span>Отмена</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Clip Modal */}
+      {editingClip && (
+        <div className="clip-edit-modal-backdrop" onClick={() => !isSavingEdit && setEditingClip(null)}>
+          <div className="clip-edit-modal" onClick={e => e.stopPropagation()}>
+            <div className="clip-edit-header">
+              <div className="clip-edit-title">
+                <Edit3 size={20} color="var(--color-accent, #a855f7)" />
+                <span>Редактировать клип</span>
+              </div>
+              <button 
+                type="button" 
+                className="clip-edit-close" 
+                onClick={() => !isSavingEdit && setEditingClip(null)}
+                disabled={isSavingEdit}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="clip-edit-body">
+              <div className="clip-edit-preview-row">
+                <img 
+                  src={resolveMediaUrl(editingClip.poster || editingClip.user?.avatar)} 
+                  alt="Превью" 
+                  className="clip-edit-thumb" 
+                />
+                <div className="clip-edit-preview-meta">
+                  <span className="clip-edit-author">{editingClip.user?.name}</span>
+                  <span className="clip-edit-note">Изменения мгновенно отобразятся в ленте и профиле</span>
+                </div>
+              </div>
+
+              <div className="clip-edit-field">
+                <label className="clip-edit-label">Описание / Подпись</label>
+                <textarea
+                  className="clip-edit-textarea"
+                  value={editCaption}
+                  onChange={e => setEditCaption(e.target.value)}
+                  placeholder="Добавьте описание или хэштеги..."
+                  rows={4}
+                  maxLength={500}
+                  disabled={isSavingEdit}
+                />
+                <span className="clip-edit-counter">{editCaption.length} / 500</span>
+              </div>
+
+              <div className="clip-edit-field">
+                <label className="clip-edit-label">Название аудиодорожки</label>
+                <input
+                  type="text"
+                  className="clip-edit-input"
+                  value={editSoundTitle}
+                  onChange={e => setEditSoundTitle(e.target.value)}
+                  placeholder="Оригинальный звук..."
+                  maxLength={100}
+                  disabled={isSavingEdit}
+                />
+              </div>
+            </div>
+
+            <div className="clip-edit-footer">
+              <button 
+                type="button" 
+                className="clip-edit-btn-cancel" 
+                onClick={() => setEditingClip(null)}
+                disabled={isSavingEdit}
+              >
+                Отмена
+              </button>
+              <button 
+                type="button" 
+                className="clip-edit-btn-save" 
+                onClick={handleSaveEdit}
+                disabled={isSavingEdit}
+              >
+                {isSavingEdit ? 'Сохранение...' : 'Сохранить изменения'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmClip && (
+        <div className="clip-menu-backdrop" onClick={() => !isDeletingClip && setDeleteConfirmClip(null)}>
+          <div className="clip-confirm-dialog" onClick={e => e.stopPropagation()}>
+            <div className="clip-confirm-icon-wrap">
+              <Trash2 size={28} color="#ef4444" />
+            </div>
+            <h3 className="clip-confirm-title">Удалить это видео?</h3>
+            <p className="clip-confirm-text">
+              Видео будет навсегда удалено из вашей ленты и профиля. Это действие нельзя отменить.
+            </p>
+            <div className="clip-confirm-actions">
+              <button 
+                type="button" 
+                className="clip-confirm-btn-delete"
+                onClick={() => handleDeleteClip(deleteConfirmClip)}
+                disabled={isDeletingClip}
+              >
+                {isDeletingClip ? 'Удаление...' : 'Да, удалить'}
+              </button>
+              <button 
+                type="button" 
+                className="clip-confirm-btn-cancel"
+                onClick={() => setDeleteConfirmClip(null)}
+                disabled={isDeletingClip}
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Floating Action Button for quick upload */}
       <button 
