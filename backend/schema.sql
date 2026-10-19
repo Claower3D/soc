@@ -661,7 +661,14 @@ CREATE TABLE IF NOT EXISTS videos (
 );
 
 CREATE INDEX IF NOT EXISTS idx_videos_user ON videos(user_id);
-CREATE INDEX IF NOT EXISTS idx_videos_created ON videos(created_at DESC);
+-- Персистентное хранилище медиафайлов (видео, превью) для Railway и контейнеров
+CREATE TABLE IF NOT EXISTS media_files (
+    id VARCHAR(255) PRIMARY KEY,
+    content_type VARCHAR(100) NOT NULL,
+    data BYTEA NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_media_files_created ON media_files(created_at);
 
 -- Клипы (короткие вертикальные видео Reels/TikTok-style)
 CREATE TABLE IF NOT EXISTS clips (

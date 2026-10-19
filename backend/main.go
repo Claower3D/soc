@@ -340,6 +340,12 @@ var (
 	dbEnvKeyUsed  = ""
 )
 
+func getDB() *sql.DB {
+	dbMu.RLock()
+	defer dbMu.RUnlock()
+	return db
+}
+
 // getDatabaseURL ищет строку подключения к PostgreSQL в стандартных переменных Railway, Render и Heroku
 func getDatabaseURL() (string, string) {
 	keys := []string{
@@ -512,11 +518,17 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 			likes_count INT DEFAULT 0,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		);
-		CREATE INDEX IF NOT EXISTS idx_clip_comments_clip ON clip_comments(clip_id);
+		CREATE TABLE IF NOT EXISTS media_files (
+			id VARCHAR(255) PRIMARY KEY,
+			content_type VARCHAR(100) NOT NULL,
+			data BYTEA NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_media_files_created ON media_files(created_at);
 
-		-- Очистка битых (blob:) и фейковых тестовых видео и клипов
-		DELETE FROM clips WHERE video_url LIKE 'blob:%' OR video_url LIKE '%googleapis.com/sample%';
-		DELETE FROM videos WHERE video_url LIKE 'blob:%' OR video_url LIKE '%googleapis.com/sample%';
+		-- Очистка битых (blob:) и фейковых тестовых видео и клипов, а также потерянного клипа без файла
+		DELETE FROM clips WHERE video_url LIKE 'blob:%' OR video_url LIKE '%googleapis.com/sample%' OR video_url LIKE '%clip_1792408583_4c824401%';
+		DELETE FROM videos WHERE video_url LIKE 'blob:%' OR video_url LIKE '%googleapis.com/sample%' OR video_url LIKE '%clip_1792408583_4c824401%';
 	`)
 
 	return conn, nil
@@ -1281,10 +1293,9 @@ func main() {
 				mux.ServeHTTP(w, r)
 				return
 			}
-			// Раздача загруженных медиафайлов (/uploads/videos, /uploads/thumbnails)
+			// Раздача загруженных медиафайлов (/uploads/videos, /uploads/thumbnails) с поддержкой Range и БД
 			if strings.HasPrefix(r.URL.Path, "/uploads/") {
-				uploadsDir := getUploadsDir()
-				http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadsDir))).ServeHTTP(w, r)
+				serveUploadFile(w, r, strings.TrimPrefix(r.URL.Path, "/uploads/"))
 				return
 			}
 			// Проверяем есть ли статический файл
@@ -1314,8 +1325,7 @@ func main() {
 	} else {
 		rootHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(r.URL.Path, "/uploads/") {
-				uploadsDir := getUploadsDir()
-				http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadsDir))).ServeHTTP(w, r)
+				serveUploadFile(w, r, strings.TrimPrefix(r.URL.Path, "/uploads/"))
 				return
 			}
 			mux.ServeHTTP(w, r)
@@ -7956,6 +7966,94 @@ func getUploadsDir() string {
 	return u
 }
 
+// saveMediaFile сохраняет медиафайл в персистентную таблицу PostgreSQL
+func saveMediaFile(relPath string, contentType string, data []byte) error {
+	dbConn := getDB()
+	if dbConn == nil || len(data) == 0 {
+		return nil
+	}
+	cleanID := strings.TrimPrefix(filepath.ToSlash(relPath), "/")
+	_, err := dbConn.Exec(`
+		INSERT INTO media_files (id, content_type, data, created_at)
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (id) DO UPDATE SET content_type = EXCLUDED.content_type, data = EXCLUDED.data, created_at = NOW();
+	`, cleanID, contentType, data)
+	return err
+}
+
+// serveUploadFile раздает медиафайлы с поддержкой Range-запросов и самовосстановления из PostgreSQL
+func serveUploadFile(w http.ResponseWriter, r *http.Request, subPath string) {
+	cleanSub := filepath.Clean(filepath.ToSlash(subPath))
+	cleanSub = strings.TrimPrefix(cleanSub, "/")
+	if strings.Contains(cleanSub, "..") {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+
+	uploadsDir := getUploadsDir()
+	localFile := filepath.Join(uploadsDir, filepath.FromSlash(cleanSub))
+
+	// Если файл на диске отсутствует (например, после перезапуска контейнера Railway),
+	// восстанавливаем его из постоянной таблицы media_files в PostgreSQL
+	if _, err := os.Stat(localFile); os.IsNotExist(err) {
+		dbConn := getDB()
+		if dbConn != nil {
+			var contentType string
+			var data []byte
+			baseName := filepath.Base(cleanSub)
+			err := dbConn.QueryRowContext(r.Context(),
+				`SELECT content_type, data FROM media_files WHERE id = $1 OR id = $2 OR id LIKE '%' || $3 LIMIT 1`,
+				cleanSub, baseName, baseName).Scan(&contentType, &data)
+			if err == nil && len(data) > 0 {
+				_ = os.MkdirAll(filepath.Dir(localFile), 0755)
+				_ = os.WriteFile(localFile, data, 0644)
+			}
+		}
+	}
+
+	fi, err := os.Stat(localFile)
+	if err != nil || fi.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Определение Content-Type
+	ext := strings.ToLower(filepath.Ext(localFile))
+	mimeType := ""
+	switch ext {
+	case ".mp4", ".m4v", ".mov":
+		// QuickTime MOV файлы отдаем как video/mp4, чтобы Chromium / Android WebView могли воспроизвести их нативно
+		mimeType = "video/mp4"
+	case ".webm":
+		mimeType = "video/webm"
+	case ".ogv", ".ogg":
+		mimeType = "video/ogg"
+	case ".jpg", ".jpeg":
+		mimeType = "image/jpeg"
+	case ".png":
+		mimeType = "image/png"
+	case ".webp":
+		mimeType = "image/webp"
+	case ".gif":
+		mimeType = "image/gif"
+	case ".svg":
+		mimeType = "image/svg+xml"
+	case ".mp3":
+		mimeType = "audio/mpeg"
+	case ".wav":
+		mimeType = "audio/wav"
+	}
+
+	if mimeType != "" {
+		w.Header().Set("Content-Type", mimeType)
+	}
+	w.Header().Set("Accept-Ranges", "bytes")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+
+	http.ServeFile(w, r, localFile)
+}
+
 // POST /api/clips — create clip (supports multipart/form-data video upload and JSON)
 func handleCreateClip(w http.ResponseWriter, r *http.Request) {
 	token := extractBearerToken(r)
@@ -7994,20 +8092,26 @@ func handleCreateClip(w http.ResponseWriter, r *http.Request) {
 		}
 		if fileErr == nil {
 			defer file.Close()
-			ext := filepath.Ext(fileHeader.Filename)
-			if ext == "" {
-				ext = ".mp4"
-			}
-			filename := fmt.Sprintf("clip_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
-			uploadsDir := getUploadsDir()
-			destPath := filepath.Join(uploadsDir, "videos", filename)
-			out, createErr := os.Create(destPath)
-			if createErr == nil {
-				defer out.Close()
-				_, _ = io.Copy(out, file)
-				videoUrl = "/uploads/videos/" + filename
-			} else {
-				log.Printf("⚠️ Ошибка сохранения видеофайла клипа: %v", createErr)
+			fileBytes, readErr := io.ReadAll(file)
+			if readErr == nil && len(fileBytes) > 0 {
+				ext := filepath.Ext(fileHeader.Filename)
+				if ext == "" {
+					ext = ".mp4"
+				}
+				filename := fmt.Sprintf("clip_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
+				uploadsDir := getUploadsDir()
+				destPath := filepath.Join(uploadsDir, "videos", filename)
+				if writeErr := os.WriteFile(destPath, fileBytes, 0644); writeErr == nil {
+					videoUrl = "/uploads/videos/" + filename
+				} else {
+					log.Printf("⚠️ Ошибка сохранения видеофайла клипа на диск: %v", writeErr)
+				}
+				// Персистентное сохранение видео в PostgreSQL (media_files)
+				cType := "video/mp4"
+				if strings.ToLower(ext) == ".webm" {
+					cType = "video/webm"
+				}
+				_ = saveMediaFile("videos/"+filename, cType, fileBytes)
 			}
 		}
 
@@ -8018,18 +8122,25 @@ func handleCreateClip(w http.ResponseWriter, r *http.Request) {
 		}
 		if thumbErr == nil {
 			defer thumbFile.Close()
-			ext := filepath.Ext(thumbHeader.Filename)
-			if ext == "" {
-				ext = ".jpg"
-			}
-			thumbFilename := fmt.Sprintf("thumb_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
-			uploadsDir := getUploadsDir()
-			destPath := filepath.Join(uploadsDir, "thumbnails", thumbFilename)
-			out, createErr := os.Create(destPath)
-			if createErr == nil {
-				defer out.Close()
-				_, _ = io.Copy(out, thumbFile)
-				posterUrl = "/uploads/thumbnails/" + thumbFilename
+			thumbBytes, readErr := io.ReadAll(thumbFile)
+			if readErr == nil && len(thumbBytes) > 0 {
+				ext := filepath.Ext(thumbHeader.Filename)
+				if ext == "" {
+					ext = ".jpg"
+				}
+				thumbFilename := fmt.Sprintf("thumb_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
+				uploadsDir := getUploadsDir()
+				destPath := filepath.Join(uploadsDir, "thumbnails", thumbFilename)
+				if writeErr := os.WriteFile(destPath, thumbBytes, 0644); writeErr == nil {
+					posterUrl = "/uploads/thumbnails/" + thumbFilename
+				}
+				cType := "image/jpeg"
+				if strings.ToLower(ext) == ".png" {
+					cType = "image/png"
+				} else if strings.ToLower(ext) == ".webp" {
+					cType = "image/webp"
+				}
+				_ = saveMediaFile("thumbnails/"+thumbFilename, cType, thumbBytes)
 			}
 		}
 	} else {
@@ -8194,7 +8305,17 @@ func handleDeleteClip(w http.ResponseWriter, r *http.Request) {
 	dbConn := db
 	dbMu.RUnlock()
 	if dbConn != nil {
+		var vUrl, pUrl string
+		_ = dbConn.QueryRow(`SELECT video_url, poster FROM clips WHERE id = $1 AND user_id = $2`, clipID, claims.UserID).Scan(&vUrl, &pUrl)
 		_, _ = dbConn.Exec(`DELETE FROM clips WHERE id = $1 AND user_id = $2`, clipID, claims.UserID)
+		if vUrl != "" {
+			sub := strings.TrimPrefix(vUrl, "/uploads/")
+			_, _ = dbConn.Exec(`DELETE FROM media_files WHERE id = $1 OR id = $2`, sub, filepath.Base(sub))
+		}
+		if pUrl != "" {
+			sub := strings.TrimPrefix(pUrl, "/uploads/")
+			_, _ = dbConn.Exec(`DELETE FROM media_files WHERE id = $1 OR id = $2`, sub, filepath.Base(sub))
+		}
 	}
 	writeJSON(w, 200, Response{Status: "ok"})
 }
@@ -8233,20 +8354,25 @@ func handleCreateVideo(w http.ResponseWriter, r *http.Request) {
 		}
 		if fileErr == nil {
 			defer file.Close()
-			ext := filepath.Ext(fileHeader.Filename)
-			if ext == "" {
-				ext = ".mp4"
-			}
-			filename := fmt.Sprintf("vid_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
-			uploadsDir := getUploadsDir()
-			destPath := filepath.Join(uploadsDir, "videos", filename)
-			out, createErr := os.Create(destPath)
-			if createErr == nil {
-				defer out.Close()
-				_, _ = io.Copy(out, file)
-				videoUrl = "/uploads/videos/" + filename
-			} else {
-				log.Printf("⚠️ Ошибка сохранения видеофайла: %v", createErr)
+			fileBytes, readErr := io.ReadAll(file)
+			if readErr == nil && len(fileBytes) > 0 {
+				ext := filepath.Ext(fileHeader.Filename)
+				if ext == "" {
+					ext = ".mp4"
+				}
+				filename := fmt.Sprintf("vid_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
+				uploadsDir := getUploadsDir()
+				destPath := filepath.Join(uploadsDir, "videos", filename)
+				if writeErr := os.WriteFile(destPath, fileBytes, 0644); writeErr == nil {
+					videoUrl = "/uploads/videos/" + filename
+				} else {
+					log.Printf("⚠️ Ошибка сохранения видеофайла: %v", writeErr)
+				}
+				cType := "video/mp4"
+				if strings.ToLower(ext) == ".webm" {
+					cType = "video/webm"
+				}
+				_ = saveMediaFile("videos/"+filename, cType, fileBytes)
 			}
 		}
 
@@ -8257,18 +8383,25 @@ func handleCreateVideo(w http.ResponseWriter, r *http.Request) {
 		}
 		if thumbErr == nil {
 			defer thumbFile.Close()
-			ext := filepath.Ext(thumbHeader.Filename)
-			if ext == "" {
-				ext = ".jpg"
-			}
-			thumbFilename := fmt.Sprintf("thumb_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
-			uploadsDir := getUploadsDir()
-			destPath := filepath.Join(uploadsDir, "thumbnails", thumbFilename)
-			out, createErr := os.Create(destPath)
-			if createErr == nil {
-				defer out.Close()
-				_, _ = io.Copy(out, thumbFile)
-				thumbUrl = "/uploads/thumbnails/" + thumbFilename
+			thumbBytes, readErr := io.ReadAll(thumbFile)
+			if readErr == nil && len(thumbBytes) > 0 {
+				ext := filepath.Ext(thumbHeader.Filename)
+				if ext == "" {
+					ext = ".jpg"
+				}
+				thumbFilename := fmt.Sprintf("thumb_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
+				uploadsDir := getUploadsDir()
+				destPath := filepath.Join(uploadsDir, "thumbnails", thumbFilename)
+				if writeErr := os.WriteFile(destPath, thumbBytes, 0644); writeErr == nil {
+					thumbUrl = "/uploads/thumbnails/" + thumbFilename
+				}
+				cType := "image/jpeg"
+				if strings.ToLower(ext) == ".png" {
+					cType = "image/png"
+				} else if strings.ToLower(ext) == ".webp" {
+					cType = "image/webp"
+				}
+				_ = saveMediaFile("thumbnails/"+thumbFilename, cType, thumbBytes)
 			}
 		}
 	} else {
@@ -8348,7 +8481,17 @@ func handleDeleteVideo(w http.ResponseWriter, r *http.Request) {
 	dbConn := db
 	dbMu.RUnlock()
 	if dbConn != nil {
+		var vUrl, tUrl string
+		_ = dbConn.QueryRow(`SELECT video_url, thumbnail FROM videos WHERE id = $1 AND user_id = $2`, videoID, claims.UserID).Scan(&vUrl, &tUrl)
 		_, _ = dbConn.Exec(`DELETE FROM videos WHERE id = $1 AND user_id = $2`, videoID, claims.UserID)
+		if vUrl != "" {
+			sub := strings.TrimPrefix(vUrl, "/uploads/")
+			_, _ = dbConn.Exec(`DELETE FROM media_files WHERE id = $1 OR id = $2`, sub, filepath.Base(sub))
+		}
+		if tUrl != "" {
+			sub := strings.TrimPrefix(tUrl, "/uploads/")
+			_, _ = dbConn.Exec(`DELETE FROM media_files WHERE id = $1 OR id = $2`, sub, filepath.Base(sub))
+		}
 		globalCache.InvalidateTag("videos")
 	}
 	writeJSON(w, 200, Response{Status: "ok"})

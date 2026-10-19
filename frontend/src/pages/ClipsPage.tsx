@@ -68,28 +68,20 @@ export function ClipsPage() {
 
   useEffect(() => {
     let mounted = true;
+    try {
+      localStorage.removeItem('newage_clips_state');
+    } catch (_) {}
+
     api.clips.list().then((data) => {
       if (mounted) {
-        const saved = localStorage.getItem('newage_clips_state');
         let finalClips: Clip[] = Array.isArray(data) ? data : [];
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed)) {
-              const ids = new Set(finalClips.map((c: Clip) => c.id));
-              const missing = parsed.filter((c: Clip) => !ids.has(c.id));
-              finalClips = [...finalClips, ...missing];
-            }
-          } catch (e) {
-            console.error('Failed to parse saved clips', e);
-          }
-        }
         
-        // Удаляем битые (blob:) ссылки и тестовые фейковые клипы
+        // Удаляем битые (blob:) ссылки, тестовые фейковые клипы и потерянные видеофайлы
         finalClips = finalClips.filter(c => 
           c && c.videoUrl && 
           !c.videoUrl.startsWith('blob:') && 
           !c.videoUrl.includes('googleapis.com/sample') &&
+          !c.videoUrl.includes('clip_1792408583_4c824401') &&
           !c.id.startsWith('clip_zen_')
         );
 
@@ -290,10 +282,6 @@ export function ClipsPage() {
 
   const feedRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
-
-  useEffect(() => {
-    localStorage.setItem('newage_clips_state', JSON.stringify(clips));
-  }, [clips]);
 
   useEffect(() => {
     const currentClip = clips[activeIndex];
@@ -942,20 +930,49 @@ export function ClipsPage() {
                     <div className="clip-video-error-fallback">
                       <Video size={42} className="clip-error-icon" />
                       <p>Видео обрабатывается или временно недоступно</p>
-                      <button 
-                        type="button" 
-                        className="clip-retry-play-btn" 
-                        onClick={() => {
-                          setFailedVideoIds(prev => ({ ...prev, [clip.id]: false }));
-                          const vid = videoRefs.current[clip.id];
-                          if (vid) {
-                            vid.load();
-                            vid.play().catch(console.warn);
-                          }
-                        }}
-                      >
-                        Повторить
-                      </button>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '6px' }}>
+                        <button 
+                          type="button" 
+                          className="clip-retry-play-btn" 
+                          onClick={() => {
+                            setFailedVideoIds(prev => ({ ...prev, [clip.id]: false }));
+                            const vid = videoRefs.current[clip.id];
+                            if (vid) {
+                              vid.load();
+                              vid.play().catch(console.warn);
+                            }
+                          }}
+                        >
+                          Повторить
+                        </button>
+                        {index < displayedClips.length - 1 && (
+                          <button
+                            type="button"
+                            className="clip-retry-play-btn"
+                            style={{ background: 'rgba(255,255,255,0.18)', borderColor: 'rgba(255,255,255,0.25)' }}
+                            onClick={() => {
+                              if (feedRef.current) {
+                                feedRef.current.scrollTo({
+                                  top: (index + 1) * feedRef.current.clientHeight,
+                                  behavior: 'smooth'
+                                });
+                              }
+                            }}
+                          >
+                            Следующий клип
+                          </button>
+                        )}
+                        {isMyClip(clip) && (
+                          <button
+                            type="button"
+                            className="clip-retry-play-btn"
+                            style={{ background: 'rgba(239, 68, 68, 0.3)', borderColor: 'rgba(239, 68, 68, 0.6)', color: '#fca5a5' }}
+                            onClick={() => setDeleteConfirmClip(clip)}
+                          >
+                            Удалить клип
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
 
