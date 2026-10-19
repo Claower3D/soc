@@ -88,7 +88,7 @@ export function ChannelPage() {
   }, [isMe, channelUser.id, channelUser.name]);
   const [videoSort, setVideoSort] = useState<'newest' | 'popular'>('newest');
   const [isSubscribed, setIsSubscribed] = useState(channelUser.isFollowed ?? false);
-  const [subsCount, setSubsCount] = useState(channelUser.followersCount || 14200);
+  const [subsCount, setSubsCount] = useState(channelUser.followersCount || 0);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isEditChannelOpen, setIsEditChannelOpen] = useState(false);

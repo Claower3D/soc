@@ -490,6 +490,30 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 			PRIMARY KEY (story_id, user_id)
 		);
 
+		ALTER TABLE clips ADD COLUMN IF NOT EXISTS shares_count INT DEFAULT 0;
+		ALTER TABLE clips ADD COLUMN IF NOT EXISTS views_count BIGINT DEFAULT 0;
+		ALTER TABLE clips ADD COLUMN IF NOT EXISTS comments_count INT DEFAULT 0;
+		ALTER TABLE clips ADD COLUMN IF NOT EXISTS likes_count INT DEFAULT 0;
+		ALTER TABLE videos ADD COLUMN IF NOT EXISTS views_count BIGINT DEFAULT 0;
+		ALTER TABLE videos ADD COLUMN IF NOT EXISTS likes_count INT DEFAULT 0;
+
+		CREATE TABLE IF NOT EXISTS clip_likes (
+			clip_id VARCHAR(64) NOT NULL,
+			user_id VARCHAR(64) NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			PRIMARY KEY (clip_id, user_id)
+		);
+
+		CREATE TABLE IF NOT EXISTS clip_comments (
+			id VARCHAR(64) PRIMARY KEY,
+			clip_id VARCHAR(64) NOT NULL,
+			user_id VARCHAR(64) NOT NULL,
+			text TEXT NOT NULL,
+			likes_count INT DEFAULT 0,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_clip_comments_clip ON clip_comments(clip_id);
+
 		-- Очистка битых (blob:) и фейковых тестовых видео и клипов
 		DELETE FROM clips WHERE video_url LIKE 'blob:%' OR video_url LIKE '%googleapis.com/sample%';
 		DELETE FROM videos WHERE video_url LIKE 'blob:%' OR video_url LIKE '%googleapis.com/sample%';
@@ -1193,9 +1217,14 @@ func main() {
 	mux.HandleFunc("POST /api/clips", handleCreateClip)
 	mux.HandleFunc("POST /api/clips/{id}/like", handleLikeClip)
 	mux.HandleFunc("POST /api/clips/{id}/view", handleViewClip)
+	mux.HandleFunc("POST /api/clips/{id}/share", handleShareClip)
+	mux.HandleFunc("GET /api/clips/{id}/comments", handleGetClipComments)
+	mux.HandleFunc("POST /api/clips/{id}/comments", handleCreateClipComment)
 	mux.HandleFunc("DELETE /api/clips/{id}", handleDeleteClip)
 	mux.HandleFunc("PUT /api/clips/{id}", handleUpdateClip)
 	mux.HandleFunc("PUT /api/videos/{id}", handleUpdateVideo)
+	mux.HandleFunc("POST /api/videos/{id}/like", handleLikeVideo)
+	mux.HandleFunc("POST /api/videos/{id}/view", handleViewVideo)
 
 	// DB Admin эндпоинты
 	mux.HandleFunc("GET /api/admin/db-status", handleDBStatus)
@@ -1998,16 +2027,36 @@ func handleUserPosts(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: userPosts})
 }
 
+func formatViewsCount(count int) string {
+	if count >= 1000000 {
+		return fmt.Sprintf("%.1fM просмотров", float64(count)/1000000.0)
+	}
+	if count >= 1000 {
+		return fmt.Sprintf("%.1fK просмотров", float64(count)/1000.0)
+	}
+	if count == 1 {
+		return "1 просмотр"
+	}
+	if count >= 2 && count <= 4 {
+		return fmt.Sprintf("%d просмотра", count)
+	}
+	return fmt.Sprintf("%d просмотров", count)
+}
+
 func handleVideos(w http.ResponseWriter, r *http.Request) {
 	if cached, ok := globalCache.Get("api:videos"); ok && cached != nil {
 		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: cached})
 		return
 	}
 	videos := make([]map[string]interface{}, 0)
-	if db != nil {
-		rows, err := db.Query(`
-			SELECT v.id, v.title, v.description, v.thumbnail, v.video_url, v.duration, v.views_count, v.likes_count, v.created_at,
-				u.id, u.name, u.username, u.avatar
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn != nil {
+		rows, err := dbConn.Query(`
+			SELECT v.id, v.title, v.description, v.thumbnail, v.video_url, v.duration, 
+				COALESCE(v.views_count, 0), COALESCE(v.likes_count, 0), v.created_at,
+				u.id, u.name, u.username, COALESCE(u.avatar, ''), COALESCE(u.followers_count, 0)
 			FROM videos v JOIN users u ON v.user_id = u.id
 			WHERE v.video_url NOT LIKE 'blob:%' AND v.video_url NOT LIKE '%googleapis.com/sample%'
 			ORDER BY v.created_at DESC LIMIT 50
@@ -2016,17 +2065,22 @@ func handleVideos(w http.ResponseWriter, r *http.Request) {
 			defer rows.Close()
 			for rows.Next() {
 				var id, title, desc, thumb, videoUrl, duration, userId, userName, userUsername, userAvatar string
-				var viewsCount, likesCount int
+				var viewsCount, likesCount, followersCount int
 				var createdAt time.Time
-				if err := rows.Scan(&id, &title, &desc, &thumb, &videoUrl, &duration, &viewsCount, &likesCount, &createdAt, &userId, &userName, &userUsername, &userAvatar); err == nil {
+				if err := rows.Scan(&id, &title, &desc, &thumb, &videoUrl, &duration, &viewsCount, &likesCount, &createdAt, &userId, &userName, &userUsername, &userAvatar, &followersCount); err == nil {
 					videos = append(videos, map[string]interface{}{
 						"id": id, "title": title, "description": desc,
 						"thumbnail": thumb, "videoUrl": videoUrl,
 						"duration": duration,
-						"views": fmt.Sprintf("%dK просмотров", viewsCount/1000),
+						"views": formatViewsCount(viewsCount),
+						"viewsCount": viewsCount,
 						"likes": likesCount,
+						"likesCount": likesCount,
 						"timeAgo": formatTimeAgo(createdAt),
-						"channel": map[string]interface{}{"id": userId, "name": userName, "username": userUsername, "avatar": userAvatar},
+						"channel": map[string]interface{}{
+							"id": userId, "name": userName, "username": userUsername, 
+							"avatar": userAvatar, "followersCount": followersCount,
+						},
 					})
 				}
 			}
@@ -5053,9 +5107,22 @@ func handleStories(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleClips(w http.ResponseWriter, r *http.Request) {
-	if db != nil {
-		rows, err := db.Query(`
-			SELECT c.id, c.video_url, COALESCE(c.poster, ''), COALESCE(c.caption, ''), COALESCE(c.likes_count, 0), COALESCE(c.views_count, 0), COALESCE(c.comments_count, 0), c.created_at,
+	currentUserID := ""
+	token := extractBearerToken(r)
+	if claims, err := parseAndValidateJWT(token); err == nil && claims != nil {
+		currentUserID = claims.UserID
+	}
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+
+	if dbConn != nil {
+		rows, err := dbConn.Query(`
+			SELECT c.id, c.video_url, COALESCE(c.poster, ''), COALESCE(c.caption, ''), 
+				COALESCE(c.music_title, ''), COALESCE(c.music_author, ''),
+				COALESCE(c.likes_count, 0), COALESCE(c.views_count, 0), 
+				COALESCE(c.comments_count, 0), COALESCE(c.shares_count, 0), c.created_at,
 				u.id, u.name, u.username, COALESCE(u.avatar, '')
 			FROM clips c JOIN users u ON c.user_id = u.id
 			WHERE c.video_url NOT LIKE 'blob:%' AND c.video_url NOT LIKE '%googleapis.com/sample%'
@@ -5065,19 +5132,29 @@ func handleClips(w http.ResponseWriter, r *http.Request) {
 			defer rows.Close()
 			var clips []map[string]interface{}
 			for rows.Next() {
-				var cid, videoUrl, poster, caption, uid, uname, uusername, uavatar string
-				var likesCount, viewsCount, commentsCount int
+				var cid, videoUrl, poster, caption, musicTitle, musicAuthor, uid, uname, uusername, uavatar string
+				var likesCount, commentsCount, sharesCount int
+				var viewsCount int64
 				var createdAt time.Time
-				if rows.Scan(&cid, &videoUrl, &poster, &caption, &likesCount, &viewsCount, &commentsCount, &createdAt, &uid, &uname, &uusername, &uavatar) == nil {
+				if rows.Scan(&cid, &videoUrl, &poster, &caption, &musicTitle, &musicAuthor, &likesCount, &viewsCount, &commentsCount, &sharesCount, &createdAt, &uid, &uname, &uusername, &uavatar) == nil {
+					isLiked := false
+					if currentUserID != "" {
+						_ = dbConn.QueryRow(`SELECT EXISTS(SELECT 1 FROM clip_likes WHERE clip_id = $1 AND user_id = $2)`, cid, currentUserID).Scan(&isLiked)
+					}
 					clips = append(clips, map[string]interface{}{
 						"id":            cid,
 						"videoUrl":      videoUrl,
 						"poster":        poster,
 						"caption":       caption,
+						"musicTitle":    musicTitle,
+						"musicAuthor":   musicAuthor,
 						"likesCount":    likesCount,
 						"viewsCount":    viewsCount,
 						"commentsCount": commentsCount,
-						"sharesCount":   0,
+						"sharesCount":   sharesCount,
+						"isLiked":       isLiked,
+						"createdAt":     createdAt,
+						"timeAgo":       formatTimeAgo(createdAt),
 						"user": map[string]interface{}{
 							"id":       uid,
 							"name":     uname,
@@ -8280,7 +8357,7 @@ func handleDeleteVideo(w http.ResponseWriter, r *http.Request) {
 // POST /api/clips/{id}/like — toggle like
 func handleLikeClip(w http.ResponseWriter, r *http.Request) {
 	token := extractBearerToken(r)
-	_, err := parseAndValidateJWT(token)
+	claims, err := parseAndValidateJWT(token)
 	if err != nil {
 		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
 		return
@@ -8296,9 +8373,27 @@ func handleLikeClip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbConn.Exec(`UPDATE clips SET likes_count = likes_count + 1 WHERE id = $1`, clipID)
+	var exists bool
+	_ = dbConn.QueryRow(`SELECT EXISTS(SELECT 1 FROM clip_likes WHERE clip_id = $1 AND user_id = $2)`, clipID, claims.UserID).Scan(&exists)
 
-	writeJSON(w, 200, Response{Status: "ok"})
+	liked := false
+	if exists {
+		dbConn.Exec(`DELETE FROM clip_likes WHERE clip_id = $1 AND user_id = $2`, clipID, claims.UserID)
+		dbConn.Exec(`UPDATE clips SET likes_count = GREATEST(0, likes_count - 1) WHERE id = $1`, clipID)
+		liked = false
+	} else {
+		dbConn.Exec(`INSERT INTO clip_likes (clip_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, clipID, claims.UserID)
+		dbConn.Exec(`UPDATE clips SET likes_count = likes_count + 1 WHERE id = $1`, clipID)
+		liked = true
+	}
+
+	var newLikes int
+	_ = dbConn.QueryRow(`SELECT COALESCE(likes_count, 0) FROM clips WHERE id = $1`, clipID).Scan(&newLikes)
+
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
+		"liked": liked,
+		"likesCount": newLikes,
+	}})
 }
 
 // POST /api/clips/{id}/view — record view
@@ -8315,6 +8410,174 @@ func handleViewClip(w http.ResponseWriter, r *http.Request) {
 
 	dbConn.Exec(`UPDATE clips SET views_count = views_count + 1 WHERE id = $1`, clipID)
 
+	var views int64
+	_ = dbConn.QueryRow(`SELECT COALESCE(views_count, 0) FROM clips WHERE id = $1`, clipID).Scan(&views)
+
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
+		"viewsCount": views,
+	}})
+}
+
+// POST /api/clips/{id}/share — record share
+func handleShareClip(w http.ResponseWriter, r *http.Request) {
+	clipID := r.PathValue("id")
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	dbConn.Exec(`UPDATE clips SET shares_count = shares_count + 1 WHERE id = $1`, clipID)
+
+	var shares int
+	_ = dbConn.QueryRow(`SELECT COALESCE(shares_count, 0) FROM clips WHERE id = $1`, clipID).Scan(&shares)
+
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
+		"sharesCount": shares,
+	}})
+}
+
+// GET /api/clips/{id}/comments — get clip comments
+func handleGetClipComments(w http.ResponseWriter, r *http.Request) {
+	clipID := r.PathValue("id")
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 200, Response{Status: "ok", Data: []interface{}{}})
+		return
+	}
+
+	rows, err := dbConn.Query(`
+		SELECT cc.id, cc.text, cc.likes_count, cc.created_at,
+		       u.id, u.name, u.username, COALESCE(u.avatar, '')
+		FROM clip_comments cc
+		JOIN users u ON cc.user_id = u.id
+		WHERE cc.clip_id = $1
+		ORDER BY cc.created_at DESC
+		LIMIT 100
+	`, clipID)
+	if err != nil {
+		writeJSON(w, 200, Response{Status: "ok", Data: []interface{}{}})
+		return
+	}
+	defer rows.Close()
+
+	var comments []map[string]interface{}
+	for rows.Next() {
+		var cid, text, uid, uname, uusername, uavatar string
+		var likes int
+		var createdAt time.Time
+		if rows.Scan(&cid, &text, &likes, &createdAt, &uid, &uname, &uusername, &uavatar) == nil {
+			comments = append(comments, map[string]interface{}{
+				"id":        cid,
+				"text":      text,
+				"likes":     likes,
+				"createdAt": createdAt,
+				"timeAgo":   formatTimeAgo(createdAt),
+				"user": map[string]interface{}{
+					"id":       uid,
+					"name":     uname,
+					"username": uusername,
+					"avatar":   uavatar,
+				},
+			})
+		}
+	}
+	if comments == nil {
+		comments = []map[string]interface{}{}
+	}
+	writeJSON(w, 200, Response{Status: "ok", Data: comments})
+}
+
+// POST /api/clips/{id}/comments — add clip comment
+func handleCreateClipComment(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
+		return
+	}
+	clipID := r.PathValue("id")
+	var req struct {
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, Response{Status: "error", Message: "invalid json"})
+		return
+	}
+	text := strings.TrimSpace(req.Text)
+	if text == "" {
+		writeJSON(w, 400, Response{Status: "error", Message: "empty comment"})
+		return
+	}
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
+	}
+
+	commentID := "cc_" + uuid.New().String()
+	_, err = dbConn.Exec(`INSERT INTO clip_comments (id, clip_id, user_id, text) VALUES ($1, $2, $3, $4)`, commentID, clipID, claims.UserID, text)
+	if err != nil {
+		writeJSON(w, 500, Response{Status: "error", Message: err.Error()})
+		return
+	}
+	dbConn.Exec(`UPDATE clips SET comments_count = comments_count + 1 WHERE id = $1`, clipID)
+
+	var commentsCount int
+	_ = dbConn.QueryRow(`SELECT COALESCE(comments_count, 0) FROM clips WHERE id = $1`, clipID).Scan(&commentsCount)
+
+	var uname, uusername, uavatar string
+	_ = dbConn.QueryRow(`SELECT name, username, COALESCE(avatar, '') FROM users WHERE id = $1`, claims.UserID).Scan(&uname, &uusername, &uavatar)
+
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
+		"comment": map[string]interface{}{
+			"id":      commentID,
+			"text":    text,
+			"likes":   0,
+			"timeAgo": "только что",
+			"user": map[string]interface{}{
+				"id":       claims.UserID,
+				"name":     uname,
+				"username": uusername,
+				"avatar":   uavatar,
+			},
+		},
+		"commentsCount": commentsCount,
+	}})
+}
+
+// POST /api/videos/{id}/view — increment video views
+func handleViewVideo(w http.ResponseWriter, r *http.Request) {
+	videoID := r.PathValue("id")
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn != nil {
+		dbConn.Exec(`UPDATE videos SET views_count = views_count + 1 WHERE id = $1`, videoID)
+		globalCache.InvalidateTag("videos")
+	}
+	writeJSON(w, 200, Response{Status: "ok"})
+}
+
+// POST /api/videos/{id}/like — increment video likes
+func handleLikeVideo(w http.ResponseWriter, r *http.Request) {
+	videoID := r.PathValue("id")
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn != nil {
+		dbConn.Exec(`UPDATE videos SET likes_count = likes_count + 1 WHERE id = $1`, videoID)
+		globalCache.InvalidateTag("videos")
+	}
 	writeJSON(w, 200, Response{Status: "ok"})
 }
 

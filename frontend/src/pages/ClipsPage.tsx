@@ -4,7 +4,7 @@ import {
   Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, 
   Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send, Smile,
   Radio, Users, Sparkles, Flame, Video, Activity, Hash, Disc3,
-  Search, Edit3, Trash2, Flag, Link2
+  Search, Edit3, Trash2, Flag, Link2, Eye
 } from 'lucide-react';
 import { type Clip, type ClipComment } from '../data/mock';
 import { api, resolveMediaUrl } from '../api';
@@ -64,6 +64,7 @@ export function ClipsPage() {
   const [clips, setClips] = useState<Clip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [failedVideoIds, setFailedVideoIds] = useState<Record<string, boolean>>({});
+  const viewedClipsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let mounted = true;
@@ -295,7 +296,11 @@ export function ClipsPage() {
       if (!vid) return;
 
       if (clipId === currentClip.id) {
-        api.clips.view(clipId).catch(console.warn);
+        if (!viewedClipsRef.current.has(clipId)) {
+          viewedClipsRef.current.add(clipId);
+          api.clips.view(clipId).catch(console.warn);
+          setClips(prev => prev.map(c => c.id === clipId ? { ...c, viewsCount: (c.viewsCount || 0) + 1 } : c));
+        }
         vid.muted = isMuted;
         if (isPlaying) {
           vid.play().catch(() => {
@@ -374,23 +379,33 @@ export function ClipsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeIndex, commentsDrawerOpen, isPlaying, isMuted]);
 
-  const handleLike = (clipId: string) => {
+  const handleLike = async (clipId: string) => {
     if (!isAuthenticated) {
       openAuthModal('login');
       return;
     }
-    api.clips.like(clipId).catch(console.warn);
+    // Optimistic toggle first
     setClips(prev => prev.map(c => {
       if (c.id === clipId) {
         const liked = !c.isLiked;
         return {
           ...c,
           isLiked: liked,
-          likesCount: liked ? c.likesCount + 1 : Math.max(0, c.likesCount - 1)
+          likesCount: liked ? (c.likesCount || 0) + 1 : Math.max(0, (c.likesCount || 0) - 1)
         };
       }
       return c;
     }));
+
+    try {
+      const res = await api.clips.like(clipId);
+      if (res?.data) {
+        const { liked, likesCount } = res.data;
+        setClips(prev => prev.map(c => c.id === clipId ? { ...c, isLiked: liked, likesCount } : c));
+      }
+    } catch (err) {
+      console.warn('Like clip error', err);
+    }
   };
 
   const triggerSacredBurst = (emoji: string, clipId: string) => {
@@ -454,20 +469,32 @@ export function ClipsPage() {
     }));
   };
 
-  const handleShare = (clip: Clip) => {
+  const handleShare = async (clip: Clip) => {
     const url = window.location.origin + '/clips?id=' + clip.id;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url);
-      alert('Ссылка на клип скопирована!');
+    }
+    api.clips.share(clip.id).catch(console.warn);
+    setClips(prev => prev.map(c => c.id === clip.id ? { ...c, sharesCount: (c.sharesCount || 0) + 1 } : c));
+    alert('Ссылка на клип скопирована в буфер обмена!');
+  };
+
+  const openComments = async (clip: Clip) => {
+    setActiveClipForComments(clip);
+    setCommentsDrawerOpen(true);
+    try {
+      const res = await api.clips.getComments(clip.id);
+      const serverComments = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      if (serverComments.length > 0) {
+        setClips(prev => prev.map(c => c.id === clip.id ? { ...c, comments: serverComments, commentsCount: serverComments.length } : c));
+        setActiveClipForComments(prev => prev && prev.id === clip.id ? { ...prev, comments: serverComments, commentsCount: serverComments.length } : prev);
+      }
+    } catch (e) {
+      console.warn('Error loading clip comments', e);
     }
   };
 
-  const openComments = (clip: Clip) => {
-    setActiveClipForComments(clip);
-    setCommentsDrawerOpen(true);
-  };
-
-  const handleAddComment = (e: React.FormEvent) => {
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCommentText.trim() || !activeClipForComments) return;
     if (!isAuthenticated) {
@@ -475,10 +502,38 @@ export function ClipsPage() {
       return;
     }
 
+    const text = newCommentText.trim();
+    setNewCommentText('');
+
+    try {
+      const res = await api.clips.addComment(activeClipForComments.id, text);
+      if (res?.data?.comment) {
+        const addedComment = res.data.comment;
+        const totalCount = res.data.commentsCount || ((activeClipForComments.commentsCount || 0) + 1);
+        setClips(prev => prev.map(c => {
+          if (c.id === activeClipForComments.id) {
+            const updatedComments = [addedComment, ...(c.comments || [])];
+            const updatedClip = {
+              ...c,
+              comments: updatedComments,
+              commentsCount: totalCount
+            };
+            setActiveClipForComments(updatedClip);
+            return updatedClip;
+          }
+          return c;
+        }));
+        return;
+      }
+    } catch (err) {
+      console.warn('Add comment error', err);
+    }
+
+    // Optimistic fallback
     const newComment: ClipComment = {
       id: 'cc_' + Date.now(),
       user: currentUser,
-      text: newCommentText.trim(),
+      text: text,
       timeAgo: 'только что',
       likes: 0
     };
@@ -489,15 +544,13 @@ export function ClipsPage() {
         const updatedClip = {
           ...c,
           comments: updatedComments,
-          commentsCount: c.commentsCount + 1
+          commentsCount: (c.commentsCount || 0) + 1
         };
         setActiveClipForComments(updatedClip);
         return updatedClip;
       }
       return c;
     }));
-
-    setNewCommentText('');
   };
 
   const handleLikeComment = (commentId: string) => {
@@ -524,7 +577,7 @@ export function ClipsPage() {
     return num.toString();
   };
 
-  const displayedClips = clips.filter(c => {
+  let displayedClips = clips.filter(c => {
     if (activeTab === 'zen') {
       const isZen = (c.tags && c.tags.some(t => ['медитация', 'дзен', 'частота432', 'звук', 'гармония'].includes(t))) ||
         (c.caption && /медитац|дзен|432|звук|частот|гармон|поток/i.test(c.caption));
@@ -532,9 +585,6 @@ export function ClipsPage() {
     }
     if (activeTab === 'live') {
       if (!c.isLive) return false;
-    }
-    if (activeTab === 'trending') {
-      if (c.likesCount <= 10000) return false;
     }
     if (activeTab === 'my') {
       if (c.user.id !== currentUser.id) return false;
@@ -557,6 +607,13 @@ export function ClipsPage() {
     }
     return true;
   });
+
+  if (activeTab === 'trending') {
+    displayedClips = [...displayedClips].sort((a, b) => 
+      ((b.likesCount || 0) * 3 + (b.viewsCount || 0) + (b.commentsCount || 0) + (b.sharesCount || 0)) -
+      ((a.likesCount || 0) * 3 + (a.viewsCount || 0) + (a.commentsCount || 0) + (a.sharesCount || 0))
+    );
+  }
 
   if (isLoading) {
     return <div style={{ padding: '20px', color: '#fff' }}>Загрузка...</div>;
@@ -1031,7 +1088,7 @@ export function ClipsPage() {
                     >
                       <Heart size={24} fill={clip.isLiked ? '#ef4444' : 'none'} color={clip.isLiked ? '#ef4444' : '#fff'} />
                     </button>
-                    <span className="clip-action-count">{formatCount(clip.likesCount)}</span>
+                    <span className="clip-action-count">{formatCount(clip.likesCount || 0)}</span>
                   </div>
 
                   {/* Comment */}
@@ -1044,7 +1101,7 @@ export function ClipsPage() {
                     >
                       <MessageCircle size={24} color="#fff" />
                     </button>
-                    <span className="clip-action-count">{formatCount(clip.commentsCount)}</span>
+                    <span className="clip-action-count">{formatCount(clip.commentsCount || 0)}</span>
                   </div>
 
                   {/* Share / Repost */}
@@ -1057,7 +1114,15 @@ export function ClipsPage() {
                     >
                       <Share2 size={23} color="#fff" />
                     </button>
-                    <span className="clip-action-count">{clip.sharesCount || 56}</span>
+                    <span className="clip-action-count">{formatCount(clip.sharesCount || 0)}</span>
+                  </div>
+
+                  {/* Real Views counter */}
+                  <div className="clip-action-item">
+                    <div className="clip-action-btn" title="Просмотры" style={{ cursor: 'default' }}>
+                      <Eye size={23} color="#fff" />
+                    </div>
+                    <span className="clip-action-count">{formatCount(clip.viewsCount || 0)}</span>
                   </div>
 
                   {/* Save / Bookmark */}

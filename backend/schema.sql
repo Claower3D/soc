@@ -683,6 +683,23 @@ CREATE TABLE IF NOT EXISTS clips (
 
 CREATE INDEX IF NOT EXISTS idx_clips_user ON clips(user_id);
 
+CREATE TABLE IF NOT EXISTS clip_likes (
+    clip_id VARCHAR(64) NOT NULL REFERENCES clips(id) ON DELETE CASCADE,
+    user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (clip_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS clip_comments (
+    id VARCHAR(64) PRIMARY KEY,
+    clip_id VARCHAR(64) NOT NULL REFERENCES clips(id) ON DELETE CASCADE,
+    user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    likes_count INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_clip_comments_clip ON clip_comments(clip_id);
+
 -- Подкасты
 CREATE TABLE IF NOT EXISTS podcasts (
     id VARCHAR(64) PRIMARY KEY,

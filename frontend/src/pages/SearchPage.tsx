@@ -303,7 +303,7 @@ export function SearchPage() {
                         <div className="account-card-details">
                           <span className="account-card-name">{user.name}</span>
                           <span className="account-card-username">@{user.username}</span>
-                          <span className="account-card-followers">{user.followersCount || 1} подписчиков</span>
+                          <span className="account-card-followers">{user.followersCount || 0} подписчиков</span>
                         </div>
                         {!isMe && (
                           <button
@@ -453,7 +453,7 @@ export function SearchPage() {
                         </div>
                         {user.bio && <p className="account-row-bio">{user.bio}</p>}
                         <div className="account-row-stats-line">
-                          <span>{user.followersCount || 1} подписчиков</span>
+                          <span>{user.followersCount || 0} подписчиков</span>
                           <span>•</span>
                           <span>{user.postsCount || 0} публикаций</span>
                         </div>

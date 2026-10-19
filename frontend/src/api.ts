@@ -171,7 +171,9 @@ export const api = {
       return apiFetch<any>('/api/videos', { method: 'POST', body: JSON.stringify(data) });
     },
     delete: (id: string) => apiFetch<any>(`/api/videos/${id}`, { method: 'DELETE' }),
-    update: (id: string, data: { title?: string; description?: string; category?: string }) => apiFetch<any>(`/api/videos/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+    update: (id: string, data: { title?: string; description?: string; category?: string }) => apiFetch<any>(`/api/videos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    like: (id: string) => apiFetch<any>(`/api/videos/${id}/like`, { method: 'POST' }),
+    view: (id: string) => apiFetch<any>(`/api/videos/${id}/view`, { method: 'POST' })
   },
   clips: {
     list: () => apiFetch<any>('/api/clips'),
@@ -184,7 +186,10 @@ export const api = {
     delete: (id: string) => apiFetch<any>(`/api/clips/${id}`, { method: 'DELETE' }),
     update: (id: string, data: { caption?: string; soundTitle?: string }) => apiFetch<any>(`/api/clips/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     like: (id: string) => apiFetch<any>(`/api/clips/${id}/like`, { method: 'POST' }),
-    view: (id: string) => apiFetch<any>(`/api/clips/${id}/view`, { method: 'POST' })
+    view: (id: string) => apiFetch<any>(`/api/clips/${id}/view`, { method: 'POST' }),
+    share: (id: string) => apiFetch<any>(`/api/clips/${id}/share`, { method: 'POST' }),
+    getComments: (id: string) => apiFetch<any>(`/api/clips/${id}/comments`),
+    addComment: (id: string, text: string) => apiFetch<any>(`/api/clips/${id}/comments`, { method: 'POST', body: JSON.stringify({ text }) })
   },
   chats: {
     list: () => apiFetch<any>('/api/chats'),

@@ -143,12 +143,21 @@ export function VideoPlayer({ video, onUpdateVideo, onDeleteVideo, isKidsMode }:
     }
   };
 
+  useEffect(() => {
+    if (video?.id) {
+      api.videos.view(video.id).catch(console.warn);
+    }
+  }, [video?.id]);
+
   const handleToggleLike = () => {
     if (liked) {
       setLiked(false);
     } else {
       setLiked(true);
       setDisliked(false);
+      if (video?.id) {
+        api.videos.like(video.id).catch(console.warn);
+      }
     }
   };
 
@@ -283,7 +292,7 @@ export function VideoPlayer({ video, onUpdateVideo, onDeleteVideo, isKidsMode }:
             <img src={video.channel.avatar} alt={video.channel.name} className="channel-avatar" />
             <div className="channel-text">
               <span className="channel-name">{video.channel.name}</span>
-              <span className="channel-subs">{(video.channel.followersCount || 12400).toLocaleString('ru-RU')} подписчиков</span>
+              <span className="channel-subs">{(video.channel.followersCount || 0).toLocaleString('ru-RU')} подписчиков</span>
             </div>
             <button
               className={`channel-sub-btn ${isSubscribed ? 'subscribed' : ''}`}
@@ -312,7 +321,7 @@ export function VideoPlayer({ video, onUpdateVideo, onDeleteVideo, isKidsMode }:
                 onClick={handleToggleLike}
               >
                 <ThumbsUp size={16} fill={liked ? 'currentColor' : 'none'} />
-                <span>{liked ? (video.likesCount || 1400) + 1 : (video.likesCount || 1400)}</span>
+                <span>{liked ? (video.likesCount || 0) + 1 : (video.likesCount || 0)}</span>
               </button>
               <div className="pill-divider" />
               <button 
@@ -464,7 +473,7 @@ export function VideoPlayer({ video, onUpdateVideo, onDeleteVideo, isKidsMode }:
           <div className="video-stream-chat-wrapper">
             <StreamChat 
               initialMessages={video.streamChat || []} 
-              viewersCount={video.viewersCount || 14200}
+              viewersCount={video.viewersCount || 0}
               channelName={video.channel.name}
             />
           </div>
