@@ -368,14 +368,30 @@ export function ClipsPage() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (commentsDrawerOpen) return;
+      // Do not intercept keyboard shortcuts when typing in inputs, textareas or when any modal/drawer is active
+      const target = e.target as HTMLElement | null;
+      if (
+        target && (
+          target.tagName === 'INPUT' || 
+          target.tagName === 'TEXTAREA' || 
+          target.isContentEditable || 
+          target.closest('input, textarea, [contenteditable="true"]')
+        )
+      ) {
+        return;
+      }
+
+      if (commentsDrawerOpen || uploadModalOpen || Boolean(editingClip) || Boolean(deleteConfirmClip)) {
+        return;
+      }
+
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         scrollToClip(activeIndex + 1);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         scrollToClip(activeIndex - 1);
-      } else if (e.key === ' ') {
+      } else if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         togglePlayPause();
       } else if (e.key === 'm' || e.key === 'M') {
@@ -385,7 +401,7 @@ export function ClipsPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeIndex, commentsDrawerOpen, isPlaying, isMuted]);
+  }, [activeIndex, commentsDrawerOpen, uploadModalOpen, editingClip, deleteConfirmClip, isPlaying, isMuted]);
 
   const handleLike = async (clipId: string) => {
     if (!isAuthenticated) {

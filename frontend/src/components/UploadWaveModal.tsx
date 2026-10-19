@@ -70,6 +70,7 @@ export function UploadWaveModal({
           placeholder="Описание волны... (необязательно, можно с #тегами)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+          onKeyDown={(e) => e.stopPropagation()}
           disabled={isPublishing}
         />
 
