@@ -1292,34 +1292,9 @@
   transform: scale(0.98);
 }
 
-/* Floating Action Button (Mobile) */
+/* Floating Action Button (Mobile) - moved to center bottom-nav */
 .clips-mobile-fab-btn {
-  display: none;
-  position: absolute;
-  bottom: 24px;
-  right: 20px;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #8b5cf6, #ec4899);
-  border: none;
-  color: #ffffff;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.6);
-  cursor: pointer;
-  z-index: 50;
-  transition: all 0.2s ease;
-}
-
-.clips-mobile-fab-btn:active {
-  transform: scale(0.93);
-}
-
-@media (max-width: 768px) {
-  .clips-mobile-fab-btn {
-    display: flex;
-  }
+  display: none !important;
 }
 
 /* Comments Modal / Drawer (Instagram Desktop Floating Panel - Screenshot 1) */

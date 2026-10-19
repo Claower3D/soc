@@ -1,21 +1,24 @@
-import { NavLink } from 'react-router-dom';
-import { Home, Video, MessageCircle, Layers, User, Film, Sparkles } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { Home, Video, MessageCircle, Layers, User, Sparkles, Plus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './BottomNav.css';
 
 export function BottomNav() {
   const { isAuthenticated, openAuthModal, currentUser } = useAuth();
+  const location = useLocation();
+
+  const handleClipsClick = (e: React.MouseEvent) => {
+    if (location.pathname === '/clips') {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('open_clip_upload'));
+    }
+  };
 
   return (
     <nav className="bottom-nav">
       <NavLink to="/" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`} end>
         <Home className="bottom-nav-icon" size={20} />
         <span className="bottom-nav-label">Лента</span>
-      </NavLink>
-
-      <NavLink to="/clips" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
-        <Film className="bottom-nav-icon" size={20} />
-        <span className="bottom-nav-label">Клипы</span>
       </NavLink>
 
       <NavLink to="/spiritual" className={({ isActive }) => `bottom-nav-item bottom-nav-spiritual ${isActive ? 'active' : ''}`}>
@@ -26,6 +29,19 @@ export function BottomNav() {
       <NavLink to="/video" className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}>
         <Video className="bottom-nav-icon" size={20} />
         <span className="bottom-nav-label">Видео</span>
+      </NavLink>
+
+      {/* Клипы в центре со стильной кнопкой + */}
+      <NavLink 
+        to="/clips" 
+        onClick={handleClipsClick}
+        className={({ isActive }) => `bottom-nav-item bottom-nav-center-item ${isActive ? 'active' : ''}`}
+        title="Клипы и публикация"
+      >
+        <div className="bottom-nav-center-fab">
+          <Plus size={22} color="#ffffff" strokeWidth={2.8} />
+        </div>
+        <span className="bottom-nav-label">Клипы</span>
       </NavLink>
 
       {isAuthenticated ? (

@@ -213,6 +213,14 @@ export function ClipsPage() {
     uploadInputRef.current?.click();
   };
 
+  useEffect(() => {
+    const handleOpenUploadEvent = () => {
+      handleTriggerUpload();
+    };
+    window.addEventListener('open_clip_upload', handleOpenUploadEvent);
+    return () => window.removeEventListener('open_clip_upload', handleOpenUploadEvent);
+  }, [isAuthenticated]);
+
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -1490,15 +1498,6 @@ export function ClipsPage() {
       )}
 
 
-      {/* Floating Action Button for quick upload */}
-      <button 
-        type="button" 
-        className="clips-mobile-fab-btn"
-        onClick={handleTriggerUpload}
-        title="Загрузить клип"
-      >
-        <Plus size={24} />
-      </button>
     </div>
   );
 }
