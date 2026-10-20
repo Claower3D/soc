@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles, Globe, Languages, Check, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles, Globe, Languages, Check, ChevronDown, Play, Download, Disc, Film } from 'lucide-react';
 import { type Chat, type Message } from '../data/mock';
 import { formatLastSeen } from '../utils/onlineStatus';
 import { API_BASE_URL } from '../api';
 import { WORLD_LANGUAGES, POPULAR_LANG_CODES, translateText, playVoiceSpeech } from '../utils/translator';
+import { downloadRecordingFile } from '../utils/conferenceManager';
 import './ChatWindowNew.css';
 
 
@@ -430,6 +431,7 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
 
   const [isRecording, setIsRecording] = useState(false);
+  const [selectedConfRec, setSelectedConfRec] = useState<{ title: string; duration: string; videoUrl: string; date: string } | null>(null);
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2612,6 +2614,74 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
                   )}
 
 
+                  {/* Conference Recording Video Card */}
+                  {msg.conferenceRecording && (
+                    <div className="cw-conf-rec-card">
+                      <div 
+                        className="cw-conf-rec-thumb"
+                        onClick={() => setSelectedConfRec({
+                          title: msg.conferenceRecording?.title || 'Запись конференции',
+                          duration: msg.conferenceRecording?.duration || '14:28',
+                          videoUrl: (msg.conferenceRecording as any)?.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                          date: msg.conferenceRecording?.date || 'Сегодня',
+                        })}
+                      >
+                        <img 
+                          src={(msg.conferenceRecording as any)?.thumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80'} 
+                          alt="Запись" 
+                        />
+                        <span className="cw-conf-rec-hd-badge">REC · 1080p</span>
+                        <span className="cw-conf-rec-dur-badge">{msg.conferenceRecording.duration}</span>
+                        <div className="cw-conf-rec-play-overlay">
+                          <Play size={24} fill="currentColor" />
+                        </div>
+                      </div>
+
+                      <div className="cw-conf-rec-body">
+                        <div className="cw-conf-rec-header">
+                          <Disc size={15} className="cw-conf-rec-icon" />
+                          <span className="cw-conf-rec-tag">Запись видеоконференции</span>
+                        </div>
+                        <h4 className="cw-conf-rec-title">{msg.conferenceRecording.title}</h4>
+                        <div className="cw-conf-rec-meta">
+                          <span>{msg.conferenceRecording.date}</span>
+                          <span>•</span>
+                          <span>{msg.conferenceRecording.duration}</span>
+                          <span>•</span>
+                          <span>Код: {msg.conferenceRecording.code}</span>
+                        </div>
+                        <div className="cw-conf-rec-actions">
+                          <button
+                            type="button"
+                            className="cw-conf-rec-btn-watch"
+                            onClick={() => setSelectedConfRec({
+                              title: msg.conferenceRecording?.title || 'Запись конференции',
+                              duration: msg.conferenceRecording?.duration || '14:28',
+                              videoUrl: (msg.conferenceRecording as any)?.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                              date: msg.conferenceRecording?.date || 'Сегодня',
+                            })}
+                          >
+                            <Play size={13} fill="currentColor" /> Смотреть
+                          </button>
+                          <button
+                            type="button"
+                            className="cw-conf-rec-btn-download"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadRecordingFile(
+                                (msg.conferenceRecording as any)?.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                                msg.conferenceRecording?.title || 'conference'
+                              );
+                            }}
+                            title="Скачать видеозапись"
+                          >
+                            <Download size={13} /> Скачать
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {msg.mediaType === 'voice' ? (
                     <VoiceMessageBubble msg={msg} isMe={isMe} />
                   ) : (
@@ -3447,7 +3517,56 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
       </div>
 
-
+      {/* Conference Recording Video Player Modal */}
+      {selectedConfRec && (
+        <div className="tg-rec-modal-overlay" onClick={() => setSelectedConfRec(null)}>
+          <div className="tg-rec-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="tg-rec-modal-header">
+              <div className="tg-rec-modal-title-col">
+                <span className="tg-rec-modal-badge"><Film size={13} /> Запись видеоконференции</span>
+                <h3>{selectedConfRec.title}</h3>
+              </div>
+              <button className="modal-close-icon" onClick={() => setSelectedConfRec(null)} title="Закрыть">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="tg-rec-modal-player">
+              <video 
+                src={selectedConfRec.videoUrl} 
+                controls 
+                autoPlay 
+                playsInline 
+                className="tg-rec-real-video"
+              />
+            </div>
+            <div className="tg-rec-modal-footer">
+              <div className="tg-rec-meta-info">
+                <span>Длительность: <strong>{selectedConfRec.duration}</strong></span>
+                <span className="meta-dot">•</span>
+                <span>Формат: <strong>Full HD 1080p</strong></span>
+                <span className="meta-dot">•</span>
+                <span>{selectedConfRec.date}</span>
+              </div>
+              <div className="tg-rec-modal-actions">
+                <button 
+                  type="button" 
+                  className="btn-download-rec"
+                  onClick={() => downloadRecordingFile(selectedConfRec.videoUrl, selectedConfRec.title)}
+                >
+                  <Download size={15} /> Скачать MP4
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-close-rec" 
+                  onClick={() => setSelectedConfRec(null)}
+                >
+                  Закрыть
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
 
 

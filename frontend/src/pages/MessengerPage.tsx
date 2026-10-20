@@ -71,7 +71,7 @@ export function MessengerPage() {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
             userChats = parsed
-              .filter((c: any) => c && c.id && c.user && typeof c.user === 'object' && typeof c.user.name === 'string')
+              .filter((c: any) => c && c.id && (c.isGroup || (c.user && typeof c.user === 'object' && typeof c.user.name === 'string')))
               .map((c: any) => {
                 const isOracle = c.id === 'chat_ai_oracle' || c.id === 'ai_guru_bot';
                 return {
@@ -80,9 +80,9 @@ export function MessengerPage() {
                   time: String(c.time || ''),
                   user: {
                     ...c.user,
-                    name: String(c.user.name || ''),
-                    username: String(c.user.username || ''),
-                    avatar: String(c.user.avatar || ''),
+                    name: String(c.user?.name || c.groupTitle || 'Группа'),
+                    username: String(c.user?.username || c.id || ''),
+                    avatar: String(c.user?.avatar || c.groupAvatar || ''),
                     online: isOracle ? true : Boolean(c.user?.online),
                     lastSeen: c.user?.lastSeen,
                     lastSeenText: c.user?.lastSeenText,
@@ -117,6 +117,13 @@ export function MessengerPage() {
       }
     };
 
+    // Слушаем внешние события обновления чатов (например, завершение конференции)
+    const handleStorageOrUpdate = () => {
+      if (mounted) loadChats();
+    };
+    window.addEventListener('newage_chats_updated', handleStorageOrUpdate);
+    window.addEventListener('storage', handleStorageOrUpdate);
+
     // Пробуем получить список чатов с сервера
     api.chats.list().then((data) => {
       if (mounted) {
@@ -142,20 +149,21 @@ export function MessengerPage() {
             time: String(c.time || 'Сейчас'),
           })).filter((c: any) => c.id);
 
-          // Проверяем наличие личного ИИ чата из локального хранилища этого аккаунта
-          let existingAiChat: Chat | undefined;
+          // Сохраняем локальные группы и ИИ чат
+          let localGroupsAndAi: Chat[] = [];
           const saved = localStorage.getItem(CHATS_STORAGE_KEY);
           if (saved) {
             try {
               const parsed = JSON.parse(saved);
               if (Array.isArray(parsed)) {
-                existingAiChat = parsed.find((c: any) => c.id === 'chat_ai_oracle');
+                localGroupsAndAi = parsed.filter((c: any) => c.isGroup || c.id === 'chat_ai_oracle' || c.conferenceId);
               }
             } catch { /* ignore */ }
           }
-          const personalAi = existingAiChat || createPersonalAiChat(currentUser);
-          const chatsWithoutAi = normalized.filter((c: Chat) => c.id !== 'chat_ai_oracle');
-          const finalChats = [personalAi, ...chatsWithoutAi];
+          const personalAi = localGroupsAndAi.find(c => c.id === 'chat_ai_oracle') || createPersonalAiChat(currentUser);
+          const localGroups = localGroupsAndAi.filter(c => c.id !== 'chat_ai_oracle');
+          const serverWithoutAi = normalized.filter((c: Chat) => c.id !== 'chat_ai_oracle' && !localGroups.some(lg => lg.id === c.id));
+          const finalChats = [personalAi, ...localGroups, ...serverWithoutAi];
 
           setChatList(finalChats);
           localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(finalChats));
@@ -168,8 +176,19 @@ export function MessengerPage() {
       if (mounted) loadChats();
     });
 
-    return () => { mounted = false; };
+    return () => { 
+      mounted = false; 
+      window.removeEventListener('newage_chats_updated', handleStorageOrUpdate);
+      window.removeEventListener('storage', handleStorageOrUpdate);
+    };
   }, [currentUserId, isAuthenticated]);
+
+  // Реакция на изменение query-параметра chat
+  useEffect(() => {
+    if (requestedChatId) {
+      setActiveChatId(requestedChatId);
+    }
+  }, [requestedChatId]);
 
   // Выбор начального активного чата: только для десктопа! На мобильных устройствах пользователь сначала видит список чатов!
   useEffect(() => {

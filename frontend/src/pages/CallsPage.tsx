@@ -1,42 +1,53 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Video, Plus, Link as LinkIcon, Disc, Lock, Globe, 
   Users, Play, ShieldCheck, Copy, Check, MessageSquare, 
-  Clock, ArrowRight, Search, Trash2
+  Clock, ArrowRight, Search, Trash2, Download, Film, X
 } from 'lucide-react';
 import { CallGrid } from '../components/CallGrid';
 import { CreateConferenceModal } from '../components/CreateConferenceModal';
 import { 
-  initialConferences, initialRecordings, initialChats, 
-  currentUser, type Conference, type Chat 
+  initialConferences, 
+  currentUser, type Conference 
 } from '../data/mock';
+import { 
+  getStoredConferenceRecordings, 
+  deleteConferenceRecording, 
+  saveConferenceGroupChat,
+  downloadRecordingFile,
+  type ConferenceRecordingItem 
+} from '../utils/conferenceManager';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
 import './CallsPage.css';
-interface Recording {
-  id: string;
-  title: string;
-  date: string;
-  duration: string;
-  participantsCount: number;
-  thumbnail: string;
-  chatGroupId: string;
-}
 
 export function ConferencesPage() {
   const navigate = useNavigate();
   const { currentUser: authUser, isAuthenticated, openAuthModal } = useAuth();
   const effectiveUser = authUser || currentUser;
   const [conferences, setConferences] = useState<Conference[]>(initialConferences);
-  const [recordings, setRecordings] = useState<Recording[]>(initialRecordings as any);
+  const [recordings, setRecordings] = useState<ConferenceRecordingItem[]>(() => getStoredConferenceRecordings());
   const [activeTab, setActiveTab] = useState<'all' | 'open' | 'private' | 'recordings'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeConference, setActiveConference] = useState<Conference | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [previewRecording, setPreviewRecording] = useState<{ title: string; duration: string } | null>(null);
+  const [previewRecording, setPreviewRecording] = useState<ConferenceRecordingItem | null>(null);
+
+  // Sync recordings with localStorage on custom events
+  useEffect(() => {
+    const handleRecsUpdate = () => {
+      setRecordings(getStoredConferenceRecordings());
+    };
+    window.addEventListener('newage_recordings_updated', handleRecsUpdate);
+    window.addEventListener('storage', handleRecsUpdate);
+    return () => {
+      window.removeEventListener('newage_recordings_updated', handleRecsUpdate);
+      window.removeEventListener('storage', handleRecsUpdate);
+    };
+  }, []);
 
   const handleDeleteConference = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -45,6 +56,7 @@ export function ConferencesPage() {
 
   const handleDeleteRecording = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    deleteConferenceRecording(id);
     setRecordings(prev => prev.filter(r => r.id !== id));
   };
 
@@ -54,29 +66,15 @@ export function ConferencesPage() {
     
     // Auto-create Telegram group chat for this conference if enabled
     if (autoCreateGroup) {
-      const newGroupChat: Chat = {
-        id: `group_${newConf.id}`,
-        user: effectiveUser,
-        isGroup: true,
-        groupTitle: `💬 Конференция: ${newConf.title}`,
-        groupAvatar: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=150&q=80',
-        membersCount: 1,
-        conferenceId: newConf.id,
-        lastMessage: 'Конференция создана. Все материалы будут сохраняться здесь.',
-        time: 'Только что',
-        unread: 0,
-        messages: [
-          {
-            id: `m_init_${Date.now()}`,
-            fromMe: true,
-            text: `Группа конференции «${newConf.title}» создана автоматически. Код подключения: ${newConf.inviteCode}`,
-            time: 'Только что',
-          },
-        ],
-      };
-
-      initialChats.unshift(newGroupChat);
-      newConf.chatGroupId = newGroupChat.id;
+      const createdGroupId = saveConferenceGroupChat({
+        conference: newConf,
+        duration: '0:00',
+        messages: [],
+        thumbnail: newConf.recordingThumbnail,
+        currentUserId: effectiveUser?.id || 'me',
+        hostUser: effectiveUser,
+      });
+      newConf.chatGroupId = createdGroupId;
     }
 
     setConferences(prev => [newConf, ...prev]);
@@ -105,6 +103,7 @@ export function ConferencesPage() {
         host: effectiveUser,
         status: 'live',
         participants: [effectiveUser],
+        hasRecording: true,
       };
       setConferences(prev => [instantConf, ...prev]);
       setActiveConference(instantConf);
@@ -121,19 +120,11 @@ export function ConferencesPage() {
   };
 
   // When call ends
-  const handleLeaveCall = () => {
-    if (activeConference && activeConference.hasRecording) {
-      // Save new recording to list
-      const newRec: Recording = {
-        id: `rec_${Date.now()}`,
-        title: `Запись: ${activeConference.title}`,
-        date: 'Сегодня',
-        duration: '14:28',
-        participantsCount: activeConference.participants.length || 4,
-        thumbnail: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
-        chatGroupId: activeConference.chatGroupId || 'group_conf_1',
-      };
-      setRecordings(prev => [newRec, ...prev]);
+  const handleLeaveCall = (savedRec?: ConferenceRecordingItem) => {
+    if (savedRec) {
+      setRecordings(prev => [savedRec, ...prev.filter(r => r.id !== savedRec.id)]);
+    } else {
+      setRecordings(getStoredConferenceRecordings());
     }
     setActiveConference(null);
   };
@@ -145,9 +136,9 @@ export function ConferencesPage() {
         conference={activeConference}
         participants={activeConference.participants.length > 0 ? activeConference.participants : [effectiveUser]}
         onLeaveCall={handleLeaveCall}
-        onGoToChatGroup={(_chatId) => {
+        onGoToChatGroup={(chatId) => {
           handleLeaveCall();
-          navigate('/messenger');
+          navigate(`/messenger?chat=${chatId}`);
         }}
       />
     );
@@ -292,10 +283,11 @@ export function ConferencesPage() {
             <div key={rec.id} className="recording-card">
               <div 
                 className="rec-card-thumb-box"
-                onClick={() => setPreviewRecording({ title: rec.title, duration: rec.duration })}
+                onClick={() => setPreviewRecording(rec)}
               >
                 <img src={rec.thumbnail} alt={rec.title} />
                 <span className="rec-duration-badge">{rec.duration}</span>
+                <span className="rec-quality-badge">HD 1080p</span>
                 <div className="rec-play-overlay">
                   <Play size={28} fill="white" color="white" />
                 </div>
@@ -310,16 +302,23 @@ export function ConferencesPage() {
                 <div className="rec-card-actions">
                   <button 
                     className="rec-btn-watch"
-                    onClick={() => setPreviewRecording({ title: rec.title, duration: rec.duration })}
+                    onClick={() => setPreviewRecording(rec)}
                   >
                     <Play size={14} fill="currentColor" /> Смотреть
                   </button>
                   <button 
-                    className="rec-btn-chat"
-                    onClick={() => navigate('/messenger')}
-                    title="Открыть группу в мессенджере"
+                    className="rec-btn-download"
+                    onClick={() => downloadRecordingFile(rec.videoUrl, rec.title)}
+                    title="Скачать видеозапись (.mp4)"
                   >
-                    <MessageSquare size={14} /> Чат группы
+                    <Download size={14} />
+                  </button>
+                  <button 
+                    className="rec-btn-chat"
+                    onClick={() => navigate(`/messenger?chat=${rec.chatGroupId}`)}
+                    title="Открыть группу конференции в мессенджере"
+                  >
+                    <MessageSquare size={14} /> Чат
                   </button>
                   <button 
                     className="rec-btn-delete"
@@ -459,26 +458,62 @@ export function ConferencesPage() {
         <div className="tg-rec-modal-overlay" onClick={() => setPreviewRecording(null)}>
           <div className="tg-rec-modal-box" onClick={e => e.stopPropagation()}>
             <div className="tg-rec-modal-header">
-              <h3>{previewRecording.title}</h3>
-              <button className="modal-close-icon" onClick={() => setPreviewRecording(null)}>
-                &times;
-              </button>
-            </div>
-            <div className="tg-rec-modal-player">
-              <img 
-                src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80" 
-                alt="Recording" 
-                className="tg-rec-video-preview"
-              />
-              <div className="video-rec-play-overlay">
-                <Play size={48} fill="white" color="white" />
+              <div className="tg-rec-modal-title-col">
+                <span className="tg-rec-modal-badge"><Film size={13} /> Запись видеоконференции</span>
+                <h3>{previewRecording.title}</h3>
               </div>
-            </div>
-            <div className="tg-rec-modal-footer">
-              <span>Длительность: {previewRecording.duration} · Full HD 1080p</span>
-              <button className="btn btn-primary" onClick={() => setPreviewRecording(null)}>
-                Закрыть
+              <button className="modal-close-icon" onClick={() => setPreviewRecording(null)} title="Закрыть">
+                <X size={20} />
               </button>
+            </div>
+
+            <div className="tg-rec-modal-player">
+              <video 
+                src={previewRecording.videoUrl} 
+                controls 
+                autoPlay 
+                playsInline
+                poster={previewRecording.thumbnail}
+                className="tg-rec-real-video"
+              />
+            </div>
+
+            <div className="tg-rec-modal-footer">
+              <div className="tg-rec-meta-info">
+                <span>Длительность: <strong>{previewRecording.duration}</strong></span>
+                <span className="meta-dot">•</span>
+                <span>Формат: <strong>Full HD 1080p</strong></span>
+                <span className="meta-dot">•</span>
+                <span>{previewRecording.date}</span>
+              </div>
+
+              <div className="tg-rec-modal-actions">
+                <button 
+                  type="button" 
+                  className="btn-download-rec"
+                  onClick={() => downloadRecordingFile(previewRecording.videoUrl, previewRecording.title)}
+                >
+                  <Download size={15} /> Скачать MP4
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-chat-rec"
+                  onClick={() => {
+                    const targetChat = previewRecording.chatGroupId;
+                    setPreviewRecording(null);
+                    navigate(`/messenger?chat=${targetChat}`);
+                  }}
+                >
+                  <MessageSquare size={15} /> Открыть группу в чате
+                </button>
+                <button 
+                  type="button" 
+                  className="btn-close-rec" 
+                  onClick={() => setPreviewRecording(null)}
+                >
+                  Закрыть
+                </button>
+              </div>
             </div>
           </div>
         </div>

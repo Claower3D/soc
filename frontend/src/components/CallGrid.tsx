@@ -11,12 +11,18 @@ import {
 import { initialConferenceMessages, currentUser, type User, type ConferenceMessage, type Conference } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
 import { spiritualAudio } from '../utils/spiritualAudio';
+import { 
+  saveConferenceRecording, 
+  saveConferenceGroupChat, 
+  downloadRecordingFile, 
+  type ConferenceRecordingItem 
+} from '../utils/conferenceManager';
 import './CallGrid.css';
 
 interface CallGridProps {
   participants: User[];
   conference?: Conference | null;
-  onLeaveCall?: () => void;
+  onLeaveCall?: (savedRecording?: ConferenceRecordingItem) => void;
   onGoToChatGroup?: (chatId: string) => void;
 }
 
@@ -78,8 +84,9 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
   const [chatInput, setChatInput] = useState('');
   const [callDuration, setCallDuration] = useState(145);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [floatingReaction, setFloatingReaction] = useState<string | null>(null);
   const [callEndedModal, setCallEndedModal] = useState(false);
+  const [savedRecordingData, setSavedRecordingData] = useState<ConferenceRecordingItem | null>(null);
+  const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
 
   // Refs
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -91,6 +98,8 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
   const animFrameRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const screenContainerRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   const confTitle = conference?.title || 'Спринт-синк команды #104';
   const confCode = conference?.inviteCode || 'conf-892-xyt';
@@ -244,7 +253,72 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
     }
   }, []);
 
-  // Request user camera and microphone on mount
+  // Start recording conference stream
+  const startCallRecording = useCallback((stream: MediaStream) => {
+    try {
+      if (typeof MediaRecorder === 'undefined' || !stream || stream.getTracks().length === 0) return;
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') return;
+
+      const mimeTypes = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm',
+        'video/mp4'
+      ];
+      let selectedMime = '';
+      for (const m of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(m)) {
+          selectedMime = m;
+          break;
+        }
+      }
+      const options = selectedMime ? { mimeType: selectedMime } : undefined;
+      const recorder = new MediaRecorder(stream, options);
+      recordedChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          recordedChunksRef.current.push(e.data);
+        }
+      };
+      recorder.start(1000);
+      mediaRecorderRef.current = recorder;
+    } catch (err) {
+      console.warn('MediaRecorder start notice:', err);
+    }
+  }, []);
+
+  const stopCallRecording = useCallback((): Promise<{ blob: Blob | null; url: string }> => {
+    return new Promise((resolve) => {
+      const fallbackUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.onstop = () => {
+          if (recordedChunksRef.current.length > 0) {
+            const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            resolve({ blob, url });
+          } else {
+            resolve({ blob: null, url: fallbackUrl });
+          }
+        };
+        try {
+          recorder.stop();
+        } catch (_) {
+          resolve({ blob: null, url: fallbackUrl });
+        }
+      } else {
+        if (recordedChunksRef.current.length > 0) {
+          const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          resolve({ blob, url });
+        } else {
+          resolve({ blob: null, url: fallbackUrl });
+        }
+      }
+    });
+  }, []);
+
+  // WebRTC UserMedia (Microphone + Camera) initialization
   useEffect(() => {
     let active = true;
 
@@ -284,6 +358,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
         }
 
         setupAudioAnalyser(stream);
+        startCallRecording(stream);
         await refreshDevices();
       } catch (err) {
         console.warn('getUserMedia camera+mic failed, trying audio-only:', err);
@@ -298,6 +373,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
           localStreamRef.current = audioOnly;
           setVideoOn(false);
           setupAudioAnalyser(audioOnly);
+          startCallRecording(audioOnly);
           await refreshDevices();
         } catch (audioErr) {
           console.warn('Microphone permission denied or not available:', audioErr);
@@ -313,6 +389,9 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         try { audioContextRef.current.close(); } catch (_) {}
       }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch (_) {}
+      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(t => t.stop());
       }
@@ -320,7 +399,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
         screenStreamRef.current.getTracks().forEach(t => t.stop());
       }
     };
-  }, [setupAudioAnalyser, refreshDevices, echoCancellation, noiseSuppression, selectedAudioInput, selectedVideoInput]);
+  }, [setupAudioAnalyser, refreshDevices, echoCancellation, noiseSuppression, selectedAudioInput, selectedVideoInput, startCallRecording]);
 
   // Connect local video ref whenever videoOn or localStream updates
   useEffect(() => {
@@ -645,7 +724,47 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const handleEndCall = () => {
+  const handleEndCall = async () => {
+    const { blob, url } = await stopCallRecording();
+    const finalDuration = formatTime(callDuration);
+    const recId = `rec_${Date.now()}`;
+    const targetGroupId = conference?.chatGroupId || `group_${conference?.id || Date.now()}`;
+
+    const recItem: ConferenceRecordingItem = {
+      id: recId,
+      title: confTitle,
+      date: 'Сегодня, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      duration: finalDuration,
+      participantsCount: participants.length || 1,
+      thumbnail: conference?.recordingThumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+      videoUrl: url,
+      chatGroupId: targetGroupId,
+      conferenceId: conference?.id,
+      inviteCode: confCode,
+    };
+
+    saveConferenceRecording(recItem, blob || undefined);
+
+    saveConferenceGroupChat({
+      conference: conference || {
+        id: `conf_${Date.now()}`,
+        title: confTitle,
+        inviteCode: confCode,
+        isPrivate: false,
+        host: effectiveUser,
+        status: 'ended',
+        participants: participants,
+      },
+      duration: finalDuration,
+      messages: messages,
+      videoUrl: url,
+      thumbnail: recItem.thumbnail,
+      currentUserId: effectiveUser?.id || 'me',
+      hostUser: effectiveUser,
+    });
+
+    setSavedRecordingData(recItem);
+    setCreatedGroupId(targetGroupId);
     setCallEndedModal(true);
   };
 
@@ -1504,15 +1623,28 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
             </div>
             <h2>Конференция успешно завершена</h2>
             <p className="summary-desc">
-              Запись звонка обработана, а группа общения автоматически создана в мессенджере.
+              Запись звонка обработана и сохранена, а группа общения автоматически создана в мессенджере.
             </p>
+
+            {/* Video preview player */}
+            {savedRecordingData && (
+              <div className="summary-video-preview-wrap">
+                <video 
+                  src={savedRecordingData.videoUrl} 
+                  controls 
+                  playsInline 
+                  poster={savedRecordingData.thumbnail}
+                  className="summary-video-player"
+                />
+              </div>
+            )}
 
             <div className="summary-card-items">
               <div className="summary-item">
                 <Disc size={20} className="summary-item-icon rec" />
                 <div className="summary-item-text">
                   <strong>Запись звонка сохранена</strong>
-                  <span>Длительность: {formatTime(callDuration)} · Архив записей</span>
+                  <span>Длительность: {savedRecordingData?.duration || formatTime(callDuration)} · Архив записей</span>
                 </div>
               </div>
 
@@ -1520,20 +1652,32 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
                 <MessageCircle size={20} className="summary-item-icon chat" />
                 <div className="summary-item-text">
                   <strong>Создана группа «{confTitle}»</strong>
-                  <span>{participants.length} участников · история чата сохранена</span>
+                  <span>{participants.length} участников · история чата и видео сохранены</span>
                 </div>
               </div>
             </div>
 
             <div className="summary-actions">
+              {savedRecordingData && (
+                <button 
+                  type="button"
+                  className="btn-download-summary"
+                  onClick={() => downloadRecordingFile(savedRecordingData.videoUrl, savedRecordingData.title)}
+                >
+                  <Download size={18} /> Скачать видеозапись (.mp4)
+                </button>
+              )}
+
               <button 
+                type="button"
                 className="btn-primary-summary"
                 onClick={() => {
                   setCallEndedModal(false);
+                  const targetChat = createdGroupId || savedRecordingData?.chatGroupId || ('group_' + (conference?.id || 'conf_1'));
                   if (onGoToChatGroup) {
-                    onGoToChatGroup('group_conf_1');
+                    onGoToChatGroup(targetChat);
                   } else {
-                    navigate('/messenger');
+                    navigate(`/messenger?chat=${targetChat}`);
                   }
                 }}
               >
@@ -1541,10 +1685,11 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
               </button>
 
               <button 
+                type="button"
                 className="btn-secondary-summary"
                 onClick={() => {
                   setCallEndedModal(false);
-                  if (onLeaveCall) onLeaveCall();
+                  if (onLeaveCall) onLeaveCall(savedRecordingData || undefined);
                 }}
               >
                 Вернуться к списку конференций

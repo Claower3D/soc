@@ -707,6 +707,26 @@ CREATE TABLE IF NOT EXISTS clip_comments (
 );
 CREATE INDEX IF NOT EXISTS idx_clip_comments_clip ON clip_comments(clip_id);
 
+-- Уникальные просмотры клипов (1 аккаунт = 1 просмотр)
+CREATE TABLE IF NOT EXISTS clip_views (
+    clip_id VARCHAR(64) NOT NULL REFERENCES clips(id) ON DELETE CASCADE,
+    user_id VARCHAR(64) NOT NULL,
+    viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (clip_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_clip_views_clip ON clip_views(clip_id);
+CREATE INDEX IF NOT EXISTS idx_clip_views_user ON clip_views(user_id);
+
+-- Уникальные просмотры видео (1 аккаунт = 1 просмотр)
+CREATE TABLE IF NOT EXISTS video_views (
+    video_id VARCHAR(64) NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    user_id VARCHAR(64) NOT NULL,
+    viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    PRIMARY KEY (video_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_video_views_video ON video_views(video_id);
+CREATE INDEX IF NOT EXISTS idx_video_views_user ON video_views(user_id);
+
 -- Подкасты
 CREATE TABLE IF NOT EXISTS podcasts (
     id VARCHAR(64) PRIMARY KEY,

@@ -65,7 +65,20 @@ export function ClipsPage() {
   const [clips, setClips] = useState<Clip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [failedVideoIds, setFailedVideoIds] = useState<Record<string, boolean>>({});
+  const userStorageKey = `newage_viewed_clips_${currentUser?.id || 'guest'}`;
   const viewedClipsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(userStorageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          viewedClipsRef.current = new Set(parsed);
+        }
+      }
+    } catch (_) {}
+  }, [userStorageKey]);
 
   useEffect(() => {
     let mounted = true;
@@ -307,8 +320,14 @@ export function ClipsPage() {
       if (clipId === currentClip.id) {
         if (!viewedClipsRef.current.has(clipId)) {
           viewedClipsRef.current.add(clipId);
-          api.clips.view(clipId).catch(console.warn);
-          setClips(prev => prev.map(c => c.id === clipId ? { ...c, viewsCount: (c.viewsCount || 0) + 1 } : c));
+          try {
+            localStorage.setItem(userStorageKey, JSON.stringify(Array.from(viewedClipsRef.current)));
+          } catch (_) {}
+          api.clips.view(clipId).then((res: any) => {
+            if (res && res.data && typeof res.data.viewsCount === 'number') {
+              setClips(prev => prev.map(c => c.id === clipId ? { ...c, viewsCount: res.data.viewsCount } : c));
+            }
+          }).catch(console.warn);
         }
         vid.muted = isMuted;
         if (isPlaying) {

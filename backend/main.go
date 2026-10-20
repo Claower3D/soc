@@ -510,6 +510,38 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 			PRIMARY KEY (clip_id, user_id)
 		);
 
+		CREATE TABLE IF NOT EXISTS clip_views (
+			clip_id VARCHAR(64) NOT NULL,
+			user_id VARCHAR(64) NOT NULL,
+			viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			PRIMARY KEY (clip_id, user_id)
+		);
+		CREATE INDEX IF NOT EXISTS idx_clip_views_clip ON clip_views(clip_id);
+		CREATE INDEX IF NOT EXISTS idx_clip_views_user ON clip_views(user_id);
+
+		CREATE TABLE IF NOT EXISTS video_views (
+			video_id VARCHAR(64) NOT NULL,
+			user_id VARCHAR(64) NOT NULL,
+			viewed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			PRIMARY KEY (video_id, user_id)
+		);
+		CREATE INDEX IF NOT EXISTS idx_video_views_video ON video_views(video_id);
+		CREATE INDEX IF NOT EXISTS idx_video_views_user ON video_views(user_id);
+
+		INSERT INTO clip_views (clip_id, user_id, viewed_at)
+		SELECT id, user_id, created_at FROM clips
+		ON CONFLICT (clip_id, user_id) DO NOTHING;
+
+		UPDATE clips c
+		SET views_count = (SELECT COUNT(DISTINCT user_id) FROM clip_views cv WHERE cv.clip_id = c.id);
+
+		INSERT INTO video_views (video_id, user_id, viewed_at)
+		SELECT id, user_id, created_at FROM videos
+		ON CONFLICT (video_id, user_id) DO NOTHING;
+
+		UPDATE videos v
+		SET views_count = (SELECT COUNT(DISTINCT user_id) FROM video_views vv WHERE vv.video_id = v.id);
+
 		CREATE TABLE IF NOT EXISTS clip_comments (
 			id VARCHAR(64) PRIMARY KEY,
 			clip_id VARCHAR(64) NOT NULL,
@@ -8540,8 +8572,37 @@ func handleLikeClip(w http.ResponseWriter, r *http.Request) {
 }
 
 // POST /api/clips/{id}/view — record view
+func getViewerIdentifier(r *http.Request) string {
+	token := extractBearerToken(r)
+	if token != "" {
+		if claims, err := parseAndValidateJWT(token); err == nil && claims != nil && claims.UserID != "" {
+			return claims.UserID
+		}
+	}
+	clientIP := r.Header.Get("X-Forwarded-For")
+	if clientIP == "" {
+		clientIP = r.Header.Get("X-Real-IP")
+	}
+	if clientIP == "" {
+		clientIP = r.RemoteAddr
+	}
+	if comma := strings.Index(clientIP, ","); comma != -1 {
+		clientIP = strings.TrimSpace(clientIP[:comma])
+	}
+	if clientIP == "" {
+		clientIP = "unknown"
+	}
+	return "guest_" + clientIP
+}
+
 func handleViewClip(w http.ResponseWriter, r *http.Request) {
 	clipID := r.PathValue("id")
+	if clipID == "" {
+		writeJSON(w, 400, Response{Status: "error", Message: "clip id required"})
+		return
+	}
+
+	viewerID := getViewerIdentifier(r)
 
 	dbMu.RLock()
 	dbConn := db
@@ -8551,13 +8612,22 @@ func handleViewClip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbConn.Exec(`UPDATE clips SET views_count = views_count + 1 WHERE id = $1`, clipID)
+	res, err := dbConn.Exec(`INSERT INTO clip_views (clip_id, user_id, viewed_at) VALUES ($1, $2, NOW()) ON CONFLICT (clip_id, user_id) DO NOTHING`, clipID, viewerID)
+	var isNewView bool
+	if err == nil && res != nil {
+		if affected, _ := res.RowsAffected(); affected > 0 {
+			isNewView = true
+			dbConn.Exec(`UPDATE clips SET views_count = (SELECT COUNT(DISTINCT user_id) FROM clip_views WHERE clip_id = $1) WHERE id = $1`, clipID)
+			globalCache.InvalidateTag("clips")
+		}
+	}
 
 	var views int64
 	_ = dbConn.QueryRow(`SELECT COALESCE(views_count, 0) FROM clips WHERE id = $1`, clipID).Scan(&views)
 
 	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
 		"viewsCount": views,
+		"isNewView":  isNewView,
 	}})
 }
 
@@ -8701,14 +8771,38 @@ func handleCreateClipComment(w http.ResponseWriter, r *http.Request) {
 // POST /api/videos/{id}/view — increment video views
 func handleViewVideo(w http.ResponseWriter, r *http.Request) {
 	videoID := r.PathValue("id")
+	if videoID == "" {
+		writeJSON(w, 400, Response{Status: "error", Message: "video id required"})
+		return
+	}
+
+	viewerID := getViewerIdentifier(r)
+
 	dbMu.RLock()
 	dbConn := db
 	dbMu.RUnlock()
-	if dbConn != nil {
-		dbConn.Exec(`UPDATE videos SET views_count = views_count + 1 WHERE id = $1`, videoID)
-		globalCache.InvalidateTag("videos")
+	if dbConn == nil {
+		writeJSON(w, 503, Response{Status: "error", Message: "db not connected"})
+		return
 	}
-	writeJSON(w, 200, Response{Status: "ok"})
+
+	res, err := dbConn.Exec(`INSERT INTO video_views (video_id, user_id, viewed_at) VALUES ($1, $2, NOW()) ON CONFLICT (video_id, user_id) DO NOTHING`, videoID, viewerID)
+	var isNewView bool
+	if err == nil && res != nil {
+		if affected, _ := res.RowsAffected(); affected > 0 {
+			isNewView = true
+			dbConn.Exec(`UPDATE videos SET views_count = (SELECT COUNT(DISTINCT user_id) FROM video_views WHERE video_id = $1) WHERE id = $1`, videoID)
+			globalCache.InvalidateTag("videos")
+		}
+	}
+
+	var views int64
+	_ = dbConn.QueryRow(`SELECT COALESCE(views_count, 0) FROM videos WHERE id = $1`, videoID).Scan(&views)
+
+	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
+		"viewsCount": views,
+		"isNewView":  isNewView,
+	}})
 }
 
 // POST /api/videos/{id}/like — increment video likes
