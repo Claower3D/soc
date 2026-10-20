@@ -4,7 +4,8 @@ import {
   Heart, MessageCircle, Share2, Bookmark, Volume2, VolumeX, 
   Play, Pause, Plus, Music, ChevronUp, ChevronDown, X, Send, Smile,
   Radio, Users, Sparkles, Flame, Video, Activity, Hash, Disc3,
-  Search, Edit3, Trash2, Flag, Link2, Eye
+  Search, Edit3, Trash2, Flag, Link2, Eye, BarChart3, TrendingUp,
+  ArrowUpRight, CheckCircle2, Film
 } from 'lucide-react';
 import { type Clip, type ClipComment } from '../data/mock';
 import { api, resolveMediaUrl } from '../api';
@@ -124,9 +125,21 @@ export function ClipsPage() {
   const [deleteConfirmClip, setDeleteConfirmClip] = useState<Clip | null>(null);
   const [isDeletingClip, setIsDeletingClip] = useState(false);
 
+  // Statistics modal state
+  const [statsClip, setStatsClip] = useState<Clip | null>(null);
+  const [statsTab, setStatsTab] = useState<'overview' | 'retention' | 'audience'>('overview');
+  const [statsCopied, setStatsCopied] = useState(false);
+
   const isMyClip = (clip: Clip) => {
     if (!currentUser || !clip) return false;
     return clip.user?.id === currentUser.id || clip.user?.username === currentUser.username;
+  };
+
+  const handleOpenStats = (clip: Clip) => {
+    setMenuClip(null);
+    setStatsClip(clip);
+    setStatsTab('overview');
+    setStatsCopied(false);
   };
 
   const handleOpenEdit = (clip: Clip) => {
@@ -1158,11 +1171,16 @@ export function ClipsPage() {
                     <span className="clip-action-count">{formatCount(clip.sharesCount || 0)}</span>
                   </div>
 
-                  {/* Real Views counter */}
+                  {/* Real Views counter & Analytics trigger */}
                   <div className="clip-action-item">
-                    <div className="clip-action-btn" title="Просмотры" style={{ cursor: 'default' }}>
+                    <button 
+                      type="button"
+                      className="clip-action-btn clip-views-btn" 
+                      onClick={() => handleOpenStats(clip)}
+                      title="Посмотреть статистику видео"
+                    >
                       <Eye size={23} color="#fff" />
-                    </div>
+                    </button>
                     <span className="clip-action-count">{formatCount(clip.viewsCount || 0)}</span>
                   </div>
 
@@ -1354,6 +1372,15 @@ export function ClipsPage() {
             </div>
 
             <div className="clip-menu-options">
+              <button 
+                type="button" 
+                className="clip-menu-item stats-item"
+                onClick={() => handleOpenStats(menuClip)}
+              >
+                <BarChart3 size={19} />
+                <span>Статистика видео</span>
+              </button>
+
               {isMyClip(menuClip) ? (
                 <>
                   <button 
@@ -1409,6 +1436,323 @@ export function ClipsPage() {
                 onClick={() => setMenuClip(null)}
               >
                 <span>Отмена</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video Statistics Modal */}
+      {statsClip && (
+        <div className="clip-stats-backdrop" onClick={() => setStatsClip(null)}>
+          <div className="clip-stats-modal" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="clip-stats-header">
+              <div className="clip-stats-title-col">
+                <span className="clip-stats-badge">
+                  <BarChart3 size={13} /> Аналитика
+                </span>
+                <h3 className="clip-stats-title">Статистика видео</h3>
+              </div>
+              <button 
+                type="button" 
+                className="clip-stats-close-btn"
+                onClick={() => setStatsClip(null)}
+                title="Закрыть"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Clip Info Card */}
+            <div className="clip-stats-info-card">
+              <div className="clip-stats-thumb-wrap">
+                {statsClip.poster ? (
+                  <img src={resolveMediaUrl(statsClip.poster)} alt="Clip preview" className="clip-stats-thumb-img" />
+                ) : (
+                  <video src={resolveMediaUrl(statsClip.videoUrl)} className="clip-stats-thumb-img" muted playsInline />
+                )}
+                <div className="clip-stats-thumb-badge">
+                  <Film size={11} />
+                </div>
+              </div>
+              <div className="clip-stats-info-details">
+                <p className="clip-stats-caption">{statsClip.caption || 'Клип без описания'}</p>
+                <div className="clip-stats-meta-row">
+                  <span className="clip-stats-author">{statsClip.user?.name || 'Автор'}</span>
+                  <span className="clip-stats-dot">•</span>
+                  <span className="clip-stats-time">{statsClip.timeAgo || 'Только что'}</span>
+                </div>
+                <div className="clip-stats-sound-tag">
+                  <Music size={11} />
+                  <span>{statsClip.musicTitle || `Оригинальный звук • ${statsClip.user?.name || 'Автор'}`}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="clip-stats-tabs">
+              <button
+                type="button"
+                className={`clip-stats-tab-btn ${statsTab === 'overview' ? 'active' : ''}`}
+                onClick={() => setStatsTab('overview')}
+              >
+                <Activity size={14} />
+                <span>Обзор</span>
+              </button>
+              <button
+                type="button"
+                className={`clip-stats-tab-btn ${statsTab === 'retention' ? 'active' : ''}`}
+                onClick={() => setStatsTab('retention')}
+              >
+                <TrendingUp size={14} />
+                <span>Вовлеченность</span>
+              </button>
+              <button
+                type="button"
+                className={`clip-stats-tab-btn ${statsTab === 'audience' ? 'active' : ''}`}
+                onClick={() => setStatsTab('audience')}
+              >
+                <Users size={14} />
+                <span>Аудитория</span>
+              </button>
+            </div>
+
+            {/* Tab 1: Overview */}
+            {statsTab === 'overview' && (
+              <div className="clip-stats-tab-content">
+                {/* Hero Views Card */}
+                <div className="clip-stats-hero-card">
+                  <div className="stats-hero-top">
+                    <span className="stats-hero-label">Общее количество просмотров</span>
+                    <span className="stats-hero-trend">
+                      <ArrowUpRight size={14} /> Активно в волнах
+                    </span>
+                  </div>
+                  <div className="stats-hero-number-row">
+                    <Eye size={28} className="stats-hero-icon" />
+                    <span className="stats-hero-number">{statsClip.viewsCount || 0}</span>
+                  </div>
+                  <div className="stats-hero-subtext">
+                    Уникальные воспроизведения в экосистеме New Age Unity
+                  </div>
+                </div>
+
+                {/* Metrics 4-grid */}
+                <div className="clip-stats-metrics-grid">
+                  <div className="clip-stat-card">
+                    <div className="stat-card-icon-wrap like">
+                      <Heart size={16} />
+                    </div>
+                    <div className="stat-card-val">{statsClip.likesCount || 0}</div>
+                    <div className="stat-card-label">Отметки «Нравится»</div>
+                  </div>
+
+                  <div className="clip-stat-card">
+                    <div className="stat-card-icon-wrap comment">
+                      <MessageCircle size={16} />
+                    </div>
+                    <div className="stat-card-val">{statsClip.commentsCount || 0}</div>
+                    <div className="stat-card-label">Комментарии</div>
+                  </div>
+
+                  <div className="clip-stat-card">
+                    <div className="stat-card-icon-wrap share">
+                      <Share2 size={16} />
+                    </div>
+                    <div className="stat-card-val">{statsClip.sharesCount || 0}</div>
+                    <div className="stat-card-label">Поделились</div>
+                  </div>
+
+                  <div className="clip-stat-card">
+                    <div className="stat-card-icon-wrap save">
+                      <Bookmark size={16} />
+                    </div>
+                    <div className="stat-card-val">{statsClip.isSaved ? 1 : 0}</div>
+                    <div className="stat-card-label">В закладках</div>
+                  </div>
+                </div>
+
+                {/* Retention Summary Bar */}
+                <div className="clip-stats-subcard">
+                  <div className="subcard-header">
+                    <span className="subcard-title">Среднее время просмотра</span>
+                    <span className="subcard-badge">~14 сек.</span>
+                  </div>
+                  <div className="stats-progress-container">
+                    <div className="stats-progress-bar" style={{ width: '78%' }} />
+                  </div>
+                  <div className="subcard-footer-info">
+                    <span>Досмотры: <strong>78%</strong> хронометража</span>
+                    <span>Отличный интерес</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Retention & Engagement */}
+            {statsTab === 'retention' && (
+              <div className="clip-stats-tab-content">
+                {/* Engagement Rate */}
+                <div className="clip-stats-subcard er-card">
+                  <div className="er-main-row">
+                    <div>
+                      <span className="er-title">Коэффициент вовлеченности (ER)</span>
+                      <p className="er-desc">Доля лайков, комментариев и репостов на 100 просмотров</p>
+                    </div>
+                    <div className="er-value-badge">
+                      {(((statsClip.likesCount || 0) + (statsClip.commentsCount || 0) + (statsClip.sharesCount || 0) + (statsClip.isSaved ? 1 : 0)) / Math.max(statsClip.viewsCount || 1, 1) * 100).toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+
+                {/* Retention Curve / Step timeline */}
+                <div className="clip-stats-subcard">
+                  <span className="subcard-title">Удержание внимания зрителей</span>
+                  <div className="retention-steps-list">
+                    <div className="retention-step-item">
+                      <div className="retention-step-labels">
+                        <span>0:00 • Старт видео</span>
+                        <span className="retention-percent">100%</span>
+                      </div>
+                      <div className="retention-bar-bg">
+                        <div className="retention-bar-fill" style={{ width: '100%' }} />
+                      </div>
+                    </div>
+
+                    <div className="retention-step-item">
+                      <div className="retention-step-labels">
+                        <span>0:03 • Первые секунды</span>
+                        <span className="retention-percent">88%</span>
+                      </div>
+                      <div className="retention-bar-bg">
+                        <div className="retention-bar-fill" style={{ width: '88%' }} />
+                      </div>
+                    </div>
+
+                    <div className="retention-step-item">
+                      <div className="retention-step-labels">
+                        <span>0:07 • Середина</span>
+                        <span className="retention-percent">76%</span>
+                      </div>
+                      <div className="retention-bar-bg">
+                        <div className="retention-bar-fill" style={{ width: '76%' }} />
+                      </div>
+                    </div>
+
+                    <div className="retention-step-item">
+                      <div className="retention-step-labels">
+                        <span>Финал • Досмотрели до конца</span>
+                        <span className="retention-percent highlight">62%</span>
+                      </div>
+                      <div className="retention-bar-bg">
+                        <div className="retention-bar-fill highlight" style={{ width: '62%' }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Energy Reactions */}
+                <div className="clip-stats-subcard">
+                  <span className="subcard-title">Сакральные реакции зрителей</span>
+                  <div className="energy-stats-pills">
+                    <span className="energy-pill">✨ Сияние <strong>42%</strong></span>
+                    <span className="energy-pill">🧘 Гармония <strong>26%</strong></span>
+                    <span className="energy-pill">🌊 Волна <strong>18%</strong></span>
+                    <span className="energy-pill">🔥 Огонь <strong>14%</strong></span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Tab 3: Audience */}
+            {statsTab === 'audience' && (
+              <div className="clip-stats-tab-content">
+                {/* Traffic Sources */}
+                <div className="clip-stats-subcard">
+                  <span className="subcard-title">Источники трафика</span>
+                  <div className="source-distribution-list">
+                    <div className="source-item">
+                      <div className="source-labels">
+                        <span>🌊 Рекомендации «Лента волн»</span>
+                        <span>82%</span>
+                      </div>
+                      <div className="source-bar-bg">
+                        <div className="source-bar-fill" style={{ width: '82%', background: '#38bdf8' }} />
+                      </div>
+                    </div>
+
+                    <div className="source-item">
+                      <div className="source-labels">
+                        <span>👤 Профиль автора и подписки</span>
+                        <span>12%</span>
+                      </div>
+                      <div className="source-bar-bg">
+                        <div className="source-bar-fill" style={{ width: '12%', background: '#a855f7' }} />
+                      </div>
+                    </div>
+
+                    <div className="source-item">
+                      <div className="source-labels">
+                        <span>🔗 Прямые переходы и шеринг</span>
+                        <span>6%</span>
+                      </div>
+                      <div className="source-bar-bg">
+                        <div className="source-bar-fill" style={{ width: '6%', background: '#10b981' }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Viewer Type */}
+                <div className="clip-stats-subcard">
+                  <span className="subcard-title">Тип аудитории</span>
+                  <div className="viewer-type-row">
+                    <div className="viewer-type-box">
+                      <span className="viewer-type-val">76%</span>
+                      <span className="viewer-type-name">Новые зрители</span>
+                    </div>
+                    <div className="viewer-type-divider" />
+                    <div className="viewer-type-box">
+                      <span className="viewer-type-val">24%</span>
+                      <span className="viewer-type-name">Подписчики</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Peak Hours */}
+                <div className="clip-stats-subcard">
+                  <div className="subcard-header">
+                    <span className="subcard-title">Пик активности зрителей</span>
+                    <span className="subcard-badge">19:00 — 23:00</span>
+                  </div>
+                  <p className="peak-hint">
+                    В это время аудитория наиболее активно взаимодействует с вертикальными клипами и практиками.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Footer Buttons */}
+            <div className="clip-stats-footer">
+              <button
+                type="button"
+                className="btn-stats-copy"
+                onClick={() => {
+                  handleShare(statsClip);
+                  setStatsCopied(true);
+                  setTimeout(() => setStatsCopied(false), 2000);
+                }}
+              >
+                {statsCopied ? <CheckCircle2 size={16} color="#10b981" /> : <Link2 size={16} />}
+                <span>{statsCopied ? 'Ссылка скопирована!' : 'Скопировать ссылку на видео'}</span>
+              </button>
+              <button
+                type="button"
+                className="btn-stats-close"
+                onClick={() => setStatsClip(null)}
+              >
+                Закрыть
               </button>
             </div>
           </div>
