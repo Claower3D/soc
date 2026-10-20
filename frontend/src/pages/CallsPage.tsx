@@ -26,7 +26,8 @@ interface Recording {
 
 export function ConferencesPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, openAuthModal } = useAuth();
+  const { currentUser: authUser, isAuthenticated, openAuthModal } = useAuth();
+  const effectiveUser = authUser || currentUser;
   const [conferences, setConferences] = useState<Conference[]>(initialConferences);
   const [recordings, setRecordings] = useState<Recording[]>(initialRecordings as any);
   const [activeTab, setActiveTab] = useState<'all' | 'open' | 'private' | 'recordings'>('all');
@@ -55,7 +56,7 @@ export function ConferencesPage() {
     if (autoCreateGroup) {
       const newGroupChat: Chat = {
         id: `group_${newConf.id}`,
-        user: currentUser,
+        user: effectiveUser,
         isGroup: true,
         groupTitle: `💬 Конференция: ${newConf.title}`,
         groupAvatar: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=150&q=80',
@@ -101,9 +102,9 @@ export function ConferencesPage() {
         title: `Конференция по ссылке: ${joinCodeInput}`,
         isPrivate: true,
         inviteCode: joinCodeInput,
-        host: currentUser,
+        host: effectiveUser,
         status: 'live',
-        participants: [currentUser],
+        participants: [effectiveUser],
       };
       setConferences(prev => [instantConf, ...prev]);
       setActiveConference(instantConf);
@@ -142,7 +143,7 @@ export function ConferencesPage() {
     return (
       <CallGrid
         conference={activeConference}
-        participants={activeConference.participants.length > 0 ? activeConference.participants : [currentUser]}
+        participants={activeConference.participants.length > 0 ? activeConference.participants : [effectiveUser]}
         onLeaveCall={handleLeaveCall}
         onGoToChatGroup={(_chatId) => {
           handleLeaveCall();

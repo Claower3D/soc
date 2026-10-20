@@ -1,11 +1,16 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff, 
   Monitor, MessageSquare, Users, Hand, Send,
-  Copy, Check, Volume2, Disc, MessageCircle
+  Copy, Check, Volume2, VolumeX, Disc, MessageCircle,
+  Settings, Palette, Eraser, Trash2, Download, Maximize2, 
+  Minimize2, ChevronLeft, ChevronRight, Upload, 
+  X, AlertCircle, Sparkles, Presentation, Film
 } from 'lucide-react';
 import { initialConferenceMessages, currentUser, type User, type ConferenceMessage, type Conference } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
+import { spiritualAudio } from '../utils/spiritualAudio';
 import './CallGrid.css';
 
 interface CallGridProps {
@@ -17,23 +22,321 @@ interface CallGridProps {
 
 export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGroup }: CallGridProps) {
   const navigate = useNavigate();
+  const { currentUser: authUser } = useAuth();
+  const effectiveUser = authUser || currentUser;
+
+  // Audio / Video Media states
   const [micOn, setMicOn] = useState(true);
   const [videoOn, setVideoOn] = useState(true);
+  const [audioVolume, setAudioVolume] = useState(0);
+  const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
+  const [activeSpeakerId, setActiveSpeakerId] = useState<string>('me');
+  const [audioTestPlaying, setAudioTestPlaying] = useState(false);
+
+  // Screen Sharing states
   const [screenSharing, setScreenSharing] = useState(false);
+  const [screenShareMode, setScreenShareMode] = useState<'screen' | 'whiteboard' | 'presentation' | 'media' | null>(null);
+  const [isSharePickerOpen, setIsSharePickerOpen] = useState(false);
+  const [screenAudioMuted, setScreenAudioMuted] = useState(false);
+  const [screenTrackTitle, setScreenTrackTitle] = useState('Экран устройства');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [screenShareError, setScreenShareError] = useState<string | null>(null);
+
+  // Whiteboard states
+  const [whiteboardTool, setWhiteboardTool] = useState<'pen' | 'highlighter' | 'eraser'>('pen');
+  const [whiteboardColor, setWhiteboardColor] = useState('#0F172A');
+  const [whiteboardLineWidth, setWhiteboardLineWidth] = useState(3);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Presentation states
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [laserPointerActive, setLaserPointerActive] = useState(false);
+  const [laserPos, setLaserPos] = useState<{ x: number; y: number } | null>(null);
+  const [customSlideUrl, setCustomSlideUrl] = useState<string | null>(null);
+
+  // Media share states
+  const [mediaVideoUrl, setMediaVideoUrl] = useState<string>('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+  const [, setIsMediaPlaying] = useState(false);
+  const mediaVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Device settings states
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
+  const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
+  const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
+  const [selectedAudioInput, setSelectedAudioInput] = useState<string>('');
+  const [selectedAudioOutput, setSelectedAudioOutput] = useState<string>('');
+  const [selectedVideoInput, setSelectedVideoInput] = useState<string>('');
+  const [noiseSuppression, setNoiseSuppression] = useState(true);
+  const [echoCancellation, setEchoCancellation] = useState(true);
+
+  // Meeting & UI states
   const [handRaised, setHandRaised] = useState(false);
   const [activeSidePanel, setActiveSidePanel] = useState<'chat' | 'users' | null>('chat');
   const [messages, setMessages] = useState<ConferenceMessage[]>(initialConferenceMessages);
   const [chatInput, setChatInput] = useState('');
   const [callDuration, setCallDuration] = useState(145);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [activeSpeakerId, setActiveSpeakerId] = useState<string>('2');
   const [floatingReaction, setFloatingReaction] = useState<string | null>(null);
   const [callEndedModal, setCallEndedModal] = useState(false);
 
+  // Refs
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const screenVideoRef = useRef<HTMLVideoElement | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animFrameRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const screenContainerRef = useRef<HTMLDivElement>(null);
 
   const confTitle = conference?.title || 'Спринт-синк команды #104';
   const confCode = conference?.inviteCode || 'conf-892-xyt';
+
+  // 8 Presentation Slides Data
+  const slides = [
+    {
+      title: 'Экосистема New Age Unity: Архитектура',
+      subtitle: 'React 19 + TypeScript + Go (Gin) + PostgreSQL',
+      points: [
+        'Единое высоконагруженное ядро на Go с пулом соединений к PostgreSQL',
+        'Персистентное хранилище медиафайлов и видео (media_files)',
+        'Клиентская часть на React 19 с оптимизированным SPA-роутингом',
+        'Полная поддержка Android WebView и PWA-установки'
+      ]
+    },
+    {
+      title: 'Модуль Видеоконференций и звонков',
+      subtitle: 'Звук высокой чёткости, микрофон и захват экрана',
+      points: [
+        'Полноценный захват экрана, окон приложений и вкладок браузера (getDisplayMedia)',
+        'Интерактивная виртуальная доска (Whiteboard) для совместных зарисовок',
+        'Слайд-презентации с лазерной указкой и загрузкой материалов',
+        'Интеллектуальное шумоподавление и эхоподавление голоса'
+      ]
+    },
+    {
+      title: 'Интерактивная доска (Whiteboard)',
+      subtitle: 'Инструмент визуализации и командной работы',
+      points: [
+        'Рисование ручкой, маркером и ластиком на векторном холсте',
+        'Выбор толщины кисти и гармоничной палитры цветов',
+        'Экспорт наработок в формате изображения высокого разрешения',
+        'Быстрый сброс и очистка холста в один клик'
+      ]
+    },
+    {
+      title: 'Модуль Ленты и Публикаций',
+      subtitle: 'Интеллектуальный ранжирующий алгоритм новостей',
+      points: [
+        'Публикации фото, видео, музыки и опросов',
+        'Реакции, треды комментариев и закладки',
+        'Режим «Оракул» с ИИ-помощником и анализом тем',
+        'Мгновенный отклик ленты с оптимистичными обновлениями'
+      ]
+    },
+    {
+      title: 'Короткие вертикальные видео (Клипы)',
+      subtitle: 'Reels и TikTok-формат с персистентным хранилищем',
+      points: [
+        'Мгновенная загрузка вертикальных видеороликов до 150МБ',
+        'Потоковое воспроизведение видео через HTTP Range (206 Partial Content)',
+        'Удобная навигация: свайп, переход по звуку, комментарии',
+        'Центральная кнопка создания клипа в мобильной панели'
+      ]
+    },
+    {
+      title: 'Telegram-стиль Мессенджер',
+      subtitle: 'Чаты, каналы, папки и голосовые сообщения',
+      points: [
+        'Сквозное шифрование и защищенная передача сообщений',
+        'Запись и воспроизведение голосовых сообщений со спектрограммой',
+        'Автосоздание групп конференций и прикрепление записей',
+        'Управление папками: Личные, Группы, Каналы, Боты'
+      ]
+    },
+    {
+      title: 'Маркетплейс и Доставка еды',
+      subtitle: 'Встроенная электронная коммерция',
+      points: [
+        'Каталог товаров с фильтрацией, корзиной и оформлением заказов',
+        'Рестораны, блюда и отслеживание статуса доставки курьером',
+        'Безопасная оплата через внутренний кошелек или карты',
+        'Отзывы покупателей с рейтингом и фотографиями'
+      ]
+    },
+    {
+      title: 'Безопасность и Верификация',
+      subtitle: 'Паспортные данные и защита аккаунтов',
+      points: [
+        'Юридическая ответственность и привязка паспортных данных',
+        'Двухфакторная авторизация и управление сессиями устройств',
+        'Ролевая модель: Пользователь, Бизнес, Эксперт, Администратор',
+        'Резервное копирование и защита персональных данных'
+      ]
+    }
+  ];
+
+  // Helper: setup Web Audio API analyser to measure microphone volume & detect speaking
+  const setupAudioAnalyser = useCallback((stream: MediaStream) => {
+    try {
+      if (stream.getAudioTracks().length === 0) return;
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        try { audioContextRef.current.close(); } catch (_) {}
+      }
+
+      const ctx = new AudioCtx();
+      audioContextRef.current = ctx;
+
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.4;
+      analyserRef.current = analyser;
+
+      const source = ctx.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const checkVolume = () => {
+        if (!analyserRef.current) return;
+        analyserRef.current.getByteFrequencyData(dataArray);
+
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const avg = sum / bufferLength;
+        const normalized = Math.min(100, Math.round((avg / 128) * 100));
+
+        setAudioVolume(normalized);
+        const speaking = normalized > 14;
+        setIsLocalSpeaking(speaking);
+        if (speaking) {
+          setActiveSpeakerId('me');
+        }
+
+        animFrameRef.current = requestAnimationFrame(checkVolume);
+      };
+
+      checkVolume();
+    } catch (err) {
+      console.warn('Audio analyser setup error:', err);
+    }
+  }, []);
+
+  // Enumerate input and output devices
+  const refreshDevices = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setAudioInputs(devices.filter(d => d.kind === 'audioinput'));
+      setAudioOutputs(devices.filter(d => d.kind === 'audiooutput'));
+      setVideoInputs(devices.filter(d => d.kind === 'videoinput'));
+    } catch (e) {
+      console.warn('Device enumeration failed:', e);
+    }
+  }, []);
+
+  // Request user camera and microphone on mount
+  useEffect(() => {
+    let active = true;
+
+    async function initUserMedia() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          console.warn('getUserMedia not supported in this browser environment');
+          return;
+        }
+
+        await refreshDevices();
+
+        const constraints: MediaStreamConstraints = {
+          audio: {
+            echoCancellation: echoCancellation,
+            noiseSuppression: noiseSuppression,
+            autoGainControl: true,
+            ...(selectedAudioInput ? { deviceId: { exact: selectedAudioInput } } : {})
+          },
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: 'user',
+            ...(selectedVideoInput ? { deviceId: { exact: selectedVideoInput } } : {})
+          }
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (!active) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
+        }
+
+        localStreamRef.current = stream;
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+        }
+
+        setupAudioAnalyser(stream);
+        await refreshDevices();
+      } catch (err) {
+        console.warn('getUserMedia camera+mic failed, trying audio-only:', err);
+        try {
+          const audioOnly = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true }
+          });
+          if (!active) {
+            audioOnly.getTracks().forEach(t => t.stop());
+            return;
+          }
+          localStreamRef.current = audioOnly;
+          setVideoOn(false);
+          setupAudioAnalyser(audioOnly);
+          await refreshDevices();
+        } catch (audioErr) {
+          console.warn('Microphone permission denied or not available:', audioErr);
+        }
+      }
+    }
+
+    initUserMedia();
+
+    return () => {
+      active = false;
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        try { audioContextRef.current.close(); } catch (_) {}
+      }
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(t => t.stop());
+      }
+    };
+  }, [setupAudioAnalyser, refreshDevices, echoCancellation, noiseSuppression, selectedAudioInput, selectedVideoInput]);
+
+  // Connect local video ref whenever videoOn or localStream updates
+  useEffect(() => {
+    if (videoOn && localStreamRef.current && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.play().catch(console.warn);
+    }
+  }, [videoOn]);
+
+  // Connect screen video ref whenever screenStream updates
+  useEffect(() => {
+    if (screenShareMode === 'screen' && screenStreamRef.current && screenVideoRef.current) {
+      screenVideoRef.current.srcObject = screenStreamRef.current;
+      screenVideoRef.current.play().catch(console.warn);
+    }
+  }, [screenShareMode]);
 
   // Timer
   useEffect(() => {
@@ -43,15 +346,19 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
     return () => clearInterval(timer);
   }, []);
 
-  // Speaker simulation
+  // Speaker simulation for other participants
   useEffect(() => {
     const speakerTimer = setInterval(() => {
-      const ids = ['me', '1', '2', '6'];
-      const randomId = ids[Math.floor(Math.random() * ids.length)];
-      setActiveSpeakerId(randomId);
-    }, 7000);
+      if (!isLocalSpeaking) {
+        const otherIds = participants.filter(p => p.id !== 'me' && p.id !== effectiveUser?.id).map(p => p.id);
+        if (otherIds.length > 0) {
+          const randomId = otherIds[Math.floor(Math.random() * otherIds.length)];
+          setActiveSpeakerId(randomId);
+        }
+      }
+    }, 6000);
     return () => clearInterval(speakerTimer);
-  }, []);
+  }, [isLocalSpeaking, participants, effectiveUser]);
 
   // Scroll chat
   useEffect(() => {
@@ -59,6 +366,255 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, activeSidePanel]);
+
+  // Toggle Microphone
+  const toggleMic = () => {
+    const nextMic = !micOn;
+    setMicOn(nextMic);
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = nextMic;
+      });
+    }
+    if (!nextMic) {
+      setAudioVolume(0);
+      setIsLocalSpeaking(false);
+    }
+  };
+
+  // Toggle Camera
+  const toggleVideo = async () => {
+    const nextVideo = !videoOn;
+    setVideoOn(nextVideo);
+    if (localStreamRef.current) {
+      const videoTracks = localStreamRef.current.getVideoTracks();
+      if (videoTracks.length > 0) {
+        videoTracks.forEach(track => {
+          track.enabled = nextVideo;
+        });
+      } else if (nextVideo) {
+        try {
+          const newStream = await navigator.mediaDevices.getUserMedia({
+            video: selectedVideoInput ? { deviceId: { exact: selectedVideoInput } } : true
+          });
+          const newTrack = newStream.getVideoTracks()[0];
+          localStreamRef.current.addTrack(newTrack);
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = localStreamRef.current;
+            localVideoRef.current.play().catch(console.warn);
+          }
+        } catch (err) {
+          console.warn('Failed to start webcam track:', err);
+          setVideoOn(false);
+        }
+      }
+    }
+  };
+
+  // Stop screen sharing cleanly
+  const stopScreenShare = useCallback(() => {
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(t => t.stop());
+      screenStreamRef.current = null;
+    }
+    setScreenSharing(false);
+    setScreenShareMode(null);
+    setScreenShareError(null);
+    if (screenVideoRef.current) {
+      screenVideoRef.current.srcObject = null;
+    }
+  }, []);
+
+  // Real System Screen Capture (Desktop, Window, Browser Tab with Audio)
+  const startSystemScreenShare = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        setScreenShareError('Ваш браузер или устройство не поддерживает прямой захват экрана. Доступна Интерактивная доска или Слайды.');
+        setScreenShareMode('whiteboard');
+        setScreenSharing(true);
+        setIsSharePickerOpen(false);
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          cursor: 'always',
+          frameRate: { ideal: 30, max: 60 }
+        } as unknown as MediaTrackConstraints,
+        audio: true
+      });
+
+      screenStreamRef.current = stream;
+      setScreenSharing(true);
+      setScreenShareMode('screen');
+      setIsSharePickerOpen(false);
+      setScreenShareError(null);
+
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        setScreenTrackTitle(videoTrack.label || 'Экран устройства / Окно');
+        videoTrack.onended = () => {
+          stopScreenShare();
+        };
+      }
+
+      setTimeout(() => {
+        if (screenVideoRef.current) {
+          screenVideoRef.current.srcObject = stream;
+          screenVideoRef.current.play().catch(console.warn);
+        }
+      }, 100);
+    } catch (err: unknown) {
+      console.warn('Screen share error or dismissed:', err);
+      const errorObj = err as { name?: string; message?: string };
+      if (errorObj?.name !== 'NotAllowedError') {
+        setScreenShareError('Не удалось начать демонстрацию экрана: ' + (errorObj?.message || 'Доступ отклонен'));
+      }
+    }
+  };
+
+  // Start selected screen share mode
+  const handleSelectShareMode = (mode: 'screen' | 'whiteboard' | 'presentation' | 'media') => {
+    if (mode === 'screen') {
+      startSystemScreenShare();
+    } else {
+      setScreenShareMode(mode);
+      setScreenSharing(true);
+      setIsSharePickerOpen(false);
+      setScreenShareError(null);
+    }
+  };
+
+  // Toggle Screen Audio
+  const toggleScreenAudio = () => {
+    setScreenAudioMuted(prev => !prev);
+    if (screenVideoRef.current) {
+      screenVideoRef.current.muted = !screenAudioMuted;
+    }
+  };
+
+  // Toggle Fullscreen on Screen Share
+  const toggleFullscreen = () => {
+    if (!screenContainerRef.current) return;
+    if (!document.fullscreenElement) {
+      screenContainerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(console.warn);
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(console.warn);
+    }
+  };
+
+  // Test Speaker Sound
+  const handleTestSpeakerSound = () => {
+    setAudioTestPlaying(true);
+    spiritualAudio.playCrystalChime();
+    setTimeout(() => {
+      setAudioTestPlaying(false);
+    }, 2000);
+  };
+
+  // Switch Audio Output (if supported by browser)
+  const handleSelectAudioOutput = async (deviceId: string) => {
+    setSelectedAudioOutput(deviceId);
+    if (screenVideoRef.current && 'setSinkId' in screenVideoRef.current) {
+      try {
+        await (screenVideoRef.current as unknown as { setSinkId: (id: string) => Promise<void> }).setSinkId(deviceId);
+      } catch (e) {
+        console.warn('setSinkId failed:', e);
+      }
+    }
+  };
+
+  // Whiteboard drawing handlers
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (whiteboardTool === 'eraser') {
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = whiteboardLineWidth * 4;
+    } else if (whiteboardTool === 'highlighter') {
+      ctx.strokeStyle = whiteboardColor + '40'; // semi-transparent
+      ctx.lineWidth = whiteboardLineWidth * 3;
+    } else {
+      ctx.strokeStyle = whiteboardColor;
+      ctx.lineWidth = whiteboardLineWidth;
+    }
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx?.closePath();
+    }
+    setIsDrawing(false);
+  };
+
+  const clearWhiteboard = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const downloadWhiteboard = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const url = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `whiteboard-${confCode}.png`;
+    a.click();
+  };
+
+  // Upload custom presentation slide
+  const handleUploadCustomSlide = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setCustomSlideUrl(url);
+    }
+  };
+
+  // Upload custom video for media share
+  const handleUploadCustomVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setMediaVideoUrl(url);
+      setIsMediaPlaying(true);
+    }
+  };
 
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60);
@@ -70,7 +626,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
     if (!chatInput.trim()) return;
     const newMsg: ConferenceMessage = {
       id: `msg_${Date.now()}`,
-      user: currentUser,
+      user: effectiveUser,
       text: chatInput.trim(),
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
@@ -112,6 +668,10 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
         </div>
 
         <div className="conf-meta-right">
+          <button className="conf-pill-btn" onClick={() => setIsSettingsModalOpen(true)} title="Настройки звука, микрофона и камеры">
+            <Settings size={14} />
+            <span>Оборудование</span>
+          </button>
           <button className="conf-pill-btn" onClick={handleCopyInvite}>
             {copiedLink ? <Check size={14} /> : <Copy size={14} />}
             <span>{copiedLink ? 'Ссылка скопирована' : 'Поделиться ссылкой'}</span>
@@ -137,53 +697,333 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
             </div>
           )}
 
-          {/* Screen Share View */}
+          {/* Screen Sharing Views */}
           {screenSharing ? (
             <div className="screen-share-view">
-              <div className="screen-share-presentation">
-                <div className="presentation-header">
-                  <Monitor size={18} /> Демонстрация экрана: {confTitle}
-                </div>
-                <div className="presentation-content">
-                  <div className="demo-slide">
-                    <span className="slide-badge">Слайд 1 из 8</span>
-                    <h2>Архитектура соцсети: React 19 + Go</h2>
-                    <p>✓ Модуль Ленты · ✓ Видеохостинг · ✓ Telegram-мессенджер с медиа и войсами</p>
-                    <p>✓ Конференции с автосозданием групп и сохранением записей</p>
+              {/* MODE 1: REAL SYSTEM SCREEN SHARE */}
+              {screenShareMode === 'screen' && (
+                <div className="screen-share-presentation">
+                  <div className="presentation-header">
+                    <div className="presentation-header-left">
+                      <span className="live-share-badge"><span className="rec-dot" /> В ЭФИРЕ</span>
+                      <Monitor size={18} />
+                      <span>{screenTrackTitle}</span>
+                    </div>
+                    <div className="presentation-header-actions">
+                      <button 
+                        className="screen-header-btn" 
+                        onClick={toggleScreenAudio} 
+                        title={screenAudioMuted ? 'Включить звук демонстрации' : 'Выключить звук демонстрации'}
+                      >
+                        {screenAudioMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                        <span>{screenAudioMuted ? 'Без звука' : 'Звук экрана'}</span>
+                      </button>
+                      <button className="screen-header-btn" onClick={toggleFullscreen} title="Во весь экран">
+                        {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                        <span>{isFullscreen ? 'Свернуть' : 'Во весь экран'}</span>
+                      </button>
+                      <button className="screen-stop-btn" onClick={stopScreenShare}>
+                        <PhoneOff size={15} />
+                        <span>Остановить показ</span>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              <div className="mini-participants-strip">
-                {participants.slice(0, 4).map(p => (
-                  <div key={p.id} className="mini-participant-tile">
-                    <img src={p.avatar} alt={p.name} />
-                    <span>{p.id === 'me' ? 'Вы' : p.name.split(' ')[0]}</span>
+                  <div className="screen-video-container" ref={screenContainerRef}>
+                    <video
+                      ref={screenVideoRef}
+                      autoPlay
+                      playsInline
+                      muted={screenAudioMuted}
+                      className="real-screen-video"
+                    />
+                    {screenShareError && (
+                      <div className="screen-fallback-alert" style={{ position: 'absolute', background: 'rgba(239, 68, 68, 0.95)', color: 'white', padding: '1rem 1.5rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <AlertCircle size={22} />
+                        <span>{screenShareError}</span>
+                      </div>
+                    )}
                   </div>
-                ))}
+                </div>
+              )}
+
+              {/* MODE 2: INTERACTIVE WHITEBOARD */}
+              {screenShareMode === 'whiteboard' && (
+                <div className="screen-share-presentation">
+                  <div className="presentation-header">
+                    <div className="presentation-header-left">
+                      <span className="live-share-badge"><span className="rec-dot" /> ДОСКА</span>
+                      <Palette size={18} />
+                      <span>Интерактивная доска конференции</span>
+                    </div>
+                    <div className="presentation-header-actions">
+                      <button className="screen-header-btn" onClick={clearWhiteboard} title="Очистить холст">
+                        <Trash2 size={15} />
+                        <span>Очистить</span>
+                      </button>
+                      <button className="screen-header-btn" onClick={downloadWhiteboard} title="Скачать рисунок">
+                        <Download size={15} />
+                        <span>Скачать PNG</span>
+                      </button>
+                      <button className="screen-stop-btn" onClick={stopScreenShare}>
+                        <PhoneOff size={15} />
+                        <span>Остановить показ</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="whiteboard-stage-wrapper">
+                    <div className="whiteboard-toolbar">
+                      <div className="whiteboard-tools-group">
+                        <button 
+                          className={`whiteboard-tool-btn ${whiteboardTool === 'pen' ? 'active' : ''}`}
+                          onClick={() => setWhiteboardTool('pen')}
+                          title="Маркер / Ручка"
+                        >
+                          <Palette size={16} />
+                        </button>
+                        <button 
+                          className={`whiteboard-tool-btn ${whiteboardTool === 'highlighter' ? 'active' : ''}`}
+                          onClick={() => setWhiteboardTool('highlighter')}
+                          title="Текстовыделитель"
+                        >
+                          <Sparkles size={16} />
+                        </button>
+                        <button 
+                          className={`whiteboard-tool-btn ${whiteboardTool === 'eraser' ? 'active' : ''}`}
+                          onClick={() => setWhiteboardTool('eraser')}
+                          title="Ластик"
+                        >
+                          <Eraser size={16} />
+                        </button>
+                      </div>
+
+                      <div className="whiteboard-colors-group">
+                        {['#0F172A', '#6366F1', '#10B981', '#EF4444', '#F59E0B', '#3B82F6'].map(c => (
+                          <span
+                            key={c}
+                            className={`whiteboard-color-dot ${whiteboardColor === c && whiteboardTool !== 'eraser' ? 'active' : ''}`}
+                            style={{ background: c }}
+                            onClick={() => { setWhiteboardColor(c); if (whiteboardTool === 'eraser') setWhiteboardTool('pen'); }}
+                          />
+                        ))}
+                      </div>
+
+                      <div className="whiteboard-tools-group">
+                        <span style={{ fontSize: '0.74rem', color: '#64748B' }}>Толщина:</span>
+                        {[2, 5, 12, 22].map(w => (
+                          <button
+                            key={w}
+                            className={`whiteboard-tool-btn ${whiteboardLineWidth === w ? 'active' : ''}`}
+                            onClick={() => setWhiteboardLineWidth(w)}
+                            style={{ fontSize: '0.74rem', fontWeight: 600 }}
+                          >
+                            {w}px
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="whiteboard-canvas-area">
+                      <canvas
+                        ref={canvasRef}
+                        width={1200}
+                        height={700}
+                        className="whiteboard-canvas"
+                        onMouseDown={startDrawing}
+                        onMouseMove={draw}
+                        onMouseUp={stopDrawing}
+                        onMouseLeave={stopDrawing}
+                        onTouchStart={startDrawing}
+                        onTouchMove={draw}
+                        onTouchEnd={stopDrawing}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* MODE 3: INTERACTIVE PRESENTATION */}
+              {screenShareMode === 'presentation' && (
+                <div className="screen-share-presentation">
+                  <div className="presentation-header">
+                    <div className="presentation-header-left">
+                      <span className="live-share-badge"><span className="rec-dot" /> СЛАЙДЫ</span>
+                      <Presentation size={18} />
+                      <span>{customSlideUrl ? 'Пользовательская презентация' : `Слайд ${currentSlide + 1} из ${slides.length}`}</span>
+                    </div>
+                    <div className="presentation-header-actions">
+                      <label className="screen-header-btn" style={{ cursor: 'pointer' }} title="Загрузить свой слайд / изображение">
+                        <Upload size={15} />
+                        <span>Свой файл</span>
+                        <input type="file" accept="image/*" onChange={handleUploadCustomSlide} style={{ display: 'none' }} />
+                      </label>
+                      <button 
+                        className={`screen-header-btn ${laserPointerActive ? 'active' : ''}`}
+                        onClick={() => setLaserPointerActive(!laserPointerActive)}
+                        title="Лазерная указка"
+                      >
+                        <Sparkles size={15} />
+                        <span>{laserPointerActive ? 'Указка: ВКЛ' : 'Указка'}</span>
+                      </button>
+                      <button className="screen-stop-btn" onClick={stopScreenShare}>
+                        <PhoneOff size={15} />
+                        <span>Остановить показ</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div 
+                    className="presentation-stage-wrapper"
+                    onMouseMove={e => {
+                      if (!laserPointerActive) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setLaserPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+                    }}
+                    onMouseLeave={() => setLaserPos(null)}
+                  >
+                    {laserPointerActive && laserPos && (
+                      <div className="presentation-laser-pointer" style={{ left: laserPos.x, top: laserPos.y }} />
+                    )}
+
+                    <div className="presentation-slide-view">
+                      {customSlideUrl ? (
+                        <img src={customSlideUrl} alt="Пользовательский слайд" className="presentation-custom-img" />
+                      ) : (
+                        <div className="presentation-slide-card">
+                          <span className="slide-badge">Слайд {currentSlide + 1} из {slides.length}</span>
+                          <h2>{slides[currentSlide].title}</h2>
+                          <p style={{ color: '#94A3B8', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+                            {slides[currentSlide].subtitle}
+                          </p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                            {slides[currentSlide].points.map((pt, idx) => (
+                              <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', fontSize: '0.88rem', color: '#E2E8F0' }}>
+                                <Check size={18} color="#10B981" style={{ flexShrink: 0, marginTop: '2px' }} />
+                                <span>{pt}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {!customSlideUrl && (
+                      <div className="presentation-nav-controls">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <button
+                            className="screen-header-btn"
+                            onClick={() => setCurrentSlide(s => Math.max(0, s - 1))}
+                            disabled={currentSlide === 0}
+                          >
+                            <ChevronLeft size={16} /> Назад
+                          </button>
+                          <button
+                            className="screen-header-btn"
+                            onClick={() => setCurrentSlide(s => Math.min(slides.length - 1, s + 1))}
+                            disabled={currentSlide === slides.length - 1}
+                          >
+                            Вперед <ChevronRight size={16} />
+                          </button>
+                        </div>
+
+                        <div className="presentation-thumbnails-strip">
+                          {slides.map((_, i) => (
+                            <button
+                              key={i}
+                              className={`slide-thumb-btn ${currentSlide === i ? 'active' : ''}`}
+                              onClick={() => setCurrentSlide(i)}
+                            >
+                              {i + 1}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* MODE 4: MEDIA / VIDEO DEMONSTRATION */}
+              {screenShareMode === 'media' && (
+                <div className="screen-share-presentation">
+                  <div className="presentation-header">
+                    <div className="presentation-header-left">
+                      <span className="live-share-badge"><span className="rec-dot" /> МЕДИА</span>
+                      <Film size={18} />
+                      <span>Демонстрация видео со звуком</span>
+                    </div>
+                    <div className="presentation-header-actions">
+                      <label className="screen-header-btn" style={{ cursor: 'pointer' }} title="Выбрать свой видеофайл">
+                        <Upload size={15} />
+                        <span>Выбрать видео</span>
+                        <input type="file" accept="video/*" onChange={handleUploadCustomVideo} style={{ display: 'none' }} />
+                      </label>
+                      <button className="screen-stop-btn" onClick={stopScreenShare}>
+                        <PhoneOff size={15} />
+                        <span>Остановить показ</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="media-share-wrapper">
+                    <video
+                      ref={mediaVideoRef}
+                      src={mediaVideoUrl}
+                      controls
+                      autoPlay
+                      playsInline
+                      className="media-share-video"
+                      onPlay={() => setIsMediaPlaying(true)}
+                      onPause={() => setIsMediaPlaying(false)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Mini participants strip at bottom of screen share */}
+              <div className="mini-participants-strip">
+                {participants.slice(0, 5).map(p => {
+                  const isMe = p.id === 'me' || p.id === effectiveUser?.id || p.username === effectiveUser?.username;
+                  return (
+                    <div key={p.id} className="mini-participant-tile">
+                      {isMe && videoOn && localStreamRef.current ? (
+                        <video ref={localVideoRef} autoPlay playsInline muted className="mini-live-video" />
+                      ) : (
+                        <img src={p.avatar || '/default-avatar.svg'} alt={p.name} />
+                      )}
+                      <span>{isMe ? 'Вы' : p.name.split(' ')[0]}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : (
-            /* Normal Grid View */
+            /* Normal Video Grid View */
             <div className={`video-tiles-grid grid-count-${Math.min(participants.length, 6)}`}>
               {participants.map((p) => {
-                const isMe = p.id === 'me';
-                const isSpeaking = activeSpeakerId === p.id;
-                const isVideoMuted = isMe && !videoOn;
-                const isAudioMuted = isMe && !micOn;
+                const isMe = p.id === 'me' || p.id === effectiveUser?.id || p.username === effectiveUser?.username;
+                const isSpeaking = isMe ? (micOn && isLocalSpeaking) : activeSpeakerId === p.id;
+                const isVideoMuted = isMe ? !videoOn : false;
+                const isAudioMuted = isMe ? !micOn : false;
 
                 return (
                   <div 
                     key={p.id} 
                     className={`participant-video-tile ${isSpeaking ? 'speaking-active' : ''}`}
                   >
-                    {isVideoMuted ? (
+                    {isMe && videoOn && localStreamRef.current ? (
+                      <div className="tile-video-stream">
+                        <video ref={localVideoRef} autoPlay playsInline muted className="tile-live-video" />
+                        <div className="tile-video-overlay" />
+                      </div>
+                    ) : isVideoMuted ? (
                       <div className="tile-avatar-placeholder">
-                        <img src={p.avatar} alt={p.name} />
+                        <img src={p.avatar || '/default-avatar.svg'} alt={p.name} />
                       </div>
                     ) : (
                       <div className="tile-video-stream">
-                        <img src={p.avatar} alt={p.name} className="tile-video-bg" />
+                        <img src={p.avatar || '/default-avatar.svg'} alt={p.name} className="tile-video-bg" />
                         <div className="tile-video-overlay" />
                       </div>
                     )}
@@ -200,13 +1040,22 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
                     {/* Bottom tag */}
                     <div className="tile-bottom-bar">
                       <span className="participant-name-tag">
-                        {isMe ? `${p.name} (Вы)` : p.name}
+                        {isMe ? `${effectiveUser?.name || 'Вы'} (Вы)` : p.name}
                       </span>
-                      <div className="tile-audio-status">
+                      <div className="tile-audio-status" style={{ display: 'flex', alignItems: 'center' }}>
                         {isAudioMuted ? (
                           <MicOff size={14} className="mic-muted-icon" />
                         ) : (
-                          <Mic size={14} className="mic-live-icon" />
+                          <div style={{ display: 'flex', alignItems: 'center' }}>
+                            <Mic size={14} className="mic-live-icon" />
+                            {isMe && isLocalSpeaking && (
+                              <div className="tile-mic-meter">
+                                <span className="tile-mic-meter-bar" />
+                                <span className="tile-mic-meter-bar" style={{ animationDelay: '0.15s' }} />
+                                <span className="tile-mic-meter-bar" style={{ animationDelay: '0.3s' }} />
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -217,7 +1066,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
           )}
         </div>
 
-        {/* Side Panel */}
+        {/* Side Panel (In-call Chat & Users) */}
         {activeSidePanel && (
           <aside className="conf-side-panel">
             <div className="side-panel-header">
@@ -245,10 +1094,10 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
               <div className="conf-chat-body">
                 <div className="conf-messages-feed">
                   {messages.map(msg => {
-                    const isFromMe = msg.user.id === 'me';
+                    const isFromMe = msg.user.id === 'me' || msg.user.id === effectiveUser?.id;
                     return (
                       <div key={msg.id} className={`conf-msg-item ${isFromMe ? 'from-me' : ''}`}>
-                        <img src={msg.user.avatar} alt={msg.user.name} className="conf-msg-avatar" />
+                        <img src={msg.user.avatar || '/default-avatar.svg'} alt={msg.user.name} className="conf-msg-avatar" />
                         <div className="conf-msg-content">
                           <div className="conf-msg-header">
                             <span className="conf-msg-author">{isFromMe ? 'Вы' : msg.user.name}</span>
@@ -300,29 +1149,34 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
             {activeSidePanel === 'users' && (
               <div className="conf-users-body">
                 <div className="users-list">
-                  {participants.map(p => (
-                    <div key={p.id} className="conf-user-row">
-                      <img src={p.avatar} alt={p.name} className="user-row-avatar" />
-                      <div className="user-row-info">
-                        <span className="user-row-name">{p.id === 'me' ? `${p.name} (Организатор)` : p.name}</span>
-                        <span className="user-row-status">
-                          {activeSpeakerId === p.id ? 'Говорит...' : 'В эфире'}
-                        </span>
+                  {participants.map(p => {
+                    const isMe = p.id === 'me' || p.id === effectiveUser?.id;
+                    return (
+                      <div key={p.id} className="conf-user-row">
+                        <img src={p.avatar || '/default-avatar.svg'} alt={p.name} className="user-row-avatar" />
+                        <div className="user-row-info">
+                          <span className="user-row-name">
+                            {isMe ? `${effectiveUser?.name || 'Вы'} (Организатор)` : p.name}
+                          </span>
+                          <span className="user-row-status">
+                            {isMe ? (micOn && isLocalSpeaking ? 'Говорит...' : 'В эфире') : (activeSpeakerId === p.id ? 'Говорит...' : 'В эфире')}
+                          </span>
+                        </div>
+                        <div className="user-row-controls">
+                          {isMe && !micOn ? (
+                            <MicOff size={16} className="user-row-icon red" />
+                          ) : (
+                            <Mic size={16} className="user-row-icon green" />
+                          )}
+                          {isMe && !videoOn ? (
+                            <VideoOff size={16} className="user-row-icon red" />
+                          ) : (
+                            <VideoIcon size={16} className="user-row-icon green" />
+                          )}
+                        </div>
                       </div>
-                      <div className="user-row-controls">
-                        {p.id === 'me' && !micOn ? (
-                          <MicOff size={16} className="user-row-icon red" />
-                        ) : (
-                          <Mic size={16} className="user-row-icon green" />
-                        )}
-                        {p.id === 'me' && !videoOn ? (
-                          <VideoOff size={16} className="user-row-icon red" />
-                        ) : (
-                          <VideoIcon size={16} className="user-row-icon green" />
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -330,38 +1184,63 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
         )}
       </div>
 
-      {/* Bottom Controls Bar (Redesigned with elegant modern buttons) */}
+      {/* Bottom Controls Bar */}
       <div className="conf-bottom-controls">
         <div className="controls-group-left">
+          {/* Microphone with volume indicator */}
           <button 
             className={`btn-control ${!micOn ? 'btn-danger' : ''}`} 
-            onClick={() => setMicOn(!micOn)}
+            onClick={toggleMic}
             title={micOn ? 'Выключить микрофон' : 'Включить микрофон'}
           >
             {micOn ? <Mic size={20} /> : <MicOff size={20} />}
             <span className="control-text">{micOn ? 'Микрофон' : 'Выключен'}</span>
+            {micOn && (
+              <div className="mic-volume-meter-wrapper">
+                <div className="mic-volume-meter-fill" style={{ width: `${Math.min(100, audioVolume * 2)}%` }} />
+              </div>
+            )}
           </button>
 
+          {/* Camera toggle */}
           <button 
             className={`btn-control ${!videoOn ? 'btn-danger' : ''}`} 
-            onClick={() => setVideoOn(!videoOn)}
+            onClick={toggleVideo}
             title={videoOn ? 'Выключить камеру' : 'Включить камеру'}
           >
             {videoOn ? <VideoIcon size={20} /> : <VideoOff size={20} />}
             <span className="control-text">{videoOn ? 'Камера' : 'Выключена'}</span>
           </button>
+
+          {/* Device Settings */}
+          <button 
+            className="btn-control" 
+            onClick={() => setIsSettingsModalOpen(true)}
+            title="Настройки звука и оборудования"
+          >
+            <Settings size={20} />
+            <span className="control-text">Настройки</span>
+          </button>
         </div>
 
         <div className="controls-group-center">
+          {/* Screen Share Button with Multi-choice trigger */}
           <button 
             className={`btn-control ${screenSharing ? 'btn-active' : ''}`}
-            onClick={() => setScreenSharing(!screenSharing)}
-            title="Демонстрация экрана"
+            onClick={() => {
+              if (screenSharing) {
+                stopScreenShare();
+              } else {
+                setIsSharePickerOpen(true);
+              }
+            }}
+            title={screenSharing ? 'Остановить демонстрацию' : 'Выбрать демонстрацию'}
           >
             <Monitor size={20} />
-            <span className="control-text">Экран</span>
+            <span className="control-text">{screenSharing ? 'Остановить' : 'Экран'}</span>
           </button>
 
+          {/* Hand Raise */}
           <button 
             className={`btn-control ${handRaised ? 'btn-active' : ''}`}
             onClick={() => setHandRaised(!handRaised)}
@@ -371,6 +1250,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
             <span className="control-text">Рука</span>
           </button>
 
+          {/* Chat Toggle */}
           <button 
             className={`btn-control ${activeSidePanel === 'chat' ? 'btn-active' : ''}`}
             onClick={() => setActiveSidePanel(activeSidePanel === 'chat' ? null : 'chat')}
@@ -380,6 +1260,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
             <span className="control-text">Чат</span>
           </button>
 
+          {/* Users Toggle */}
           <button 
             className={`btn-control ${activeSidePanel === 'users' ? 'btn-active' : ''}`}
             onClick={() => setActiveSidePanel(activeSidePanel === 'users' ? null : 'users')}
@@ -402,7 +1283,219 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
         </div>
       </div>
 
-      {/* Call Ended Summary Modal with Group Chat & Recording Links */}
+      {/* Screen Share Multi-Choice Modal */}
+      {isSharePickerOpen && (
+        <div className="conf-modal-overlay" onClick={() => setIsSharePickerOpen(false)}>
+          <div className="share-picker-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="share-picker-header">
+              <div className="share-picker-title">
+                <Monitor size={22} color="#6366F1" />
+                <span>Выберите тип демонстрации</span>
+              </div>
+              <button className="conf-modal-close" onClick={() => setIsSharePickerOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="share-picker-grid">
+              {/* Option 1: Real System Screen / Window / Tab */}
+              <div 
+                className="share-option-card"
+                onClick={() => handleSelectShareMode('screen')}
+              >
+                <div className="share-option-icon screen">
+                  <Monitor size={24} />
+                </div>
+                <div className="share-option-name">Экран устройства / Окно / Вкладка</div>
+                <div className="share-option-desc">
+                  Прямой системный захват рабочего стола, любого открытого приложения или вкладки браузера со звуком.
+                </div>
+              </div>
+
+              {/* Option 2: Interactive Whiteboard */}
+              <div 
+                className="share-option-card"
+                onClick={() => handleSelectShareMode('whiteboard')}
+              >
+                <div className="share-option-icon board">
+                  <Palette size={24} />
+                </div>
+                <div className="share-option-name">Интерактивная доска (Whiteboard)</div>
+                <div className="share-option-desc">
+                  Совместный виртуальный холст: рисуйте схемы, заметки маркерами, стикеры с экспортом рисунка.
+                </div>
+              </div>
+
+              {/* Option 3: Presentation Slides */}
+              <div 
+                className="share-option-card"
+                onClick={() => handleSelectShareMode('presentation')}
+              >
+                <div className="share-option-icon presentation">
+                  <Presentation size={24} />
+                </div>
+                <div className="share-option-name">Презентация и слайды</div>
+                <div className="share-option-desc">
+                  Интерактивные слайды с навигацией, лазерной указкой и возможностью загрузки собственных изображений.
+                </div>
+              </div>
+
+              {/* Option 4: Video / Media player */}
+              <div 
+                className="share-option-card"
+                onClick={() => handleSelectShareMode('media')}
+              >
+                <div className="share-option-icon media">
+                  <Film size={24} />
+                </div>
+                <div className="share-option-name">Видео и медиа-файл</div>
+                <div className="share-option-desc">
+                  Трансляция видеоролика со звуком, регулировкой громкости и воспроизведением видеофайлов.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Device Settings Modal (Microphone, Camera, Speaker) */}
+      {isSettingsModalOpen && (
+        <div className="conf-modal-overlay" onClick={() => setIsSettingsModalOpen(false)}>
+          <div className="device-settings-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="share-picker-header">
+              <div className="share-picker-title">
+                <Settings size={22} color="#10B981" />
+                <span>Настройки оборудования</span>
+              </div>
+              <button className="conf-modal-close" onClick={() => setIsSettingsModalOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Microphone Settings */}
+            <div className="device-setting-field">
+              <label className="device-setting-label">
+                <Mic size={16} color="#10B981" />
+                <span>Микрофон (Аудиовход)</span>
+              </label>
+              <select 
+                className="device-setting-select"
+                value={selectedAudioInput}
+                onChange={e => setSelectedAudioInput(e.target.value)}
+              >
+                {audioInputs.length > 0 ? (
+                  audioInputs.map((d, i) => (
+                    <option key={d.deviceId || i} value={d.deviceId}>
+                      {d.label || `Микрофон ${i + 1}`}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Микрофон по умолчанию</option>
+                )}
+              </select>
+
+              {/* Real-time mic test level */}
+              <div className="mic-test-row">
+                <span style={{ fontSize: '0.74rem', color: '#94A3B8' }}>Уровень сигнала:</span>
+                <div className="mic-test-bar">
+                  <div className="mic-test-fill" style={{ width: `${Math.min(100, audioVolume * 2)}%` }} />
+                </div>
+                <span style={{ fontSize: '0.74rem', color: isLocalSpeaking ? '#10B981' : '#64748B', fontWeight: 600 }}>
+                  {isLocalSpeaking ? 'Голос обнаружен' : 'Ожидание голоса'}
+                </span>
+              </div>
+            </div>
+
+            {/* Speaker Settings */}
+            <div className="device-setting-field">
+              <label className="device-setting-label">
+                <Volume2 size={16} color="#3B82F6" />
+                <span>Динамики / Наушники (Аудиовыход)</span>
+              </label>
+              <select 
+                className="device-setting-select"
+                value={selectedAudioOutput}
+                onChange={e => handleSelectAudioOutput(e.target.value)}
+              >
+                {audioOutputs.length > 0 ? (
+                  audioOutputs.map((d, i) => (
+                    <option key={d.deviceId || i} value={d.deviceId}>
+                      {d.label || `Динамики ${i + 1}`}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Динамики по умолчанию</option>
+                )}
+              </select>
+
+              <button 
+                type="button" 
+                className={`sound-test-btn ${audioTestPlaying ? 'playing' : ''}`}
+                onClick={handleTestSpeakerSound}
+              >
+                <Volume2 size={15} />
+                <span>{audioTestPlaying ? 'Воспроизведение перезвона...' : 'Проверить звук'}</span>
+              </button>
+            </div>
+
+            {/* Camera Settings */}
+            <div className="device-setting-field">
+              <label className="device-setting-label">
+                <VideoIcon size={16} color="#8B5CF6" />
+                <span>Веб-камера (Видеовход)</span>
+              </label>
+              <select 
+                className="device-setting-select"
+                value={selectedVideoInput}
+                onChange={e => setSelectedVideoInput(e.target.value)}
+              >
+                {videoInputs.length > 0 ? (
+                  videoInputs.map((d, i) => (
+                    <option key={d.deviceId || i} value={d.deviceId}>
+                      {d.label || `Камера ${i + 1}`}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Веб-камера по умолчанию</option>
+                )}
+              </select>
+            </div>
+
+            {/* Smart Filters */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#E2E8F0', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={noiseSuppression} 
+                  onChange={e => setNoiseSuppression(e.target.checked)} 
+                />
+                <span>Интеллектуальное шумоподавление микрофона (Noise Suppression)</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', color: '#E2E8F0', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={echoCancellation} 
+                  onChange={e => setEchoCancellation(e.target.checked)} 
+                />
+                <span>Эхоподавление динамиков и гарнитуры (Echo Cancellation)</span>
+              </label>
+            </div>
+
+            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                type="button" 
+                className="btn-primary-summary" 
+                style={{ padding: '0.55rem 1.5rem', fontSize: '0.85rem' }}
+                onClick={() => setIsSettingsModalOpen(false)}
+              >
+                Готово
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Call Ended Summary Modal */}
       {callEndedModal && (
         <div className="conf-modal-overlay">
           <div className="call-summary-modal-box">

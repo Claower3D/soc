@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Video, Lock, Globe, MessageSquare, Disc } from 'lucide-react';
 import { currentUser, type Conference } from '../data/mock';
+import { useAuth } from '../context/AuthContext';
 import './CreateConferenceModal.css';
 
 interface CreateConferenceModalProps {
@@ -10,6 +11,8 @@ interface CreateConferenceModalProps {
 }
 
 export function CreateConferenceModal({ isOpen, onClose, onCreateConference }: CreateConferenceModalProps) {
+  const { currentUser: authUser } = useAuth();
+  const effectiveHost = authUser || currentUser;
   const [title, setTitle] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [createGroup, setCreateGroup] = useState(true);
@@ -27,10 +30,10 @@ export function CreateConferenceModal({ isOpen, onClose, onCreateConference }: C
       title: confTitle,
       isPrivate,
       inviteCode: generatedCode,
-      host: currentUser,
+      host: effectiveHost,
       status: 'live',
       startedAt: 'Только что',
-      participants: [currentUser],
+      participants: [effectiveHost],
       hasRecording: recordMeeting,
       recordingDuration: '0:00',
       recordingDate: 'Сегодня',
