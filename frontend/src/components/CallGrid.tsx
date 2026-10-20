@@ -79,6 +79,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
 
   // Meeting & UI states
   const [handRaised, setHandRaised] = useState(false);
+  const [floatingReaction, setFloatingReaction] = useState<string | null>(null);
   const [activeSidePanel, setActiveSidePanel] = useState<'chat' | 'users' | null>('chat');
   const [messages, setMessages] = useState<ConferenceMessage[]>(initialConferenceMessages);
   const [chatInput, setChatInput] = useState('');
