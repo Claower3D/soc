@@ -7,6 +7,7 @@ import { type Chat } from '../data/mock';
 import { INITIAL_DATING_PROFILES } from '../data/datingData';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { getAllConferenceGroups, getStoredConferenceGroup, getStoredConferenceRecordings } from '../utils/conferenceManager';
 import './MessengerPage.css';
 
 export function MessengerPage() {
@@ -93,6 +94,14 @@ export function MessengerPage() {
         } catch { /* ignore */ }
       }
 
+      // Всегда подтягиваем все созданные группы конференций
+      const confGroups = getAllConferenceGroups();
+      for (const cg of confGroups) {
+        if (!userChats.some(c => c.id === cg.id)) {
+          userChats.push(cg);
+        }
+      }
+
       // Личный ИИ ассистент всегда присутствует и уникален для этого пользователя
       const hasOracle = userChats.some(c => c.id === 'chat_ai_oracle');
       if (!hasOracle) {
@@ -160,6 +169,13 @@ export function MessengerPage() {
               }
             } catch { /* ignore */ }
           }
+          const confGroups = getAllConferenceGroups();
+          for (const cg of confGroups) {
+            if (!localGroupsAndAi.some(g => g.id === cg.id)) {
+              localGroupsAndAi.push(cg);
+            }
+          }
+
           const personalAi = localGroupsAndAi.find(c => c.id === 'chat_ai_oracle') || createPersonalAiChat(currentUser);
           const localGroups = localGroupsAndAi.filter(c => c.id !== 'chat_ai_oracle');
           const serverWithoutAi = normalized.filter((c: Chat) => c.id !== 'chat_ai_oracle' && !localGroups.some(lg => lg.id === c.id));
@@ -219,12 +235,61 @@ export function MessengerPage() {
     if (requestedChatId) {
       setActiveChatId(requestedChatId);
       setChatList(prev => {
+        let exists = prev.find(c => c.id === requestedChatId);
+        if (!exists) {
+          // Ищем сохраненную группу конференции
+          const storedGroup = getStoredConferenceGroup(requestedChatId);
+          if (storedGroup) {
+            exists = storedGroup;
+            const updatedWithNew = [storedGroup, ...prev.filter(c => c.id !== storedGroup.id)];
+            localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updatedWithNew));
+            return updatedWithNew;
+          } else if (requestedChatId.startsWith('group_') || requestedChatId.startsWith('conf_')) {
+            // Динамически восстанавливаем группу по ID
+            const recs = getStoredConferenceRecordings();
+            const matchingRec = recs.find(r => r.chatGroupId === requestedChatId || r.conferenceId === requestedChatId || r.id === requestedChatId);
+            const titleName = matchingRec?.title || requestedChatId.replace(/^group_conf_|^group_/, 'Встреча ');
+            const dynamicGroup: Chat = {
+              id: requestedChatId,
+              isGroup: true,
+              groupTitle: `💬 Конференция: ${titleName}`,
+              groupAvatar: matchingRec?.thumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+              membersCount: matchingRec?.participantsCount || 2,
+              lastMessage: 'Группа конференции создана',
+              time: 'Сегодня',
+              unread: 0,
+              user: {
+                id: `host_${requestedChatId}`,
+                name: `💬 Конференция: ${titleName}`,
+                username: requestedChatId,
+                avatar: matchingRec?.thumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+                online: true,
+                followersCount: 0,
+                followingCount: 0,
+                postsCount: 0,
+              },
+              messages: [
+                {
+                  id: `m_dyn_${Date.now()}`,
+                  fromMe: false,
+                  text: `🎬 Группа конференции «${titleName}»\n\nИстория чата и материалы сохранены.`,
+                  time: 'Сегодня',
+                  status: 'read'
+                }
+              ]
+            };
+            const updatedWithNew = [dynamicGroup, ...prev];
+            localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updatedWithNew));
+            return updatedWithNew;
+          }
+        }
+
         const updated = prev.map(c => {
           if (c.id === requestedChatId) {
             return {
               ...c,
               unread: 0,
-              messages: c.messages.map(m => (!m.fromMe || !m.status ? { ...m, status: 'read' as const } : m))
+              messages: (c.messages || []).map(m => (!m.fromMe || !m.status ? { ...m, status: 'read' as const } : m))
             };
           }
           return c;
@@ -413,7 +478,13 @@ export function MessengerPage() {
     }
   }, [requestedChatId, datingProfileId, targetUserParam, isLoading]);
 
-  const activeChat = chatList.find(c => c.id === activeChatId) ?? null;
+  let activeChat = chatList.find(c => c.id === activeChatId) ?? null;
+  if (!activeChat && activeChatId) {
+    const recovered = getStoredConferenceGroup(activeChatId);
+    if (recovered) {
+      activeChat = recovered;
+    }
+  }
 
   const handleSelectChat = (id: string) => {
     setActiveChatId(id);

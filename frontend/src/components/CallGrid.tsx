@@ -729,7 +729,30 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
     const { blob, url } = await stopCallRecording();
     const finalDuration = formatTime(callDuration);
     const recId = `rec_${Date.now()}`;
-    const targetGroupId = conference?.chatGroupId || `group_${conference?.id || Date.now()}`;
+    const effectiveConf: Conference = conference || {
+      id: `conf_${Date.now()}`,
+      title: confTitle,
+      inviteCode: confCode,
+      isPrivate: false,
+      host: effectiveUser,
+      status: 'ended',
+      participants: participants,
+    };
+
+    const targetGroupId = effectiveConf.chatGroupId || (
+      effectiveConf.id ? (effectiveConf.id.startsWith('group_') ? effectiveConf.id : `group_${effectiveConf.id}`) : `group_conf_${Date.now()}`
+    );
+    effectiveConf.chatGroupId = targetGroupId;
+
+    const savedGroupId = saveConferenceGroupChat({
+      conference: effectiveConf,
+      duration: finalDuration,
+      messages: messages,
+      videoUrl: url,
+      thumbnail: effectiveConf.recordingThumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+      currentUserId: effectiveUser?.id || 'me',
+      hostUser: effectiveUser,
+    });
 
     const recItem: ConferenceRecordingItem = {
       id: recId,
@@ -737,35 +760,17 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       date: 'Сегодня, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       duration: finalDuration,
       participantsCount: participants.length || 1,
-      thumbnail: conference?.recordingThumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+      thumbnail: effectiveConf.recordingThumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
       videoUrl: url,
-      chatGroupId: targetGroupId,
-      conferenceId: conference?.id,
+      chatGroupId: savedGroupId,
+      conferenceId: effectiveConf.id,
       inviteCode: confCode,
     };
 
     saveConferenceRecording(recItem, blob || undefined);
 
-    saveConferenceGroupChat({
-      conference: conference || {
-        id: `conf_${Date.now()}`,
-        title: confTitle,
-        inviteCode: confCode,
-        isPrivate: false,
-        host: effectiveUser,
-        status: 'ended',
-        participants: participants,
-      },
-      duration: finalDuration,
-      messages: messages,
-      videoUrl: url,
-      thumbnail: recItem.thumbnail,
-      currentUserId: effectiveUser?.id || 'me',
-      hostUser: effectiveUser,
-    });
-
     setSavedRecordingData(recItem);
-    setCreatedGroupId(targetGroupId);
+    setCreatedGroupId(savedGroupId);
     setCallEndedModal(true);
   };
 

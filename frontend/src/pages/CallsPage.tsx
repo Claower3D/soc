@@ -138,7 +138,7 @@ export function ConferencesPage() {
         onLeaveCall={handleLeaveCall}
         onGoToChatGroup={(chatId) => {
           handleLeaveCall();
-          navigate(`/messenger?chat=${chatId}`);
+          navigate(`/messenger?chat=${encodeURIComponent(chatId)}`);
         }}
       />
     );
