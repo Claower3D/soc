@@ -4,7 +4,7 @@ import {
   Video, Headphones,
   Bell, Check, Plus, Image as ImageIcon, PhoneCall, ShoppingBag, 
   Users, Film, LogIn, Sparkles, Wind, Heart, BellRing,
-  MessageCircle, UserPlus, Trash2, X, Settings, Search, QrCode
+  MessageCircle, UserPlus, Trash2, X, Settings, Search, QrCode, Database
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -12,6 +12,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { AuthModal } from './AuthModal';
 import { EditProfileModal, type EditTab } from './EditProfileModal';
 import { QrScannerModal } from './QrScannerModal';
+import { CacheManagerModal } from './CacheManagerModal';
 import { PremiumBadge } from './PremiumBadge';
 import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import './Header.css';
@@ -38,6 +39,7 @@ export function Header() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<EditTab>('preferences');
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+  const [isCacheOpen, setIsCacheOpen] = useState(false);
   const createRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -48,11 +50,14 @@ export function Header() {
       setIsSettingsOpen(true);
     };
     const handleOpenQr = () => setIsQrScannerOpen(true);
+    const handleOpenCache = () => setIsCacheOpen(true);
     window.addEventListener('open-profile-settings', handleOpenSettings);
     window.addEventListener('open-qr-scanner', handleOpenQr);
+    window.addEventListener('open-cache-manager', handleOpenCache);
     return () => {
       window.removeEventListener('open-profile-settings', handleOpenSettings);
       window.removeEventListener('open-qr-scanner', handleOpenQr);
+      window.removeEventListener('open-cache-manager', handleOpenCache);
     };
   }, []);
 
@@ -241,7 +246,15 @@ export function Header() {
           <Search size={15} />
         </button>
 
-
+        {/* Cache Manager Shortcut */}
+        <button
+          className="header-action-btn header-cache-pill"
+          onClick={() => setIsCacheOpen(true)}
+          title="Управление кэшированием (SWR v2 + RAM)"
+        >
+          <Database size={15} />
+          <span className="btn-text">Кэш</span>
+        </button>
 
         <div className="header-divider" />
 
@@ -582,6 +595,12 @@ export function Header() {
       <QrScannerModal
         isOpen={isQrScannerOpen}
         onClose={() => setIsQrScannerOpen(false)}
+      />
+
+      {/* Global Cache Manager Modal */}
+      <CacheManagerModal
+        isOpen={isCacheOpen}
+        onClose={() => setIsCacheOpen(false)}
       />
     </header>
   );

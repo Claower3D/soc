@@ -2292,6 +2292,10 @@ func handleChats(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlePodcasts(w http.ResponseWriter, r *http.Request) {
+	if cached, ok := globalCache.Get("api:podcasts"); ok && cached != nil {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: cached})
+		return
+	}
 	podcasts := make([]map[string]interface{}, 0)
 	if db != nil {
 		rows, err := db.Query(`SELECT id, title, author_name, cover, description FROM podcasts ORDER BY created_at DESC LIMIT 20`)
@@ -2315,14 +2319,20 @@ func handlePodcasts(w http.ResponseWriter, r *http.Request) {
 					podcasts = append(podcasts, map[string]interface{}{"id": id, "title": title, "author": author, "cover": cover, "description": desc, "episodes": episodes})
 				}
 			}
+			globalCache.Set("api:podcasts", podcasts, 60*time.Second, "podcasts")
 			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: podcasts})
 			return
 		}
 	}
+	globalCache.Set("api:podcasts", podcasts, 60*time.Second, "podcasts")
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: podcasts})
 }
 
 func handleMarketplace(w http.ResponseWriter, r *http.Request) {
+	if cached, ok := globalCache.Get("api:marketplace"); ok && cached != nil {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: cached})
+		return
+	}
 	products := make([]map[string]interface{}, 0)
 	if db != nil {
 		rows, err := db.Query(`
@@ -2343,14 +2353,20 @@ func handleMarketplace(w http.ResponseWriter, r *http.Request) {
 					products = append(products, map[string]interface{}{"id": id, "title": title, "price": price, "currency": currency, "rating": rating, "image": imageUrl, "author": author, "category": category})
 				}
 			}
+			globalCache.Set("api:marketplace", products, 30*time.Second, "marketplace")
 			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: products})
 			return
 		}
 	}
+	globalCache.Set("api:marketplace", products, 30*time.Second, "marketplace")
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: products})
 }
 
 func handleCommunities(w http.ResponseWriter, r *http.Request) {
+	if cached, ok := globalCache.Get("api:communities"); ok && cached != nil {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: cached})
+		return
+	}
 	communities := make([]map[string]interface{}, 0)
 	if db != nil {
 		rows, err := db.Query(`
@@ -2367,10 +2383,12 @@ func handleCommunities(w http.ResponseWriter, r *http.Request) {
 					communities = append(communities, map[string]interface{}{"id": id, "name": name, "description": desc, "avatar": avatar, "cover": cover, "membersCount": membersCount, "category": category, "isVerified": isVerified})
 				}
 			}
+			globalCache.Set("api:communities", communities, 30*time.Second, "communities")
 			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: communities})
 			return
 		}
 	}
+	globalCache.Set("api:communities", communities, 30*time.Second, "communities")
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: communities})
 }
 
@@ -5028,6 +5046,10 @@ func handleDeletePost(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleStories(w http.ResponseWriter, r *http.Request) {
+	if cached, ok := globalCache.Get("api:stories"); ok && cached != nil {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: cached})
+		return
+	}
 	var stories []Story
 
 	dbMu.RLock()
@@ -5145,6 +5167,7 @@ func handleStories(w http.ResponseWriter, r *http.Request) {
 		stories = []Story{}
 	}
 
+	globalCache.Set("api:stories", stories, 15*time.Second, "stories")
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: stories})
 }
 
@@ -5153,6 +5176,15 @@ func handleClips(w http.ResponseWriter, r *http.Request) {
 	token := extractBearerToken(r)
 	if claims, err := parseAndValidateJWT(token); err == nil && claims != nil {
 		currentUserID = claims.UserID
+	}
+
+	cacheKey := "api:clips"
+	if currentUserID != "" {
+		cacheKey = "api:clips:" + currentUserID
+	}
+	if cached, ok := globalCache.Get(cacheKey); ok && cached != nil {
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: cached})
+		return
 	}
 
 	dbMu.RLock()
@@ -5209,6 +5241,7 @@ func handleClips(w http.ResponseWriter, r *http.Request) {
 			if clips == nil {
 				clips = []map[string]interface{}{}
 			}
+			globalCache.Set(cacheKey, clips, 20*time.Second, "clips")
 			writeJSON(w, http.StatusOK, Response{Status: "ok", Data: clips})
 			return
 		}
@@ -7283,6 +7316,7 @@ func handleCreateCommunity(w http.ResponseWriter, r *http.Request) {
 
 	dbConn.Exec(`INSERT INTO community_members (community_id, user_id, role) VALUES ($1, $2, 'owner')`, commID, claims.UserID)
 
+	globalCache.InvalidateTag("communities")
 	writeJSON(w, 200, Response{Status: "ok", Data: map[string]string{"id": commID}})
 }
 
@@ -7315,6 +7349,7 @@ func handleJoinCommunity(w http.ResponseWriter, r *http.Request) {
 		dbConn.Exec(`UPDATE communities SET member_count = member_count + 1 WHERE id = $1`, commID)
 	}
 
+	globalCache.InvalidateTag("communities")
 	writeJSON(w, 200, Response{Status: "ok"})
 }
 
@@ -7347,6 +7382,7 @@ func handleLeaveCommunity(w http.ResponseWriter, r *http.Request) {
 		dbConn.Exec(`UPDATE communities SET member_count = member_count - 1 WHERE id = $1`, commID)
 	}
 
+	globalCache.InvalidateTag("communities")
 	writeJSON(w, 200, Response{Status: "ok"})
 }
 
@@ -7551,6 +7587,7 @@ func handleCreateStory(w http.ResponseWriter, r *http.Request) {
 	store.saveToDisk()
 	store.mu.Unlock()
 
+	globalCache.InvalidateTag("stories")
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: newStory})
 }
 
@@ -7788,6 +7825,7 @@ func handleDeleteStory(w http.ResponseWriter, r *http.Request) {
 	store.saveToDisk()
 	store.mu.Unlock()
 
+	globalCache.InvalidateTag("stories")
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "История удалена"})
 }
 
@@ -8231,6 +8269,7 @@ func handleCreateClip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	globalCache.InvalidateTag("clips")
 	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
 		"id":         clipID,
 		"videoUrl":   videoUrl,
@@ -8275,6 +8314,7 @@ func handleUpdateClip(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	globalCache.InvalidateTag("clips")
 	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
 		"id": clipID,
 		"caption": caption,
@@ -8349,6 +8389,7 @@ func handleDeleteClip(w http.ResponseWriter, r *http.Request) {
 			_, _ = dbConn.Exec(`DELETE FROM media_files WHERE id = $1 OR id = $2`, sub, filepath.Base(sub))
 		}
 	}
+	globalCache.InvalidateTag("clips")
 	writeJSON(w, 200, Response{Status: "ok"})
 }
 
@@ -8565,6 +8606,7 @@ func handleLikeClip(w http.ResponseWriter, r *http.Request) {
 	var newLikes int
 	_ = dbConn.QueryRow(`SELECT COALESCE(likes_count, 0) FROM clips WHERE id = $1`, clipID).Scan(&newLikes)
 
+	globalCache.InvalidateTag("clips")
 	writeJSON(w, 200, Response{Status: "ok", Data: map[string]interface{}{
 		"liked": liked,
 		"likesCount": newLikes,

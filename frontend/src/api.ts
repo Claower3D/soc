@@ -107,7 +107,30 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}, isMultip
   return data;
 }
 
+import { dataCache } from './utils/dataCache';
+
 export const api = {
+  cache: {
+    stats: () => dataCache.getStats(),
+    clear: async () => {
+      dataCache.clear();
+      try {
+        await apiFetch<any>('/api/cache/clear', { method: 'POST' });
+      } catch {}
+    },
+    invalidate: (tag: string) => dataCache.invalidateTag(tag),
+    prefetchAll: async () => {
+      try {
+        await Promise.allSettled([
+          api.posts.list(),
+          api.clips.list(),
+          api.videos.list(),
+          api.stories.list(),
+          api.users.list(),
+        ]);
+      } catch {}
+    }
+  },
   auth: {
     register: (data: any) => apiFetch<any>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
     login: (data: any) => apiFetch<any>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
@@ -125,67 +148,151 @@ export const api = {
     verifyCode: (phone: string, code: string) => apiFetch<any>('/api/auth/verify-code', { method: 'POST', body: JSON.stringify({ phone, code }) })
   },
   users: {
-    list: () => apiFetch<any>('/api/users'),
+    list: (forceRefresh = false) => dataCache.fetchWithCache('api:users:list', () => apiFetch<any>('/api/users'), { ttlMs: 90000, tag: 'users', forceRefresh }),
     search: (query: string) => apiFetch<any>(`/api/search?q=${encodeURIComponent(query)}`),
-    profile: (id: string) => apiFetch<any>(`/api/users/${id}/profile`),
-    follow: (id: string) => apiFetch<any>(`/api/users/${id}/follow`, { method: 'POST' }),
-    unfollow: (id: string) => apiFetch<any>(`/api/users/${id}/follow`, { method: 'DELETE' }),
+    profile: (id: string, forceRefresh = false) => dataCache.fetchWithCache(`api:users:${id}:profile`, () => apiFetch<any>(`/api/users/${id}/profile`), { ttlMs: 60000, tag: `user:${id}`, forceRefresh }),
+    follow: async (id: string) => {
+      const res = await apiFetch<any>(`/api/users/${id}/follow`, { method: 'POST' });
+      dataCache.invalidateTag(`user:${id}`);
+      dataCache.invalidateTag('users');
+      return res;
+    },
+    unfollow: async (id: string) => {
+      const res = await apiFetch<any>(`/api/users/${id}/follow`, { method: 'DELETE' });
+      dataCache.invalidateTag(`user:${id}`);
+      dataCache.invalidateTag('users');
+      return res;
+    },
     followers: (id: string) => apiFetch<any>(`/api/users/${id}/followers`),
     following: (id: string) => apiFetch<any>(`/api/users/${id}/following`),
     friends: (id: string) => apiFetch<any>(`/api/users/${id}/friends`),
     removeFriend: (id: string) => apiFetch<any>(`/api/users/${id}/friend`, { method: 'DELETE' }),
-    updateProfile: (data: any) => apiFetch<any>('/api/profile', { method: 'PUT', body: JSON.stringify(data) }),
+    updateProfile: async (data: any) => {
+      const res = await apiFetch<any>('/api/profile', { method: 'PUT', body: JSON.stringify(data) });
+      dataCache.invalidateTag('users');
+      dataCache.invalidateTag('feed');
+      return res;
+    },
     heartbeat: () => apiFetch<any>('/api/users/heartbeat', { method: 'POST' }),
     offline: () => apiFetch<any>('/api/users/offline', { method: 'POST' })
   },
   posts: {
-    list: (page?: number) => apiFetch<any>(page ? `/api/feed?page=${page}` : '/api/feed'),
-    userPosts: (userId: string) => apiFetch<any>(`/api/users/${userId}/posts`),
-    create: (data: FormData | any) => {
-      if (data instanceof FormData) {
-        return apiFetch<any>('/api/posts', { method: 'POST', body: data }, true);
-      }
-      return apiFetch<any>('/api/posts', { method: 'POST', body: JSON.stringify(data) });
+    list: (page?: number, forceRefresh = false) => {
+      const key = page ? `api:feed:${page}` : 'api:feed:1';
+      return dataCache.fetchWithCache(key, () => apiFetch<any>(page ? `/api/feed?page=${page}` : '/api/feed'), { ttlMs: 45000, tag: 'feed', forceRefresh });
     },
-    like: (id: string) => apiFetch<any>(`/api/posts/${id}/like`, { method: 'POST' }),
-    unlike: (id: string) => apiFetch<any>(`/api/posts/${id}/like`, { method: 'DELETE' }),
+    userPosts: (userId: string, forceRefresh = false) => {
+      return dataCache.fetchWithCache(`api:users:${userId}:posts`, () => apiFetch<any>(`/api/users/${userId}/posts`), { ttlMs: 60000, tag: `user:${userId}`, forceRefresh });
+    },
+    create: async (data: FormData | any) => {
+      let res;
+      if (data instanceof FormData) {
+        res = await apiFetch<any>('/api/posts', { method: 'POST', body: data }, true);
+      } else {
+        res = await apiFetch<any>('/api/posts', { method: 'POST', body: JSON.stringify(data) });
+      }
+      dataCache.invalidateTag('feed');
+      return res;
+    },
+    like: async (id: string) => {
+      const res = await apiFetch<any>(`/api/posts/${id}/like`, { method: 'POST' });
+      dataCache.invalidateTag('feed');
+      return res;
+    },
+    unlike: async (id: string) => {
+      const res = await apiFetch<any>(`/api/posts/${id}/like`, { method: 'DELETE' });
+      dataCache.invalidateTag('feed');
+      return res;
+    },
     save: (id: string) => apiFetch<any>(`/api/posts/${id}/save`, { method: 'POST' }),
-    comment: (id: string, text: string) => apiFetch<any>(`/api/posts/${id}/comments`, { method: 'POST', body: JSON.stringify({ text }) }),
+    comment: async (id: string, text: string) => {
+      const res = await apiFetch<any>(`/api/posts/${id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
+      dataCache.invalidateTag('feed');
+      return res;
+    },
     comments: (id: string) => apiFetch<any>(`/api/posts/${id}/comments`),
-    delete: (id: string) => apiFetch<any>(`/api/posts/${id}`, { method: 'DELETE' })
+    delete: async (id: string) => {
+      const res = await apiFetch<any>(`/api/posts/${id}`, { method: 'DELETE' });
+      dataCache.invalidateTag('feed');
+      return res;
+    }
   },
   stories: {
-    list: () => apiFetch<any>('/api/stories'),
-    create: (formData: FormData) => apiFetch<any>('/api/stories', { method: 'POST', body: formData }, true),
-    sync: (stories: any[]) => apiFetch<any>('/api/stories/sync', { method: 'POST', body: JSON.stringify(stories) }),
-    delete: (id: string) => apiFetch<any>(`/api/stories/${id}`, { method: 'DELETE' }),
+    list: (forceRefresh = false) => dataCache.fetchWithCache('api:stories:list', () => apiFetch<any>('/api/stories'), { ttlMs: 30000, tag: 'stories', forceRefresh }),
+    create: async (formData: FormData) => {
+      const res = await apiFetch<any>('/api/stories', { method: 'POST', body: formData }, true);
+      dataCache.invalidateTag('stories');
+      return res;
+    },
+    sync: async (stories: any[]) => {
+      const res = await apiFetch<any>('/api/stories/sync', { method: 'POST', body: JSON.stringify(stories) });
+      dataCache.invalidateTag('stories');
+      return res;
+    },
+    delete: async (id: string) => {
+      const res = await apiFetch<any>(`/api/stories/${id}`, { method: 'DELETE' });
+      dataCache.invalidateTag('stories');
+      return res;
+    },
     view: (id: string) => apiFetch<any>(`/api/stories/${id}/view`, { method: 'POST' }),
     viewers: (id: string) => apiFetch<any>(`/api/stories/${id}/viewers`)
   },
   videos: {
-    list: () => apiFetch<any>('/api/videos'),
-    create: (data: FormData | any) => {
+    list: (forceRefresh = false) => dataCache.fetchWithCache('api:videos:list', () => apiFetch<any>('/api/videos'), { ttlMs: 60000, tag: 'videos', forceRefresh }),
+    create: async (data: FormData | any) => {
+      let res;
       if (data instanceof FormData) {
-        return apiFetch<any>('/api/videos', { method: 'POST', body: data }, true);
+        res = await apiFetch<any>('/api/videos', { method: 'POST', body: data }, true);
+      } else {
+        res = await apiFetch<any>('/api/videos', { method: 'POST', body: JSON.stringify(data) });
       }
-      return apiFetch<any>('/api/videos', { method: 'POST', body: JSON.stringify(data) });
+      dataCache.invalidateTag('videos');
+      return res;
     },
-    delete: (id: string) => apiFetch<any>(`/api/videos/${id}`, { method: 'DELETE' }),
-    update: (id: string, data: { title?: string; description?: string; category?: string }) => apiFetch<any>(`/api/videos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    like: (id: string) => apiFetch<any>(`/api/videos/${id}/like`, { method: 'POST' }),
+    delete: async (id: string) => {
+      const res = await apiFetch<any>(`/api/videos/${id}`, { method: 'DELETE' });
+      dataCache.invalidateTag('videos');
+      return res;
+    },
+    update: async (id: string, data: { title?: string; description?: string; category?: string }) => {
+      const res = await apiFetch<any>(`/api/videos/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      dataCache.invalidateTag('videos');
+      return res;
+    },
+    like: async (id: string) => {
+      const res = await apiFetch<any>(`/api/videos/${id}/like`, { method: 'POST' });
+      dataCache.invalidateTag('videos');
+      return res;
+    },
     view: (id: string) => apiFetch<any>(`/api/videos/${id}/view`, { method: 'POST' })
   },
   clips: {
-    list: () => apiFetch<any>('/api/clips'),
-    create: (data: FormData | any) => {
+    list: (forceRefresh = false) => dataCache.fetchWithCache('api:clips:list', () => apiFetch<any>('/api/clips'), { ttlMs: 45000, tag: 'clips', forceRefresh }),
+    create: async (data: FormData | any) => {
+      let res;
       if (data instanceof FormData) {
-        return apiFetch<any>('/api/clips', { method: 'POST', body: data }, true);
+        res = await apiFetch<any>('/api/clips', { method: 'POST', body: data }, true);
+      } else {
+        res = await apiFetch<any>('/api/clips', { method: 'POST', body: JSON.stringify(data) });
       }
-      return apiFetch<any>('/api/clips', { method: 'POST', body: JSON.stringify(data) });
+      dataCache.invalidateTag('clips');
+      return res;
     },
-    delete: (id: string) => apiFetch<any>(`/api/clips/${id}`, { method: 'DELETE' }),
-    update: (id: string, data: { caption?: string; soundTitle?: string }) => apiFetch<any>(`/api/clips/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-    like: (id: string) => apiFetch<any>(`/api/clips/${id}/like`, { method: 'POST' }),
+    delete: async (id: string) => {
+      const res = await apiFetch<any>(`/api/clips/${id}`, { method: 'DELETE' });
+      dataCache.invalidateTag('clips');
+      return res;
+    },
+    update: async (id: string, data: { caption?: string; soundTitle?: string }) => {
+      const res = await apiFetch<any>(`/api/clips/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      dataCache.invalidateTag('clips');
+      return res;
+    },
+    like: async (id: string) => {
+      const res = await apiFetch<any>(`/api/clips/${id}/like`, { method: 'POST' });
+      dataCache.invalidateTag('clips');
+      return res;
+    },
     view: (id: string) => apiFetch<any>(`/api/clips/${id}/view`, { method: 'POST' }),
     share: (id: string) => apiFetch<any>(`/api/clips/${id}/share`, { method: 'POST' }),
     getComments: (id: string) => apiFetch<any>(`/api/clips/${id}/comments`),
@@ -199,14 +306,18 @@ export const api = {
     read: (id: string) => apiFetch<any>(`/api/chats/${id}/read`, { method: 'POST' }),
   },
   podcasts: {
-    list: () => apiFetch<any>('/api/podcasts')
+    list: (forceRefresh = false) => dataCache.fetchWithCache('api:podcasts:list', () => apiFetch<any>('/api/podcasts'), { ttlMs: 120000, tag: 'podcasts', forceRefresh })
   },
   marketplace: {
-    products: () => apiFetch<any>('/api/marketplace')
+    products: (forceRefresh = false) => dataCache.fetchWithCache('api:marketplace:list', () => apiFetch<any>('/api/marketplace'), { ttlMs: 120000, tag: 'marketplace', forceRefresh })
   },
   communities: {
-    list: () => apiFetch<any>('/api/communities'),
-    join: (id: string) => apiFetch<any>(`/api/communities/${id}/join`, { method: 'POST' })
+    list: (forceRefresh = false) => dataCache.fetchWithCache('api:communities:list', () => apiFetch<any>('/api/communities'), { ttlMs: 120000, tag: 'communities', forceRefresh }),
+    join: async (id: string) => {
+      const res = await apiFetch<any>(`/api/communities/${id}/join`, { method: 'POST' });
+      dataCache.invalidateTag('communities');
+      return res;
+    }
   },
   wallet: {
     balance: () => apiFetch<any>('/api/wallet'),
