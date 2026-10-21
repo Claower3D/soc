@@ -11,9 +11,9 @@ import {
   getAllConferenceGroups, 
   getStoredConferenceGroup, 
   getStoredConferenceRecordings, 
-  getDeletedChatIds, 
   deleteConferenceGroup, 
-  unmarkChatDeleted 
+  unmarkChatDeleted,
+  isChatDeleted
 } from '../utils/conferenceManager';
 import './MessengerPage.css';
 
@@ -101,18 +101,13 @@ export function MessengerPage() {
         } catch { /* ignore */ }
       }
 
-      const deletedIds = getDeletedChatIds();
       // Исключаем удалённые чаты из локального кэша
-      userChats = userChats.filter(c => 
-        !deletedIds.has(c.id) && 
-        !deletedIds.has(c.conferenceId || '') &&
-        !deletedIds.has(`group_${c.id}`)
-      );
+      userChats = userChats.filter(c => !isChatDeleted(c.id, c.conferenceId));
 
       // Всегда подтягиваем все созданные группы конференций (за исключением удалённых)
       const confGroups = getAllConferenceGroups();
       for (const cg of confGroups) {
-        if (!deletedIds.has(cg.id) && !deletedIds.has(cg.conferenceId || '') && !userChats.some(c => c.id === cg.id)) {
+        if (!isChatDeleted(cg.id, cg.conferenceId) && !userChats.some(c => c.id === cg.id)) {
           userChats.push(cg);
         }
       }
@@ -151,10 +146,9 @@ export function MessengerPage() {
     // Пробуем получить список чатов с сервера
     api.chats.list().then((data) => {
       if (mounted) {
-        const deletedIds = getDeletedChatIds();
         if (Array.isArray(data) && data.length > 0) {
           const normalized = data
-            .filter((c: any) => c && c.id && !deletedIds.has(c.id) && !deletedIds.has(c.conferenceId || '') && !deletedIds.has(`group_${c.id}`))
+            .filter((c: any) => c && c.id && !isChatDeleted(c.id, c.conferenceId))
             .map((c: any) => ({
               ...c,
               user: c.user && typeof c.user === 'object' ? {
@@ -184,8 +178,7 @@ export function MessengerPage() {
               const parsed = JSON.parse(saved);
               if (Array.isArray(parsed)) {
                 localGroupsAndAi = parsed.filter((c: any) => 
-                  !deletedIds.has(c.id) && 
-                  !deletedIds.has(c.conferenceId || '') && 
+                  !isChatDeleted(c.id, c.conferenceId) && 
                   (c.isGroup || c.id === 'chat_ai_oracle' || c.conferenceId)
                 );
               }
@@ -193,7 +186,7 @@ export function MessengerPage() {
           }
           const confGroups = getAllConferenceGroups();
           for (const cg of confGroups) {
-            if (!deletedIds.has(cg.id) && !deletedIds.has(cg.conferenceId || '') && !localGroupsAndAi.some(g => g.id === cg.id)) {
+            if (!isChatDeleted(cg.id, cg.conferenceId) && !localGroupsAndAi.some(g => g.id === cg.id)) {
               localGroupsAndAi.push(cg);
             }
           }
@@ -201,12 +194,11 @@ export function MessengerPage() {
           const personalAi = localGroupsAndAi.find(c => c.id === 'chat_ai_oracle') || createPersonalAiChat(currentUser);
           const localGroups = localGroupsAndAi.filter(c => c.id !== 'chat_ai_oracle');
           const serverWithoutAi = normalized.filter((c: Chat) => 
-            !deletedIds.has(c.id) && 
-            !deletedIds.has(c.conferenceId || '') && 
+            !isChatDeleted(c.id, c.conferenceId) && 
             c.id !== 'chat_ai_oracle' && 
             !localGroups.some(lg => lg.id === c.id)
           );
-          const finalChats = [personalAi, ...localGroups, ...serverWithoutAi];
+          const finalChats = [personalAi, ...localGroups, ...serverWithoutAi].filter(c => !isChatDeleted(c.id, c.conferenceId));
 
           setChatList(finalChats);
           localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(finalChats));
@@ -229,7 +221,14 @@ export function MessengerPage() {
   // Реакция на изменение query-параметра chat
   useEffect(() => {
     if (requestedChatId) {
-      setActiveChatId(requestedChatId);
+      if (isChatDeleted(requestedChatId)) {
+        setActiveChatId(null);
+        if (typeof window !== 'undefined' && (window.location.search.includes('chat=') || window.location.search.includes('id='))) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } else {
+        setActiveChatId(requestedChatId);
+      }
     }
   }, [requestedChatId]);
 
@@ -249,7 +248,14 @@ export function MessengerPage() {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const cId = params.get('chat') || params.get('id');
-      setActiveChatId(cId || null);
+      if (cId && isChatDeleted(cId)) {
+        setActiveChatId(null);
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      } else {
+        setActiveChatId(cId || null);
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -260,26 +266,37 @@ export function MessengerPage() {
     if (isLoading) return;
 
     if (requestedChatId) {
-      if (getDeletedChatIds().has(requestedChatId)) {
+      if (isChatDeleted(requestedChatId)) {
         setActiveChatId(null);
+        if (typeof window !== 'undefined' && (window.location.search.includes('chat=') || window.location.search.includes('id='))) {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
         return;
       }
       setActiveChatId(requestedChatId);
       setChatList(prev => {
         let exists = prev.find(c => c.id === requestedChatId);
         if (!exists) {
-          // Ищем сохраненную группу конференции
+          // Ищем сохраненную группу конференции только если она не удалена
           const storedGroup = getStoredConferenceGroup(requestedChatId);
-          if (storedGroup) {
+          if (storedGroup && !isChatDeleted(storedGroup.id, storedGroup.conferenceId)) {
             exists = storedGroup;
             const updatedWithNew = [storedGroup, ...prev.filter(c => c.id !== storedGroup.id)];
             localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updatedWithNew));
             return updatedWithNew;
-          } else if (requestedChatId.startsWith('group_') || requestedChatId.startsWith('conf_')) {
-            // Динамически восстанавливаем группу по ID
+          } else if ((requestedChatId.startsWith('group_') || requestedChatId.startsWith('conf_')) && !isChatDeleted(requestedChatId)) {
+            // Динамически восстанавливаем группу по ID ТОЛЬКО если есть неудалённая запись в архиве
             const recs = getStoredConferenceRecordings();
-            const matchingRec = recs.find(r => r.chatGroupId === requestedChatId || r.conferenceId === requestedChatId || r.id === requestedChatId);
-            const titleName = matchingRec?.title || requestedChatId.replace(/^group_conf_|^group_/, 'Встреча ');
+            const matchingRec = recs.find(r => 
+              (r.chatGroupId === requestedChatId || r.conferenceId === requestedChatId || r.id === requestedChatId) &&
+              !isChatDeleted(r.id, r.chatGroupId) && 
+              !isChatDeleted(r.conferenceId)
+            );
+            if (!matchingRec) {
+              // Если запись удалена или не существует, НЕ создаём фантомную группу заново!
+              return prev;
+            }
+            const titleName = matchingRec.title || requestedChatId.replace(/^group_conf_|^group_/, 'Встреча ');
             const dynamicGroup: Chat = {
               id: requestedChatId,
               isGroup: true,
@@ -575,21 +592,30 @@ export function MessengerPage() {
     // 1. Помечаем в постоянном реестре удалённых и очищаем из всех локальных хранилищ конференций
     deleteConferenceGroup(id);
 
-    // 2. Удаляем из текущего состояния и локального хранилища мессенджера
+    // 2. Если удаляемый чат открыт или фигурирует в URL, сбрасываем и очищаем URL без перезагрузки
+    if (activeChatId === id || isChatDeleted(activeChatId)) {
+      setActiveChatId(null);
+    }
+    if (typeof window !== 'undefined' && (window.location.search.includes('chat=') || window.location.search.includes('id='))) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    // 3. Удаляем из текущего состояния и локального хранилища мессенджера
     setChatList(prev => {
-      const updated = prev.filter(c => c.id !== id && c.conferenceId !== id);
+      const updated = prev.filter(c => !isChatDeleted(c.id, c.conferenceId) && c.id !== id && c.conferenceId !== id);
       localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
 
-    if (activeChatId === id) {
-      setActiveChatId(null);
-    }
-
-    // 3. Безвозвратно удаляем из базы данных PostgreSQL и серверного хранилища
+    // 4. Безвозвратно удаляем из базы данных PostgreSQL и серверного хранилища
     api.chats.delete(id).catch(err => {
       console.warn('[Messenger] Failed to delete chat on backend:', err);
     });
+    const clean = id.replace(/^group_conf_|^group_|^conf_|^rec_/, '');
+    if (clean && clean !== id) {
+      api.chats.delete(clean).catch(() => {});
+      api.chats.delete(`group_${clean}`).catch(() => {});
+    }
   };
 
   useEffect(() => {

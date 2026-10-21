@@ -642,6 +642,7 @@ type StoredChat struct {
 	Avatar        string    `json:"avatar"`
 	OwnerID       string    `json:"owner_id"`
 	Members       []string  `json:"members"`
+	ConferenceID  string    `json:"conference_id,omitempty"`
 	LastMessage   string    `json:"last_message"`
 	LastMessageAt time.Time `json:"last_message_at"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -7539,6 +7540,7 @@ func handleCreateGroupChat(w http.ResponseWriter, r *http.Request) {
 		Avatar:        avatar,
 		OwnerID:       claims.UserID,
 		Members:       allMembers,
+		ConferenceID:  req.ConferenceID,
 		LastMessage:   lastMsg,
 		LastMessageAt: now,
 		CreatedAt:     now,
@@ -7613,22 +7615,59 @@ func handleDeleteChatBackend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cleanID := strings.TrimPrefix(chatID, "group_conf_")
+	cleanID = strings.TrimPrefix(cleanID, "group_")
+	cleanID = strings.TrimPrefix(cleanID, "conf_")
+	cleanID = strings.TrimPrefix(cleanID, "rec_")
+
+	candidateIDs := []string{
+		chatID,
+		cleanID,
+		"group_" + cleanID,
+		"conf_" + cleanID,
+		"group_conf_" + cleanID,
+		"rec_" + cleanID,
+	}
+
 	dbMu.RLock()
 	dbConn := db
 	dbMu.RUnlock()
 
 	if dbConn != nil {
-		_, err := dbConn.Exec(`DELETE FROM chats WHERE id = $1`, chatID)
+		_, err := dbConn.Exec(`
+			DELETE FROM chats 
+			WHERE id IN ($1, $2, $3, $4, $5, $6)
+			   OR conference_id IN ($1, $2, $3, $4, $5, $6)
+		`, candidateIDs[0], candidateIDs[1], candidateIDs[2], candidateIDs[3], candidateIDs[4], candidateIDs[5])
 		if err != nil {
 			log.Printf("[DB] Error deleting chat %s: %v", chatID, err)
 		}
-		_, _ = dbConn.Exec(`DELETE FROM chat_members WHERE chat_id = $1`, chatID)
-		_, _ = dbConn.Exec(`DELETE FROM messages WHERE chat_id = $1`, chatID)
+		_, _ = dbConn.Exec(`
+			DELETE FROM chat_members 
+			WHERE chat_id IN ($1, $2, $3, $4, $5, $6)
+		`, candidateIDs[0], candidateIDs[1], candidateIDs[2], candidateIDs[3], candidateIDs[4], candidateIDs[5])
+		_, _ = dbConn.Exec(`
+			DELETE FROM messages 
+			WHERE chat_id IN ($1, $2, $3, $4, $5, $6)
+		`, candidateIDs[0], candidateIDs[1], candidateIDs[2], candidateIDs[3], candidateIDs[4], candidateIDs[5])
 	}
 
 	store.mu.Lock()
-	delete(store.chats, chatID)
-	delete(store.messages, chatID)
+	for _, cid := range candidateIDs {
+		if cid != "" {
+			delete(store.chats, cid)
+			delete(store.messages, cid)
+		}
+	}
+	for k, sc := range store.chats {
+		for _, cid := range candidateIDs {
+			if cid != "" && (sc.ID == cid || sc.ConferenceID == cid || k == cid) {
+				delete(store.chats, k)
+				delete(store.messages, k)
+				break
+			}
+		}
+	}
 	store.saveToDisk()
 	store.mu.Unlock()
 
