@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles, Globe, Languages, Check, ChevronDown, Play, Download, Disc, Film } from 'lucide-react';
 import { type Chat, type Message } from '../data/mock';
 import { formatLastSeen } from '../utils/onlineStatus';
-import { API_BASE_URL } from '../api';
+import { API_BASE_URL, api, resolveMediaUrl } from '../api';
 import { WORLD_LANGUAGES, POPULAR_LANG_CODES, translateText, playVoiceSpeech } from '../utils/translator';
 import { downloadRecordingFile } from '../utils/conferenceManager';
 import './ChatWindowNew.css';
@@ -604,69 +604,52 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
   
 
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-
-
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-
-
     if (!file) return;
 
+    const isVideo = file.type.startsWith('video');
+    const localPreviewUrl = URL.createObjectURL(file);
+    const msgId = `msg_${Date.now()}`;
 
-    
-
-
-    const reader = new FileReader();
-
-
-    reader.onload = () => {
-
-
-      const isVideo = file.type.startsWith('video');
-
-
-      const newMsg: Message = {
-
-
-        id: `msg_${Date.now()}`,
-
-
-        text: '',
-
-
-        fromMe: true,
-
-
-        time: formatTime(),
-
-
-        status: 'sent',
-
-
-        mediaUrl: reader.result as string,
-
-
-        mediaType: isVideo ? 'video' : 'image',
-
-
-      };
-
-
-      const updatedMessages = [...messages, newMsg];
-
-
-      setMessages(updatedMessages);
-
-
-      saveMessages(updatedMessages);
-
-
+    const newMsg: Message = {
+      id: msgId,
+      text: '',
+      fromMe: true,
+      time: formatTime(),
+      status: 'sent',
+      mediaUrl: localPreviewUrl,
+      mediaType: isVideo ? 'video' : 'image',
     };
 
+    const currentMsgs = messagesRef.current;
+    const updatedMessages = [...currentMsgs, newMsg];
+    messagesRef.current = updatedMessages;
+    setMessages(updatedMessages);
+    saveMessages(updatedMessages);
 
-    reader.readAsDataURL(file);
-
-
+    // Фоновая загрузка файла на сервер
+    try {
+      const uploadRes = await api.upload(file, 'chats');
+      const serverUrl = uploadRes?.url || localPreviewUrl;
+      setMessages(prev => {
+        const mapped = prev.map(m => m.id === msgId ? { ...m, mediaUrl: serverUrl, status: 'sent' as const } : m);
+        messagesRef.current = mapped;
+        saveMessages(mapped);
+        return mapped;
+      });
+      if (chat?.id) {
+        api.chats.send(chat.id, '', { mediaUrl: serverUrl, mediaType: isVideo ? 'video' : 'image' }).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('⚠️ Ошибка загрузки файла на сервер:', err);
+      setMessages(prev => {
+        const mapped = prev.map(m => m.id === msgId ? { ...m, status: 'sent' as const } : m);
+        messagesRef.current = mapped;
+        saveMessages(mapped);
+        return mapped;
+      });
+    }
   };
 
 
@@ -718,6 +701,30 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
         messagesRef.current = updatedMessages;
         setMessages(updatedMessages);
         saveMessages(updatedMessages);
+
+        // Фоновая загрузка голосового сообщения на сервер и отправка в чат
+        (async () => {
+          let serverAudioUrl = audioUrl;
+          try {
+            const ext = finalAudioBlob.type.includes('wav') ? '.wav' : '.webm';
+            const uploadRes = await api.upload(finalAudioBlob, 'audio', `voice_${Date.now()}${ext}`);
+            if (uploadRes?.url) {
+              serverAudioUrl = resolveMediaUrl(uploadRes.url);
+              setMessages(prev => {
+                const mapped = prev.map(m => m.id === msgId ? { ...m, mediaUrl: serverAudioUrl } : m);
+                messagesRef.current = mapped;
+                saveMessages(mapped);
+                return mapped;
+              });
+            }
+          } catch (uploadErr) {
+            console.warn('⚠️ Ошибка загрузки голосового сообщения на сервер:', uploadErr);
+          }
+
+          if (chat?.id) {
+            api.chats.send(chat.id, '', { mediaUrl: serverAudioUrl, mediaType: 'voice' }).catch(() => {});
+          }
+        })();
 
         // Автоматическое фоновое распознавание речи пользователя через Google Speech Engine v2
         if (finalAudioBlob.size > 400) {

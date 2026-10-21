@@ -131,6 +131,81 @@ export const api = {
       } catch {}
     }
   },
+  upload: async (
+    fileOrBlob: File | Blob | string,
+    folder: string = 'general',
+    customFilename?: string
+  ): Promise<{ status: string; url: string; fullUrl: string; filename?: string; size?: number; contentType?: string }> => {
+    // Если передан Base64 Data URL
+    if (typeof fileOrBlob === 'string' && fileOrBlob.startsWith('data:')) {
+      const res = await apiFetch<any>('/api/upload', {
+        method: 'POST',
+        body: JSON.stringify({
+          data: fileOrBlob,
+          folder,
+          filename: customFilename || 'upload.bin',
+        }),
+      });
+      return {
+        ...res,
+        fullUrl: resolveMediaUrl(res.url),
+      };
+    }
+
+    // Если передан File или Blob
+    if (fileOrBlob instanceof Blob) {
+      const formData = new FormData();
+      let filename = customFilename;
+      if (!filename && 'name' in (fileOrBlob as any) && typeof (fileOrBlob as any).name === 'string') {
+        filename = (fileOrBlob as any).name;
+      }
+      if (!filename) {
+        const ext = fileOrBlob.type.includes('webm')
+          ? '.webm'
+          : fileOrBlob.type.includes('mp4')
+          ? '.mp4'
+          : fileOrBlob.type.includes('png')
+          ? '.png'
+          : fileOrBlob.type.includes('webp')
+          ? '.webp'
+          : fileOrBlob.type.includes('wav')
+          ? '.wav'
+          : fileOrBlob.type.includes('ogg')
+          ? '.ogg'
+          : fileOrBlob.type.includes('audio')
+          ? '.webm'
+          : '.jpg';
+        filename = `upload_${Date.now()}${ext}`;
+      }
+      formData.append('file', fileOrBlob, filename);
+      formData.append('folder', folder);
+
+      const res = await apiFetch<any>(
+        '/api/upload',
+        {
+          method: 'POST',
+          body: formData,
+        },
+        true
+      );
+
+      return {
+        ...res,
+        fullUrl: resolveMediaUrl(res.url),
+      };
+    }
+
+    // Если это уже URL
+    if (typeof fileOrBlob === 'string') {
+      return {
+        status: 'ok',
+        url: fileOrBlob,
+        fullUrl: resolveMediaUrl(fileOrBlob),
+      };
+    }
+
+    throw new Error('Некорректный формат файла для загрузки');
+  },
   auth: {
     register: (data: any) => apiFetch<any>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
     login: (data: any) => apiFetch<any>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),

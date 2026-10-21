@@ -17,6 +17,7 @@ import {
   downloadRecordingFile, 
   type ConferenceRecordingItem 
 } from '../utils/conferenceManager';
+import { api, resolveMediaUrl } from '../api';
 import './CallGrid.css';
 
 interface CallGridProps {
@@ -748,6 +749,18 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       participants: participants,
     };
 
+    let finalVideoUrl = url;
+    if (blob && blob.size > 0) {
+      try {
+        const uploadRes = await api.upload(blob, 'conferences', `conf_${effectiveConf.id || Date.now()}.webm`);
+        if (uploadRes?.url) {
+          finalVideoUrl = resolveMediaUrl(uploadRes.url);
+        }
+      } catch (uploadErr) {
+        console.warn('⚠️ Ошибка фоновой загрузки видеозаписи на сервер:', uploadErr);
+      }
+    }
+
     const targetGroupId = effectiveConf.chatGroupId || (
       effectiveConf.id ? (effectiveConf.id.startsWith('group_') ? effectiveConf.id : `group_${effectiveConf.id}`) : `group_conf_${Date.now()}`
     );
@@ -757,7 +770,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       conference: effectiveConf,
       duration: finalDuration,
       messages: messages,
-      videoUrl: url,
+      videoUrl: finalVideoUrl,
       thumbnail: effectiveConf.recordingThumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
       currentUserId: effectiveUser?.id || 'me',
       hostUser: effectiveUser,
@@ -770,7 +783,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       duration: finalDuration,
       participantsCount: participants.length || 1,
       thumbnail: effectiveConf.recordingThumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
-      videoUrl: url,
+      videoUrl: finalVideoUrl,
       chatGroupId: savedGroupId,
       conferenceId: effectiveConf.id,
       inviteCode: confCode,

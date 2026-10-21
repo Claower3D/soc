@@ -118,9 +118,21 @@ export function CreatePostModal({ isOpen, onClose, onCreatePost }: CreatePostMod
     onClose();
 
     try {
+      let finalImageUrl = postPayload.image;
+      if (selectedImage && selectedImage.startsWith('data:')) {
+        try {
+          const uploadRes = await api.upload(selectedImage, 'posts');
+          if (uploadRes?.url) {
+            finalImageUrl = uploadRes.url;
+          }
+        } catch (uploadErr) {
+          console.warn('⚠️ Ошибка загрузки картинки поста на сервер, фолбек на прямую отправку:', uploadErr);
+        }
+      }
+
       const serverRes = await api.posts.create({
         caption: postPayload.caption,
-        image: postPayload.image,
+        image: finalImageUrl,
         location: postPayload.location || '',
       });
       const createdPost = serverRes?.data || serverRes;

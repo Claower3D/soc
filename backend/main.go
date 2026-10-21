@@ -1283,6 +1283,10 @@ func main() {
 	// Geo / Location автоопределение
 	mux.HandleFunc("GET /api/geo/detect", handleGeoDetect)
 
+	// Универсальная загрузка медиафайлов
+	mux.HandleFunc("POST /api/upload", handleUploadFile)
+	mux.HandleFunc("OPTIONS /api/upload", handleUploadFile)
+
 	// Cache Management эндпоинты
 	mux.HandleFunc("GET /api/cache/stats", handleCacheStats)
 	mux.HandleFunc("POST /api/cache/clear", handleCacheClear)
@@ -4620,6 +4624,18 @@ func handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Автоматическая конвертация Base64 аватара и обложки в персистентные файлы
+	if strings.HasPrefix(req.Avatar, "data:") {
+		if cleanUrl, err := saveBase64DataUrl(req.Avatar, "avatars"); err == nil {
+			req.Avatar = cleanUrl
+		}
+	}
+	if strings.HasPrefix(req.CoverImage, "data:") {
+		if cleanUrl, err := saveBase64DataUrl(req.CoverImage, "covers"); err == nil {
+			req.CoverImage = cleanUrl
+		}
+	}
+
 	if db != nil {
 		var targetID string
 		db.QueryRow("SELECT id FROM users WHERE id = $1 OR LOWER(REPLACE(username, '@', '')) = LOWER(REPLACE($1, '@', '')) LIMIT 1", claims.UserID).Scan(&targetID)
@@ -4769,11 +4785,21 @@ func handleCreatePost(w http.ResponseWriter, r *http.Request) {
 		r.ParseMultipartForm(32 << 20)
 		caption = r.FormValue("caption")
 		location = r.FormValue("location")
-		file, _, fileErr := r.FormFile("image")
+		file, fileHeader, fileErr := r.FormFile("image")
 		if fileErr == nil {
 			defer file.Close()
 			buf, _ := io.ReadAll(file)
-			image = "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(buf)
+			ext := filepath.Ext(fileHeader.Filename)
+			if ext == "" {
+				ext = ".jpg"
+			}
+			filename := fmt.Sprintf("post_%d_%s%s", time.Now().Unix(), uuid.New().String()[:8], ext)
+			uploadsDir := getUploadsDir()
+			destPath := filepath.Join(uploadsDir, "posts", filename)
+			if writeErr := os.WriteFile(destPath, buf, 0644); writeErr == nil {
+				image = "/uploads/posts/" + filename
+			}
+			_ = saveMediaFile("posts/"+filename, "image/jpeg", buf)
 		} else {
 			image = r.FormValue("image")
 		}
@@ -4787,6 +4813,13 @@ func handleCreatePost(w http.ResponseWriter, r *http.Request) {
 			caption = req.Caption
 			image = req.Image
 			location = req.Location
+		}
+	}
+
+	// Автоматическая конвертация Base64 в персистентный файл на сервере
+	if strings.HasPrefix(image, "data:") {
+		if cleanUrl, err := saveBase64DataUrl(image, "posts"); err == nil {
+			image = cleanUrl
 		}
 	}
 
@@ -7175,6 +7208,17 @@ func handleSendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Автоматическая конвертация Base64 в персистентный файл в чате
+	if strings.HasPrefix(req.MediaUrl, "data:") {
+		folder := "chats"
+		if req.MediaType == "voice" || req.MediaType == "audio" {
+			folder = "audio"
+		}
+		if cleanUrl, err := saveBase64DataUrl(req.MediaUrl, folder); err == nil {
+			req.MediaUrl = cleanUrl
+		}
+	}
+
 	// Если передан direct-чат (например chat_direct_dair)
 	if strings.HasPrefix(chatID, "chat_direct_") {
 		target := strings.TrimPrefix(chatID, "chat_direct_")
@@ -7799,6 +7843,14 @@ func handleCreateStory(w http.ResponseWriter, r *http.Request) {
 			mediaURL = "linear-gradient(135deg, #6366f1, #a855f7)"
 		}
 	}
+
+	// Автоматическая конвертация Base64 сторис в персистентный файл
+	if strings.HasPrefix(mediaURL, "data:") {
+		if cleanUrl, err := saveBase64DataUrl(mediaURL, "stories"); err == nil {
+			mediaURL = cleanUrl
+		}
+	}
+
 	isVideo := req.IsVideo || req.VideoURL != ""
 	textContent := strings.TrimSpace(req.Text)
 	if textContent == "" {
@@ -8352,6 +8404,14 @@ func getUploadsDir() string {
 	}
 	_ = os.MkdirAll(filepath.Join(u, "videos"), 0755)
 	_ = os.MkdirAll(filepath.Join(u, "thumbnails"), 0755)
+	_ = os.MkdirAll(filepath.Join(u, "avatars"), 0755)
+	_ = os.MkdirAll(filepath.Join(u, "covers"), 0755)
+	_ = os.MkdirAll(filepath.Join(u, "posts"), 0755)
+	_ = os.MkdirAll(filepath.Join(u, "chats"), 0755)
+	_ = os.MkdirAll(filepath.Join(u, "conferences"), 0755)
+	_ = os.MkdirAll(filepath.Join(u, "audio"), 0755)
+	_ = os.MkdirAll(filepath.Join(u, "stories"), 0755)
+	_ = os.MkdirAll(filepath.Join(u, "general"), 0755)
 	return u
 }
 
@@ -8368,6 +8428,64 @@ func saveMediaFile(relPath string, contentType string, data []byte) error {
 		ON CONFLICT (id) DO UPDATE SET content_type = EXCLUDED.content_type, data = EXCLUDED.data, created_at = NOW();
 	`, cleanID, contentType, data)
 	return err
+}
+
+// saveBase64DataUrl сохраняет Base64 Data URL (data:image/...;base64,...) в файл и PostgreSQL media_files
+func saveBase64DataUrl(dataUrl string, folder string) (string, error) {
+	if !strings.HasPrefix(dataUrl, "data:") {
+		return dataUrl, nil
+	}
+	idx := strings.Index(dataUrl, ";base64,")
+	if idx == -1 {
+		return dataUrl, fmt.Errorf("invalid data url")
+	}
+	cType := strings.TrimPrefix(dataUrl[:idx], "data:")
+	b64 := dataUrl[idx+8:]
+	data, err := base64.StdEncoding.DecodeString(b64)
+	if err != nil {
+		return dataUrl, err
+	}
+
+	ext := ".bin"
+	switch {
+	case strings.Contains(cType, "jpeg") || strings.Contains(cType, "jpg"):
+		ext = ".jpg"
+	case strings.Contains(cType, "png"):
+		ext = ".png"
+	case strings.Contains(cType, "webp"):
+		ext = ".webp"
+	case strings.Contains(cType, "gif"):
+		ext = ".gif"
+	case strings.Contains(cType, "webm"):
+		ext = ".webm"
+	case strings.Contains(cType, "mp4"):
+		ext = ".mp4"
+	case strings.Contains(cType, "wav"):
+		ext = ".wav"
+	case strings.Contains(cType, "mp3") || strings.Contains(cType, "mpeg"):
+		ext = ".mp3"
+	case strings.Contains(cType, "ogg"):
+		ext = ".ogg"
+	}
+
+	if folder == "" {
+		folder = "general"
+	}
+	folder = strings.ToLower(regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(folder, ""))
+	filename := fmt.Sprintf("%s_%d_%s%s", folder, time.Now().Unix(), uuid.New().String()[:8], ext)
+
+	uploadsDir := getUploadsDir()
+	targetDir := filepath.Join(uploadsDir, folder)
+	_ = os.MkdirAll(targetDir, 0755)
+	destPath := filepath.Join(targetDir, filename)
+	if err := os.WriteFile(destPath, data, 0644); err != nil {
+		log.Printf("⚠️ Ошибка записи файла base64: %v", err)
+	}
+
+	relPath := folder + "/" + filename
+	_ = saveMediaFile(relPath, cType, data)
+
+	return "/uploads/" + relPath, nil
 }
 
 // serveUploadFile раздает медиафайлы с поддержкой Range-запросов и самовосстановления из PostgreSQL
@@ -8431,6 +8549,21 @@ func serveUploadFile(w http.ResponseWriter, r *http.Request, subPath string) {
 		mimeType = "audio/mpeg"
 	case ".wav":
 		mimeType = "audio/wav"
+	case ".m4a", ".aac":
+		mimeType = "audio/mp4"
+	case ".pdf":
+		mimeType = "application/pdf"
+	case ".json":
+		mimeType = "application/json"
+	}
+
+	if mimeType == "" {
+		if headerBuf, rErr := os.ReadFile(localFile); rErr == nil && len(headerBuf) > 0 {
+			if len(headerBuf) > 512 {
+				headerBuf = headerBuf[:512]
+			}
+			mimeType = http.DetectContentType(headerBuf)
+		}
 	}
 
 	if mimeType != "" {
@@ -8441,6 +8574,151 @@ func serveUploadFile(w http.ResponseWriter, r *http.Request, subPath string) {
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 
 	http.ServeFile(w, r, localFile)
+}
+
+// POST /api/upload — универсальная загрузка файлов на сервер (multipart/form-data и base64 JSON)
+func handleUploadFile(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	folder := strings.TrimSpace(r.URL.Query().Get("folder"))
+	if folder == "" {
+		folder = "general"
+	}
+
+	var fileBytes []byte
+	var fileName string
+	var contentType string
+
+	reqContentType := r.Header.Get("Content-Type")
+	if strings.HasPrefix(reqContentType, "multipart/form-data") {
+		// Парсим до 100 МБ для видеозаписей, подкастов и картинок
+		if err := r.ParseMultipartForm(100 << 20); err != nil {
+			writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Файл превышает лимит 100МБ"})
+			return
+		}
+		if f := r.FormValue("folder"); f != "" {
+			folder = strings.TrimSpace(f)
+		}
+
+		fileFieldNames := []string{"file", "media", "image", "video", "audio", "blob", "recording"}
+		for _, name := range fileFieldNames {
+			f, fh, err := r.FormFile(name)
+			if err == nil {
+				defer f.Close()
+				data, readErr := io.ReadAll(f)
+				if readErr == nil && len(data) > 0 {
+					fileBytes = data
+					fileName = fh.Filename
+					contentType = fh.Header.Get("Content-Type")
+					break
+				}
+			}
+		}
+	} else {
+		// Поддержка JSON с Data URL (Base64)
+		var bodyReq struct {
+			Data     string `json:"data"`
+			File     string `json:"file"`
+			Image    string `json:"image"`
+			Folder   string `json:"folder"`
+			Filename string `json:"filename"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&bodyReq); err == nil {
+			raw := bodyReq.Data
+			if raw == "" {
+				raw = bodyReq.File
+			}
+			if raw == "" {
+				raw = bodyReq.Image
+			}
+			if bodyReq.Folder != "" {
+				folder = strings.TrimSpace(bodyReq.Folder)
+			}
+			fileName = bodyReq.Filename
+			if strings.HasPrefix(raw, "data:") {
+				idx := strings.Index(raw, ";base64,")
+				if idx != -1 {
+					contentType = strings.TrimPrefix(raw[:idx], "data:")
+					b64Data := raw[idx+8:]
+					decoded, decErr := base64.StdEncoding.DecodeString(b64Data)
+					if decErr == nil {
+						fileBytes = decoded
+					}
+				}
+			}
+		}
+	}
+
+	if len(fileBytes) == 0 {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Файл не передан или пуст"})
+		return
+	}
+
+	// Очищаем имя папки от опасных символов
+	folder = strings.ToLower(regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(folder, ""))
+	if folder == "" {
+		folder = "general"
+	}
+
+	// Определяем расширение файла
+	ext := strings.ToLower(filepath.Ext(fileName))
+	if ext == "" {
+		switch {
+		case strings.Contains(contentType, "webm"):
+			ext = ".webm"
+		case strings.Contains(contentType, "mp4"):
+			ext = ".mp4"
+		case strings.Contains(contentType, "jpeg") || strings.Contains(contentType, "jpg"):
+			ext = ".jpg"
+		case strings.Contains(contentType, "png"):
+			ext = ".png"
+		case strings.Contains(contentType, "webp"):
+			ext = ".webp"
+		case strings.Contains(contentType, "gif"):
+			ext = ".gif"
+		case strings.Contains(contentType, "wav"):
+			ext = ".wav"
+		case strings.Contains(contentType, "mpeg") || strings.Contains(contentType, "mp3"):
+			ext = ".mp3"
+		case strings.Contains(contentType, "ogg"):
+			ext = ".ogg"
+		default:
+			ext = ".bin"
+		}
+	}
+
+	if contentType == "" {
+		contentType = http.DetectContentType(fileBytes)
+	}
+
+	savedFilename := fmt.Sprintf("%s_%d_%s%s", folder, time.Now().Unix(), uuid.New().String()[:8], ext)
+	uploadsDir := getUploadsDir()
+	targetDir := filepath.Join(uploadsDir, folder)
+	_ = os.MkdirAll(targetDir, 0755)
+
+	destPath := filepath.Join(targetDir, savedFilename)
+	if err := os.WriteFile(destPath, fileBytes, 0644); err != nil {
+		log.Printf("⚠️ Ошибка записи загруженного файла %s: %v", destPath, err)
+	}
+
+	// Персистентное сохранение в PostgreSQL (media_files)
+	relPath := folder + "/" + savedFilename
+	_ = saveMediaFile(relPath, contentType, fileBytes)
+
+	publicUrl := "/uploads/" + folder + "/" + savedFilename
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"status":      "ok",
+		"url":         publicUrl,
+		"filename":    savedFilename,
+		"size":        len(fileBytes),
+		"contentType": contentType,
+	})
 }
 
 // POST /api/clips — create clip (supports multipart/form-data video upload and JSON)

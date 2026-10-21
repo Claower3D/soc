@@ -18,6 +18,7 @@ import { calculateZodiacProfile, type ZodiacInfo } from '../utils/astrology';
 import { detectUserCityAndCountry } from '../utils/countryDetect';
 import { ReligionSymbol } from './ReligionSymbols';
 import { ImageCropModal } from './ImageCropModal';
+import { api, resolveMediaUrl } from '../api';
 import './EditProfileModal.css';
 
 interface EditProfileModalProps {
@@ -176,11 +177,23 @@ export function EditProfileModal({
     }
   };
 
-  const handleCropSave = (croppedUrl: string) => {
+  const handleCropSave = async (croppedUrl: string) => {
     setAvatar(croppedUrl);
     setCropImageUrl(null);
+    let finalAvatarUrl = croppedUrl;
+    if (croppedUrl.startsWith('data:')) {
+      try {
+        const uploadRes = await api.upload(croppedUrl, 'avatars');
+        if (uploadRes?.url) {
+          finalAvatarUrl = resolveMediaUrl(uploadRes.url);
+          setAvatar(finalAvatarUrl);
+        }
+      } catch (err) {
+        console.warn('⚠️ Ошибка загрузки аватара на сервер:', err);
+      }
+    }
     if (updateProfile) {
-      updateProfile({ avatar: croppedUrl });
+      updateProfile({ avatar: finalAvatarUrl });
     }
   };
 
@@ -188,12 +201,19 @@ export function EditProfileModal({
     setCropImageUrl(null);
   };
 
-  const handleCoverFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = () => setCoverImage(reader.result as string);
-      reader.readAsDataURL(file);
+      const localUrl = URL.createObjectURL(file);
+      setCoverImage(localUrl);
+      try {
+        const uploadRes = await api.upload(file, 'covers');
+        if (uploadRes?.url) {
+          setCoverImage(resolveMediaUrl(uploadRes.url));
+        }
+      } catch (err) {
+        console.warn('⚠️ Ошибка загрузки обложки на сервер:', err);
+      }
     }
   };
 
