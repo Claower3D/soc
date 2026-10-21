@@ -7,7 +7,14 @@ import { type Chat } from '../data/mock';
 import { INITIAL_DATING_PROFILES } from '../data/datingData';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
-import { getAllConferenceGroups, getStoredConferenceGroup, getStoredConferenceRecordings } from '../utils/conferenceManager';
+import { 
+  getAllConferenceGroups, 
+  getStoredConferenceGroup, 
+  getStoredConferenceRecordings, 
+  getDeletedChatIds, 
+  deleteConferenceGroup, 
+  unmarkChatDeleted 
+} from '../utils/conferenceManager';
 import './MessengerPage.css';
 
 export function MessengerPage() {
@@ -94,10 +101,18 @@ export function MessengerPage() {
         } catch { /* ignore */ }
       }
 
-      // Всегда подтягиваем все созданные группы конференций
+      const deletedIds = getDeletedChatIds();
+      // Исключаем удалённые чаты из локального кэша
+      userChats = userChats.filter(c => 
+        !deletedIds.has(c.id) && 
+        !deletedIds.has(c.conferenceId || '') &&
+        !deletedIds.has(`group_${c.id}`)
+      );
+
+      // Всегда подтягиваем все созданные группы конференций (за исключением удалённых)
       const confGroups = getAllConferenceGroups();
       for (const cg of confGroups) {
-        if (!userChats.some(c => c.id === cg.id)) {
+        if (!deletedIds.has(cg.id) && !deletedIds.has(cg.conferenceId || '') && !userChats.some(c => c.id === cg.id)) {
           userChats.push(cg);
         }
       }
@@ -126,7 +141,7 @@ export function MessengerPage() {
       }
     };
 
-    // Слушаем внешние события обновления чатов (например, завершение конференции)
+    // Слушаем внешние события обновления чатов (например, завершение конференции или удаление группы)
     const handleStorageOrUpdate = () => {
       if (mounted) loadChats();
     };
@@ -136,27 +151,30 @@ export function MessengerPage() {
     // Пробуем получить список чатов с сервера
     api.chats.list().then((data) => {
       if (mounted) {
+        const deletedIds = getDeletedChatIds();
         if (Array.isArray(data) && data.length > 0) {
-          const normalized = data.map((c: any) => ({
-            ...c,
-            user: c.user && typeof c.user === 'object' ? {
-              ...c.user,
-              name: String(c.user.name || c.name || 'Чат'),
-              username: String(c.user.username || c.id || ''),
-              avatar: String(c.user.avatar || ''),
-              id: String(c.user.id || c.id || ''),
-              online: Boolean(c.user.online),
-            } : {
-              id: String(c.id || ''),
-              name: String(c.name || 'Чат'),
-              username: String(c.id || ''),
-              avatar: '',
-              online: false,
-            },
-            messages: Array.isArray(c.messages) ? c.messages : [],
-            lastMessage: String(c.lastMessage || ''),
-            time: String(c.time || 'Сейчас'),
-          })).filter((c: any) => c.id);
+          const normalized = data
+            .filter((c: any) => c && c.id && !deletedIds.has(c.id) && !deletedIds.has(c.conferenceId || '') && !deletedIds.has(`group_${c.id}`))
+            .map((c: any) => ({
+              ...c,
+              user: c.user && typeof c.user === 'object' ? {
+                ...c.user,
+                name: String(c.user.name || c.name || 'Чат'),
+                username: String(c.user.username || c.id || ''),
+                avatar: String(c.user.avatar || ''),
+                id: String(c.user.id || c.id || ''),
+                online: Boolean(c.user.online),
+              } : {
+                id: String(c.id || ''),
+                name: String(c.name || 'Чат'),
+                username: String(c.id || ''),
+                avatar: '',
+                online: false,
+              },
+              messages: Array.isArray(c.messages) ? c.messages : [],
+              lastMessage: String(c.lastMessage || ''),
+              time: String(c.time || 'Сейчас'),
+            }));
 
           // Сохраняем локальные группы и ИИ чат
           let localGroupsAndAi: Chat[] = [];
@@ -165,20 +183,29 @@ export function MessengerPage() {
             try {
               const parsed = JSON.parse(saved);
               if (Array.isArray(parsed)) {
-                localGroupsAndAi = parsed.filter((c: any) => c.isGroup || c.id === 'chat_ai_oracle' || c.conferenceId);
+                localGroupsAndAi = parsed.filter((c: any) => 
+                  !deletedIds.has(c.id) && 
+                  !deletedIds.has(c.conferenceId || '') && 
+                  (c.isGroup || c.id === 'chat_ai_oracle' || c.conferenceId)
+                );
               }
             } catch { /* ignore */ }
           }
           const confGroups = getAllConferenceGroups();
           for (const cg of confGroups) {
-            if (!localGroupsAndAi.some(g => g.id === cg.id)) {
+            if (!deletedIds.has(cg.id) && !deletedIds.has(cg.conferenceId || '') && !localGroupsAndAi.some(g => g.id === cg.id)) {
               localGroupsAndAi.push(cg);
             }
           }
 
           const personalAi = localGroupsAndAi.find(c => c.id === 'chat_ai_oracle') || createPersonalAiChat(currentUser);
           const localGroups = localGroupsAndAi.filter(c => c.id !== 'chat_ai_oracle');
-          const serverWithoutAi = normalized.filter((c: Chat) => c.id !== 'chat_ai_oracle' && !localGroups.some(lg => lg.id === c.id));
+          const serverWithoutAi = normalized.filter((c: Chat) => 
+            !deletedIds.has(c.id) && 
+            !deletedIds.has(c.conferenceId || '') && 
+            c.id !== 'chat_ai_oracle' && 
+            !localGroups.some(lg => lg.id === c.id)
+          );
           const finalChats = [personalAi, ...localGroups, ...serverWithoutAi];
 
           setChatList(finalChats);
@@ -233,6 +260,10 @@ export function MessengerPage() {
     if (isLoading) return;
 
     if (requestedChatId) {
+      if (getDeletedChatIds().has(requestedChatId)) {
+        setActiveChatId(null);
+        return;
+      }
       setActiveChatId(requestedChatId);
       setChatList(prev => {
         let exists = prev.find(c => c.id === requestedChatId);
@@ -408,7 +439,7 @@ export function MessengerPage() {
         }).catch(() => {});
       } else {
         // Ищем информацию о собеседнике среди аккаунтов или сохранённых пользователей
-        const matchedAccount = allAccounts.find(a =>
+        const matchedAccount = allAccounts.find((a: any) =>
           a.id === cleanTarget ||
           (a.username && a.username.toLowerCase() === cleanTarget.toLowerCase())
         );
@@ -515,6 +546,7 @@ export function MessengerPage() {
   };
 
   const handleCreateGroup = (newGroup: Chat) => {
+    unmarkChatDeleted(newGroup.id);
     const readGroup = {
       ...newGroup,
       unread: 0,
@@ -526,17 +558,38 @@ export function MessengerPage() {
       return updated;
     });
     setActiveChatId(readGroup.id);
+
+    // Сохраняем группу и её начальные сообщения в БД бэкенда
+    api.chats.createGroup({
+      id: readGroup.id,
+      title: readGroup.groupTitle || readGroup.user?.name || 'Группа',
+      avatar: readGroup.groupAvatar || readGroup.user?.avatar || '',
+      lastMessage: readGroup.lastMessage || '',
+      messages: readGroup.messages || [],
+    }).catch(err => {
+      console.warn('[Messenger] Failed to persist new group chat to backend:', err);
+    });
   };
 
   const handleDeleteChat = (id: string) => {
+    // 1. Помечаем в постоянном реестре удалённых и очищаем из всех локальных хранилищ конференций
+    deleteConferenceGroup(id);
+
+    // 2. Удаляем из текущего состояния и локального хранилища мессенджера
     setChatList(prev => {
-      const updated = prev.filter(c => c.id !== id);
+      const updated = prev.filter(c => c.id !== id && c.conferenceId !== id);
       localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
+
     if (activeChatId === id) {
       setActiveChatId(null);
     }
+
+    // 3. Безвозвратно удаляем из базы данных PostgreSQL и серверного хранилища
+    api.chats.delete(id).catch(err => {
+      console.warn('[Messenger] Failed to delete chat on backend:', err);
+    });
   };
 
   useEffect(() => {
@@ -602,7 +655,7 @@ export function MessengerPage() {
                 };
               }
             } else {
-              const localAcc = allAccounts.find(a =>
+              const localAcc = allAccounts.find((a: any) =>
                 (a.id && a.id.toLowerCase() === targetId) ||
                 (a.username && a.username.replace(/^@+/, '').toLowerCase() === targetUsername)
               );

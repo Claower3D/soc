@@ -303,6 +303,16 @@ export const api = {
     messages: (id: string) => apiFetch<any>(`/api/chats/${id}/messages`),
     send: (id: string, text: string, extra?: any) => apiFetch<any>(`/api/chats/${id}/messages`, { method: 'POST', body: JSON.stringify({ text, ...extra }) }),
     direct: (userId: string) => apiFetch<any>('/api/chats/direct', { method: 'POST', body: JSON.stringify({ userId }) }),
+    createGroup: async (data: any) => {
+      const res = await apiFetch<any>('/api/chats/group', { method: 'POST', body: JSON.stringify(data) });
+      dataCache.invalidateTag('chats');
+      return res;
+    },
+    delete: async (id: string) => {
+      const res = await apiFetch<any>(`/api/chats/${id}`, { method: 'DELETE' });
+      dataCache.invalidateTag('chats');
+      return res;
+    },
     read: (id: string) => apiFetch<any>(`/api/chats/${id}/read`, { method: 'POST' }),
   },
   podcasts: {
