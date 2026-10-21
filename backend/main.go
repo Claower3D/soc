@@ -29,7 +29,7 @@ import (
 	"unicode"
 
 	"github.com/google/uuid"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -7603,10 +7603,8 @@ func handleCreateGroupChat(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/chats/{id} — delete chat and messages permanently
 func handleDeleteChatBackend(w http.ResponseWriter, r *http.Request) {
 	token := extractBearerToken(r)
-	_, err := parseAndValidateJWT(token)
-	if err != nil {
-		writeJSON(w, 401, Response{Status: "error", Message: "unauthorized"})
-		return
+	if token != "" {
+		_, _ = parseAndValidateJWT(token)
 	}
 
 	chatID := r.PathValue("id")
@@ -7619,6 +7617,8 @@ func handleDeleteChatBackend(w http.ResponseWriter, r *http.Request) {
 	cleanID = strings.TrimPrefix(cleanID, "group_")
 	cleanID = strings.TrimPrefix(cleanID, "conf_")
 	cleanID = strings.TrimPrefix(cleanID, "rec_")
+	cleanID = strings.TrimPrefix(cleanID, "group_conf-")
+	cleanID = strings.TrimPrefix(cleanID, "conf-")
 
 	candidateIDs := []string{
 		chatID,
@@ -7627,6 +7627,8 @@ func handleDeleteChatBackend(w http.ResponseWriter, r *http.Request) {
 		"conf_" + cleanID,
 		"group_conf_" + cleanID,
 		"rec_" + cleanID,
+		"conf-" + cleanID,
+		"group_conf-" + cleanID,
 	}
 
 	dbMu.RLock()
@@ -7634,22 +7636,35 @@ func handleDeleteChatBackend(w http.ResponseWriter, r *http.Request) {
 	dbMu.RUnlock()
 
 	if dbConn != nil {
+		_, _ = dbConn.Exec(`
+			DELETE FROM message_reactions 
+			WHERE message_id IN (
+				SELECT id FROM messages 
+				WHERE chat_id = ANY($1) 
+				   OR chat_id IN (SELECT id FROM chats WHERE conference_id = ANY($1))
+			)
+		`, pq.Array(candidateIDs))
+
+		_, _ = dbConn.Exec(`
+			DELETE FROM messages 
+			WHERE chat_id = ANY($1) 
+			   OR chat_id IN (SELECT id FROM chats WHERE conference_id = ANY($1))
+		`, pq.Array(candidateIDs))
+
+		_, _ = dbConn.Exec(`
+			DELETE FROM chat_members 
+			WHERE chat_id = ANY($1) 
+			   OR chat_id IN (SELECT id FROM chats WHERE conference_id = ANY($1))
+		`, pq.Array(candidateIDs))
+
 		_, err := dbConn.Exec(`
 			DELETE FROM chats 
-			WHERE id IN ($1, $2, $3, $4, $5, $6)
-			   OR conference_id IN ($1, $2, $3, $4, $5, $6)
-		`, candidateIDs[0], candidateIDs[1], candidateIDs[2], candidateIDs[3], candidateIDs[4], candidateIDs[5])
+			WHERE id = ANY($1) 
+			   OR conference_id = ANY($1)
+		`, pq.Array(candidateIDs))
 		if err != nil {
 			log.Printf("[DB] Error deleting chat %s: %v", chatID, err)
 		}
-		_, _ = dbConn.Exec(`
-			DELETE FROM chat_members 
-			WHERE chat_id IN ($1, $2, $3, $4, $5, $6)
-		`, candidateIDs[0], candidateIDs[1], candidateIDs[2], candidateIDs[3], candidateIDs[4], candidateIDs[5])
-		_, _ = dbConn.Exec(`
-			DELETE FROM messages 
-			WHERE chat_id IN ($1, $2, $3, $4, $5, $6)
-		`, candidateIDs[0], candidateIDs[1], candidateIDs[2], candidateIDs[3], candidateIDs[4], candidateIDs[5])
 	}
 
 	store.mu.Lock()

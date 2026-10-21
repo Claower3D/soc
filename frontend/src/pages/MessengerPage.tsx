@@ -589,11 +589,14 @@ export function MessengerPage() {
   };
 
   const handleDeleteChat = (id: string) => {
+    const targetChat = chatList.find(c => c.id === id || c.conferenceId === id);
+    const confId = targetChat?.conferenceId;
+
     // 1. Помечаем в постоянном реестре удалённых и очищаем из всех локальных хранилищ конференций
-    deleteConferenceGroup(id);
+    deleteConferenceGroup(id, confId);
 
     // 2. Если удаляемый чат открыт или фигурирует в URL, сбрасываем и очищаем URL без перезагрузки
-    if (activeChatId === id || isChatDeleted(activeChatId)) {
+    if (activeChatId === id || (confId && activeChatId === confId) || isChatDeleted(activeChatId)) {
       setActiveChatId(null);
     }
     if (typeof window !== 'undefined' && (window.location.search.includes('chat=') || window.location.search.includes('id='))) {
@@ -602,19 +605,25 @@ export function MessengerPage() {
 
     // 3. Удаляем из текущего состояния и локального хранилища мессенджера
     setChatList(prev => {
-      const updated = prev.filter(c => !isChatDeleted(c.id, c.conferenceId) && c.id !== id && c.conferenceId !== id);
+      const updated = prev.filter(c => 
+        !isChatDeleted(c.id, c.conferenceId) && 
+        c.id !== id && 
+        c.conferenceId !== id &&
+        (!confId || (c.id !== confId && c.conferenceId !== confId))
+      );
       localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
 
     // 4. Безвозвратно удаляем из базы данных PostgreSQL и серверного хранилища
-    api.chats.delete(id).catch(err => {
-      console.warn('[Messenger] Failed to delete chat on backend:', err);
-    });
-    const clean = id.replace(/^group_conf_|^group_|^conf_|^rec_/, '');
+    api.chats.delete(id).catch(() => {});
+    if (confId) api.chats.delete(confId).catch(() => {});
+    const clean = id.replace(/^group_conf_|^group_|^conf_|^rec_|^group_conf-|^conf-/, '');
     if (clean && clean !== id) {
       api.chats.delete(clean).catch(() => {});
       api.chats.delete(`group_${clean}`).catch(() => {});
+      api.chats.delete(`conf_${clean}`).catch(() => {});
+      api.chats.delete(`group_conf_${clean}`).catch(() => {});
     }
   };
 
@@ -865,8 +874,18 @@ export function MessengerPage() {
           let hasChanges = false;
           const prevMap = new Map(prev.map(c => [c.id, c]));
 
+          // Первым делом вычищаем любые чаты, помеченные как удалённые
+          for (const [id, c] of prevMap.entries()) {
+            if (isChatDeleted(id, c.conferenceId)) {
+              prevMap.delete(id);
+              hasChanges = true;
+            }
+          }
+
           for (const sc of serverChats) {
             if (!sc || !sc.id) continue;
+            if (isChatDeleted(sc.id, sc.conferenceId)) continue;
+
             const existing = prevMap.get(sc.id);
             if (!existing) {
               hasChanges = true;
@@ -875,6 +894,7 @@ export function MessengerPage() {
                 isGroup: Boolean(sc.isGroup),
                 groupTitle: sc.isGroup ? sc.name : undefined,
                 groupAvatar: sc.isGroup ? sc.avatar : undefined,
+                conferenceId: sc.conferenceId,
                 user: sc.user ? {
                   id: sc.user.id,
                   name: sc.user.name,

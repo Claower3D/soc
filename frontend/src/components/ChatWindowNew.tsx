@@ -400,7 +400,7 @@ function VoiceMessageBubble({ msg, isMe, onUpdateText }: { msg: Message; isMe: b
   );
 }
 
-export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
+export function ChatWindowNew({ chat, onBack, onDeleteChat, onUpdateChat }: ChatWindowProps) {
 
 
   const [inputValue, setInputValue] = useState('');
@@ -413,6 +413,8 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
 
 
   const [showEmoji, setShowEmoji] = useState(false);
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
 
   const [replyTo, setReplyTo] = useState<Message | null>(null);
@@ -2477,9 +2479,138 @@ export function ChatWindowNew({ chat, onBack, onUpdateChat }: ChatWindowProps) {
               <button className="cw-action-btn"><Video size={18} /></button>
             </>
           )}
-          <button className="cw-action-btn"><MoreVertical size={18} /></button>
+          <div style={{ position: 'relative' }}>
+            <button 
+              className="cw-action-btn"
+              onClick={() => setShowHeaderMenu(prev => !prev)}
+              title="Меню чата"
+            >
+              <MoreVertical size={18} />
+            </button>
+            {showHeaderMenu && (
+              <div 
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: '8px',
+                  background: 'var(--color-bg-card, #1E1F2A)',
+                  border: '1px solid var(--color-border, rgba(255,255,255,0.1))',
+                  borderRadius: '12px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+                  zIndex: 100,
+                  minWidth: '180px',
+                  overflow: 'hidden',
+                  padding: '4px',
+                }}
+              >
+                {!isAi && onDeleteChat && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowHeaderMenu(false);
+                      setShowDeleteConfirm(true);
+                    }}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 12px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#ff4d4f',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      textAlign: 'left',
+                    }}
+                  >
+                    <Trash2 size={16} />
+                    <span>Удалить этот чат</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {showDeleteConfirm && (
+        <div 
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div 
+            style={{
+              background: 'var(--color-bg-card, #181924)',
+              border: '1px solid var(--color-border, rgba(255,255,255,0.15))',
+              borderRadius: '16px',
+              padding: '24px',
+              maxWidth: '380px',
+              width: '90%',
+              textAlign: 'center',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(255, 77, 79, 0.15)', color: '#ff4d4f', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <Trash2 size={24} />
+            </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 600 }}>Удалить этот чат?</h3>
+            <p style={{ margin: '0 0 20px', fontSize: '13.5px', color: 'var(--color-text-secondary, #8E8EA0)', lineHeight: '1.5' }}>
+              Вся переписка и материалы этого диалога будут безвозвратно удалены.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button 
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--color-border, rgba(255,255,255,0.15))',
+                  background: 'transparent',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+              >
+                Отмена
+              </button>
+              <button 
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  if (onDeleteChat && chat?.id) {
+                    onDeleteChat(chat.id);
+                    onBack();
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: '#ff4d4f',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="cw-messages">

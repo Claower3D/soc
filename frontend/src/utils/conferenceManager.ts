@@ -45,13 +45,15 @@ export function markChatDeleted(chatId: string) {
   set.add(chatId);
 
   // Extract clean ID without any prefixes
-  const cleanId = chatId.replace(/^group_conf_|^group_|^conf_|^rec_/, '');
+  const cleanId = chatId.replace(/^group_conf_|^group_|^conf_|^rec_|^group_conf-|^conf-/, '');
   if (cleanId) {
     set.add(cleanId);
     set.add(`group_${cleanId}`);
     set.add(`conf_${cleanId}`);
     set.add(`group_conf_${cleanId}`);
     set.add(`rec_${cleanId}`);
+    set.add(`conf-${cleanId}`);
+    set.add(`group_conf-${cleanId}`);
   }
   try {
     localStorage.setItem(DELETED_CHATS_STORAGE_KEY, JSON.stringify(Array.from(set)));
@@ -66,14 +68,18 @@ export function isChatDeleted(id?: string | null, conferenceId?: string | null):
   const deleted = getDeletedChatIds();
   const check = (val?: string | null): boolean => {
     if (!val) return false;
-    if (deleted.has(val)) return true;
-    const clean = val.replace(/^group_conf_|^group_|^conf_|^rec_/, '');
+    const v = String(val).trim();
+    if (!v) return false;
+    if (deleted.has(v)) return true;
+    const clean = v.replace(/^group_conf_|^group_|^conf_|^rec_|^group_conf-|^conf-/, '');
     if (clean && (
       deleted.has(clean) || 
       deleted.has(`group_${clean}`) || 
       deleted.has(`conf_${clean}`) || 
       deleted.has(`group_conf_${clean}`) || 
-      deleted.has(`rec_${clean}`)
+      deleted.has(`rec_${clean}`) ||
+      deleted.has(`conf-${clean}`) ||
+      deleted.has(`group_conf-${clean}`)
     )) {
       return true;
     }
@@ -89,13 +95,15 @@ export function unmarkChatDeleted(chatId: string) {
   if (!chatId) return;
   const set = getDeletedChatIds();
   set.delete(chatId);
-  const cleanId = chatId.replace(/^group_conf_|^group_|^conf_|^rec_/, '');
+  const cleanId = chatId.replace(/^group_conf_|^group_|^conf_|^rec_|^group_conf-|^conf-/, '');
   if (cleanId) {
     set.delete(cleanId);
     set.delete(`group_${cleanId}`);
     set.delete(`conf_${cleanId}`);
     set.delete(`group_conf_${cleanId}`);
     set.delete(`rec_${cleanId}`);
+    set.delete(`conf-${cleanId}`);
+    set.delete(`group_conf-${cleanId}`);
   }
   try {
     localStorage.setItem(DELETED_CHATS_STORAGE_KEY, JSON.stringify(Array.from(set)));
@@ -258,11 +266,14 @@ export function deleteConferenceRecording(id: string) {
 /**
  * Delete a conference group permanently across all storage keys, registries, and backend DB
  */
-export function deleteConferenceGroup(groupId: string) {
-  if (!groupId) return;
+export function deleteConferenceGroup(groupId: string, conferenceId?: string) {
+  if (!groupId && !conferenceId) return;
+
+  const primaryId = groupId || conferenceId || '';
 
   // 1. Mark in permanent tombstones (including all alias prefixes)
-  markChatDeleted(groupId);
+  if (groupId) markChatDeleted(groupId);
+  if (conferenceId) markChatDeleted(conferenceId);
 
   // 2. Remove from master conference groups storage
   try {
@@ -273,7 +284,9 @@ export function deleteConferenceGroup(groupId: string) {
         const filtered = allGroups.filter(g => 
           g && 
           g.id !== groupId && 
+          g.id !== conferenceId &&
           g.conferenceId !== groupId && 
+          g.conferenceId !== conferenceId &&
           !isChatDeleted(g.id, g.conferenceId)
         );
         localStorage.setItem(CONFERENCE_GROUPS_STORAGE_KEY, JSON.stringify(filtered));
@@ -292,6 +305,7 @@ export function deleteConferenceGroup(groupId: string) {
         const matches = r.chatGroupId === groupId || 
                         r.conferenceId === groupId || 
                         r.id === groupId ||
+                        (conferenceId && (r.chatGroupId === conferenceId || r.conferenceId === conferenceId || r.id === conferenceId)) ||
                         isChatDeleted(r.id, r.chatGroupId) ||
                         isChatDeleted(r.conferenceId);
         if (matches) {
@@ -325,7 +339,9 @@ export function deleteConferenceGroup(groupId: string) {
             const filtered = parsed.filter((c: any) => 
               c && 
               c.id !== groupId && 
+              c.id !== conferenceId &&
               c.conferenceId !== groupId && 
+              c.conferenceId !== conferenceId &&
               !isChatDeleted(c.id, c.conferenceId)
             );
             localStorage.setItem(key, JSON.stringify(filtered));
@@ -335,20 +351,33 @@ export function deleteConferenceGroup(groupId: string) {
     }
   } catch {}
 
-  // 5. Delete permanently from backend DB / store
-  try {
-    api.chats.delete(groupId).catch(() => {});
-    const clean = groupId.replace(/^group_conf_|^group_|^conf_|^rec_/, '');
-    if (clean && clean !== groupId) {
-      api.chats.delete(clean).catch(() => {});
-      api.chats.delete(`group_${clean}`).catch(() => {});
+  // 5. Delete permanently from backend DB / store across all aliases
+  const idsToDelete = new Set<string>();
+  if (groupId) idsToDelete.add(groupId);
+  if (conferenceId) idsToDelete.add(conferenceId);
+
+  for (const id of Array.from(idsToDelete)) {
+    const clean = id.replace(/^group_conf_|^group_|^conf_|^rec_|^group_conf-|^conf-/, '');
+    if (clean) {
+      idsToDelete.add(clean);
+      idsToDelete.add(`group_${clean}`);
+      idsToDelete.add(`conf_${clean}`);
+      idsToDelete.add(`group_conf_${clean}`);
+      idsToDelete.add(`conf-${clean}`);
+      idsToDelete.add(`group_conf-${clean}`);
     }
-  } catch {}
+  }
+
+  for (const targetId of idsToDelete) {
+    try {
+      api.chats.delete(targetId).catch(() => {});
+    } catch {}
+  }
 
   // 6. Dispatch reactive event
   try {
     window.dispatchEvent(new CustomEvent('newage_chats_updated', {
-      detail: { deletedChatId: groupId }
+      detail: { deletedChatId: primaryId }
     }));
   } catch {}
 }
@@ -436,7 +465,7 @@ export function createGroupChatFromRecording(rec: ConferenceRecordingItem): Chat
 export function getAllConferenceGroups(): Chat[] {
   const groupsMap = new Map<string, Chat>();
 
-  // 1. Master registry
+  // Master registry
   try {
     const raw = localStorage.getItem(CONFERENCE_GROUPS_STORAGE_KEY);
     if (raw) {
@@ -451,21 +480,7 @@ export function getAllConferenceGroups(): Chat[] {
     }
   } catch {}
 
-  // 2. Scan all recordings in archive
-  const recordings = getStoredConferenceRecordings();
-  for (const rec of recordings) {
-    if (
-      rec.chatGroupId && 
-      !isChatDeleted(rec.chatGroupId, rec.conferenceId) && 
-      !isChatDeleted(rec.id) && 
-      !groupsMap.has(rec.chatGroupId)
-    ) {
-      const synthesized = createGroupChatFromRecording(rec);
-      groupsMap.set(rec.chatGroupId, synthesized);
-    }
-  }
-
-  // 3. Scan common local storage messenger keys
+  // Scan common local storage messenger keys
   const targetKeys = ['newage_messenger_chats_me', 'newage_messenger_chats_guest'];
   try {
     const cur = localStorage.getItem('new_age_current_user');
