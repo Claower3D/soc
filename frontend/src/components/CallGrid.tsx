@@ -83,7 +83,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
   const [activeSidePanel, setActiveSidePanel] = useState<'chat' | 'users' | null>('chat');
   const [messages, setMessages] = useState<ConferenceMessage[]>(initialConferenceMessages);
   const [chatInput, setChatInput] = useState('');
-  const [callDuration, setCallDuration] = useState(145);
+  const [callDuration, setCallDuration] = useState(0);
   const [copiedLink, setCopiedLink] = useState(false);
   const [callEndedModal, setCallEndedModal] = useState(false);
   const [savedRecordingData, setSavedRecordingData] = useState<ConferenceRecordingItem | null>(null);
@@ -413,6 +413,8 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
   // Connect screen video ref whenever screenStream updates
   useEffect(() => {
     if (screenShareMode === 'screen' && screenStreamRef.current && screenVideoRef.current) {
+      screenVideoRef.current.muted = true;
+      screenVideoRef.current.volume = 0;
       screenVideoRef.current.srcObject = screenStreamRef.current;
       screenVideoRef.current.play().catch(console.warn);
     }
@@ -540,6 +542,8 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
 
       setTimeout(() => {
         if (screenVideoRef.current) {
+          screenVideoRef.current.muted = true;
+          screenVideoRef.current.volume = 0;
           screenVideoRef.current.srcObject = stream;
           screenVideoRef.current.play().catch(console.warn);
         }
@@ -565,12 +569,17 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
     }
   };
 
-  // Toggle Screen Audio
+  // Toggle Screen Audio transmission (for call participants & recording; presenter preview is always local-muted)
   const toggleScreenAudio = () => {
-    setScreenAudioMuted(prev => !prev);
-    if (screenVideoRef.current) {
-      screenVideoRef.current.muted = !screenAudioMuted;
-    }
+    setScreenAudioMuted(prev => {
+      const next = !prev;
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getAudioTracks().forEach(track => {
+          track.enabled = !next;
+        });
+      }
+      return next;
+    });
   };
 
   // Toggle Fullscreen on Screen Share
@@ -838,10 +847,10 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
                       <button 
                         className="screen-header-btn" 
                         onClick={toggleScreenAudio} 
-                        title={screenAudioMuted ? 'Включить звук демонстрации' : 'Выключить звук демонстрации'}
+                        title={screenAudioMuted ? 'Включить трансляцию звука экрана для участников' : 'Выключить трансляцию звука экрана для участников'}
                       >
                         {screenAudioMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-                        <span>{screenAudioMuted ? 'Без звука' : 'Звук экрана'}</span>
+                        <span>{screenAudioMuted ? 'Звук выкл' : 'Звук экрана'}</span>
                       </button>
                       <button className="screen-header-btn" onClick={toggleFullscreen} title="Во весь экран">
                         {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
@@ -859,7 +868,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
                       ref={screenVideoRef}
                       autoPlay
                       playsInline
-                      muted={screenAudioMuted}
+                      muted={true}
                       className="real-screen-video"
                     />
                     {screenShareError && (
@@ -1641,6 +1650,9 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
                   playsInline 
                   poster={savedRecordingData.thumbnail}
                   className="summary-video-player"
+                  onLoadedMetadata={(e) => {
+                    e.currentTarget.currentTime = 0;
+                  }}
                 />
               </div>
             )}
