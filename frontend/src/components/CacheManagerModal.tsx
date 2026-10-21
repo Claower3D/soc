@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { dataCache, type CacheStats } from '../utils/dataCache';
 import { api } from '../api';
+import { useAuth } from '../context/AuthContext';
 import './CacheManagerModal.css';
 
 interface CacheManagerModalProps {
@@ -88,7 +89,8 @@ export function CacheManagerModal({ isOpen, onClose }: CacheManagerModalProps) {
     };
   }, [isOpen, refreshStats, fetchServerStats]);
 
-  if (!isOpen) return null;
+  const { currentUser } = useAuth();
+  if (!isOpen || currentUser?.role !== 'admin') return null;
 
   const handlePrefetch = async () => {
     setIsPrefetching(true);

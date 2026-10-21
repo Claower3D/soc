@@ -50,7 +50,11 @@ export function Header() {
       setIsSettingsOpen(true);
     };
     const handleOpenQr = () => setIsQrScannerOpen(true);
-    const handleOpenCache = () => setIsCacheOpen(true);
+    const handleOpenCache = () => {
+      if (currentUser?.role === 'admin') {
+        setIsCacheOpen(true);
+      }
+    };
     window.addEventListener('open-profile-settings', handleOpenSettings);
     window.addEventListener('open-qr-scanner', handleOpenQr);
     window.addEventListener('open-cache-manager', handleOpenCache);
@@ -59,7 +63,7 @@ export function Header() {
       window.removeEventListener('open-qr-scanner', handleOpenQr);
       window.removeEventListener('open-cache-manager', handleOpenCache);
     };
-  }, []);
+  }, [currentUser?.role]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent | TouchEvent) {
@@ -246,15 +250,17 @@ export function Header() {
           <Search size={15} />
         </button>
 
-        {/* Cache Manager Shortcut */}
-        <button
-          className="header-action-btn header-cache-pill"
-          onClick={() => setIsCacheOpen(true)}
-          title="Управление кэшированием (SWR v2 + RAM)"
-        >
-          <Database size={15} />
-          <span className="btn-text">Кэш</span>
-        </button>
+        {/* Cache Manager Shortcut (Admin only) */}
+        {currentUser?.role === 'admin' && (
+          <button
+            className="header-action-btn header-cache-pill"
+            onClick={() => setIsCacheOpen(true)}
+            title="Управление кэшированием (SWR v2 + RAM)"
+          >
+            <Database size={15} />
+            <span className="btn-text">Кэш</span>
+          </button>
+        )}
 
         <div className="header-divider" />
 
@@ -597,11 +603,13 @@ export function Header() {
         onClose={() => setIsQrScannerOpen(false)}
       />
 
-      {/* Global Cache Manager Modal */}
-      <CacheManagerModal
-        isOpen={isCacheOpen}
-        onClose={() => setIsCacheOpen(false)}
-      />
+      {/* Global Cache Manager Modal (Admin only) */}
+      {currentUser?.role === 'admin' && (
+        <CacheManagerModal
+          isOpen={isCacheOpen}
+          onClose={() => setIsCacheOpen(false)}
+        />
+      )}
     </header>
   );
 }

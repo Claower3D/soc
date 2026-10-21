@@ -1131,38 +1131,40 @@ export function EditProfileModal({
                 </div>
               </div>
 
-              {/* === Cache & Memory Management === */}
-              <div className="privacy-settings-box" style={{ marginTop: '0.85rem' }}>
-                <div className="settings-qr-scanner-card" style={{ borderColor: 'rgba(6, 182, 212, 0.3)', background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.06) 0%, rgba(59, 130, 246, 0.06) 100%)' }}>
-                  <div className="settings-qr-left-content">
-                    <div className="settings-qr-icon-wrap" style={{ background: 'rgba(6, 182, 212, 0.15)', color: '#06b6d4' }}>
-                      <Database size={24} />
-                    </div>
-                    <div className="settings-qr-text-meta">
-                      <div className="settings-qr-badge-title">
-                        <strong className="settings-qr-title">Память и кэширование</strong>
-                        <span className="settings-qr-quick-tag" style={{ background: 'rgba(6, 182, 212, 0.2)', color: '#06b6d4' }}>SWR v2</span>
+              {/* === Cache & Memory Management (Admin only) === */}
+              {currentUser?.role === 'admin' && (
+                <div className="privacy-settings-box" style={{ marginTop: '0.85rem' }}>
+                  <div className="settings-qr-scanner-card" style={{ borderColor: 'rgba(6, 182, 212, 0.3)', background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.06) 0%, rgba(59, 130, 246, 0.06) 100%)' }}>
+                    <div className="settings-qr-left-content">
+                      <div className="settings-qr-icon-wrap" style={{ background: 'rgba(6, 182, 212, 0.15)', color: '#06b6d4' }}>
+                        <Database size={24} />
                       </div>
-                      <p className="settings-qr-description">
-                        Двухуровневый кэш (L1 RAM + L2 Offline LocalStorage), моментальное переключение экранов и ручная очистка
-                      </p>
+                      <div className="settings-qr-text-meta">
+                        <div className="settings-qr-badge-title">
+                          <strong className="settings-qr-title">Память и кэширование</strong>
+                          <span className="settings-qr-quick-tag" style={{ background: 'rgba(6, 182, 212, 0.2)', color: '#06b6d4' }}>SWR v2</span>
+                        </div>
+                        <p className="settings-qr-description">
+                          Двухуровневый кэш (L1 RAM + L2 Offline LocalStorage), моментальное переключение экранов и ручная очистка
+                        </p>
+                      </div>
                     </div>
+                    <button 
+                      type="button" 
+                      className="btn-open-qr-scanner"
+                      style={{ background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)', borderColor: 'transparent', color: '#fff' }}
+                      onClick={() => {
+                        onClose();
+                        window.dispatchEvent(new CustomEvent('open-cache-manager'));
+                      }}
+                      title="Открыть Центр управления кэшем"
+                    >
+                      <Database size={16} />
+                      <span>Управление кэшем</span>
+                    </button>
                   </div>
-                  <button 
-                    type="button" 
-                    className="btn-open-qr-scanner"
-                    style={{ background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)', borderColor: 'transparent', color: '#fff' }}
-                    onClick={() => {
-                      onClose();
-                      window.dispatchEvent(new CustomEvent('open-cache-manager'));
-                    }}
-                    title="Открыть Центр управления кэшем"
-                  >
-                    <Database size={16} />
-                    <span>Управление кэшем</span>
-                  </button>
                 </div>
-              </div>
+              )}
 
               <div className="privacy-divider" />
 
