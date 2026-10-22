@@ -1240,6 +1240,7 @@ func main() {
 	mux.HandleFunc("POST /api/posts/{id}/comments", handleAddComment)
 	mux.HandleFunc("GET /api/posts/{id}/comments", handleGetComments)
 	mux.HandleFunc("DELETE /api/posts/{id}", handleDeletePost)
+	mux.HandleFunc("PUT /api/posts/{id}", handleUpdatePost)
 
 	// Сторис и клипы
 	mux.HandleFunc("GET /api/stories", handleStories)
@@ -5132,6 +5133,76 @@ func handleDeletePost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusForbidden, Response{Status: "error", Message: "Нет прав для удаления или публикация не найдена"})
+}
+
+// PUT /api/posts/{id} — update post caption & location
+func handleUpdatePost(w http.ResponseWriter, r *http.Request) {
+	token := extractBearerToken(r)
+	claims, err := parseAndValidateJWT(token)
+	if err != nil {
+		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Необходима авторизация"})
+		return
+	}
+
+	postID := r.PathValue("id")
+	var req struct {
+		Caption  string `json:"caption"`
+		Location string `json:"location"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Неверный формат данных"})
+		return
+	}
+
+	updated := false
+
+	dbMu.RLock()
+	dbConn := db
+	dbMu.RUnlock()
+	if dbConn != nil {
+		var authorID, authorUsername string
+		err := dbConn.QueryRow(`
+			SELECT p.user_id, COALESCE(u.username, '') 
+			FROM posts p 
+			LEFT JOIN users u ON p.user_id = u.id 
+			WHERE p.id = $1
+		`, postID).Scan(&authorID, &authorUsername)
+		if err == nil {
+			isOwner := authorID == claims.UserID || 
+				strings.EqualFold(authorUsername, claims.Username) || 
+				claims.Role == "admin"
+			if isOwner {
+				dbConn.Exec("UPDATE posts SET caption = $1, location = $2 WHERE id = $3", req.Caption, req.Location, postID)
+				updated = true
+			}
+		}
+	}
+
+	store.mu.Lock()
+	for i, p := range store.posts {
+		if p.ID == postID {
+			isOwner := p.UserID == claims.UserID || 
+				strings.EqualFold(p.User.Username, claims.Username) || 
+				claims.Role == "admin"
+			if isOwner {
+				store.posts[i].Caption = req.Caption
+				store.posts[i].Location = req.Location
+				updated = true
+			}
+			break
+		}
+	}
+	if updated {
+		store.saveToDisk()
+	}
+	store.mu.Unlock()
+
+	if updated {
+		globalCache.InvalidateTag("feed")
+		writeJSON(w, http.StatusOK, Response{Status: "ok", Message: "Публикация успешно обновлена"})
+	} else {
+		writeJSON(w, http.StatusForbidden, Response{Status: "error", Message: "Нет прав на редактирование публикации или публикация не найдена"})
+	}
 }
 
 func handleStories(w http.ResponseWriter, r *http.Request) {

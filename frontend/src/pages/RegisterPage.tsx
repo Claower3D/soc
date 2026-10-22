@@ -336,8 +336,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                   <div className="side-logo-radiance" />
                 </div>
                 <div className="side-badge">
-                  <Sparkles size={14} className="sparkle-icon" />
-                  <span>{authMode === 'register' ? 'Официальная регистрация' : 'Авторизация в систему'}</span>
+                  <span>New Age Unity</span>
                 </div>
               </div>
 

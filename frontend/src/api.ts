@@ -290,6 +290,11 @@ export const api = {
       const res = await apiFetch<any>(`/api/posts/${id}`, { method: 'DELETE' });
       dataCache.invalidateTag('feed');
       return res;
+    },
+    update: async (id: string, data: { caption?: string; location?: string }) => {
+      const res = await apiFetch<any>(`/api/posts/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      dataCache.invalidateTag('feed');
+      return res;
     }
   },
   stories: {
