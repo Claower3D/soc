@@ -37,7 +37,7 @@ export function CreateConferenceModal({ isOpen, onClose, onCreateConference }: C
       hasRecording: recordMeeting,
       recordingDuration: '0:00',
       recordingDate: 'Сегодня',
-      recordingThumbnail: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+      recordingThumbnail: '',
     };
 
     onCreateConference(newConf, createGroup);

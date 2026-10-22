@@ -233,7 +233,7 @@ export function ChatList({
       user: currentUser,
       isGroup: true,
       groupTitle: groupTitle.trim(),
-      groupAvatar: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=150&q=80',
+      groupAvatar: '',
       membersCount: selectedUserIds.length + 1,
       lastMessage: 'Группа успешно создана',
       time: 'Только что',
@@ -478,7 +478,13 @@ export function ChatList({
             const isGroup = chat.isGroup;
             const isAi = chat.id === 'ai_guru_bot' || chat.id === 'chat_ai_oracle' || chat.isSystem;
             const displayName = chat.groupTitle || chat.user.name || 'Чат';
-            const displayAvatar = isGroup ? (chat.groupAvatar || '/default-avatar.svg') : getAvatarUrl(chat.user);
+            const hasGroupImage = Boolean(
+              isGroup &&
+              chat.groupAvatar &&
+              !chat.groupAvatar.includes('photo-1522071820081') &&
+              chat.groupAvatar !== '/default-avatar.svg'
+            );
+            const displayAvatar = isGroup ? (hasGroupImage ? chat.groupAvatar : '') : getAvatarUrl(chat.user);
 
             return (
               <div
@@ -487,14 +493,20 @@ export function ChatList({
                 onClick={() => handleChatClick(chat)}
               >
                 <div className="chat-avatar-wrapper">
-                  <img src={displayAvatar} alt={displayName} className="chat-avatar" onError={handleAvatarError} />
+                  {isGroup && !hasGroupImage ? (
+                    <div className="chat-avatar chat-avatar-group-placeholder" title={displayName}>
+                      <Users size={20} />
+                    </div>
+                  ) : (
+                    <img src={displayAvatar} alt={displayName} className="chat-avatar" onError={handleAvatarError} />
+                  )}
                   {!isGroup && !isAi && (
                     <div 
                       className={`online-indicator ${chat.user?.online ? 'is-online' : 'is-offline'}`} 
                       title={chat.user?.online ? 'В сети' : formatLastSeen(chat.user?.lastSeen, false, chat.user?.lastSeenText)}
                     />
                   )}
-                  {isGroup && (
+                  {isGroup && hasGroupImage && (
                     <div className="group-badge-circle" title="Групповая беседа">
                       <Users size={10} />
                     </div>

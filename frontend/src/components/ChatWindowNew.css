@@ -123,6 +123,12 @@
   background: linear-gradient(135deg, #a855f7, #ec4899);
 }
 
+.cw-avatar-placeholder.group {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(168, 85, 247, 0.22));
+  border: 1.5px solid rgba(139, 92, 246, 0.35);
+  color: var(--color-accent, #6366f1);
+}
+
 .cw-online-dot {
   position: absolute;
   bottom: 0px;

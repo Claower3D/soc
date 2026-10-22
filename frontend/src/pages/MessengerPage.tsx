@@ -82,15 +82,21 @@ export function MessengerPage() {
               .filter((c: any) => c && c.id && (c.isGroup || (c.user && typeof c.user === 'object' && typeof c.user.name === 'string')))
               .map((c: any) => {
                 const isOracle = c.id === 'chat_ai_oracle' || c.id === 'ai_guru_bot';
+                const isGroup = Boolean(c.isGroup);
+                const rawAvatar = String(c.user?.avatar || c.groupAvatar || '');
+                const cleanAvatar = isGroup && (rawAvatar.includes('photo-1522071820081') || rawAvatar === '/default-avatar.svg') ? '' : rawAvatar;
+                const cleanGroupAvatar = isGroup && c.groupAvatar && (c.groupAvatar.includes('photo-1522071820081') || c.groupAvatar === '/default-avatar.svg') ? '' : c.groupAvatar;
+
                 return {
                   ...c,
+                  groupAvatar: cleanGroupAvatar,
                   lastMessage: String(c.lastMessage || ''),
                   time: String(c.time || ''),
                   user: {
                     ...c.user,
                     name: String(c.user?.name || c.groupTitle || 'Группа'),
                     username: String(c.user?.username || c.id || ''),
-                    avatar: String(c.user?.avatar || c.groupAvatar || ''),
+                    avatar: cleanAvatar,
                     online: isOracle ? true : Boolean(c.user?.online),
                     lastSeen: c.user?.lastSeen,
                     lastSeenText: c.user?.lastSeenText,
@@ -301,7 +307,7 @@ export function MessengerPage() {
               id: requestedChatId,
               isGroup: true,
               groupTitle: `💬 Конференция: ${titleName}`,
-              groupAvatar: matchingRec?.thumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+              groupAvatar: '',
               membersCount: matchingRec?.participantsCount || 2,
               lastMessage: 'Группа конференции создана',
               time: 'Сегодня',
@@ -310,7 +316,7 @@ export function MessengerPage() {
                 id: `host_${requestedChatId}`,
                 name: `💬 Конференция: ${titleName}`,
                 username: requestedChatId,
-                avatar: matchingRec?.thumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+                avatar: '',
                 online: true,
                 followersCount: 0,
                 followingCount: 0,
@@ -893,13 +899,13 @@ export function MessengerPage() {
                 id: sc.id,
                 isGroup: Boolean(sc.isGroup),
                 groupTitle: sc.isGroup ? sc.name : undefined,
-                groupAvatar: sc.isGroup ? sc.avatar : undefined,
+                groupAvatar: sc.isGroup ? (sc.avatar && !sc.avatar.includes('photo-1522071820081') ? sc.avatar : '') : undefined,
                 conferenceId: sc.conferenceId,
                 user: sc.user ? {
                   id: sc.user.id,
                   name: sc.user.name,
                   username: sc.user.username,
-                  avatar: sc.user.avatar,
+                  avatar: sc.isGroup ? '' : sc.user.avatar,
                   online: Boolean(sc.user.online),
                   lastSeen: sc.user.lastSeen,
                   lastSeenText: sc.user.lastSeenText,
@@ -910,7 +916,7 @@ export function MessengerPage() {
                   id: sc.id,
                   name: sc.name || 'Чат',
                   username: sc.id,
-                  avatar: sc.avatar || '',
+                  avatar: sc.isGroup ? '' : (sc.avatar || ''),
                   online: false,
                   followersCount: 0,
                   followingCount: 0,

@@ -563,6 +563,9 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 		-- Очистка битых (blob:) и фейковых тестовых видео и клипов, а также потерянного клипа без файла
 		DELETE FROM clips WHERE video_url LIKE 'blob:%' OR video_url LIKE '%googleapis.com/sample%' OR video_url LIKE '%clip_1792408583_4c824401%';
 		DELETE FROM videos WHERE video_url LIKE 'blob:%' OR video_url LIKE '%googleapis.com/sample%' OR video_url LIKE '%clip_1792408583_4c824401%';
+
+		-- Очистка автоматических картинок у групп (группы по умолчанию должны быть без аватарок)
+		UPDATE chats SET avatar = '' WHERE is_group = true AND avatar LIKE '%photo-1522071820081%';
 	`)
 
 	return conn, nil
@@ -2203,6 +2206,10 @@ func handleChats(w http.ResponseWriter, r *http.Request) {
 						ls = otherLastSeen.Time
 					}
 					isOnline := isUserOnline(otherID, otherOnline, ls)
+
+					if isGroup && strings.Contains(avatar, "photo-1522071820081") {
+						avatar = ""
+					}
 
 					chatObj := map[string]interface{}{
 						"id":           id,
@@ -7436,9 +7443,9 @@ func handleCreateGroupChat(w http.ResponseWriter, r *http.Request) {
 		title = "Новая группа"
 	}
 
-	avatar := req.Avatar
-	if avatar == "" {
-		avatar = "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80"
+	avatar := strings.TrimSpace(req.Avatar)
+	if strings.Contains(avatar, "photo-1522071820081") {
+		avatar = ""
 	}
 
 	now := time.Now()

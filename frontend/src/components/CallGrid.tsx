@@ -771,7 +771,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       duration: finalDuration,
       messages: messages,
       videoUrl: finalVideoUrl,
-      thumbnail: effectiveConf.recordingThumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+      thumbnail: effectiveConf.recordingThumbnail && !effectiveConf.recordingThumbnail.includes('photo-1522071820081') ? effectiveConf.recordingThumbnail : '',
       currentUserId: effectiveUser?.id || 'me',
       hostUser: effectiveUser,
     });
@@ -782,7 +782,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       date: 'Сегодня, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       duration: finalDuration,
       participantsCount: participants.length || 1,
-      thumbnail: effectiveConf.recordingThumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+      thumbnail: effectiveConf.recordingThumbnail && !effectiveConf.recordingThumbnail.includes('photo-1522071820081') ? effectiveConf.recordingThumbnail : '',
       videoUrl: finalVideoUrl,
       chatGroupId: savedGroupId,
       conferenceId: effectiveConf.id,

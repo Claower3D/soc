@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles, Globe, Languages, Check, ChevronDown, Play, Download, Disc, Film } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Paperclip, MoreVertical, Phone, Video, Copy, Reply, Trash2, Pin, Forward, X, Mic, Volume2, VolumeX, Volume1, MicOff, Sparkles, Globe, Languages, Check, ChevronDown, Play, Download, Disc, Film, Users } from 'lucide-react';
 import { type Chat, type Message } from '../data/mock';
 import { formatLastSeen } from '../utils/onlineStatus';
 import { API_BASE_URL, api, resolveMediaUrl } from '../api';
@@ -2114,7 +2114,15 @@ export function ChatWindowNew({ chat, onBack, onDeleteChat, onUpdateChat }: Chat
   const chatName = String(chat.groupTitle || chat.user?.name || 'Чат');
 
 
-  const chatAvatar = String(chat.groupAvatar || chat.user?.avatar || '');
+  const isGroupHasImage = Boolean(
+    chat.isGroup &&
+    chat.groupAvatar &&
+    !chat.groupAvatar.includes('photo-1522071820081') &&
+    chat.groupAvatar !== '/default-avatar.svg'
+  );
+  const chatAvatar = chat.isGroup
+    ? (isGroupHasImage ? chat.groupAvatar! : '')
+    : String(chat.user?.avatar || '');
 
 
   const isOnline = isAi || Boolean(chat.user?.online);
@@ -2424,23 +2432,15 @@ export function ChatWindowNew({ chat, onBack, onDeleteChat, onUpdateChat }: Chat
 
 
           {chatAvatar ? (
-
-
             <img src={chatAvatar} alt={chatName} className="cw-avatar-img" />
-
-
           ) : (
-
-
-            <div className={`cw-avatar-placeholder ${isAi ? 'ai' : ''}`}>
-
-
-              {chatName.charAt(0)}
-
-
+            <div className={`cw-avatar-placeholder ${isAi ? 'ai' : ''} ${chat.isGroup ? 'group' : ''}`}>
+              {chat.isGroup ? (
+                <Users size={18} />
+              ) : (
+                chatName.replace(/^[^\p{L}\p{N}]+/u, '').charAt(0).toUpperCase() || chatName.charAt(0)
+              )}
             </div>
-
-
           )}
 
 

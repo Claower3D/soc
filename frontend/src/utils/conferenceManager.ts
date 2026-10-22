@@ -18,7 +18,6 @@ export interface ConferenceRecordingItem {
 export const RECORDINGS_STORAGE_KEY = 'newage_conference_recordings';
 export const DELETED_CHATS_STORAGE_KEY = 'newage_deleted_chat_ids_v2';
 const DEFAULT_VIDEO_URL = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
-const DEFAULT_THUMBNAIL = 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80';
 
 /**
  * Get the set of chat/group IDs that have been explicitly deleted by the user
@@ -409,7 +408,7 @@ export const CONFERENCE_GROUPS_STORAGE_KEY = 'newage_conference_groups';
 export function createGroupChatFromRecording(rec: ConferenceRecordingItem): Chat {
   const groupId = rec.chatGroupId || `group_${rec.id}`;
   const groupTitle = `💬 Конференция: ${rec.title}`;
-  const groupAvatar = rec.thumbnail || DEFAULT_THUMBNAIL;
+  const groupAvatar = '';
   const resolvedVideoUrl = rec.videoUrl || DEFAULT_VIDEO_URL;
 
   const initMsg: Message = {
@@ -523,9 +522,15 @@ export function getAllConferenceGroups(): Chat[] {
     } catch {}
   }
 
-  return Array.from(groupsMap.values()).filter(g => 
-    !isChatDeleted(g.id, g.conferenceId)
-  );
+  return Array.from(groupsMap.values())
+    .filter(g => !isChatDeleted(g.id, g.conferenceId))
+    .map(g => {
+      if (g.isGroup) {
+        if (g.groupAvatar && g.groupAvatar.includes('photo-1522071820081')) g.groupAvatar = '';
+        if (g.user && g.user.avatar && g.user.avatar.includes('photo-1522071820081')) g.user.avatar = '';
+      }
+      return g;
+    });
 }
 
 /**
@@ -569,7 +574,7 @@ export function saveConferenceGroupChat({
   duration,
   messages = [],
   videoUrl,
-  thumbnail,
+  thumbnail: _thumbnail,
   currentUserId,
   hostUser,
 }: {
@@ -592,7 +597,8 @@ export function saveConferenceGroupChat({
   unmarkChatDeleted(groupId);
   if (conference.id) unmarkChatDeleted(conference.id);
   const groupTitle = `💬 Конференция: ${conference.title}`;
-  const groupAvatar = thumbnail || conference.recordingThumbnail || DEFAULT_THUMBNAIL;
+  // Группы по умолчанию создаются БЕЗ аватарки/картинки
+  const groupAvatar = '';
   const resolvedVideoUrl = videoUrl || conference.recordingThumbnail || DEFAULT_VIDEO_URL;
 
   // 1. System Welcome Message

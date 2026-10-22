@@ -160,6 +160,17 @@
   object-fit: cover;
 }
 
+.chat-avatar-group-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.16), rgba(168, 85, 247, 0.16));
+  border: 1.5px solid rgba(139, 92, 246, 0.28);
+  color: var(--color-accent, #6366f1);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
 .online-indicator {
   position: absolute;
   bottom: 1px;

@@ -7,7 +7,7 @@ import {
   CheckCheck, X, Trash2, Edit2, Reply, Copy, Check, MoreVertical,
   Camera, FileText, Headphones, UserCheck, BarChart2, Calendar, 
   Sparkles, ShoppingBag, Zap, VolumeX, Palette, Archive, ArchiveRestore, Lock, Unlock,
-  Pin, Languages, Forward, CheckSquare, Search, Bookmark
+  Pin, Languages, Forward, CheckSquare, Search, Bookmark, Users
 } from 'lucide-react';
 import { 
   type Chat, type Message, type PollData, type EventData, 
@@ -1084,12 +1084,18 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
 
           <div className="tg-user-box" onClick={handleHeaderClick}>
             <div className="tg-avatar-wrap">
-              <img 
-                src={chat.isGroup ? (chat.groupAvatar || '/default-avatar.svg') : getAvatarUrl(chat.user)} 
-                alt={String(chat.groupTitle || chat.user?.name || 'Чат')} 
-                className="tg-header-avatar" 
-                onError={handleAvatarError}
-              />
+              {chat.isGroup && (!chat.groupAvatar || chat.groupAvatar.includes('photo-1522071820081') || chat.groupAvatar === '/default-avatar.svg') ? (
+                <div className="tg-header-avatar chat-avatar-group-placeholder" title={String(chat.groupTitle || 'Группа')}>
+                  <Users size={18} />
+                </div>
+              ) : (
+                <img 
+                  src={chat.isGroup ? chat.groupAvatar : getAvatarUrl(chat.user)} 
+                  alt={String(chat.groupTitle || chat.user?.name || 'Чат')} 
+                  className="tg-header-avatar" 
+                  onError={handleAvatarError}
+                />
+              )}
               {!chat.isGroup && (
                 <span 
                   className={`tg-online-pip ${chat.user?.online ? 'is-online' : 'is-offline'}`} 
