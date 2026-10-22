@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Heart, MessageCircle, Send, Bookmark, MoreHorizontal, Check, MapPin, 
@@ -34,6 +34,36 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
   const [location, setLocation] = useState(post.location || post.user?.location || '');
   // Menu and Modals state
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showMoreMenu) return;
+
+    const handleOutsideClick = (e: MouseEvent | TouchEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowMoreMenu(false);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('touchstart', handleOutsideClick);
+      document.addEventListener('keydown', handleEscape);
+    }, 10);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showMoreMenu]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -71,9 +101,11 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
     const origin = window.location.origin;
     return `${origin}/post/${post.id}`;
   };
-  const handleShareNative = async () => {
+  const handleShareNative = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     const url = getPostUrl();
-    if (navigator.share) {
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    if (isMobile && navigator.share) {
       try {
         await navigator.share({
           title: `Публикация от @${post.user.username}`,
@@ -83,7 +115,13 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
         return;
       } catch (_) {}
     }
-    navigator.clipboard?.writeText(url);
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast('Ссылка на публикацию скопирована');
+        return;
+      } catch (_) {}
+    }
     showToast('Ссылка на публикацию скопирована');
   };
   const handleCopyLink = () => {
@@ -293,7 +331,7 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
           </div>
         </div>
         {/* 3 Dots Options Button & Side Dropdown */}
-        <div className="post-more-wrap">
+        <div className="post-more-wrap" ref={moreMenuRef}>
           <button 
             type="button"
             className="post-more-btn" 
@@ -308,15 +346,7 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
           </button>
 
           {showMoreMenu && (
-            <>
-              <div 
-                className="post-menu-backdrop-transparent" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMoreMenu(false);
-                }} 
-              />
-              <div className="post-dropdown-menu" onClick={e => e.stopPropagation()}>
+            <div className="post-dropdown-menu" onClick={e => e.stopPropagation()}>
                 {isPostOwner ? (
                   <>
                     <button 
@@ -571,7 +601,6 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
                   </>
                 )}
               </div>
-            </>
           )}
         </div>
       </header>
