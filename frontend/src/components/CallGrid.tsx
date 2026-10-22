@@ -107,6 +107,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
   const firstCapturedFrameRef = useRef<string>('');
   const recordCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const recordAnimRef = useRef<number | null>(null);
+  const recordSourceVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const confTitle = conference?.title || 'Спринт-синк команды #104';
   const confCode = conference?.inviteCode || 'conf-892-xyt';
@@ -349,114 +350,135 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
     }
 
     // 5. Active Camera Video
-    const activeCam = (localVideoRef.current && localVideoRef.current.videoWidth > 0) ? localVideoRef.current : null;
-    if (videoOn && activeCam) {
+    const camElement = (recordSourceVideoRef.current && recordSourceVideoRef.current.videoWidth > 0)
+      ? recordSourceVideoRef.current
+      : (localVideoRef.current && localVideoRef.current.videoWidth > 0) ? localVideoRef.current : null;
+
+    if (videoOn && camElement) {
       try {
-        const vw = activeCam.videoWidth;
-        const vh = activeCam.videoHeight;
+        const vw = camElement.videoWidth;
+        const vh = camElement.videoHeight;
         const scale = Math.max(1280 / vw, 720 / vh);
         const nw = vw * scale;
         const nh = vh * scale;
         const ox = (1280 - nw) / 2;
         const oy = (720 - nh) / 2;
-        ctx.drawImage(activeCam, ox, oy, nw, nh);
+        ctx.drawImage(camElement, ox, oy, nw, nh);
 
         // Header REC badge overlay
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
         ctx.beginPath();
-        ctx.roundRect(30, 30, 280, 44, 22);
+        ctx.roundRect(30, 30, 320, 46, 23);
         ctx.fill();
 
         ctx.fillStyle = '#EF4444';
         ctx.beginPath();
-        ctx.arc(52, 52, 6, 0, Math.PI * 2);
+        ctx.arc(52, 53, 7, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = '600 15px Inter, sans-serif';
-        ctx.fillText(`REC · ${confTitle.slice(0, 20)}`, 68, 57);
+        ctx.font = 'bold 16px Inter, sans-serif';
+        ctx.fillText(`REC · ${confTitle.slice(0, 22)}`, 68, 59);
         return;
       } catch (_) {}
     }
 
-    // 6. Camera is OFF or audio-only: Render high-end animated meeting stage
+    // 6. Camera is OFF or audio-only: Render vibrant, beautiful animated meeting stage
     const bgGrad = ctx.createLinearGradient(0, 0, 1280, 720);
-    bgGrad.addColorStop(0, '#090D16');
-    bgGrad.addColorStop(0.5, '#13112E');
-    bgGrad.addColorStop(1, '#1E1B4B');
+    bgGrad.addColorStop(0, '#0F172A');
+    bgGrad.addColorStop(0.5, '#1E1B4B');
+    bgGrad.addColorStop(1, '#312E81');
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, 1280, 720);
 
-    // Decorative ambient glow
-    ctx.fillStyle = 'rgba(99, 102, 241, 0.08)';
+    // Decorative ambient grid / glow
+    ctx.fillStyle = 'rgba(99, 102, 241, 0.15)';
     ctx.beginPath();
-    ctx.arc(640, 330, 240, 0, Math.PI * 2);
+    ctx.arc(640, 310, 260, 0, Math.PI * 2);
     ctx.fill();
 
-    // Sound wave pulse rings when speaking
-    const pulseIntensity = Math.min(1, Math.max(0.1, audioVolume / 60));
-    const isSpeakingNow = micOn && (isLocalSpeaking || audioVolume > 8);
+    // Pulse wave rings when speaking
+    const pulseIntensity = Math.min(1, Math.max(0.1, (audioVolume || 0) / 50));
+    const isSpeakingNow = micOn && (isLocalSpeaking || (audioVolume || 0) > 6);
 
     if (isSpeakingNow) {
-      ctx.strokeStyle = `rgba(16, 185, 129, ${0.3 + pulseIntensity * 0.4})`;
+      ctx.strokeStyle = `rgba(16, 185, 129, ${0.4 + pulseIntensity * 0.5})`;
       ctx.lineWidth = 4 + pulseIntensity * 6;
       ctx.beginPath();
-      ctx.arc(640, 310, 95 + pulseIntensity * 25, 0, Math.PI * 2);
+      ctx.arc(640, 300, 110 + pulseIntensity * 30, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.strokeStyle = `rgba(99, 102, 241, ${0.2 + pulseIntensity * 0.3})`;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = `rgba(129, 140, 248, ${0.3 + pulseIntensity * 0.4})`;
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(640, 310, 120 + pulseIntensity * 40, 0, Math.PI * 2);
+      ctx.arc(640, 300, 140 + pulseIntensity * 45, 0, Math.PI * 2);
       ctx.stroke();
     }
 
-    // Speaker avatar circle
-    ctx.fillStyle = '#312E81';
+    // Speaker avatar circle with bright gradient
+    const avGrad = ctx.createLinearGradient(540, 200, 740, 400);
+    avGrad.addColorStop(0, '#4F46E5');
+    avGrad.addColorStop(1, '#7C3AED');
+    ctx.fillStyle = avGrad;
     ctx.beginPath();
-    ctx.arc(640, 310, 80, 0, Math.PI * 2);
+    ctx.arc(640, 300, 90, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = isSpeakingNow ? '#10B981' : '#6366F1';
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = isSpeakingNow ? '#10B981' : '#A78BFA';
+    ctx.lineWidth = 5;
     ctx.stroke();
 
     // Speaker initial
     const nameStr = effectiveUser?.name || 'Пользователь';
     const initialChar = nameStr.charAt(0).toUpperCase();
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 54px Inter, sans-serif';
+    ctx.font = 'bold 64px Inter, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(initialChar, 640, 310);
+    ctx.fillText(initialChar, 640, 300);
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
 
     // Speaker name
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '600 24px Inter, sans-serif';
-    ctx.fillText(nameStr, 640, 435);
+    ctx.font = 'bold 28px Inter, sans-serif';
+    ctx.fillText(nameStr, 640, 440);
 
     // Speaking badge / status
-    ctx.fillStyle = isSpeakingNow ? '#10B981' : '#94A3B8';
-    ctx.font = '500 16px Inter, sans-serif';
-    ctx.fillText(isSpeakingNow ? '🎙 Говорит сейчас...' : 'Микрофон включен', 640, 468);
+    ctx.fillStyle = isSpeakingNow ? '#34D399' : '#C7D2FE';
+    ctx.font = '600 18px Inter, sans-serif';
+    ctx.fillText(isSpeakingNow ? '🎙 Говорит сейчас...' : 'Микрофон включен · В эфире', 640, 475);
+
+    // Dynamic audio equalizer bars under the avatar
+    const barCount = 18;
+    const barWidth = 6;
+    const barGap = 8;
+    const totalBarsWidth = barCount * barWidth + (barCount - 1) * barGap;
+    const startX = 640 - totalBarsWidth / 2;
+    for (let b = 0; b < barCount; b++) {
+      const freq = Math.sin((Date.now() / 200) + b * 0.5);
+      const h = isSpeakingNow ? Math.max(6, Math.abs(freq) * (20 + pulseIntensity * 30)) : 4;
+      ctx.fillStyle = isSpeakingNow ? '#34D399' : '#818CF8';
+      ctx.beginPath();
+      ctx.roundRect(startX + b * (barWidth + barGap), 520 - h / 2, barWidth, h, 3);
+      ctx.fill();
+    }
 
     // Header bar overlay
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
     ctx.beginPath();
-    ctx.roundRect(40, 35, 340, 44, 22);
+    ctx.roundRect(40, 35, 380, 48, 24);
     ctx.fill();
 
     ctx.fillStyle = '#EF4444';
     ctx.beginPath();
-    ctx.arc(62, 57, 6, 0, Math.PI * 2);
+    ctx.arc(65, 59, 7, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '600 16px Inter, sans-serif';
-    ctx.fillText(`REC · ${confTitle.slice(0, 24)}`, 78, 62);
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.fillText(`REC · ${confTitle.slice(0, 26)}`, 84, 65);
   }, [screenShareMode, videoOn, slides, currentSlide, confTitle, audioVolume, micOn, isLocalSpeaking, effectiveUser]);
 
   // Continuous animation loop for conference recording canvas
@@ -543,6 +565,11 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
         cancelAnimationFrame(recordAnimRef.current);
       }
       if (recorder && recorder.state !== 'inactive') {
+        try {
+          if (recorder.state === 'recording') {
+            recorder.requestData();
+          }
+        } catch (_) {}
         recorder.onstop = () => {
           if (recordedChunksRef.current.length > 0) {
             const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'video/webm' });
@@ -608,6 +635,10 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
+        if (recordSourceVideoRef.current) {
+          recordSourceVideoRef.current.srcObject = stream;
+          recordSourceVideoRef.current.play().catch(console.warn);
+        }
 
         setupAudioAnalyser(stream);
         startCallRecording(stream);
@@ -658,9 +689,15 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
 
   // Connect local video ref whenever videoOn or localStream updates
   useEffect(() => {
-    if (videoOn && localStreamRef.current && localVideoRef.current) {
-      localVideoRef.current.srcObject = localStreamRef.current;
-      localVideoRef.current.play().catch(console.warn);
+    if (videoOn && localStreamRef.current) {
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current;
+        localVideoRef.current.play().catch(console.warn);
+      }
+      if (recordSourceVideoRef.current) {
+        recordSourceVideoRef.current.srcObject = localStreamRef.current;
+        recordSourceVideoRef.current.play().catch(console.warn);
+      }
     }
   }, [videoOn]);
 
@@ -2064,6 +2101,39 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
           </div>
         </div>
       )}
+
+      {/* Persistent Offscreen Compositor Canvas & Camera Source for Guaranteed High-Fidelity Recording */}
+      <canvas
+        ref={recordCanvasRef}
+        width={1280}
+        height={720}
+        style={{
+          position: 'fixed',
+          left: '-9999px',
+          top: '-9999px',
+          width: '160px',
+          height: '90px',
+          pointerEvents: 'none',
+          opacity: 0.01,
+          zIndex: -9999,
+        }}
+      />
+      <video
+        ref={recordSourceVideoRef}
+        autoPlay
+        playsInline
+        muted
+        style={{
+          position: 'fixed',
+          left: '-9999px',
+          top: '-9999px',
+          width: '1px',
+          height: '1px',
+          pointerEvents: 'none',
+          opacity: 0,
+          zIndex: -9999,
+        }}
+      />
     </div>
   );
 }

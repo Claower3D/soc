@@ -1,5 +1,5 @@
 import { type Conference, type ConferenceMessage, type Chat, type Message, currentUser } from '../data/mock';
-import { api } from '../api';
+import { api, resolveMediaUrl } from '../api';
 
 export interface ConferenceRecordingItem {
   id: string;
@@ -250,6 +250,9 @@ export async function resolveRecordingVideoUrl(rec: any): Promise<string> {
     return DEFAULT_VIDEO_URL;
   }
 
+  if (typeof rec.videoUrl === 'string' && rec.videoUrl.startsWith('/')) {
+    return resolveMediaUrl(rec.videoUrl);
+  }
   return rec.videoUrl;
 }
 
@@ -512,16 +515,60 @@ export function deleteConferenceGroup(groupId: string, conferenceId?: string) {
 /**
  * Download a recording video file directly to user device
  */
-export function downloadRecordingFile(videoUrl: string, title: string) {
+export async function downloadRecordingFile(videoUrl: string, title: string) {
+  const safeFilename = `${(title || 'conference').replace(/[/\\?%*:|"<>]/g, '_')}_запись.mp4`;
+  if (!videoUrl) return;
+
+  // 1. Native Android download interface
+  if (typeof (window as any).Android?.downloadFile === 'function') {
+    try {
+      (window as any).Android.downloadFile(videoUrl, safeFilename);
+      return;
+    } catch (err) {
+      console.warn('Android native download error:', err);
+    }
+  }
+
+  // 2. Direct blob URL download
+  if (videoUrl.startsWith('blob:')) {
+    const a = document.createElement('a');
+    a.href = videoUrl;
+    a.download = safeFilename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return;
+  }
+
+  // 3. For HTTP/HTTPS URLs: fetch as Blob so browser downloads without cross-origin restriction
   try {
-    const link = document.createElement('a');
-    link.href = videoUrl;
-    link.download = `${title.replace(/[/\\?%*:|"<>]/g, '_')}_запись.mp4`;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const res = await fetch(videoUrl);
+    if (res.ok) {
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = safeFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+      return;
+    }
+  } catch (err) {
+    console.warn('Direct blob fetch error, fallback to direct anchor:', err);
+  }
+
+  // 4. Fallback anchor
+  try {
+    const a = document.createElement('a');
+    a.href = videoUrl;
+    a.download = safeFilename;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   } catch (err) {
     console.error('Download error:', err);
     window.open(videoUrl, '_blank');

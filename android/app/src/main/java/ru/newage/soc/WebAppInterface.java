@@ -61,4 +61,33 @@ public class WebAppInterface {
         } catch (Exception ignored) {
         }
     }
+
+    @JavascriptInterface
+    public void downloadFile(String url, String filename) {
+        try {
+            if (url == null || url.isEmpty()) return;
+            android.net.Uri uri = android.net.Uri.parse(url);
+            android.app.DownloadManager.Request request = new android.app.DownloadManager.Request(uri);
+            String safeName = (filename != null && !filename.trim().isEmpty()) ? filename.trim() : "conference_recording.mp4";
+            request.setDescription("Загрузка видеозаписи конференции...");
+            request.setTitle(safeName);
+            request.allowScanningByMediaScanner();
+            request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            request.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, safeName);
+
+            android.app.DownloadManager dm = (android.app.DownloadManager) mContext.getSystemService(Context.DOWNLOAD_SERVICE);
+            if (dm != null) {
+                dm.enqueue(request);
+                Toast.makeText(mContext, "Загрузка началась: " + safeName, Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                mContext.startActivity(intent);
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
 }

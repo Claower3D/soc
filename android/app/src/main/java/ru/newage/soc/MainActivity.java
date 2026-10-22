@@ -103,6 +103,42 @@ public class MainActivity extends AppCompatActivity {
         // Add native bridge
         mWebView.addJavascriptInterface(new WebAppInterface(this), "Android");
 
+        // Native download manager support for recordings, videos, and media files
+        mWebView.setDownloadListener((url, userAgent, contentDisposition, mimetype, contentLength) -> {
+            try {
+                android.net.Uri uri = android.net.Uri.parse(url);
+                android.app.DownloadManager.Request request = new android.app.DownloadManager.Request(uri);
+                if (mimetype != null && !mimetype.isEmpty()) {
+                    request.setMimeType(mimetype);
+                }
+                String cookies = CookieManager.getInstance().getCookie(url);
+                if (cookies != null) {
+                    request.addRequestHeader("cookie", cookies);
+                }
+                request.addRequestHeader("User-Agent", userAgent);
+                request.setDescription("Загрузка видеозаписи конференции...");
+                String filename = android.webkit.URLUtil.guessFileName(url, contentDisposition, mimetype);
+                if (filename == null || filename.isEmpty() || filename.endsWith(".bin")) {
+                    filename = "conference_recording.mp4";
+                }
+                request.setTitle(filename);
+                request.allowScanningByMediaScanner();
+                request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                request.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, filename);
+                android.app.DownloadManager dm = (android.app.DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                if (dm != null) {
+                    dm.enqueue(request);
+                    Toast.makeText(getApplicationContext(), "Загрузка началась: " + filename, Toast.LENGTH_SHORT).show();
+                }
+            } catch (Exception e) {
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url));
+                    startActivity(intent);
+                } catch (Exception ignored) {
+                }
+            }
+        });
+
         // Set up WebViewAssetLoader for secure local origin fallback
         final WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
                 .setDomain("appassets.androidplatform.net")
