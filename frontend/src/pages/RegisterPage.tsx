@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { 
   User as UserIcon, Mail, Lock, Eye, EyeOff, Shield, 
   CheckCircle2, ArrowRight, ArrowLeft, Sparkles, AlertCircle, 
-  Check, Info, Video, ShoppingBag, Globe, QrCode, RefreshCw, Smartphone
+  Check, Info, Video, ShoppingBag, Globe, QrCode, RefreshCw, Smartphone, X, LogIn, UserPlus
 } from 'lucide-react';
 import { RELIGIONS_CATALOG, type UserRole, type BeliefPrivacy } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -92,6 +92,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
   const [loginQuery, setLoginQuery] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isLoginSubmitting, setIsLoginSubmitting] = useState(false);
 
   // Registration form state
@@ -326,14 +327,17 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
           <div className="register-side-banner">
             <div className="side-banner-content">
               <div className="side-banner-brand-header">
-                <img 
-                  src={logoImg} 
-                  alt="New Age Unity Logo" 
-                  className="side-banner-clean-logo" 
-                />
+                <div className="side-banner-logo-wrapper">
+                  <img 
+                    src={logoImg} 
+                    alt="New Age Unity Logo" 
+                    className="side-banner-clean-logo" 
+                  />
+                  <div className="side-logo-radiance" />
+                </div>
                 <div className="side-badge">
                   <Sparkles size={14} className="sparkle-icon" />
-                  <span>Официальная регистрация</span>
+                  <span>{authMode === 'register' ? 'Официальная регистрация' : 'Авторизация в систему'}</span>
                 </div>
               </div>
 
@@ -348,55 +352,25 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                 </p>
                 <div className="side-desc-topics">
                   <strong>Здесь вы можете изучить:</strong>
-                  <span> астрологию, нумерологию, гороскоп, Таро, дизайн человека (human design), эзотерику, ченнелинг, тета хилинг, гипноз, осознанные сновидения, ВсеЛенскую терапию, гипнотерапию, регресс, различные религии и философские концепции.</span>
+                  <span>астрологию, нумерологию, гороскопы, Таро, дизайн человека (Human Design), эзотерику, ченнелинг, тета-хилинг, гипноз, осознанные сновидения, ВсеЛенскую терапию, гипнотерапию, регрессию, различные религии и философские концепции.</span>
                 </div>
               </div>
 
               <div className="side-knowledge-tags">
-                <span className="side-tag">✨ Астрология</span>
-                <span className="side-tag">🔢 Нумерология</span>
-                <span className="side-tag">🌟 Гороскоп</span>
-                <span className="side-tag">🃏 Таро</span>
-                <span className="side-tag">🧬 Human Design</span>
-                <span className="side-tag">🔮 Эзотерика</span>
-                <span className="side-tag">💫 Ченнелинг</span>
-                <span className="side-tag">🌿 Тета-хилинг</span>
-                <span className="side-tag">🌀 Гипноз</span>
-                <span className="side-tag">🌌 Осознанные сны</span>
-                <span className="side-tag">🪐 ВсеЛенская терапия</span>
-                <span className="side-tag">🧘 Гипнотерапия</span>
-                <span className="side-tag">⏳ Регресс</span>
-                <span className="side-tag">🕊️ Религии и философия</span>
-              </div>
-
-              {/* Sacred QR Code Widget */}
-              <div className="side-banner-qr-block">
-                {qrStatus === 'confirmed' ? (
-                  <div className="side-qr-success-card">
-                    <CheckCircle2 size={36} color="#10B981" />
-                    <strong>Вход подтверждён!</strong>
-                    <span>Авторизуем профиль...</span>
-                  </div>
-                ) : (
-                  <>
-                    <SacredQrLogo 
-                      size={150} 
-                      dataUrl={qrSessionId ? `${window.location.origin}/qr-login?session=${qrSessionId}` : `${window.location.origin}/qr-login`} 
-                    />
-                    <span className="side-qr-caption">
-                      {qrStatus === 'expired' ? 'QR-код устарел' : 'Сканируйте сакральный QR для входа с телефона'}
-                    </span>
-                    {qrStatus === 'expired' && (
-                      <button 
-                        type="button" 
-                        className="side-qr-refresh-btn"
-                        onClick={initQR}
-                      >
-                        <RefreshCw size={13} /> Обновить QR-код
-                      </button>
-                    )}
-                  </>
-                )}
+                <span className="side-tag"><span className="side-tag-dot" /> Астрология</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Нумерология</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Гороскопы</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Таро</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Human Design</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Эзотерика</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Ченнелинг</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Тета-хилинг</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Гипноз</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Осознанные сны</span>
+                <span className="side-tag"><span className="side-tag-dot" /> ВсеЛенская терапия</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Гипнотерапия</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Регрессия</span>
+                <span className="side-tag"><span className="side-tag-dot" /> Религии и философия</span>
               </div>
 
               <div className="side-banner-footer">
@@ -452,7 +426,8 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                   setErrorMessage(null);
                 }}
               >
-                Вход в аккаунт
+                <LogIn size={16} />
+                <span>Вход в аккаунт</span>
               </button>
               <button
                 type="button"
@@ -462,7 +437,8 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                   setErrorMessage(null);
                 }}
               >
-                Регистрация
+                <UserPlus size={16} />
+                <span>Регистрация</span>
               </button>
             </div>
 
@@ -586,7 +562,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
 
                     <div className="form-fields-grid single-col">
                       <div className="form-group-field">
-                        <label>{t('auth.modal.email_or_phone')} *</label>
+                        <label>{t('auth.modal.email_or_phone') || 'Email, телефон или @username'} *</label>
                         <div className="form-input-box">
                           <Mail size={18} className="field-icon" />
                           <input 
@@ -597,12 +573,22 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                             autoFocus
                             required 
                           />
+                          {loginQuery && (
+                            <button
+                              type="button"
+                              className="input-clear-btn"
+                              onClick={() => setLoginQuery('')}
+                              title="Очистить"
+                            >
+                              <X size={15} />
+                            </button>
+                          )}
                         </div>
                       </div>
 
                       <div className="form-group-field">
                         <div className="field-label-row">
-                          <label>{t('auth.modal.password')} *</label>
+                          <label>{t('auth.modal.password') || 'Пароль'} *</label>
                         </div>
                         <div className="form-input-box">
                           <Lock size={18} className="field-icon" />
@@ -618,10 +604,22 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                             type="button" 
                             className="password-toggle-btn"
                             onClick={() => setShowLoginPassword(!showLoginPassword)}
+                            title={showLoginPassword ? 'Скрыть пароль' : 'Показать пароль'}
                           >
                             {showLoginPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                           </button>
                         </div>
+                      </div>
+
+                      <div className="login-options-row">
+                        <label className="remember-me-checkbox">
+                          <input 
+                            type="checkbox" 
+                            checked={rememberMe} 
+                            onChange={(e) => setRememberMe(e.target.checked)} 
+                          />
+                          <span>Запомнить меня на этом устройстве</span>
+                        </label>
                       </div>
                     </div>
 
@@ -631,7 +629,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                         className="primary-register-btn full-width"
                         disabled={isLoginSubmitting}
                       >
-                        <span>{isLoginSubmitting ? 'Проверка JWT токена...' : 'Войти в профиль'}</span>
+                        <span>{isLoginSubmitting ? 'Вход в систему...' : 'Войти в профиль'}</span>
                         <ArrowRight size={18} />
                       </button>
                     </div>
@@ -756,8 +754,15 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                       </div>
 
                       <div className="form-group-field">
-                        <label>{t('auth.modal.confirm_password_label')} *</label>
-                        <div className="form-input-box">
+                        <div className="field-label-row">
+                          <label>{t('auth.modal.confirm_password_label')} *</label>
+                          {confirmPassword && (
+                            <span className={`password-match-badge ${confirmPassword === password ? 'match' : 'mismatch'}`}>
+                              {confirmPassword === password ? '✓ Пароли совпадают' : '✕ Пароли не совпадают'}
+                            </span>
+                          )}
+                        </div>
+                        <div className={`form-input-box ${confirmPassword ? (confirmPassword === password ? 'success' : 'error') : ''}`}>
                           <Lock size={18} className="field-icon" />
                           <input 
                             type={showPassword ? 'text' : 'password'}
