@@ -1,0 +1,26 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+Allow: /register
+Allow: /login
+Allow: /feed
+Allow: /conferences
+Allow: /courses
+Allow: /marketplace
+Allow: /spiritual
+Allow: /spiritual/*
+Allow: /profile/*
+Allow: /posts/*
+Allow: /clips
+Allow: /podcasts
+
+# Disallow private/internal functional routes
+Disallow: /api/
+Disallow: /settings
+Disallow: /messenger
+Disallow: /admin
+Disallow: /calls/*
+Disallow: /qr-login
+
+# Search engine sitemap location
+Sitemap: https://newageunity.com/sitemap.xml

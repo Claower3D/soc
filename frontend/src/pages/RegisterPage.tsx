@@ -13,6 +13,7 @@ import { SacredQrLogo } from '../components/SacredQrLogo';
 import { CountryPhoneInput } from '../components/CountryPhoneInput';
 import { type CountryInfo } from '../utils/countryDetect';
 import { API_BASE_URL } from '../api';
+import { useSEO } from '../utils/seo';
 import logoImg from '../assets/logo.png';
 import './RegisterPage.css';
 
@@ -23,6 +24,12 @@ interface RegisterPageProps {
 export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
   const navigate = useNavigate();
   const { register, login, currentUser, loginWithToken } = useAuth();
+
+  useSEO({
+    title: initialMode === 'login' ? 'Вход в аккаунт' : 'Регистрация профиля',
+    description: 'Регистрация и вход в экосистему New Age Unity: познание себя, духовный рост, астрология, Human Design, ченнелинг и сообщество осознанных людей.',
+    url: 'https://newageunity.com/register',
+  });
   const { t, currentLang, setLanguage, languages } = useTranslation();
 
   const [authMode, setAuthMode] = useState<'register' | 'login'>(initialMode);
