@@ -340,7 +340,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                 </div>
               </div>
 
-              <h1 className="side-title">Приветствую тебя на платформе New Age Unity</h1>
+              <h1 className="side-title">Приветствую тебя на платформе</h1>
 
               <div className="side-welcome-text-box">
                 <p className="side-desc">
