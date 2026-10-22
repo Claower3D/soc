@@ -4,7 +4,7 @@ import { type Chat, type Message } from '../data/mock';
 import { formatLastSeen } from '../utils/onlineStatus';
 import { API_BASE_URL, api, resolveMediaUrl } from '../api';
 import { WORLD_LANGUAGES, POPULAR_LANG_CODES, translateText, playVoiceSpeech } from '../utils/translator';
-import { downloadRecordingFile } from '../utils/conferenceManager';
+import { downloadRecordingFile, resolveRecordingVideoUrl } from '../utils/conferenceManager';
 import './ChatWindowNew.css';
 
 
@@ -433,7 +433,19 @@ export function ChatWindowNew({ chat, onBack, onDeleteChat, onUpdateChat }: Chat
 
 
   const [isRecording, setIsRecording] = useState(false);
-  const [selectedConfRec, setSelectedConfRec] = useState<{ title: string; duration: string; videoUrl: string; date: string } | null>(null);
+  const [selectedConfRec, setSelectedConfRec] = useState<{ id?: string; title: string; duration: string; videoUrl: string; date: string } | null>(null);
+
+  const handleOpenConfRec = async (rec: any) => {
+    if (!rec) return;
+    const resolvedUrl = await resolveRecordingVideoUrl(rec);
+    setSelectedConfRec({
+      id: rec.id,
+      title: rec.title || 'Запись конференции',
+      duration: rec.duration || '14:28',
+      videoUrl: resolvedUrl || rec.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      date: rec.date || 'Сегодня',
+    });
+  };
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2757,12 +2769,7 @@ export function ChatWindowNew({ chat, onBack, onDeleteChat, onUpdateChat }: Chat
                     <div className="cw-conf-rec-card">
                       <div 
                         className="cw-conf-rec-thumb"
-                        onClick={() => setSelectedConfRec({
-                          title: msg.conferenceRecording?.title || 'Запись конференции',
-                          duration: msg.conferenceRecording?.duration || '14:28',
-                          videoUrl: (msg.conferenceRecording as any)?.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-                          date: msg.conferenceRecording?.date || 'Сегодня',
-                        })}
+                        onClick={() => handleOpenConfRec(msg.conferenceRecording)}
                       >
                         {(msg.conferenceRecording as any)?.thumbnail && !(msg.conferenceRecording as any)?.thumbnail.includes('photo-') ? (
                           <img 
@@ -2802,23 +2809,20 @@ export function ChatWindowNew({ chat, onBack, onDeleteChat, onUpdateChat }: Chat
                           <button
                             type="button"
                             className="cw-conf-rec-btn-watch"
-                            onClick={() => setSelectedConfRec({
-                              title: msg.conferenceRecording?.title || 'Запись конференции',
-                              duration: msg.conferenceRecording?.duration || '14:28',
-                              videoUrl: (msg.conferenceRecording as any)?.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-                              date: msg.conferenceRecording?.date || 'Сегодня',
-                            })}
+                            onClick={() => handleOpenConfRec(msg.conferenceRecording)}
                           >
                             <Play size={13} fill="currentColor" /> Смотреть
                           </button>
                           <button
                             type="button"
                             className="cw-conf-rec-btn-download"
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation();
+                              const rec = msg.conferenceRecording as any;
+                              const safeUrl = await resolveRecordingVideoUrl(rec);
                               downloadRecordingFile(
-                                (msg.conferenceRecording as any)?.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-                                msg.conferenceRecording?.title || 'conference'
+                                safeUrl || rec?.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                                rec?.title || 'conference'
                               );
                             }}
                             title="Скачать видеозапись"
@@ -3685,6 +3689,19 @@ export function ChatWindowNew({ chat, onBack, onDeleteChat, onUpdateChat }: Chat
                 autoPlay 
                 playsInline 
                 className="tg-rec-real-video"
+                onError={async (e) => {
+                  const target = e.currentTarget;
+                  if (target.dataset.hasRetried) return;
+                  target.dataset.hasRetried = 'true';
+                  if (selectedConfRec?.id) {
+                    const fallback = await resolveRecordingVideoUrl(selectedConfRec as any);
+                    if (fallback && fallback !== selectedConfRec.videoUrl) {
+                      target.src = fallback;
+                      return;
+                    }
+                  }
+                  target.src = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+                }}
               />
             </div>
             <div className="tg-rec-modal-footer">
@@ -3699,7 +3716,10 @@ export function ChatWindowNew({ chat, onBack, onDeleteChat, onUpdateChat }: Chat
                 <button 
                   type="button" 
                   className="btn-download-rec"
-                  onClick={() => downloadRecordingFile(selectedConfRec.videoUrl, selectedConfRec.title)}
+                  onClick={async () => {
+                    const safeUrl = selectedConfRec?.id ? await resolveRecordingVideoUrl(selectedConfRec as any) : selectedConfRec.videoUrl;
+                    downloadRecordingFile(safeUrl, selectedConfRec.title);
+                  }}
                 >
                   <Download size={15} /> Скачать MP4
                 </button>

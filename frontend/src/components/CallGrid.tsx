@@ -16,6 +16,7 @@ import {
   saveConferenceGroupChat, 
   downloadRecordingFile, 
   extractVideoThumbnail,
+  saveRecordingBlobToIDB,
   type ConferenceRecordingItem 
 } from '../utils/conferenceManager';
 import { api, resolveMediaUrl } from '../api';
@@ -104,6 +105,8 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const firstCapturedFrameRef = useRef<string>('');
+  const recordCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const recordAnimRef = useRef<number | null>(null);
 
   const confTitle = conference?.title || 'Спринт-синк команды #104';
   const confCode = conference?.inviteCode || 'conf-892-xyt';
@@ -257,11 +260,252 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
     }
   }, []);
 
-  // Start recording conference stream
-  const startCallRecording = useCallback((stream: MediaStream) => {
+  // Draw current live conference state to offscreen recording canvas
+  const drawConferenceFrame = useCallback(() => {
+    let canvas = recordCanvasRef.current;
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.width = 1280;
+      canvas.height = 720;
+      recordCanvasRef.current = canvas;
+    }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 1. Screen sharing
+    if (screenShareMode === 'screen' && screenVideoRef.current && screenVideoRef.current.videoWidth > 0) {
+      try {
+        ctx.drawImage(screenVideoRef.current, 0, 0, 1280, 720);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.beginPath();
+        ctx.roundRect(24, 24, 280, 40, 20);
+        ctx.fill();
+        ctx.fillStyle = '#EF4444';
+        ctx.beginPath();
+        ctx.arc(44, 44, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '600 15px Inter, sans-serif';
+        ctx.fillText(`REC · ${confTitle.slice(0, 22)}`, 60, 49);
+        return;
+      } catch (_) {}
+    }
+
+    // 2. Presentation Slides
+    if (screenShareMode === 'presentation') {
+      const slide = slides[currentSlide] || slides[0];
+      const grad = ctx.createLinearGradient(0, 0, 1280, 720);
+      grad.addColorStop(0, '#0B0F19');
+      grad.addColorStop(1, '#1E1B4B');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 1280, 720);
+
+      ctx.strokeStyle = 'rgba(99, 102, 241, 0.25)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(40, 40, 1200, 640);
+
+      ctx.fillStyle = '#818CF8';
+      ctx.font = '600 18px Inter, sans-serif';
+      ctx.fillText(`СЛАЙД ${currentSlide + 1} ИЗ ${slides.length} · ${confTitle}`, 70, 95);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 36px Inter, sans-serif';
+      ctx.fillText(slide.title, 70, 165);
+
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '500 22px Inter, sans-serif';
+      ctx.fillText(slide.subtitle, 70, 215);
+
+      slide.points.forEach((pt, i) => {
+        const y = 300 + i * 55;
+        ctx.fillStyle = '#6366F1';
+        ctx.beginPath();
+        ctx.arc(80, y - 7, 7, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#E2E8F0';
+        ctx.font = '500 20px Inter, sans-serif';
+        ctx.fillText(pt, 105, y);
+      });
+      return;
+    }
+
+    // 3. Interactive Whiteboard
+    if (screenShareMode === 'whiteboard' && canvasRef.current) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, 1280, 720);
+      try {
+        ctx.drawImage(canvasRef.current, 40, 10, 1200, 700);
+      } catch (_) {}
+      return;
+    }
+
+    // 4. Custom Video Share
+    if (screenShareMode === 'media' && mediaVideoRef.current && mediaVideoRef.current.videoWidth > 0) {
+      try {
+        ctx.drawImage(mediaVideoRef.current, 0, 0, 1280, 720);
+        return;
+      } catch (_) {}
+    }
+
+    // 5. Active Camera Video
+    const activeCam = (localVideoRef.current && localVideoRef.current.videoWidth > 0) ? localVideoRef.current : null;
+    if (videoOn && activeCam) {
+      try {
+        const vw = activeCam.videoWidth;
+        const vh = activeCam.videoHeight;
+        const scale = Math.max(1280 / vw, 720 / vh);
+        const nw = vw * scale;
+        const nh = vh * scale;
+        const ox = (1280 - nw) / 2;
+        const oy = (720 - nh) / 2;
+        ctx.drawImage(activeCam, ox, oy, nw, nh);
+
+        // Header REC badge overlay
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+        ctx.beginPath();
+        ctx.roundRect(30, 30, 280, 44, 22);
+        ctx.fill();
+
+        ctx.fillStyle = '#EF4444';
+        ctx.beginPath();
+        ctx.arc(52, 52, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '600 15px Inter, sans-serif';
+        ctx.fillText(`REC · ${confTitle.slice(0, 20)}`, 68, 57);
+        return;
+      } catch (_) {}
+    }
+
+    // 6. Camera is OFF or audio-only: Render high-end animated meeting stage
+    const bgGrad = ctx.createLinearGradient(0, 0, 1280, 720);
+    bgGrad.addColorStop(0, '#090D16');
+    bgGrad.addColorStop(0.5, '#13112E');
+    bgGrad.addColorStop(1, '#1E1B4B');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1280, 720);
+
+    // Decorative ambient glow
+    ctx.fillStyle = 'rgba(99, 102, 241, 0.08)';
+    ctx.beginPath();
+    ctx.arc(640, 330, 240, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Sound wave pulse rings when speaking
+    const pulseIntensity = Math.min(1, Math.max(0.1, audioVolume / 60));
+    const isSpeakingNow = micOn && (isLocalSpeaking || audioVolume > 8);
+
+    if (isSpeakingNow) {
+      ctx.strokeStyle = `rgba(16, 185, 129, ${0.3 + pulseIntensity * 0.4})`;
+      ctx.lineWidth = 4 + pulseIntensity * 6;
+      ctx.beginPath();
+      ctx.arc(640, 310, 95 + pulseIntensity * 25, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(99, 102, 241, ${0.2 + pulseIntensity * 0.3})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(640, 310, 120 + pulseIntensity * 40, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Speaker avatar circle
+    ctx.fillStyle = '#312E81';
+    ctx.beginPath();
+    ctx.arc(640, 310, 80, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = isSpeakingNow ? '#10B981' : '#6366F1';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Speaker initial
+    const nameStr = effectiveUser?.name || 'Пользователь';
+    const initialChar = nameStr.charAt(0).toUpperCase();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 54px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(initialChar, 640, 310);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+
+    // Speaker name
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '600 24px Inter, sans-serif';
+    ctx.fillText(nameStr, 640, 435);
+
+    // Speaking badge / status
+    ctx.fillStyle = isSpeakingNow ? '#10B981' : '#94A3B8';
+    ctx.font = '500 16px Inter, sans-serif';
+    ctx.fillText(isSpeakingNow ? '🎙 Говорит сейчас...' : 'Микрофон включен', 640, 468);
+
+    // Header bar overlay
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    ctx.beginPath();
+    ctx.roundRect(40, 35, 340, 44, 22);
+    ctx.fill();
+
+    ctx.fillStyle = '#EF4444';
+    ctx.beginPath();
+    ctx.arc(62, 57, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '600 16px Inter, sans-serif';
+    ctx.fillText(`REC · ${confTitle.slice(0, 24)}`, 78, 62);
+  }, [screenShareMode, videoOn, slides, currentSlide, confTitle, audioVolume, micOn, isLocalSpeaking, effectiveUser]);
+
+  // Continuous animation loop for conference recording canvas
+  useEffect(() => {
+    let animId: number;
+    const loop = () => {
+      drawConferenceFrame();
+      animId = requestAnimationFrame(loop);
+    };
+    animId = requestAnimationFrame(loop);
+    recordAnimRef.current = animId;
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [drawConferenceFrame]);
+
+  // Start recording conference stream with guaranteed video track
+  const startCallRecording = useCallback((stream?: MediaStream | null) => {
     try {
-      if (typeof MediaRecorder === 'undefined' || !stream || stream.getTracks().length === 0) return;
+      if (typeof MediaRecorder === 'undefined') return;
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') return;
+
+      let canvas = recordCanvasRef.current;
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.width = 1280;
+        canvas.height = 720;
+        recordCanvasRef.current = canvas;
+      }
+
+      // Draw initial frame immediately
+      drawConferenceFrame();
+
+      let recordingStream: MediaStream;
+      if (typeof (canvas as any).captureStream === 'function') {
+        const canvasStream = (canvas as any).captureStream(25);
+        const tracks: MediaStreamTrack[] = [...canvasStream.getVideoTracks()];
+        if (stream) {
+          const audioTracks = stream.getAudioTracks();
+          if (audioTracks.length > 0) {
+            tracks.push(audioTracks[0]);
+          }
+        }
+        recordingStream = new MediaStream(tracks);
+      } else if (stream) {
+        recordingStream = stream;
+      } else {
+        return;
+      }
 
       const mimeTypes = [
         'video/webm;codecs=vp9,opus',
@@ -277,7 +521,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
         }
       }
       const options = selectedMime ? { mimeType: selectedMime } : undefined;
-      const recorder = new MediaRecorder(stream, options);
+      const recorder = new MediaRecorder(recordingStream, options);
       recordedChunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) {
@@ -289,12 +533,15 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
     } catch (err) {
       console.warn('MediaRecorder start notice:', err);
     }
-  }, []);
+  }, [drawConferenceFrame]);
 
   const stopCallRecording = useCallback((): Promise<{ blob: Blob | null; url: string }> => {
     return new Promise((resolve) => {
       const fallbackUrl = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
       const recorder = mediaRecorderRef.current;
+      if (recordAnimRef.current) {
+        cancelAnimationFrame(recordAnimRef.current);
+      }
       if (recorder && recorder.state !== 'inactive') {
         recorder.onstop = () => {
           if (recordedChunksRef.current.length > 0) {
@@ -330,6 +577,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           console.warn('getUserMedia not supported in this browser environment');
+          startCallRecording(null);
           return;
         }
 
@@ -381,6 +629,9 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
           await refreshDevices();
         } catch (audioErr) {
           console.warn('Microphone permission denied or not available:', audioErr);
+          if (active) {
+            startCallRecording(null);
+          }
         }
       }
     }
@@ -423,28 +674,16 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
     }
   }, [screenShareMode]);
 
-  // Early capture of the first video frame from camera or screen share
+  // Early capture of the first video frame from conference recording canvas
   useEffect(() => {
     if (firstCapturedFrameRef.current) return;
     const interval = setInterval(() => {
-      const activeVideo = (screenVideoRef.current && screenVideoRef.current.videoWidth > 0)
-        ? screenVideoRef.current
-        : (localVideoRef.current && localVideoRef.current.videoWidth > 0)
-          ? localVideoRef.current
-          : (document.querySelector('.conference-app-container video') as HTMLVideoElement | null);
-      if (activeVideo && activeVideo.videoWidth > 0 && activeVideo.videoHeight > 0) {
+      if (recordCanvasRef.current) {
         try {
-          const canvas = document.createElement('canvas');
-          canvas.width = activeVideo.videoWidth;
-          canvas.height = activeVideo.videoHeight;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
-            const frame = canvas.toDataURL('image/jpeg', 0.85);
-            if (frame && frame.length > 200) {
-              firstCapturedFrameRef.current = frame;
-              clearInterval(interval);
-            }
+          const frame = recordCanvasRef.current.toDataURL('image/jpeg', 0.85);
+          if (frame && frame.length > 200) {
+            firstCapturedFrameRef.current = frame;
+            clearInterval(interval);
           }
         } catch (_) {}
       }
@@ -767,25 +1006,32 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
   };
 
   const handleEndCall = async () => {
-    // 1. Capture the LAST frame from active camera/screen stream before stopping
+    // 1. Capture the LAST frame directly from our live conference recording canvas
     let capturedLastFrame = '';
-    const activeVideo = (screenVideoRef.current && screenVideoRef.current.videoWidth > 0)
-      ? screenVideoRef.current
-      : (localVideoRef.current && localVideoRef.current.videoWidth > 0)
-        ? localVideoRef.current
-        : (document.querySelector('.conference-app-container video') as HTMLVideoElement | null);
-
-    if (activeVideo && activeVideo.videoWidth > 0 && activeVideo.videoHeight > 0) {
+    if (recordCanvasRef.current) {
       try {
-        const canvas = document.createElement('canvas');
-        canvas.width = activeVideo.videoWidth;
-        canvas.height = activeVideo.videoHeight;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
-          capturedLastFrame = canvas.toDataURL('image/jpeg', 0.85);
-        }
+        capturedLastFrame = recordCanvasRef.current.toDataURL('image/jpeg', 0.85);
       } catch (_) {}
+    }
+    if (!capturedLastFrame) {
+      const activeVideo = (screenVideoRef.current && screenVideoRef.current.videoWidth > 0)
+        ? screenVideoRef.current
+        : (localVideoRef.current && localVideoRef.current.videoWidth > 0)
+          ? localVideoRef.current
+          : (document.querySelector('.conference-app-container video') as HTMLVideoElement | null);
+
+      if (activeVideo && activeVideo.videoWidth > 0 && activeVideo.videoHeight > 0) {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = activeVideo.videoWidth;
+          canvas.height = activeVideo.videoHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
+            capturedLastFrame = canvas.toDataURL('image/jpeg', 0.85);
+          }
+        } catch (_) {}
+      }
     }
 
     const { blob, url } = await stopCallRecording();
@@ -811,6 +1057,9 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       } catch (uploadErr) {
         console.warn('⚠️ Ошибка фоновой загрузки видеозаписи на сервер:', uploadErr);
       }
+      try {
+        await saveRecordingBlobToIDB(recId, blob);
+      } catch (_) {}
     }
 
     // 2. Extract the FIRST frame from the live snapshot or from recorded video
@@ -837,6 +1086,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       thumbnail: realVideoThumbnail,
       currentUserId: effectiveUser?.id || 'me',
       hostUser: effectiveUser,
+      recordingId: recId,
     });
 
     const recItem: ConferenceRecordingItem = {

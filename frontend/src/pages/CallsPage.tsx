@@ -16,6 +16,7 @@ import {
   deleteConferenceRecording, 
   saveConferenceGroupChat,
   downloadRecordingFile,
+  resolveRecordingVideoUrl,
   type ConferenceRecordingItem 
 } from '../utils/conferenceManager';
 import { useAuth } from '../context/AuthContext';
@@ -58,6 +59,11 @@ export function ConferencesPage() {
     e.stopPropagation();
     deleteConferenceRecording(id);
     setRecordings(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleOpenPreviewRecording = async (rec: ConferenceRecordingItem) => {
+    const resolvedUrl = await resolveRecordingVideoUrl(rec);
+    setPreviewRecording({ ...rec, videoUrl: resolvedUrl });
   };
 
   // Handle create conference
@@ -283,7 +289,7 @@ export function ConferencesPage() {
             <div key={rec.id} className="recording-card">
               <div 
                 className="rec-card-thumb-box"
-                onClick={() => setPreviewRecording(rec)}
+                onClick={() => handleOpenPreviewRecording(rec)}
               >
                 {rec.thumbnail && !rec.thumbnail.includes('photo-') ? (
                   <img src={rec.thumbnail} alt={rec.title} />
@@ -312,7 +318,7 @@ export function ConferencesPage() {
                 <div className="rec-card-actions">
                   <button 
                     className="rec-btn-watch"
-                    onClick={() => setPreviewRecording(rec)}
+                    onClick={() => handleOpenPreviewRecording(rec)}
                   >
                     <Play size={14} fill="currentColor" /> Смотреть
                   </button>
@@ -485,6 +491,12 @@ export function ConferencesPage() {
                 playsInline
                 poster={previewRecording.thumbnail}
                 className="tg-rec-real-video"
+                onError={async () => {
+                  const safeUrl = await resolveRecordingVideoUrl(previewRecording);
+                  if (safeUrl && safeUrl !== previewRecording.videoUrl) {
+                    setPreviewRecording(prev => prev ? { ...prev, videoUrl: safeUrl } : prev);
+                  }
+                }}
               />
             </div>
 
@@ -501,7 +513,10 @@ export function ConferencesPage() {
                 <button 
                   type="button" 
                   className="btn-download-rec"
-                  onClick={() => downloadRecordingFile(previewRecording.videoUrl, previewRecording.title)}
+                  onClick={async () => {
+                    const safeUrl = await resolveRecordingVideoUrl(previewRecording);
+                    downloadRecordingFile(safeUrl, previewRecording.title);
+                  }}
                 >
                   <Download size={15} /> Скачать MP4
                 </button>

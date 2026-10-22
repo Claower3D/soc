@@ -112,6 +112,96 @@ export function unmarkChatDeleted(chatId: string) {
 // In-memory cache for live recording Blobs created during current session
 const liveBlobsCache = new Map<string, { blob: Blob; url: string }>();
 
+const IDB_NAME = 'newage_recordings_store_v1';
+const IDB_VERSION = 1;
+const IDB_STORE = 'blobs';
+
+export function saveRecordingBlobToIDB(id: string, blob: Blob): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === 'undefined') return resolve();
+    try {
+      const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(IDB_STORE)) {
+          req.result.createObjectStore(IDB_STORE);
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        try {
+          const tx = db.transaction(IDB_STORE, 'readwrite');
+          tx.objectStore(IDB_STORE).put(blob, id);
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => {
+            db.close();
+            resolve();
+          };
+        } catch {
+          db.close();
+          resolve();
+        }
+      };
+      req.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
+export function getRecordingBlobFromIDB(id: string): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === 'undefined' || !id) return resolve(null);
+    try {
+      const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(IDB_STORE)) {
+          req.result.createObjectStore(IDB_STORE);
+        }
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        try {
+          const tx = db.transaction(IDB_STORE, 'readonly');
+          const store = tx.objectStore(IDB_STORE);
+          const getReq = store.get(id);
+          getReq.onsuccess = () => {
+            const result = getReq.result as Blob | undefined;
+            if (result) {
+              db.close();
+              return resolve(result);
+            }
+            // Fallback key (with or without 'rec_' prefix)
+            const altKey = id.startsWith('rec_') ? id.slice(4) : `rec_${id}`;
+            const altReq = store.get(altKey);
+            altReq.onsuccess = () => {
+              const altResult = altReq.result as Blob | undefined;
+              db.close();
+              resolve(altResult || null);
+            };
+            altReq.onerror = () => {
+              db.close();
+              resolve(null);
+            };
+          };
+          getReq.onerror = () => {
+            db.close();
+            resolve(null);
+          };
+        } catch {
+          db.close();
+          resolve(null);
+        }
+      };
+      req.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 export function registerLiveRecordingBlob(recordingId: string, blob: Blob): string {
   const existing = liveBlobsCache.get(recordingId);
   if (existing) {
@@ -119,6 +209,7 @@ export function registerLiveRecordingBlob(recordingId: string, blob: Blob): stri
   }
   const url = URL.createObjectURL(blob);
   liveBlobsCache.set(recordingId, { blob, url });
+  saveRecordingBlobToIDB(recordingId, blob).catch(() => {});
   return url;
 }
 
@@ -128,6 +219,38 @@ export function getLiveRecordingBlobUrl(recordingId: string): string | null {
 
 export function getLiveRecordingBlob(recordingId: string): Blob | null {
   return liveBlobsCache.get(recordingId)?.blob || null;
+}
+
+export async function resolveRecordingVideoUrl(rec: any): Promise<string> {
+  if (!rec) return DEFAULT_VIDEO_URL;
+  const lookupId = rec.id || rec.conferenceId;
+
+  if (!rec.videoUrl || rec.videoUrl === DEFAULT_VIDEO_URL) {
+    if (lookupId) {
+      const live = getLiveRecordingBlobUrl(lookupId);
+      if (live) return live;
+      const idbBlob = await getRecordingBlobFromIDB(lookupId);
+      if (idbBlob) {
+        return registerLiveRecordingBlob(lookupId, idbBlob);
+      }
+    }
+    return DEFAULT_VIDEO_URL;
+  }
+
+  if (rec.videoUrl.startsWith('blob:')) {
+    if (lookupId) {
+      const live = getLiveRecordingBlobUrl(lookupId);
+      if (live) return live;
+      const idbBlob = await getRecordingBlobFromIDB(lookupId);
+      if (idbBlob) {
+        return registerLiveRecordingBlob(lookupId, idbBlob);
+      }
+    }
+    // Expired or dead blob URL: return reliable sample video instead of black void
+    return DEFAULT_VIDEO_URL;
+  }
+
+  return rec.videoUrl;
 }
 
 // Initial demo recordings to populate archive if empty
@@ -224,7 +347,10 @@ export function saveConferenceRecordingsList(list: ConferenceRecordingItem[]) {
 export function saveConferenceRecording(rec: ConferenceRecordingItem, blob?: Blob): ConferenceRecordingItem {
   if (blob) {
     const liveUrl = registerLiveRecordingBlob(rec.id, blob);
-    rec.videoUrl = liveUrl;
+    // Keep permanent server URL if already uploaded; only use live blob URL as fallback
+    if (!rec.videoUrl || rec.videoUrl.startsWith('blob:') || rec.videoUrl === DEFAULT_VIDEO_URL) {
+      rec.videoUrl = liveUrl;
+    }
   }
   const current = getStoredConferenceRecordings();
   const filtered = current.filter(r => r.id !== rec.id);
@@ -579,6 +705,7 @@ export function saveConferenceGroupChat({
   thumbnail: _thumbnail,
   currentUserId,
   hostUser,
+  recordingId,
 }: {
   conference: Conference;
   duration: string;
@@ -587,6 +714,7 @@ export function saveConferenceGroupChat({
   thumbnail?: string;
   currentUserId: string;
   hostUser?: any;
+  recordingId?: string;
 }): string {
   const effectiveHost = hostUser || conference.host || currentUser;
 
@@ -635,11 +763,13 @@ export function saveConferenceGroupChat({
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     status: 'read',
     conferenceRecording: {
+      id: recordingId || (conference.id ? `rec_${conference.id}` : undefined),
       title: conference.title,
       duration: duration,
       date: 'Сегодня',
       code: conference.inviteCode || 'conf-room',
       videoUrl: resolvedVideoUrl,
+      thumbnail: _thumbnail || conference.recordingThumbnail || '',
     } as any,
   };
 
