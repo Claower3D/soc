@@ -1398,7 +1398,7 @@ var allowedOrigins = func() []string {
 		return strings.Split(origins, ",")
 	}
 	// По умолчанию — localhost для разработки и Android WebView
-	return []string{"http://localhost:5173", "http://localhost:5175", "http://localhost:3000", "http://localhost:8080", "https://appassets.androidplatform.net", "https://soc-production-9d33.up.railway.app"}
+	return []string{"http://localhost:5173", "http://localhost:5175", "http://localhost:3000", "http://localhost:8080", "https://appassets.androidplatform.net", "https://newageunity.com", "https://www.newageunity.com", "http://newageunity.com", "https://soc-production-9d33.up.railway.app"}
 }()
 
 func isOriginAllowed(origin string) bool {
@@ -1412,7 +1412,11 @@ func isOriginAllowed(origin string) bool {
 		strings.HasPrefix(cleanOrigin, "http://localhost:") ||
 		strings.HasPrefix(cleanOrigin, "http://127.0.0.1:") ||
 		strings.HasSuffix(cleanOrigin, ".up.railway.app") ||
-		strings.HasSuffix(cleanOrigin, ".railway.app") {
+		strings.HasSuffix(cleanOrigin, ".railway.app") ||
+		cleanOrigin == "https://newageunity.com" ||
+		cleanOrigin == "https://www.newageunity.com" ||
+		cleanOrigin == "http://newageunity.com" ||
+		strings.HasSuffix(cleanOrigin, ".newageunity.com") {
 		return true
 	}
 	for _, o := range allowedOrigins {
@@ -9279,7 +9283,10 @@ func getViewerIdentifier(r *http.Request) string {
 			return claims.UserID
 		}
 	}
-	clientIP := r.Header.Get("X-Forwarded-For")
+	clientIP := r.Header.Get("CF-Connecting-IP")
+	if clientIP == "" {
+		clientIP = r.Header.Get("X-Forwarded-For")
+	}
 	if clientIP == "" {
 		clientIP = r.Header.Get("X-Real-IP")
 	}

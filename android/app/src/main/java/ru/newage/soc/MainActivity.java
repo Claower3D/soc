@@ -43,7 +43,7 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    public static final String LIVE_SERVER_URL = "https://soc-production-9d33.up.railway.app";
+    public static final String LIVE_SERVER_URL = "https://newageunity.com";
     public static final String LOCAL_OFFLINE_URL = "https://appassets.androidplatform.net/index.html";
 
     private static final int FILE_CHOOSER_REQUEST_CODE = 1001;

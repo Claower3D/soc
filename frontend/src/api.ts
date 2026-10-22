@@ -14,7 +14,7 @@ export const getApiBaseUrl = (): string => {
       window.location.protocol === 'file:' ||
       (window.location.hostname === 'localhost' && window.location.port !== '8080')
     ) {
-      return 'https://soc-production-9d33.up.railway.app';
+      return 'https://newageunity.com';
     }
   }
   return '';
