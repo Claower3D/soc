@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	mathrand "math/rand"
@@ -1329,7 +1330,7 @@ func main() {
 		log.Printf("📁 Раздача статических файлов фронтенда из: %s", distDir)
 	}
 
-	// Оборачиваем: API → mux, /uploads/ → media files, остальное → SPA static
+	// Оборачиваем: API → mux, /uploads/ → media files, /sitemap.xml & /robots.txt → SEO, остальное → SPA static
 	var rootHandler http.Handler
 	if distDir != "" {
 		fsHandler := http.FileServer(http.Dir(distDir))
@@ -1337,6 +1338,16 @@ func main() {
 			// Все /api/* запросы идут в mux (там зарегистрированы все API handlers)
 			if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/api" {
 				mux.ServeHTTP(w, r)
+				return
+			}
+			// SEO: sitemap.xml
+			if r.URL.Path == "/sitemap.xml" {
+				serveSitemapXML(w, r)
+				return
+			}
+			// SEO: robots.txt
+			if r.URL.Path == "/robots.txt" {
+				serveRobotsTxt(w, distDir)
 				return
 			}
 			// Раздача загруженных медиафайлов (/uploads/videos, /uploads/thumbnails) с поддержкой Range и БД
@@ -1364,12 +1375,19 @@ func main() {
 				fsHandler.ServeHTTP(w, r)
 				return
 			}
-			// SPA fallback → index.html
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			http.ServeFile(w, r, distDir+"/index.html")
+			// SPA fallback → index.html с динамическими Open Graph и SEO тегами для ссылок
+			serveIndexWithSEO(w, r, distDir+"/index.html")
 		})
 	} else {
 		rootHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/sitemap.xml" {
+				serveSitemapXML(w, r)
+				return
+			}
+			if r.URL.Path == "/robots.txt" {
+				serveRobotsTxt(w, "")
+				return
+			}
 			if strings.HasPrefix(r.URL.Path, "/uploads/") {
 				serveUploadFile(w, r, strings.TrimPrefix(r.URL.Path, "/uploads/"))
 				return
@@ -9991,4 +10009,315 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// ==================== SEO & OPEN GRAPH DYNAMIC PREVIEWS ====================
+
+func serveRobotsTxt(w http.ResponseWriter, distDir string) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+
+	if distDir != "" {
+		robotsPath := filepath.Join(distDir, "robots.txt")
+		if data, err := os.ReadFile(robotsPath); err == nil && len(data) > 0 {
+			w.Write(data)
+			return
+		}
+	}
+
+	defaultRobots := `# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+Allow: /register
+Allow: /login
+Allow: /feed
+Allow: /conferences
+Allow: /courses
+Allow: /marketplace
+Allow: /spiritual
+Allow: /spiritual/*
+Allow: /profile/*
+Allow: /posts/*
+Allow: /clips
+Allow: /podcasts
+
+Disallow: /api/
+Disallow: /settings
+Disallow: /messenger
+Disallow: /admin
+Disallow: /calls/*
+Disallow: /qr-login
+
+Sitemap: https://newageunity.com/sitemap.xml
+`
+	w.Write([]byte(defaultRobots))
+}
+
+func serveSitemapXML(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+
+	type SitemapURL struct {
+		Loc        string
+		ChangeFreq string
+		Priority   string
+		LastMod    string
+	}
+
+	today := time.Now().Format("2006-01-02")
+
+	staticRoutes := []SitemapURL{
+		{Loc: "https://newageunity.com/", ChangeFreq: "daily", Priority: "1.0", LastMod: today},
+		{Loc: "https://newageunity.com/feed", ChangeFreq: "hourly", Priority: "0.9", LastMod: today},
+		{Loc: "https://newageunity.com/register", ChangeFreq: "monthly", Priority: "0.8", LastMod: today},
+		{Loc: "https://newageunity.com/conferences", ChangeFreq: "daily", Priority: "0.8", LastMod: today},
+		{Loc: "https://newageunity.com/courses", ChangeFreq: "weekly", Priority: "0.8", LastMod: today},
+		{Loc: "https://newageunity.com/marketplace", ChangeFreq: "daily", Priority: "0.8", LastMod: today},
+		{Loc: "https://newageunity.com/spiritual", ChangeFreq: "weekly", Priority: "0.8", LastMod: today},
+		{Loc: "https://newageunity.com/spiritual/horoscope", ChangeFreq: "daily", Priority: "0.9", LastMod: today},
+		{Loc: "https://newageunity.com/spiritual/numerology", ChangeFreq: "weekly", Priority: "0.7", LastMod: today},
+		{Loc: "https://newageunity.com/spiritual/humandesign", ChangeFreq: "weekly", Priority: "0.7", LastMod: today},
+		{Loc: "https://newageunity.com/spiritual/tarot", ChangeFreq: "weekly", Priority: "0.7", LastMod: today},
+		{Loc: "https://newageunity.com/clips", ChangeFreq: "daily", Priority: "0.8", LastMod: today},
+		{Loc: "https://newageunity.com/podcasts", ChangeFreq: "daily", Priority: "0.8", LastMod: today},
+	}
+
+	var sb strings.Builder
+	sb.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
+	sb.WriteString(`<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
+
+	for _, u := range staticRoutes {
+		sb.WriteString("  <url>\n")
+		sb.WriteString("    <loc>" + html.EscapeString(u.Loc) + "</loc>\n")
+		sb.WriteString("    <lastmod>" + u.LastMod + "</lastmod>\n")
+		sb.WriteString("    <changefreq>" + u.ChangeFreq + "</changefreq>\n")
+		sb.WriteString("    <priority>" + u.Priority + "</priority>\n")
+		sb.WriteString("  </url>\n")
+	}
+
+	// Add public posts (up to 100 recent)
+	store.mu.RLock()
+	postsCount := 0
+	for i := len(store.posts) - 1; i >= 0 && postsCount < 100; i-- {
+		p := store.posts[i]
+		if p.ID != "" {
+			sb.WriteString("  <url>\n")
+			sb.WriteString("    <loc>https://newageunity.com/posts/" + html.EscapeString(p.ID) + "</loc>\n")
+			sb.WriteString("    <lastmod>" + today + "</lastmod>\n")
+			sb.WriteString("    <changefreq>weekly</changefreq>\n")
+			sb.WriteString("    <priority>0.7</priority>\n")
+			sb.WriteString("  </url>\n")
+			postsCount++
+		}
+	}
+
+	// Add public user profiles
+	for _, acc := range store.accounts {
+		u := acc.User
+		if u.Username != "" {
+			sb.WriteString("  <url>\n")
+			sb.WriteString("    <loc>https://newageunity.com/profile/@" + html.EscapeString(u.Username) + "</loc>\n")
+			sb.WriteString("    <lastmod>" + today + "</lastmod>\n")
+			sb.WriteString("    <changefreq>daily</changefreq>\n")
+			sb.WriteString("    <priority>0.8</priority>\n")
+			sb.WriteString("  </url>\n")
+		}
+	}
+	store.mu.RUnlock()
+
+	sb.WriteString("</urlset>")
+	w.Write([]byte(sb.String()))
+}
+
+var (
+	rawIndexHTML   string
+	rawIndexHTMLMu sync.RWMutex
+)
+
+func getCachedIndexHTML(path string) string {
+	rawIndexHTMLMu.RLock()
+	content := rawIndexHTML
+	rawIndexHTMLMu.RUnlock()
+	if content != "" {
+		return content
+	}
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	rawIndexHTMLMu.Lock()
+	rawIndexHTML = string(b)
+	rawIndexHTMLMu.Unlock()
+	return rawIndexHTML
+}
+
+func serveIndexWithSEO(w http.ResponseWriter, r *http.Request, indexPath string) {
+	htmlData := getCachedIndexHTML(indexPath)
+	if htmlData == "" {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		http.ServeFile(w, r, indexPath)
+		return
+	}
+
+	reqPath := r.URL.Path
+
+	// Default site metadata
+	title := "New Age Unity — Мультифункциональная социальная экосистема"
+	description := "New Age Unity — инновационная социальная платформа для духовного роста, самопознания и осознанного общения. Астрология, Human Design, ченнелинг, нумерология, конференции и сообщества единомышленников."
+	image := "https://newageunity.com/logo.png"
+	cardType := "website"
+	canonical := "https://newageunity.com" + reqPath
+
+	if strings.HasPrefix(reqPath, "/posts/") {
+		postID := strings.TrimPrefix(reqPath, "/posts/")
+		store.mu.RLock()
+		for _, p := range store.posts {
+			if p.ID == postID {
+				cardType = "article"
+				if p.Caption != "" {
+					cleanCap := strings.TrimSpace(p.Caption)
+					runeCap := []rune(cleanCap)
+					if len(runeCap) > 70 {
+						title = string(runeCap[:67]) + "... — New Age Unity"
+					} else {
+						title = cleanCap + " — New Age Unity"
+					}
+					if len(runeCap) > 160 {
+						description = string(runeCap[:157]) + "..."
+					} else {
+						description = cleanCap
+					}
+				} else if p.User.Name != "" {
+					title = "Публикация от " + p.User.Name + " — New Age Unity"
+				}
+				if p.Image != "" {
+					if strings.HasPrefix(p.Image, "http") {
+						image = p.Image
+					} else {
+						image = "https://newageunity.com" + p.Image
+					}
+				} else if p.User.Avatar != "" {
+					if strings.HasPrefix(p.User.Avatar, "http") {
+						image = p.User.Avatar
+					} else {
+						image = "https://newageunity.com" + p.User.Avatar
+					}
+				}
+				break
+			}
+		}
+		store.mu.RUnlock()
+	} else if strings.HasPrefix(reqPath, "/profile/") {
+		handle := strings.TrimPrefix(reqPath, "/profile/")
+		handle = strings.TrimPrefix(handle, "@")
+		store.mu.RLock()
+		for _, acc := range store.accounts {
+			u := acc.User
+			if strings.EqualFold(u.Username, handle) || u.ID == handle {
+				cardType = "profile"
+				if u.Name != "" {
+					title = u.Name + " (@" + u.Username + ") — New Age Unity"
+				} else {
+					title = "@" + u.Username + " — New Age Unity"
+				}
+				if u.Bio != "" {
+					description = u.Bio
+				} else {
+					description = "Профиль автора @" + u.Username + " в экосистеме духовного роста и осознанности New Age Unity."
+				}
+				if u.Avatar != "" {
+					if strings.HasPrefix(u.Avatar, "http") {
+						image = u.Avatar
+					} else {
+						image = "https://newageunity.com" + u.Avatar
+					}
+				}
+				break
+			}
+		}
+		store.mu.RUnlock()
+	} else if strings.HasPrefix(reqPath, "/conferences") {
+		title = "Видеоконференции — New Age Unity"
+		description = "Закрытые видеоконференции, созвоны и групповые встречи в Full HD в экосистеме New Age Unity."
+	} else if strings.HasPrefix(reqPath, "/register") {
+		title = "Регистрация профиля — New Age Unity"
+		description = "Присоединяйтесь к платформе духовного роста, самопознания и сообществу единомышленников New Age Unity."
+	} else if strings.HasPrefix(reqPath, "/marketplace") {
+		title = "Маркетплейс — New Age Unity"
+		description = "Эзотерический маркетплейс New Age Unity: курсы, книги, консультации специалистов, амулеты и товары для духовных практик."
+	} else if strings.HasPrefix(reqPath, "/spiritual") {
+		title = "Гороскоп, Таро и Духовные сервисы — New Age Unity"
+		description = "Персональный расчет гороскопа на каждый день, нумерология, дизайн человека (Human Design) и Таро онлайн."
+	} else if strings.HasPrefix(reqPath, "/courses") {
+		title = "Курсы и Обучение — New Age Unity"
+		description = "Авторские курсы и обучающие программы по самопознанию, астрологии, психологии и духовным практикам."
+	}
+
+	escapedTitle := html.EscapeString(title)
+	escapedDesc := html.EscapeString(description)
+	escapedImage := html.EscapeString(image)
+	escapedCanonical := html.EscapeString(canonical)
+
+	res := htmlData
+
+	// Replace title tag
+	if idx := strings.Index(res, "<title>"); idx != -1 {
+		if endIdx := strings.Index(res[idx:], "</title>"); endIdx != -1 {
+			res = res[:idx] + "<title>" + escapedTitle + "</title>" + res[idx+endIdx+8:]
+		}
+	}
+
+	replaceMeta := func(targetAttr, targetVal, newContent string) {
+		needle := targetAttr + `="` + targetVal + `"`
+		if idx := strings.Index(res, needle); idx != -1 {
+			tagStart := strings.LastIndex(res[:idx], "<meta")
+			if tagStart != -1 {
+				tagEnd := strings.Index(res[tagStart:], ">")
+				if tagEnd != -1 {
+					tag := res[tagStart : tagStart+tagEnd+1]
+					if cIdx := strings.Index(tag, `content="`); cIdx != -1 {
+						cEnd := strings.Index(tag[cIdx+9:], `"`)
+						if cEnd != -1 {
+							newTag := tag[:cIdx+9] + newContent + tag[cIdx+9+cEnd:]
+							res = res[:tagStart] + newTag + res[tagStart+tagEnd+1:]
+						}
+					}
+				}
+			}
+		}
+	}
+
+	replaceMeta("name", "title", escapedTitle)
+	replaceMeta("name", "description", escapedDesc)
+	replaceMeta("property", "og:title", escapedTitle)
+	replaceMeta("property", "og:description", escapedDesc)
+	replaceMeta("property", "og:image", escapedImage)
+	replaceMeta("property", "og:image:secure_url", escapedImage)
+	replaceMeta("property", "og:url", escapedCanonical)
+	replaceMeta("property", "og:type", cardType)
+	replaceMeta("name", "twitter:title", escapedTitle)
+	replaceMeta("name", "twitter:description", escapedDesc)
+	replaceMeta("name", "twitter:image", escapedImage)
+	replaceMeta("name", "twitter:url", escapedCanonical)
+
+	if cIdx := strings.Index(res, `rel="canonical"`); cIdx != -1 {
+		tagStart := strings.LastIndex(res[:cIdx], "<link")
+		if tagStart != -1 {
+			tagEnd := strings.Index(res[tagStart:], ">")
+			if tagEnd != -1 {
+				tag := res[tagStart : tagStart+tagEnd+1]
+				if hIdx := strings.Index(tag, `href="`); hIdx != -1 {
+					hEnd := strings.Index(tag[hIdx+6:], `"`)
+					if hEnd != -1 {
+						newTag := tag[:hIdx+6] + escapedCanonical + tag[hIdx+6+hEnd:]
+						res = res[:tagStart] + newTag + res[tagStart+tagEnd+1:]
+					}
+				}
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(res))
 }
