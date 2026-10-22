@@ -149,13 +149,13 @@
 
 .register-card {
   width: 100%;
-  max-width: 1140px;
+  max-width: 1220px;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.12);
   display: grid;
-  grid-template-columns: 420px 1fr;
+  grid-template-columns: 480px 1fr;
   overflow: hidden;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -178,29 +178,38 @@
 
 .side-banner-brand-header {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
+  justify-content: center;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+  width: 100%;
 }
 
 .side-banner-logo-wrapper {
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
+  width: 300px;
+  height: 300px;
+  max-width: 100%;
+  margin: 0 auto;
 }
 
 .side-banner-clean-logo {
-  width: 84px;
-  height: 84px;
-  border-radius: 22px;
+  width: 300px;
+  height: 300px;
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 36px;
   object-fit: contain;
   background: radial-gradient(circle at 30% 30%, #FFFFFF, #EEF2FF);
-  padding: 10px;
+  padding: 16px;
   box-shadow: 
-    0 12px 30px -4px rgba(99, 102, 241, 0.32),
-    0 4px 14px rgba(245, 158, 11, 0.22),
-    inset 0 0 0 1.5px rgba(255, 255, 255, 0.95);
+    0 16px 42px -4px rgba(99, 102, 241, 0.32),
+    0 6px 20px rgba(245, 158, 11, 0.22),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(139, 92, 246, 0.3);
   display: block;
   transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -209,36 +218,36 @@
 }
 
 .side-banner-clean-logo:hover {
-  transform: translateY(-3px) scale(1.04);
+  transform: translateY(-4px) scale(1.03);
   box-shadow: 
-    0 18px 40px -4px rgba(99, 102, 241, 0.42),
-    0 6px 18px rgba(245, 158, 11, 0.3),
-    inset 0 0 0 2px rgba(255, 255, 255, 1);
+    0 24px 52px -4px rgba(99, 102, 241, 0.44),
+    0 8px 24px rgba(245, 158, 11, 0.3),
+    inset 0 0 0 2.5px rgba(255, 255, 255, 1);
 }
 
 .side-logo-radiance {
   position: absolute;
-  inset: -6px;
-  border-radius: 28px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.35) 0%, rgba(245, 158, 11, 0.15) 50%, transparent 70%);
-  filter: blur(10px);
+  inset: -14px;
+  border-radius: 48px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.42) 0%, rgba(245, 158, 11, 0.18) 50%, transparent 72%);
+  filter: blur(16px);
   z-index: 1;
   pointer-events: none;
   animation: logoPulse 4s ease-in-out infinite alternate;
 }
 
 @keyframes logoPulse {
-  0% { transform: scale(0.95); opacity: 0.6; }
-  100% { transform: scale(1.08); opacity: 1; }
+  0% { transform: scale(0.96); opacity: 0.65; }
+  100% { transform: scale(1.06); opacity: 1; }
 }
 
 [data-theme='dark'] .side-banner-clean-logo {
   background: radial-gradient(circle at 30% 30%, #25224A, #15132B);
   border: 1px solid rgba(168, 85, 247, 0.4);
   box-shadow: 
-    0 12px 32px rgba(139, 92, 246, 0.38),
-    0 0 20px rgba(168, 85, 247, 0.22),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    0 16px 44px rgba(139, 92, 246, 0.4),
+    0 0 26px rgba(168, 85, 247, 0.25),
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.18);
 }
 
 .side-badge {
@@ -385,12 +394,15 @@
 }
 
 .register-mobile-logo {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  margin-bottom: 0.6rem;
-  object-fit: cover;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25);
+  width: 120px;
+  height: 120px;
+  border-radius: 26px;
+  margin-bottom: 0.85rem;
+  object-fit: contain;
+  background: radial-gradient(circle at 30% 30%, #FFFFFF, #EEF2FF);
+  padding: 10px;
+  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.28);
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 .register-mobile-welcome h2 {
