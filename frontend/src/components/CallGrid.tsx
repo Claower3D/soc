@@ -15,6 +15,7 @@ import {
   saveConferenceRecording, 
   saveConferenceGroupChat, 
   downloadRecordingFile, 
+  extractVideoThumbnail,
   type ConferenceRecordingItem 
 } from '../utils/conferenceManager';
 import { api, resolveMediaUrl } from '../api';
@@ -102,6 +103,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
   const screenContainerRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const firstCapturedFrameRef = useRef<string>('');
 
   const confTitle = conference?.title || 'Спринт-синк команды #104';
   const confCode = conference?.inviteCode || 'conf-892-xyt';
@@ -421,6 +423,35 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
     }
   }, [screenShareMode]);
 
+  // Early capture of the first video frame from camera or screen share
+  useEffect(() => {
+    if (firstCapturedFrameRef.current) return;
+    const interval = setInterval(() => {
+      const activeVideo = (screenVideoRef.current && screenVideoRef.current.videoWidth > 0)
+        ? screenVideoRef.current
+        : (localVideoRef.current && localVideoRef.current.videoWidth > 0)
+          ? localVideoRef.current
+          : (document.querySelector('.conference-app-container video') as HTMLVideoElement | null);
+      if (activeVideo && activeVideo.videoWidth > 0 && activeVideo.videoHeight > 0) {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = activeVideo.videoWidth;
+          canvas.height = activeVideo.videoHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
+            const frame = canvas.toDataURL('image/jpeg', 0.85);
+            if (frame && frame.length > 200) {
+              firstCapturedFrameRef.current = frame;
+              clearInterval(interval);
+            }
+          }
+        } catch (_) {}
+      }
+    }, 800);
+    return () => clearInterval(interval);
+  }, []);
+
   // Timer
   useEffect(() => {
     const timer = setInterval(() => {
@@ -736,6 +767,27 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
   };
 
   const handleEndCall = async () => {
+    // 1. Capture the LAST frame from active camera/screen stream before stopping
+    let capturedLastFrame = '';
+    const activeVideo = (screenVideoRef.current && screenVideoRef.current.videoWidth > 0)
+      ? screenVideoRef.current
+      : (localVideoRef.current && localVideoRef.current.videoWidth > 0)
+        ? localVideoRef.current
+        : (document.querySelector('.conference-app-container video') as HTMLVideoElement | null);
+
+    if (activeVideo && activeVideo.videoWidth > 0 && activeVideo.videoHeight > 0) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = activeVideo.videoWidth;
+        canvas.height = activeVideo.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(activeVideo, 0, 0, canvas.width, canvas.height);
+          capturedLastFrame = canvas.toDataURL('image/jpeg', 0.85);
+        }
+      } catch (_) {}
+    }
+
     const { blob, url } = await stopCallRecording();
     const finalDuration = formatTime(callDuration);
     const recId = `rec_${Date.now()}`;
@@ -761,6 +813,17 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       }
     }
 
+    // 2. Extract the FIRST frame from the live snapshot or from recorded video
+    let capturedFirstFrame = firstCapturedFrameRef.current;
+    if (!capturedFirstFrame) {
+      try {
+        capturedFirstFrame = await extractVideoThumbnail(blob || finalVideoUrl, 'first');
+      } catch (_) {}
+    }
+
+    // Genuine frame from the recorded video: prefer first frame, fallback to last frame
+    const realVideoThumbnail = capturedFirstFrame || capturedLastFrame || '';
+
     const targetGroupId = effectiveConf.chatGroupId || (
       effectiveConf.id ? (effectiveConf.id.startsWith('group_') ? effectiveConf.id : `group_${effectiveConf.id}`) : `group_conf_${Date.now()}`
     );
@@ -771,7 +834,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       duration: finalDuration,
       messages: messages,
       videoUrl: finalVideoUrl,
-      thumbnail: effectiveConf.recordingThumbnail && !effectiveConf.recordingThumbnail.includes('photo-1522071820081') ? effectiveConf.recordingThumbnail : '',
+      thumbnail: realVideoThumbnail,
       currentUserId: effectiveUser?.id || 'me',
       hostUser: effectiveUser,
     });
@@ -782,7 +845,7 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
       date: 'Сегодня, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       duration: finalDuration,
       participantsCount: participants.length || 1,
-      thumbnail: effectiveConf.recordingThumbnail && !effectiveConf.recordingThumbnail.includes('photo-1522071820081') ? effectiveConf.recordingThumbnail : '',
+      thumbnail: realVideoThumbnail,
       videoUrl: finalVideoUrl,
       chatGroupId: savedGroupId,
       conferenceId: effectiveConf.id,
@@ -1661,10 +1724,32 @@ export function CallGrid({ participants, conference, onLeaveCall, onGoToChatGrou
                   src={savedRecordingData.videoUrl} 
                   controls 
                   playsInline 
-                  poster={savedRecordingData.thumbnail}
+                  poster={savedRecordingData.thumbnail && !savedRecordingData.thumbnail.includes('photo-') ? savedRecordingData.thumbnail : undefined}
                   className="summary-video-player"
+                  onLoadedData={(e) => {
+                    const v = e.currentTarget;
+                    if ((!savedRecordingData.thumbnail || savedRecordingData.thumbnail.includes('photo-')) && v.videoWidth > 0) {
+                      try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = v.videoWidth;
+                        canvas.height = v.videoHeight;
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                          ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+                          const frame = canvas.toDataURL('image/jpeg', 0.85);
+                          if (frame && frame.length > 200) {
+                            setSavedRecordingData(prev => prev ? { ...prev, thumbnail: frame } : prev);
+                            saveConferenceRecording({ ...savedRecordingData, thumbnail: frame });
+                          }
+                        }
+                      } catch (_) {}
+                    }
+                  }}
                   onLoadedMetadata={(e) => {
-                    e.currentTarget.currentTime = 0;
+                    const v = e.currentTarget;
+                    if (!v.poster && v.currentTime === 0) {
+                      v.currentTime = 0.05;
+                    }
                   }}
                 />
               </div>

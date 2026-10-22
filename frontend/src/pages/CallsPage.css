@@ -536,15 +536,18 @@
   overflow: hidden;
 }
 
-.rec-card-thumb-box img {
+.rec-card-thumb-box img,
+.rec-card-thumb-box video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   opacity: 0.85;
   transition: transform var(--transition-normal);
+  pointer-events: none;
 }
 
-.rec-card-thumb-box:hover img {
+.rec-card-thumb-box:hover img,
+.rec-card-thumb-box:hover video {
   transform: scale(1.04);
 }
 

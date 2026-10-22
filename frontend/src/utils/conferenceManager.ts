@@ -138,7 +138,7 @@ export const initialDemoRecordings: ConferenceRecordingItem[] = [
     date: 'Вчера, 18:30',
     duration: '24:15',
     participantsCount: 8,
-    thumbnail: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&w=800&q=80',
+    thumbnail: '',
     videoUrl: DEFAULT_VIDEO_URL,
     chatGroupId: 'group_conf_demo_1',
     inviteCode: 'conf-strat-2026',
@@ -149,7 +149,7 @@ export const initialDemoRecordings: ConferenceRecordingItem[] = [
     date: '18 окт, 14:00',
     duration: '18:42',
     participantsCount: 5,
-    thumbnail: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=800&q=80',
+    thumbnail: '',
     videoUrl: DEFAULT_VIDEO_URL,
     chatGroupId: 'group_conf_demo_2',
     inviteCode: 'conf-release-v2',
@@ -160,7 +160,7 @@ export const initialDemoRecordings: ConferenceRecordingItem[] = [
     date: '16 окт, 20:00',
     duration: '45:10',
     participantsCount: 12,
-    thumbnail: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80',
+    thumbnail: '',
     videoUrl: DEFAULT_VIDEO_URL,
     chatGroupId: 'group_conf_demo_3',
     inviteCode: 'conf-zen-meditation',
@@ -185,8 +185,10 @@ export function getStoredConferenceRecordings(): ConferenceRecordingItem[] {
           )
           .map((item: ConferenceRecordingItem) => {
             const liveUrl = getLiveRecordingBlobUrl(item.id);
+            const cleanThumb = item.thumbnail && item.thumbnail.includes('photo-') ? '' : (item.thumbnail || '');
             return {
               ...item,
+              thumbnail: cleanThumb,
               videoUrl: liveUrl || item.videoUrl || DEFAULT_VIDEO_URL,
             };
           });
@@ -772,3 +774,109 @@ export function saveConferenceGroupChat({
 
   return groupId;
 }
+
+/**
+ * Extract a real frame (first or last frame) directly from a video Blob, URL, or HTMLVideoElement
+ */
+export async function extractVideoThumbnail(
+  source: string | Blob | HTMLVideoElement | null | undefined,
+  preference: 'first' | 'last' = 'first'
+): Promise<string> {
+  // If an active video element is supplied and already has decoded frames
+  if (source instanceof HTMLVideoElement && source.videoWidth > 0) {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = source.videoWidth;
+      canvas.height = source.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        if (dataUrl && dataUrl.length > 50) return dataUrl;
+      }
+    } catch (_) {}
+  }
+
+  if (!source || (typeof source !== 'string' && !(source instanceof Blob))) {
+    return '';
+  }
+
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const isBlob = source instanceof Blob;
+    if (!isBlob) {
+      video.crossOrigin = 'anonymous';
+    }
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+
+    let objectUrl = '';
+    if (typeof source === 'string') {
+      video.src = source;
+    } else {
+      objectUrl = URL.createObjectURL(source);
+      video.src = objectUrl;
+    }
+
+    let isDone = false;
+    const finish = (result: string) => {
+      if (isDone) return;
+      isDone = true;
+      clearTimeout(timer);
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => finish(''), 3500);
+
+    const tryCapture = () => {
+      try {
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            if (dataUrl && dataUrl.length > 200) {
+              finish(dataUrl);
+              return true;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Thumbnail] Frame capture notice:', err);
+      }
+      return false;
+    };
+
+    video.onloadeddata = () => {
+      if (preference === 'first') {
+        if (tryCapture()) return;
+        video.currentTime = 0.05;
+      } else if (preference === 'last' && video.duration && isFinite(video.duration) && video.duration > 0.5) {
+        video.currentTime = Math.max(0.1, video.duration - 0.2);
+      } else {
+        video.currentTime = 0.05;
+      }
+    };
+
+    video.onseeked = () => {
+      tryCapture();
+    };
+
+    video.oncanplay = () => {
+      if (preference === 'first') {
+        tryCapture();
+      }
+    };
+
+    video.onerror = () => finish('');
+  });
+}
+

@@ -46,7 +46,7 @@ const playlists = [
     id: 'pl3',
     title: 'Записи конференций и спринт-синков',
     count: 4,
-    thumbnail: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=600&q=80',
+    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=600&q=80',
     updatedAt: 'Вчера',
   },
 ];

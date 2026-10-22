@@ -2764,10 +2764,20 @@ export function ChatWindowNew({ chat, onBack, onDeleteChat, onUpdateChat }: Chat
                           date: msg.conferenceRecording?.date || 'Сегодня',
                         })}
                       >
-                        <img 
-                          src={(msg.conferenceRecording as any)?.thumbnail || 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80'} 
-                          alt="Запись" 
-                        />
+                        {(msg.conferenceRecording as any)?.thumbnail && !(msg.conferenceRecording as any)?.thumbnail.includes('photo-') ? (
+                          <img 
+                            src={(msg.conferenceRecording as any).thumbnail} 
+                            alt="Запись" 
+                          />
+                        ) : (
+                          <video 
+                            src={`${(msg.conferenceRecording as any)?.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'}#t=0.5`}
+                            className="cw-conf-rec-video-thumb"
+                            preload="metadata"
+                            muted
+                            playsInline
+                          />
+                        )}
                         <span className="cw-conf-rec-hd-badge">REC · 1080p</span>
                         <span className="cw-conf-rec-dur-badge">{msg.conferenceRecording.duration}</span>
                         <div className="cw-conf-rec-play-overlay">

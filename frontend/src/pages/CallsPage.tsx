@@ -285,7 +285,17 @@ export function ConferencesPage() {
                 className="rec-card-thumb-box"
                 onClick={() => setPreviewRecording(rec)}
               >
-                <img src={rec.thumbnail} alt={rec.title} />
+                {rec.thumbnail && !rec.thumbnail.includes('photo-') ? (
+                  <img src={rec.thumbnail} alt={rec.title} />
+                ) : (
+                  <video 
+                    src={`${rec.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'}#t=0.5`}
+                    className="rec-card-video-thumb"
+                    preload="metadata"
+                    muted
+                    playsInline
+                  />
+                )}
                 <span className="rec-duration-badge">{rec.duration}</span>
                 <span className="rec-quality-badge">HD 1080p</span>
                 <div className="rec-play-overlay">

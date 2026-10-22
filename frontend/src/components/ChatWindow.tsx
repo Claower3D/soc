@@ -77,7 +77,7 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
   const [stickerReactionFilter, setStickerReactionFilter] = useState<string | null>(null);
   const [activeEmojiCategory, setActiveEmojiCategory] = useState<string>('recent');
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
-  const [selectedRecording, setSelectedRecording] = useState<{ title: string; duration: string } | null>(null);
+  const [selectedRecording, setSelectedRecording] = useState<{ title: string; duration: string; videoUrl?: string; thumbnail?: string } | null>(null);
 
   // Modals for Attachments
   const [showPollModal, setShowPollModal] = useState(false);
@@ -1616,6 +1616,8 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
                             onClick={() => setSelectedRecording({
                               title: msg.conferenceRecording!.title,
                               duration: msg.conferenceRecording!.duration,
+                              videoUrl: (msg.conferenceRecording as any)?.videoUrl,
+                              thumbnail: (msg.conferenceRecording as any)?.thumbnail,
                             })}
                           >
                             <Play size={16} fill="currentColor" /> Смотреть запись звонка
@@ -2697,10 +2699,12 @@ export function ChatWindow({ chat, onBack, onDeleteChat, onUpdateChat, available
               </button>
             </div>
             <div className="tg-rec-modal-player">
-              <img 
-                src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80" 
-                alt="Recording video" 
+              <video 
+                src={`${selectedRecording.videoUrl || 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'}#t=0.5`} 
+                controls 
+                playsInline
                 className="tg-rec-video-preview"
+                poster={selectedRecording.thumbnail && !selectedRecording.thumbnail.includes('photo-') ? selectedRecording.thumbnail : undefined}
               />
               <div className="video-rec-play-overlay">
                 <Play size={48} fill="white" color="white" />
