@@ -72,15 +72,6 @@ export interface BookingItem {
   createdAt: string;
 }
 
-export const PRESET_RETREAT_COVERS = [
-  { title: 'Йога', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Горы', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Медитация', url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Природа', url: 'https://images.unsplash.com/photo-1510894347713-fc3ed6fdf539?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Саундхилинг', url: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80' },
-  { title: 'Шале & Спа', url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80' },
-];
-
 export function RetreatMapPage() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -807,11 +798,17 @@ export function RetreatMapPage() {
                   >
                     {/* Превью картинки с бейджами */}
                     <div className="card-thumb-wrap">
-                      <img
-                        src={ret.coverImage || ret.images?.[0]}
-                        alt={ret.title}
-                        className="card-thumb-img"
-                      />
+                      {(ret.coverImage || ret.images?.[0]) ? (
+                        <img
+                          src={ret.coverImage || ret.images?.[0]}
+                          alt={ret.title}
+                          className="card-thumb-img"
+                        />
+                      ) : (
+                        <div className="card-thumb-placeholder">
+                          <MapPin size={24} color="#6366F1" />
+                        </div>
+                      )}
                       <div className="thumb-top-badges">
                         <span className={`status-badge-chip ${ret.status}`}>
                           {statusBadge}
@@ -945,7 +942,13 @@ export function RetreatMapPage() {
                     setViewMode('map');
                   }}
                 >
-                  <img src={ret.coverImage} alt={ret.title} className="catalog-card-img" />
+                  {(ret.coverImage || ret.images?.[0]) ? (
+                    <img src={ret.coverImage || ret.images?.[0]} alt={ret.title} className="catalog-card-img" />
+                  ) : (
+                    <div className="catalog-card-placeholder">
+                      <MapPin size={32} color="#6366F1" />
+                    </div>
+                  )}
                   <div className="catalog-card-body">
                     <span className="catalog-card-cat">{ret.categoryTitle}</span>
                     <h3>{ret.title}</h3>
@@ -1050,55 +1053,62 @@ export function RetreatMapPage() {
 
             {/* Скроллируемое тело деталей */}
             <div className="drawer-scroll-body">
-              {/* Фотогалерея с переключателем */}
-              <div className="drawer-photo-gallery">
-                <img
-                  src={selectedRetreat.images?.[activePhotoIdx] || selectedRetreat.coverImage}
-                  alt={selectedRetreat.title}
-                  className="gallery-main-img"
-                />
-                {selectedRetreat.images && selectedRetreat.images.length > 1 && (
-                  <>
-                    <button
-                      className="gallery-arrow left"
-                      onClick={() =>
-                        setActivePhotoIdx((prev) =>
-                          prev === 0 ? selectedRetreat.images.length - 1 : prev - 1
-                        )
-                      }
-                    >
-                      <ChevronLeft size={18} />
-                    </button>
-                    <button
-                      className="gallery-arrow right"
-                      onClick={() =>
-                        setActivePhotoIdx((prev) =>
-                          prev === selectedRetreat.images.length - 1 ? 0 : prev + 1
-                        )
-                      }
-                    >
-                      <ChevronRight size={18} />
-                    </button>
-                    <div className="gallery-counter-badge">
-                      {activePhotoIdx + 1}/{selectedRetreat.images.length} фото
-                    </div>
-                  </>
-                )}
-                {selectedRetreat.images && selectedRetreat.images.length > 1 && (
-                  <div className="gallery-thumbs-row">
-                    {selectedRetreat.images.map((img, i) => (
+              {/* Фотогалерея с переключателем или заглушка */}
+              {(selectedRetreat.images && selectedRetreat.images.length > 0) || selectedRetreat.coverImage ? (
+                <div className="drawer-photo-gallery">
+                  <img
+                    src={selectedRetreat.images?.[activePhotoIdx] || selectedRetreat.coverImage}
+                    alt={selectedRetreat.title}
+                    className="gallery-main-img"
+                  />
+                  {selectedRetreat.images && selectedRetreat.images.length > 1 && (
+                    <>
                       <button
-                        key={i}
-                        type="button"
-                        className={`gallery-thumb-btn ${activePhotoIdx === i ? 'active' : ''}`}
-                        onClick={() => setActivePhotoIdx(i)}
+                        className="gallery-arrow left"
+                        onClick={() =>
+                          setActivePhotoIdx((prev) =>
+                            prev === 0 ? selectedRetreat.images.length - 1 : prev - 1
+                          )
+                        }
                       >
-                        <img src={img} alt={`Миниатюра ${i + 1}`} />
+                        <ChevronLeft size={18} />
                       </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      <button
+                        className="gallery-arrow right"
+                        onClick={() =>
+                          setActivePhotoIdx((prev) =>
+                            prev === selectedRetreat.images.length - 1 ? 0 : prev + 1
+                          )
+                        }
+                      >
+                        <ChevronRight size={18} />
+                      </button>
+                      <div className="gallery-counter-badge">
+                        {activePhotoIdx + 1}/{selectedRetreat.images.length} фото
+                      </div>
+                    </>
+                  )}
+                  {selectedRetreat.images && selectedRetreat.images.length > 1 && (
+                    <div className="gallery-thumbs-row">
+                      {selectedRetreat.images.map((img, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className={`gallery-thumb-btn ${activePhotoIdx === i ? 'active' : ''}`}
+                          onClick={() => setActivePhotoIdx(i)}
+                        >
+                          <img src={img} alt={`Миниатюра ${i + 1}`} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="drawer-photo-placeholder">
+                  <MapPin size={32} color="#6366F1" />
+                  <span>Фотографии локации не добавлены</span>
+                </div>
+              )}
 
               {/* Рейтинг и категории */}
               <div className="drawer-badges-row">
@@ -1551,8 +1561,8 @@ function CreateRetreatModal({
     program: '',
     included: '',
     maxSpots: 15,
-    coverImage: PRESET_RETREAT_COVERS[0].url,
-    images: [PRESET_RETREAT_COVERS[0].url]
+    coverImage: '',
+    images: [] as string[]
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -1606,7 +1616,7 @@ function CreateRetreatModal({
     setAddressSuggestions([]);
   };
 
-  // Загрузка фото с устройства
+  // Загрузка реальных фото с устройства
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -1617,11 +1627,11 @@ function CreateRetreatModal({
         const base64 = ev.target?.result as string;
         if (base64) {
           setForm((prev) => {
-            const nextImgs = [...prev.images.filter((img) => !PRESET_RETREAT_COVERS.some((p) => p.url === img)), base64];
+            const nextImgs = [...prev.images, base64];
             return {
               ...prev,
               images: nextImgs,
-              coverImage: nextImgs[0] || prev.coverImage
+              coverImage: nextImgs[0] || ''
             };
           });
         }
@@ -1633,21 +1643,12 @@ function CreateRetreatModal({
   const handleRemovePhoto = (idx: number) => {
     setForm((prev) => {
       const nextImgs = prev.images.filter((_, i) => i !== idx);
-      const fallbackCover = nextImgs[0] || PRESET_RETREAT_COVERS[0].url;
       return {
         ...prev,
-        images: nextImgs.length > 0 ? nextImgs : [fallbackCover],
-        coverImage: fallbackCover
+        images: nextImgs,
+        coverImage: nextImgs[0] || ''
       };
     });
-  };
-
-  const handlePickPresetCover = (presetUrl: string) => {
-    setForm((prev) => ({
-      ...prev,
-      coverImage: presetUrl,
-      images: [presetUrl, ...prev.images.filter((img) => img !== presetUrl)]
-    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1662,7 +1663,8 @@ function CreateRetreatModal({
     try {
       const res = await api.retreats.create({
         ...form,
-        images: form.images.length > 0 ? form.images : [form.coverImage]
+        images: form.images,
+        coverImage: form.images[0] || ''
       });
       if (res?.data) {
         onCreated(res.data);
@@ -1881,7 +1883,7 @@ function CreateRetreatModal({
                 <Upload size={16} />
                 <span>Выбрать фотографии</span>
               </label>
-              <span className="photo-upload-subtext">Вы можете загрузить свои фото или выбрать готовую обложку</span>
+              <span className="photo-upload-subtext">Загрузите реальные фото события или локации (первое фото станет обложкой)</span>
             </div>
 
             {/* Сетка загруженных фото */}
@@ -1903,25 +1905,6 @@ function CreateRetreatModal({
                 ))}
               </div>
             )}
-
-            {/* Готовые подборки качественных фото */}
-            <div className="preset-covers-section">
-              <span className="preset-covers-label">Быстрый выбор тематической обложки:</span>
-              <div className="preset-covers-row">
-                {PRESET_RETREAT_COVERS.map((preset, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    className={`preset-cover-thumb ${form.coverImage === preset.url ? 'active' : ''}`}
-                    onClick={() => handlePickPresetCover(preset.url)}
-                    title={preset.title}
-                  >
-                    <img src={preset.url} alt={preset.title} />
-                    <span className="preset-thumb-title">{preset.title}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           <div className="modal-field-group">
