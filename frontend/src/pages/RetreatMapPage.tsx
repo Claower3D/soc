@@ -568,6 +568,13 @@ export function RetreatMapPage() {
           ВЕРХНЯЯ ШАПКА RETREAT MAP PRO
       ========================================================================= */}
       <header className="retreat-map-header">
+        <div className="retreat-header-left">
+          <div className="retreat-header-title-badge">
+            <Compass size={17} color="#4F46E5" />
+            <span>Карта ретритов</span>
+          </div>
+        </div>
+
         {/* Переключатель режимов просмотра */}
         <div className="retreat-view-toggle-bar">
           <button
