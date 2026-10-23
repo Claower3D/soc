@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="128" height="128">
+<defs>
+<radialGradient id="bg" cx="50%" cy="42%" r="72%"><stop offset="0" stop-color="#262C52"/><stop offset="1" stop-color="#080C1C"/></radialGradient>
+<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="10" x2="0" y2="54"><stop offset="0" stop-color="#FFF1BF"/><stop offset=".45" stop-color="#F7C04A"/><stop offset="1" stop-color="#B9770C"/></linearGradient>
+<filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.4" result="b"/><feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 .75 0 0 0  0 0 .2 0 0  0 0 0 .7 0" result="c"/><feMerge><feMergeNode in="c"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+
+</defs>
+<rect width="64" height="64" fill="url(#bg)"/>
+<g fill="url(#g)" stroke="url(#g)" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+<path d="M32 9 Q39.5 18 35.5 26 Q34 29.5 32 29.5 Q30 29.5 28.5 26 Q24.5 18 32 9 Z"/>
+<path d="M32 31 Q37.5 40.5 32 49 Q26.5 40.5 32 31 Z"/>
+<path d="M31 49 Q20.5 47 17 36 Q27.5 38.5 31 49 Z"/>
+<path d="M33 49 Q43.5 47 47 36 Q36.5 38.5 33 49 Z"/>
+<path d="M31 50.5 Q17 52 10.5 43.5 Q23.5 43 31 50.5 Z"/>
+<path d="M33 50.5 Q47 52 53.5 43.5 Q40.5 43 33 50.5 Z"/>
+<rect x="16" y="52" width="32" height="2.4" rx="1.2"/>
+</g>
+</svg>

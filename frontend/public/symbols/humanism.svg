@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="128" height="128">
+<defs>
+<radialGradient id="bg" cx="50%" cy="42%" r="72%"><stop offset="0" stop-color="#262C52"/><stop offset="1" stop-color="#080C1C"/></radialGradient>
+<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="10" x2="0" y2="54"><stop offset="0" stop-color="#FFF1BF"/><stop offset=".45" stop-color="#F7C04A"/><stop offset="1" stop-color="#B9770C"/></linearGradient>
+<filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.4" result="b"/><feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 .75 0 0 0  0 0 .2 0 0  0 0 0 .7 0" result="c"/><feMerge><feMergeNode in="c"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+
+</defs>
+<rect width="64" height="64" fill="url(#bg)"/>
+<g fill="url(#g)" stroke="url(#g)" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+<circle cx="32" cy="14.5" r="5"/>
+<path d="M16.5 18 Q21.5 34 32 34 Q42.5 34 47.5 18" fill="none" stroke-width="5"/>
+<path d="M32 34 V41 M32 41 Q27.5 47 24.5 53 M32 41 Q36.5 47 39.5 53" fill="none" stroke-width="5"/>
+</g>
+</svg>
