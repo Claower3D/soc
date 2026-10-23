@@ -4,7 +4,7 @@ import {
   MapPin, Search, Calendar as CalendarIcon, Filter, Heart, Share2, X, Plus,
   Sparkles, CheckCircle2, ChevronLeft, ChevronRight, Star, User, Phone,
   Mail, MessageSquare, Compass, Shield, Trash2, ArrowRight, Grid,
-  Navigation, ZoomIn, ZoomOut, AlertCircle, RefreshCw
+  Navigation, ZoomIn, ZoomOut, AlertCircle, RefreshCw, Upload, Users, Check, ExternalLink
 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -54,6 +54,7 @@ export interface RetreatItem {
   maxSpots: number;
   bookedSpots: number;
   distanceKm?: number;
+  createdAt?: string;
 }
 
 export interface BookingItem {
@@ -71,6 +72,15 @@ export interface BookingItem {
   createdAt: string;
 }
 
+export const PRESET_RETREAT_COVERS = [
+  { title: 'Йога', url: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80' },
+  { title: 'Горы', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80' },
+  { title: 'Медитация', url: 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?auto=format&fit=crop&w=800&q=80' },
+  { title: 'Природа', url: 'https://images.unsplash.com/photo-1510894347713-fc3ed6fdf539?auto=format&fit=crop&w=800&q=80' },
+  { title: 'Саундхилинг', url: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80' },
+  { title: 'Шале & Спа', url: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=800&q=80' },
+];
+
 export function RetreatMapPage() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -85,8 +95,13 @@ export function RetreatMapPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedRadius, setSelectedRadius] = useState<string>('all'); // 50, 100, 500, all
-  const [sortBy, setSortBy] = useState<'nearby' | 'date' | 'rating'>('nearby');
+  const [sortBy, setSortBy] = useState<'nearby' | 'date' | 'rating' | 'price_asc' | 'price_desc'>('nearby');
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Качественная расширенная фильтрация
+  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
+  const [priceRange, setPriceRange] = useState<'all' | 'under20' | '20to50' | 'over50'>('all');
+  const [onlyAvailableSpots, setOnlyAvailableSpots] = useState(false);
 
   // Избранное
   const [favorites, setFavorites] = useState<string[]>(() => {
@@ -124,6 +139,47 @@ export function RetreatMapPage() {
   const [bookSuccess, setBookSuccess] = useState(false);
   const [bookError, setBookError] = useState<string | null>(null);
 
+  // Качественная клиентская фильтрация и сортировка
+  const filteredRetreats = useMemo(() => {
+    return retreats.filter((r) => {
+      // 1. По категории
+      if (selectedCategory !== 'all' && r.category !== selectedCategory) return false;
+
+      // 2. Поиск по тексту (название, город, адрес, описание, имя мастера)
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchTitle = r.title?.toLowerCase().includes(q);
+        const matchCity = r.locationCity?.toLowerCase().includes(q);
+        const matchAddr = r.locationAddress?.toLowerCase().includes(q);
+        const matchDesc = r.description?.toLowerCase().includes(q);
+        const matchOrg = r.organizerName?.toLowerCase().includes(q);
+        if (!matchTitle && !matchCity && !matchAddr && !matchDesc && !matchOrg) return false;
+      }
+
+      // 3. По цене
+      if (priceRange === 'under20' && r.price > 20000) return false;
+      if (priceRange === '20to50' && (r.price < 20000 || r.price > 50000)) return false;
+      if (priceRange === 'over50' && r.price < 50000) return false;
+
+      // 4. Только со свободными местами
+      if (onlyAvailableSpots) {
+        const remaining = Math.max(0, (r.maxSpots || 15) - (r.bookedSpots || 0));
+        if (remaining <= 0) return false;
+      }
+
+      return true;
+    }).sort((a, b) => {
+      if (sortBy === 'rating') return (b.rating || 5) - (a.rating || 5);
+      if (sortBy === 'date') return new Date(b.createdAt || b.startDate || 0).getTime() - new Date(a.createdAt || a.startDate || 0).getTime();
+      if (sortBy === 'price_asc') return a.price - b.price;
+      if (sortBy === 'price_desc') return b.price - a.price;
+      if (sortBy === 'nearby') return (a.distanceKm || 0) - (b.distanceKm || 0);
+      return 0;
+    });
+  }, [retreats, selectedCategory, searchQuery, priceRange, onlyAvailableSpots, sortBy]);
+
+  // Проверка активности расширенных фильтров
+  const hasActiveAdvancedFilters = priceRange !== 'all' || onlyAvailableSpots || (sortBy !== 'nearby' && sortBy !== 'date');
   // Определение геолокации пользователя
   useEffect(() => {
     if ('geolocation' in navigator) {
@@ -260,11 +316,11 @@ export function RetreatMapPage() {
 
     markersGroup.clearLayers();
 
-    if (retreats.length === 0) return;
+    if (filteredRetreats.length === 0) return;
 
     const bounds = L.latLngBounds([]);
 
-    retreats.forEach((ret) => {
+    filteredRetreats.forEach((ret) => {
       if (!ret.latitude || !ret.longitude) return;
 
       const isSelected = selectedRetreat?.id === ret.id;
@@ -492,7 +548,7 @@ export function RetreatMapPage() {
         {/* ЛЕВАЯ ПАНЕЛЬ: ФИЛЬТРЫ И СПИСОК КАРТОЧЕК */}
         <aside className="retreat-list-sidebar">
           {/* Поле поиска в панели */}
-          <div className="retreat-filter-search-box">
+          <div className="retreat-filter-search-box" style={{ position: 'relative' }}>
             <Search size={16} className="search-box-icon" />
             <input
               type="text"
@@ -500,9 +556,102 @@ export function RetreatMapPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <button className="filter-tune-btn" title="Дополнительные фильтры">
+            <button
+              className={`filter-tune-btn ${hasActiveAdvancedFilters ? 'has-active' : ''}`}
+              onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
+              title="Настройка фильтрации"
+            >
               <Filter size={15} />
+              {hasActiveAdvancedFilters && <span className="filter-active-dot-badge" />}
             </button>
+
+            {/* Выпадающая панель качественной фильтрации */}
+            {isFilterPopoverOpen && (
+              <div className="retreat-filter-popover">
+                <div className="popover-header-row">
+                  <h4>Параметры фильтрации</h4>
+                  <button className="btn-close-popover" onClick={() => setIsFilterPopoverOpen(false)}>
+                    <X size={15} />
+                  </button>
+                </div>
+
+                <div className="popover-section-block">
+                  <label>Ценовой диапазон</label>
+                  <div className="filter-chip-row">
+                    {[
+                      { id: 'all', label: 'Все цены' },
+                      { id: 'under20', label: 'До 20 000 ₸' },
+                      { id: '20to50', label: '20 000 — 50 000 ₸' },
+                      { id: 'over50', label: 'От 50 000 ₸' }
+                    ].map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className={`filter-chip-item ${priceRange === p.id ? 'active' : ''}`}
+                        onClick={() => setPriceRange(p.id as any)}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="popover-section-block">
+                  <label>Сортировка</label>
+                  <div className="filter-chip-row">
+                    {[
+                      { id: 'nearby', label: 'Рядом' },
+                      { id: 'date', label: 'Свежие' },
+                      { id: 'price_asc', label: 'Сначала дешевле' },
+                      { id: 'price_desc', label: 'Сначала дороже' },
+                      { id: 'rating', label: 'По рейтингу' }
+                    ].map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className={`filter-chip-item ${sortBy === s.id ? 'active' : ''}`}
+                        onClick={() => setSortBy(s.id as any)}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="popover-section-block">
+                  <div
+                    className={`filter-toggle-switch-row ${onlyAvailableSpots ? 'active' : ''}`}
+                    onClick={() => setOnlyAvailableSpots(!onlyAvailableSpots)}
+                  >
+                    <span className="toggle-label-text">Только со свободными местами</span>
+                    <div className="toggle-indicator">
+                      {onlyAvailableSpots && <Check size={13} strokeWidth={3} />}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="popover-footer-actions">
+                  <button
+                    type="button"
+                    className="btn-reset-filters-text"
+                    onClick={() => {
+                      setPriceRange('all');
+                      setOnlyAvailableSpots(false);
+                      setSortBy('nearby');
+                    }}
+                  >
+                    Сбросить
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-apply-filters-main"
+                    onClick={() => setIsFilterPopoverOpen(false)}
+                  >
+                    Применить
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Выбор радиуса / округа */}
@@ -572,7 +721,7 @@ export function RetreatMapPage() {
                 По рейтингу
               </button>
             </div>
-            <span className="focus-count">{retreats.length} в фокусе</span>
+            <span className="focus-count">{filteredRetreats.length} в фокусе</span>
           </div>
 
           {/* Список карточек */}
@@ -582,24 +731,36 @@ export function RetreatMapPage() {
                 <RefreshCw size={24} className="spin-icon" />
                 <span>Загрузка ретритов...</span>
               </div>
-            ) : retreats.length === 0 ? (
+            ) : filteredRetreats.length === 0 ? (
               <div className="retreat-empty-state">
                 <Compass size={36} />
                 <h3>Ретриты не найдены</h3>
-                <p>Попробуйте расширить радиус поиска или выбрать категорию «Все»</p>
-                <button
-                  className="reset-filters-btn"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedCategory('all');
-                    setSelectedRadius('all');
-                  }}
-                >
-                  Сбросить фильтры
-                </button>
+                <p>Попробуйте расширить радиус поиска, сбросить фильтры или создайте первый ретрит в вашем регионе</p>
+                <div className="empty-state-btn-row">
+                  <button
+                    className="reset-filters-btn"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSelectedCategory('all');
+                      setSelectedRadius('all');
+                      setPriceRange('all');
+                      setOnlyAvailableSpots(false);
+                      setSortBy('nearby');
+                    }}
+                  >
+                    Сбросить фильтры
+                  </button>
+                  <button
+                    className="empty-create-btn"
+                    onClick={() => setIsCreateModalOpen(true)}
+                  >
+                    + Создать свой ретрит
+                  </button>
+                </div>
               </div>
             ) : (
-              retreats.map((ret) => {
+              filteredRetreats.map((ret) => {
+                const remainingSpots = Math.max(0, (ret.maxSpots || 15) - (ret.bookedSpots || 0));
                 const isSelected = selectedRetreat?.id === ret.id;
                 const isFav = favorites.includes(ret.id);
                 const statusBadge = ret.status === 'completed'
@@ -660,6 +821,12 @@ export function RetreatMapPage() {
                       </div>
 
                       <h4 className="card-title-text">{ret.title}</h4>
+                      <div className="card-spots-pill-wrap">
+                        <span className={`card-spots-pill ${remainingSpots === 0 ? 'sold-out' : remainingSpots <= 3 ? 'few' : 'available'}`}>
+                          <Users size={11} />
+                          {remainingSpots === 0 ? 'Мест нет' : `Осталось ${remainingSpots} из ${ret.maxSpots || 15} мест`}
+                        </span>
+                      </div>
                       <p className="card-excerpt-text">{ret.description}</p>
 
                       <div className="card-footer-meta">
@@ -887,6 +1054,20 @@ export function RetreatMapPage() {
                     </div>
                   </>
                 )}
+                {selectedRetreat.images && selectedRetreat.images.length > 1 && (
+                  <div className="gallery-thumbs-row">
+                    {selectedRetreat.images.map((img, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className={`gallery-thumb-btn ${activePhotoIdx === i ? 'active' : ''}`}
+                        onClick={() => setActivePhotoIdx(i)}
+                      >
+                        <img src={img} alt={`Миниатюра ${i + 1}`} />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Рейтинг и категории */}
@@ -905,8 +1086,53 @@ export function RetreatMapPage() {
               <h2 className="drawer-title">{selectedRetreat.title}</h2>
               <div className="drawer-location-row">
                 <MapPin size={15} className="pin-icon" />
-                <span>{selectedRetreat.locationAddress}</span>
+                <span>{selectedRetreat.locationAddress}, {selectedRetreat.locationCity}</span>
               </div>
+
+              {/* 2GIS Кнопка точного адреса */}
+              <a
+                href={`https://2gis.kz/search/${encodeURIComponent((selectedRetreat.locationAddress || '') + ' ' + (selectedRetreat.locationCity || ''))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-open-2gis"
+                title="Открыть точный адрес и проложить маршрут в 2ГИС"
+              >
+                <Navigation size={14} />
+                <span>Открыть в 2ГИС (точный адрес)</span>
+                <ExternalLink size={12} />
+              </a>
+
+              {/* Блок мест: всего мест и сколько осталось */}
+              {(() => {
+                const totalSpots = selectedRetreat.maxSpots || 15;
+                const booked = selectedRetreat.bookedSpots || 0;
+                const remaining = Math.max(0, totalSpots - booked);
+                const percent = Math.min(100, Math.round((booked / totalSpots) * 100));
+                return (
+                  <div className="drawer-spots-card">
+                    <div className="spots-header-row">
+                      <div className="spots-title-group">
+                        <Users size={16} />
+                        <span>Места для участников</span>
+                      </div>
+                      <span className={`spots-badge-pill ${remaining === 0 ? 'sold-out' : remaining <= 3 ? 'few' : 'available'}`}>
+                        {remaining === 0 ? 'Все места заняты' : remaining <= 3 ? `Осталось всего ${remaining} мест` : `Свободно ${remaining} мест`}
+                      </span>
+                    </div>
+                    <div className="spots-progress-track">
+                      <div
+                        className={`spots-progress-fill ${remaining === 0 ? 'full' : remaining <= 3 ? 'warning' : 'ok'}`}
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                    <div className="spots-numbers-subline">
+                      <span>Осталось мест: <b>{remaining}</b></span>
+                      <span>Всего мест: <b>{totalSpots}</b></span>
+                      <span>Забронировано: <b>{booked}</b></span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Карточка организатора / мастера */}
               <div className="drawer-master-card">
@@ -1014,6 +1240,17 @@ export function RetreatMapPage() {
                   <MapPin size={16} />
                   <span>На карте</span>
                 </button>
+
+                <a
+                  href={`https://2gis.kz/search/${encodeURIComponent((selectedRetreat.locationAddress || '') + ' ' + (selectedRetreat.locationCity || ''))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="locate-2gis-btn"
+                  title="Открыть в приложении или на сайте 2ГИС"
+                >
+                  <Navigation size={15} />
+                  <span>2ГИС</span>
+                </a>
 
                 {/* Кнопка удаления для создателя или админа */}
                 {(currentUser?.id === selectedRetreat.organizerId || currentUser?.role === 'admin') && (
@@ -1278,14 +1515,110 @@ function CreateRetreatModal({
     price: 35000,
     currency: 'KZT',
     durationDays: 2,
+    startDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+    endDate: new Date(Date.now() + 9 * 86400000).toISOString().split('T')[0],
     description: '',
     program: '',
     included: '',
     maxSpots: 15,
-    coverImage: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1200&q=80'
+    coverImage: PRESET_RETREAT_COVERS[0].url,
+    images: [PRESET_RETREAT_COVERS[0].url]
   });
+
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // 2ГИС и геокодинг адресов
+  const [addressSuggestions, setAddressSuggestions] = useState<{ title: string; subtitle: string; lat: number; lng: number; city: string; country: string }[]>([]);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+
+  // Геокодинг адреса через Nominatim / 2ГИС поиск
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setForm({ ...form, locationAddress: val });
+
+    if (val.trim().length >= 3) {
+      setIsGeocoding(true);
+      const query = `${val}, ${form.locationCity}`;
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=4&addressdetails=1`, {
+        headers: { 'Accept-Language': 'ru' }
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            const sugs = data.map((item: any) => ({
+              title: item.display_name.split(',')[0] || val,
+              subtitle: item.display_name.split(',').slice(1, 4).join(',').trim(),
+              lat: parseFloat(item.lat),
+              lng: parseFloat(item.lon),
+              city: item.address?.city || item.address?.town || item.address?.state || form.locationCity,
+              country: item.address?.country || 'Казахстан'
+            }));
+            setAddressSuggestions(sugs);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setIsGeocoding(false));
+    } else {
+      setAddressSuggestions([]);
+    }
+  };
+
+  const handleSelectAddressSuggestion = (sug: { title: string; subtitle: string; lat: number; lng: number; city: string; country: string }) => {
+    setForm({
+      ...form,
+      locationAddress: sug.title,
+      locationCity: sug.city || form.locationCity,
+      country: sug.country || form.country,
+      latitude: sug.lat,
+      longitude: sug.lng
+    });
+    setAddressSuggestions([]);
+  };
+
+  // Загрузка фото с устройства
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64 = ev.target?.result as string;
+        if (base64) {
+          setForm((prev) => {
+            const nextImgs = [...prev.images.filter((img) => !PRESET_RETREAT_COVERS.some((p) => p.url === img)), base64];
+            return {
+              ...prev,
+              images: nextImgs,
+              coverImage: nextImgs[0] || prev.coverImage
+            };
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleRemovePhoto = (idx: number) => {
+    setForm((prev) => {
+      const nextImgs = prev.images.filter((_, i) => i !== idx);
+      const fallbackCover = nextImgs[0] || PRESET_RETREAT_COVERS[0].url;
+      return {
+        ...prev,
+        images: nextImgs.length > 0 ? nextImgs : [fallbackCover],
+        coverImage: fallbackCover
+      };
+    });
+  };
+
+  const handlePickPresetCover = (presetUrl: string) => {
+    setForm((prev) => ({
+      ...prev,
+      coverImage: presetUrl,
+      images: [presetUrl, ...prev.images.filter((img) => img !== presetUrl)]
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1299,7 +1632,7 @@ function CreateRetreatModal({
     try {
       const res = await api.retreats.create({
         ...form,
-        images: [form.coverImage]
+        images: form.images.length > 0 ? form.images : [form.coverImage]
       });
       if (res?.data) {
         onCreated(res.data);
@@ -1315,7 +1648,7 @@ function CreateRetreatModal({
 
   return (
     <div className="retreat-modal-backdrop" onClick={onClose}>
-      <div className="retreat-modal-window" onClick={(e) => e.stopPropagation()}>
+      <div className="retreat-modal-window wide" onClick={(e) => e.stopPropagation()}>
         <button className="modal-close-icon" onClick={onClose}>
           <X size={18} />
         </button>
@@ -1323,7 +1656,7 @@ function CreateRetreatModal({
         <form onSubmit={handleSubmit} className="booking-form">
           <div className="modal-header-block">
             <h2>Создать новый ретрит</h2>
-            <p className="modal-subtitle">Опубликуйте событие на интерактивной карте New Age</p>
+            <p className="modal-subtitle">Опубликуйте событие на интерактивной карте с интеграцией 2ГИС</p>
           </div>
 
           {err && (
@@ -1373,7 +1706,8 @@ function CreateRetreatModal({
                       art: 'Арт-терапия',
                       soundhealing: 'Саундхилинг',
                       spiritual: 'Места силы',
-                      vipassana: 'Випассана'
+                      vipassana: 'Випассана',
+                      nature: 'Природа & Походы'
                     };
                     setForm({ ...form, category: c, categoryTitle: catMap[c] || 'Ретрит' });
                   }}
@@ -1384,26 +1718,79 @@ function CreateRetreatModal({
                   <option value="soundhealing">Саундхилинг</option>
                   <option value="spiritual">Места силы</option>
                   <option value="vipassana">Випассана</option>
+                  <option value="nature">Природа & Походы</option>
                 </select>
               </div>
             </div>
           </div>
 
-          <div className="modal-field-group">
-            <label>Точный адрес проведения *</label>
+          {/* Интеграция с 2ГИС и точный адрес */}
+          <div className="modal-field-group address-autocomplete-group">
+            <div className="address-label-row">
+              <label>Точный адрес проведения *</label>
+              <a
+                href={`https://2gis.kz/search/${encodeURIComponent((form.locationAddress || 'Караганда') + ' ' + form.locationCity)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link-check-2gis"
+                title="Найти точное здание и организацию в 2ГИС"
+              >
+                <Navigation size={12} />
+                <span>Проверить в 2ГИС ↗</span>
+              </a>
+            </div>
             <div className="modal-input-wrap">
               <MapPin size={16} />
               <input
                 type="text"
                 placeholder="пр. Бухар-Жырау 55, Эко-центр"
                 value={form.locationAddress}
-                onChange={(e) => setForm({ ...form, locationAddress: e.target.value })}
+                onChange={handleAddressChange}
                 required
               />
+              {isGeocoding && <RefreshCw size={14} className="spin-icon" style={{ marginLeft: 8 }} />}
             </div>
+
+            {/* Выпадающий список подсказок 2ГИС / Карты */}
+            {addressSuggestions.length > 0 && (
+              <div className="address-suggestions-dropdown">
+                {addressSuggestions.map((sug, i) => (
+                  <div
+                    key={i}
+                    className="address-suggestion-item"
+                    onClick={() => handleSelectAddressSuggestion(sug)}
+                  >
+                    <MapPin size={14} className="sug-pin" />
+                    <div className="sug-text">
+                      <strong>{sug.title}</strong>
+                      <span>{sug.subtitle}</span>
+                    </div>
+                    <span className="sug-2gis-tag">2ГИС</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <span className="field-hint-text">Начните вводить адрес или проверьте объект в 2ГИС</span>
           </div>
 
+          {/* Вместимость и стоимость */}
           <div className="modal-field-row-2">
+            <div className="modal-field-group">
+              <label>Количество мест (вместимость) *</label>
+              <div className="modal-input-wrap">
+                <Users size={16} />
+                <input
+                  type="number"
+                  min="1"
+                  max="500"
+                  value={form.maxSpots}
+                  onChange={(e) => setForm({ ...form, maxSpots: Math.max(1, Number(e.target.value)) })}
+                  required
+                />
+              </div>
+              <span className="field-hint-text">Всего участников, сколько сможет принять ретрит</span>
+            </div>
+
             <div className="modal-field-group">
               <label>Стоимость участия</label>
               <div className="modal-input-wrap">
@@ -1415,7 +1802,9 @@ function CreateRetreatModal({
                 />
               </div>
             </div>
+          </div>
 
+          <div className="modal-field-row-2">
             <div className="modal-field-group">
               <label>Валюта</label>
               <div className="modal-input-wrap">
@@ -1428,6 +1817,79 @@ function CreateRetreatModal({
                   <option value="USD">Доллары ($)</option>
                   <option value="EUR">Евро (€)</option>
                 </select>
+              </div>
+            </div>
+
+            <div className="modal-field-group">
+              <label>Длительность (дней)</label>
+              <div className="modal-input-wrap">
+                <input
+                  type="number"
+                  min="1"
+                  max="60"
+                  value={form.durationDays}
+                  onChange={(e) => setForm({ ...form, durationDays: Number(e.target.value) })}
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Загрузка фото и выбор обложки */}
+          <div className="modal-field-group">
+            <label>Фотографии ретрита (загрузка с устройства)</label>
+            <div className="photo-upload-area">
+              <input
+                type="file"
+                id="modal-retreat-file-upload"
+                multiple
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                style={{ display: 'none' }}
+              />
+              <label htmlFor="modal-retreat-file-upload" className="photo-upload-btn-label">
+                <Upload size={16} />
+                <span>Выбрать фотографии</span>
+              </label>
+              <span className="photo-upload-subtext">Вы можете загрузить свои фото или выбрать готовую обложку</span>
+            </div>
+
+            {/* Сетка загруженных фото */}
+            {form.images.length > 0 && (
+              <div className="uploaded-photos-grid">
+                {form.images.map((imgUrl, idx) => (
+                  <div key={idx} className={`photo-preview-item ${idx === 0 ? 'is-cover' : ''}`}>
+                    <img src={imgUrl} alt={`Фото ${idx + 1}`} />
+                    {idx === 0 && <span className="cover-badge">Обложка</span>}
+                    <button
+                      type="button"
+                      className="btn-remove-photo"
+                      onClick={() => handleRemovePhoto(idx)}
+                      title="Удалить"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Готовые подборки качественных фото */}
+            <div className="preset-covers-section">
+              <span className="preset-covers-label">Быстрый выбор тематической обложки:</span>
+              <div className="preset-covers-row">
+                {PRESET_RETREAT_COVERS.map((preset, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    className={`preset-cover-thumb ${form.coverImage === preset.url ? 'active' : ''}`}
+                    onClick={() => handlePickPresetCover(preset.url)}
+                    title={preset.title}
+                  >
+                    <img src={preset.url} alt={preset.title} />
+                    <span className="preset-thumb-title">{preset.title}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
