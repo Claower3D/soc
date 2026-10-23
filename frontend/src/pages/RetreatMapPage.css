@@ -2426,3 +2426,37 @@
   height: 100%;
   object-fit: cover;
 }
+
+/* Активные теги фильтров в сайдбаре */
+.active-filters-chips-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+  margin-bottom: 0.35rem;
+}
+
+.active-filter-pill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #EEF2FF;
+  border: 1px solid #C7D2FE;
+  color: #4338CA;
+  border-radius: 9999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.active-filter-pill-tag:hover {
+  background: #E0E7FF;
+  color: #3730A3;
+}
+
+.retreat-filter-popover {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+}

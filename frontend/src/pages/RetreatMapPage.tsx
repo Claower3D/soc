@@ -179,7 +179,7 @@ export function RetreatMapPage() {
   }, [retreats, selectedCategory, searchQuery, priceRange, onlyAvailableSpots, sortBy]);
 
   // Проверка активности расширенных фильтров
-  const hasActiveAdvancedFilters = priceRange !== 'all' || onlyAvailableSpots || (sortBy !== 'nearby' && sortBy !== 'date');
+  const hasActiveAdvancedFilters = selectedCategory !== 'all' || selectedRadius !== 'all' || priceRange !== 'all' || onlyAvailableSpots || (sortBy !== 'nearby' && sortBy !== 'date');
   // Определение геолокации пользователя
   useEffect(() => {
     if ('geolocation' in navigator) {
@@ -576,6 +576,48 @@ export function RetreatMapPage() {
                 </div>
 
                 <div className="popover-section-block">
+                  <label>Категория ретрита</label>
+                  <div className="filter-chip-row">
+                    {categories.map((c) => {
+                      const count = c.id === 'all'
+                        ? retreats.length
+                        : retreats.filter((r) => r.category === c.id).length;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className={`filter-chip-item ${selectedCategory === c.id ? 'active' : ''}`}
+                          onClick={() => setSelectedCategory(c.id)}
+                        >
+                          {c.title} {count > 0 ? `(${count})` : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="popover-section-block">
+                  <label>Радиус поиска (округ)</label>
+                  <div className="filter-chip-row">
+                    {[
+                      { id: '50', label: '50 км' },
+                      { id: '100', label: '100 км' },
+                      { id: '500', label: '500 км' },
+                      { id: 'all', label: 'Весь мир' }
+                    ].map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        className={`filter-chip-item ${selectedRadius === r.id ? 'active' : ''}`}
+                        onClick={() => setSelectedRadius(r.id)}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="popover-section-block">
                   <label>Ценовой диапазон</label>
                   <div className="filter-chip-row">
                     {[
@@ -635,6 +677,8 @@ export function RetreatMapPage() {
                     type="button"
                     className="btn-reset-filters-text"
                     onClick={() => {
+                      setSelectedCategory('all');
+                      setSelectedRadius('all');
                       setPriceRange('all');
                       setOnlyAvailableSpots(false);
                       setSortBy('nearby');
@@ -654,47 +698,33 @@ export function RetreatMapPage() {
             )}
           </div>
 
-          {/* Выбор радиуса / округа */}
-          <div className="retreat-radius-row">
-            <span className="radius-label">
-              <Navigation size={13} /> Округ:
-            </span>
-            <div className="radius-pills-wrap">
-              {[
-                { id: '50', label: '50 км' },
-                { id: '100', label: '100 км' },
-                { id: '500', label: '500 км' },
-                { id: 'all', label: 'Весь мир' }
-              ].map((r) => (
+          {/* Активные бейджи фильтров, если выбрана категория или радиус */}
+          {(selectedCategory !== 'all' || selectedRadius !== 'all') && (
+            <div className="active-filters-chips-bar">
+              {selectedCategory !== 'all' && (
                 <button
-                  key={r.id}
-                  className={`radius-pill ${selectedRadius === r.id ? 'active' : ''}`}
-                  onClick={() => setSelectedRadius(r.id)}
+                  type="button"
+                  className="active-filter-pill-tag"
+                  onClick={() => setSelectedCategory('all')}
+                  title="Сбросить категорию"
                 >
-                  {r.label}
+                  <span>{categories.find((c) => c.id === selectedCategory)?.title || selectedCategory}</span>
+                  <X size={12} />
                 </button>
-              ))}
+              )}
+              {selectedRadius !== 'all' && (
+                <button
+                  type="button"
+                  className="active-filter-pill-tag"
+                  onClick={() => setSelectedRadius('all')}
+                  title="Сбросить радиус"
+                >
+                  <span>Округ: {selectedRadius} км</span>
+                  <X size={12} />
+                </button>
+              )}
             </div>
-          </div>
-
-          {/* Теги категорий */}
-          <div className="retreat-categories-scroll">
-            {categories.map((c) => {
-              const count = c.id === 'all'
-                ? retreats.length
-                : retreats.filter((r) => r.category === c.id).length;
-              return (
-                <button
-                  key={c.id}
-                  className={`category-pill ${selectedCategory === c.id ? 'active' : ''}`}
-                  onClick={() => setSelectedCategory(c.id)}
-                >
-                  <span>{c.title}</span>
-                  <span className="category-count">{count}</span>
-                </button>
-              );
-            })}
-          </div>
+          )}
 
           {/* Строка сортировки */}
           <div className="retreat-sort-row">
