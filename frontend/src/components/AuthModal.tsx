@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   X, Mail, Lock, User as UserIcon, Shield, CheckCircle2, 
   ShoppingBag, Video, ArrowRight, Check, Compass, Info, AlertCircle, Sparkles, LogIn, UserPlus, QrCode, Smartphone,
@@ -10,6 +10,7 @@ import { useTranslation } from '../context/LanguageContext';
 import { LegalModal } from './LegalModal';
 import { SacredQrLogo } from './SacredQrLogo';
 import { CountryPhoneInput } from './CountryPhoneInput';
+import { EmailCodeVerify, PasswordRecovery, isValidEmail } from './EmailAuthFlows';
 import { type CountryInfo } from '../utils/countryDetect';
 import { API_BASE_URL } from '../api';
 import logoImg from '../assets/logo.png';
@@ -49,6 +50,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [legalModalOpen, setLegalModalOpen] = useState(false);
   const [legalTab, setLegalTab] = useState<'privacy' | 'terms'>('privacy');
+
+  // Email-верификация и восстановление доступа
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const verifiedEmailRef = useRef<string | null>(null);
+  const pendingAfterVerify = useRef<'quick' | 'step2'>('step2');
 
   // QR Login State
   const [qrSessionId, setQrSessionId] = useState<string | null>(null);
@@ -127,6 +134,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMessage(t('auth.modal.err_password_len'));
       return;
     }
+    if (!isValidEmail(emailOrPhone)) {
+      setErrorMessage('Введите корректный адрес электронной почты');
+      return;
+    }
+    if (verifiedEmailRef.current !== emailOrPhone.trim().toLowerCase()) {
+      pendingAfterVerify.current = 'quick';
+      setErrorMessage(null);
+      setVerifyingEmail(true);
+      return;
+    }
 
     const effBelief = overrideBeliefId !== undefined ? overrideBeliefId : selectedBeliefId;
     const effRole = overrideRole !== undefined ? overrideRole : selectedRole;
@@ -199,6 +216,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       }
       if (password.length < 6) {
         setErrorMessage(t('auth.modal.err_password_len'));
+        return;
+      }
+      if (!isValidEmail(emailOrPhone)) {
+        setErrorMessage('Введите корректный адрес электронной почты');
+        return;
+      }
+      if (verifiedEmailRef.current !== emailOrPhone.trim().toLowerCase()) {
+        pendingAfterVerify.current = 'step2';
+        setVerifyingEmail(true);
         return;
       }
       setStep(2);
@@ -300,6 +326,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           ) : (
             <div className="auth-form-scroll-body">
+              {mode === 'login' && recoveryMode ? (
+                <PasswordRecovery
+                  initialEmail={emailOrPhone}
+                  onBack={() => setRecoveryMode(false)}
+                  onRecovered={(token, user) => {
+                    loginWithToken(token, user);
+                    setRecoveryMode(false);
+                    setLoginSuccessMessage(true);
+                    setTimeout(() => {
+                      if (onSuccess) onSuccess();
+                      onClose();
+                      setLoginSuccessMessage(false);
+                    }, 700);
+                  }}
+                />
+              ) : mode === 'register' && verifyingEmail ? (
+                <EmailCodeVerify
+                  email={emailOrPhone}
+                  onBack={() => setVerifyingEmail(false)}
+                  onVerified={async () => {
+                    verifiedEmailRef.current = emailOrPhone.trim().toLowerCase();
+                    setVerifyingEmail(false);
+                    setErrorMessage(null);
+                    if (pendingAfterVerify.current === 'quick') {
+                      await executeRegistration();
+                    } else {
+                      setStep(2);
+                    }
+                  }}
+                />
+              ) : (
+              <>
               {/* SUB-SELECTOR ДЛЯ ВХОДА: По логину / По QR-коду */}
               {mode === 'login' && (
                 <div className="login-method-toggle">
@@ -433,7 +491,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                             <input type="checkbox" defaultChecked />
                             <span>Запомнить меня</span>
                           </label>
-                          <a href="#forgot" className="forgot-link" onClick={e => { e.preventDefault(); setErrorMessage('Для восстановления доступа обратитесь в службу поддержки: support@newage.network'); }}>
+                          <a href="#forgot" className="forgot-link" onClick={e => { e.preventDefault(); setErrorMessage(null); setRecoveryMode(true); }}>
                             Забыли пароль?
                           </a>
                         </div>
@@ -482,22 +540,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                         </div>
 
                         <div className="auth-field">
-                          <div className="auth-field-header-row">
-                            <label>Номер телефона или Email *</label>
-                            {detectedCountry && (
-                              <span className="auth-detected-badge" title="Страна определена автоматически">
-                                📍 {detectedCountry.nameRu}
-                              </span>
-                            )}
+                          <label>Электронная почта *</label>
+                          <div className="auth-input-wrapper">
+                            <Mail size={17} className="auth-input-icon" />
+                            <input
+                              type="email"
+                              inputMode="email"
+                              placeholder="you@example.com"
+                              value={emailOrPhone}
+                              onChange={e => setEmailOrPhone(e.target.value)}
+                              autoComplete="email"
+                              required
+                            />
                           </div>
-                          <CountryPhoneInput
-                            value={emailOrPhone}
-                            onChange={(val) => setEmailOrPhone(val)}
-                            onCountryDetected={(c) => setDetectedCountry(c)}
-                            onlyPhone={false}
-                            placeholder="+7 (999) 000-00-00 или email@domain.com"
-                            required
-                          />
+                          <p className="auth-field-hint">На почту придёт код подтверждения — она нужна для входа и восстановления аккаунта</p>
                         </div>
 
                         <div className="auth-field">
@@ -745,6 +801,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     )}
                   </form>
                 </>
+              )}
+              </>
               )}
             </div>
           )}

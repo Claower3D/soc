@@ -1202,6 +1202,13 @@ func main() {
 	mux.HandleFunc("POST /api/auth/send-code", rateLimitMiddleware(smsLimiter, handleSendCode))
 	mux.HandleFunc("POST /api/auth/verify-code", rateLimitMiddleware(smsLimiter, handleVerifyCode))
 
+	// Email-верификация (Bird Verify) — регистрация и восстановление доступа
+	emailLimiter := newIPRateLimiter(10, 1*time.Minute)
+	mux.HandleFunc("POST /api/auth/email/send-code", rateLimitMiddleware(emailLimiter, handleEmailSendCode))
+	mux.HandleFunc("POST /api/auth/email/verify-code", rateLimitMiddleware(emailLimiter, handleEmailVerifyCode))
+	mux.HandleFunc("POST /api/auth/recovery/send-code", rateLimitMiddleware(emailLimiter, handleRecoverySendCode))
+	mux.HandleFunc("POST /api/auth/recovery/reset-password", rateLimitMiddleware(emailLimiter, handleRecoveryResetPassword))
+
 	// QR-код авторизация (вход со смартфона)
 	mux.HandleFunc("GET /api/auth/qr/init", handleQRInit)
 	mux.HandleFunc("GET /api/auth/qr/status", handleQRStatus)
@@ -2653,6 +2660,16 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Регистрация только по подтверждённой электронной почте
+	if !isValidEmail(cleanEmailOrPhone) {
+		writeJSON(w, http.StatusBadRequest, Response{Status: "error", Message: "Введите корректный адрес электронной почты"})
+		return
+	}
+	if !isEmailVerifiedForRegistration(cleanEmailOrPhone) {
+		writeJSON(w, http.StatusForbidden, Response{Status: "error", Message: "Подтвердите электронную почту кодом из письма"})
+		return
+	}
+
 	// Проверка уникальности в PostgreSQL
 	if db != nil {
 		var count int
@@ -2748,6 +2765,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	store.saveToDisk()
 	store.mu.Unlock()
+	verifiedEmails.Delete(cleanEmailOrPhone)
 
 	mockUsersMu.Lock()
 	mockUsers = append([]User{newUser}, mockUsers...)

@@ -10,8 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
 import { LegalModal } from '../components/LegalModal';
 import { SacredQrLogo } from '../components/SacredQrLogo';
-import { CountryPhoneInput } from '../components/CountryPhoneInput';
-import { type CountryInfo } from '../utils/countryDetect';
+import { EmailCodeVerify, PasswordRecovery, isValidEmail } from '../components/EmailAuthFlows';
 import { API_BASE_URL } from '../api';
 import { useSEO } from '../utils/seo';
 import logoImg from '../assets/logo.png';
@@ -108,7 +107,9 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
   const [usernameFeedback, setUsernameFeedback] = useState<string>('');
   const [emailOrPhone, setEmailOrPhone] = useState('');
-  const [detectedCountry, setDetectedCountry] = useState<CountryInfo | null>(null);
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -186,9 +187,8 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
       return;
     }
 
-    const phoneDigits = emailOrPhone.replace(/\D/g, '');
-    if (phoneDigits.length < 7) {
-      setErrorMessage('Пожалуйста, введите корректный номер телефона');
+    if (!isValidEmail(emailOrPhone)) {
+      setErrorMessage('Пожалуйста, введите корректный адрес электронной почты');
       return;
     }
 
@@ -209,6 +209,13 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
     }
     if (confirmPassword && password !== confirmPassword) {
       setErrorMessage(t('auth.modal.err_password_match'));
+      return;
+    }
+
+    // Почту нужно подтвердить кодом из письма (если ещё не подтверждена)
+    if (verifiedEmail !== emailOrPhone.trim().toLowerCase()) {
+      setVerifyingEmail(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -472,6 +479,18 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                 <p>{successText || 'Перенаправляем в систему...'}</p>
                 <div className="success-loader-bar" />
               </div>
+            ) : authMode === 'login' && recoveryMode ? (
+              <PasswordRecovery
+                initialEmail={loginQuery}
+                onBack={() => setRecoveryMode(false)}
+                onRecovered={(token, user) => {
+                  loginWithToken(token, user);
+                  setRecoveryMode(false);
+                  setSuccessText('Пароль изменён. Входим в профиль...');
+                  setSuccess(true);
+                  setTimeout(() => navigate(user?.username ? `/profile/@${user.username}` : '/'), 1000);
+                }}
+              />
             ) : authMode === 'login' ? (
               <div className="register-login-wrapper">
                 <div className="login-method-toggle-bar">
@@ -588,6 +607,9 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                       <div className="form-group-field">
                         <div className="field-label-row">
                           <label>{t('auth.modal.password') || 'Пароль'} *</label>
+                          <button type="button" className="eaf-forgot-link" onClick={() => { setRecoveryMode(true); setErrorMessage(null); }}>
+                            Забыли пароль?
+                          </button>
                         </div>
                         <div className="form-input-box">
                           <Lock size={18} className="field-icon" />
@@ -651,7 +673,19 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
               </div>
             ) : (
               <>
-                {step === 1 ? (
+                {verifyingEmail ? (
+                  <EmailCodeVerify
+                    email={emailOrPhone}
+                    onBack={() => setVerifyingEmail(false)}
+                    onVerified={() => {
+                      setVerifiedEmail(emailOrPhone.trim().toLowerCase());
+                      setVerifyingEmail(false);
+                      setErrorMessage(null);
+                      setStep(2);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                  />
+                ) : step === 1 ? (
                   <form onSubmit={handleStep1} className="register-step-form">
                     <div className="step-header-text">
                       <h2>Создание учетной записи</h2>
@@ -709,24 +743,24 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                       </div>
 
                       <div className="form-group-field full-width">
-                        <div className="field-label-row">
-                          <label>Номер телефона *</label>
-                          {detectedCountry && (
-                            <span className="country-detected-badge" title="Страна определена автоматически">
-                              📍 {detectedCountry.nameRu}
-                            </span>
+                        <label>Электронная почта *</label>
+                        <div className="form-input-box">
+                          <Mail size={18} className="field-icon" />
+                          <input
+                            type="email"
+                            inputMode="email"
+                            placeholder="you@example.com"
+                            value={emailOrPhone}
+                            onChange={(e) => setEmailOrPhone(e.target.value)}
+                            autoComplete="email"
+                            required
+                          />
+                          {verifiedEmail && verifiedEmail === emailOrPhone.trim().toLowerCase() && (
+                            <CheckCircle2 size={16} color="#10B981" />
                           )}
                         </div>
-                        <CountryPhoneInput
-                          value={emailOrPhone}
-                          onChange={(val) => setEmailOrPhone(val)}
-                          onCountryDetected={(c) => setDetectedCountry(c)}
-                          onlyPhone={true}
-                          placeholder="+7 (999) 000-00-00"
-                          required
-                        />
                         <span className="field-hint-text">
-                          Номер телефона используется для входа и защиты аккаунта
+                          На почту придёт код подтверждения. Она нужна для входа и восстановления аккаунта
                         </span>
                       </div>
 

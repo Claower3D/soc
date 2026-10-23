@@ -220,7 +220,11 @@ export const api = {
     },
     checkUsername: (username: string) => apiFetch<any>(`/api/auth/check-username?username=${encodeURIComponent(username)}`),
     sendCode: (phone: string) => apiFetch<any>('/api/auth/send-code', { method: 'POST', body: JSON.stringify({ phone }) }),
-    verifyCode: (phone: string, code: string) => apiFetch<any>('/api/auth/verify-code', { method: 'POST', body: JSON.stringify({ phone, code }) })
+    verifyCode: (phone: string, code: string) => apiFetch<any>('/api/auth/verify-code', { method: 'POST', body: JSON.stringify({ phone, code }) }),
+    sendEmailCode: (email: string) => apiFetch<any>('/api/auth/email/send-code', { method: 'POST', body: JSON.stringify({ email }) }),
+    verifyEmailCode: (email: string, code: string) => apiFetch<any>('/api/auth/email/verify-code', { method: 'POST', body: JSON.stringify({ email, code }) }),
+    sendRecoveryCode: (email: string) => apiFetch<any>('/api/auth/recovery/send-code', { method: 'POST', body: JSON.stringify({ email }) }),
+    resetPassword: (email: string, code: string, newPassword: string) => apiFetch<any>('/api/auth/recovery/reset-password', { method: 'POST', body: JSON.stringify({ email, code, newPassword }) })
   },
   users: {
     list: (forceRefresh = false) => dataCache.fetchWithCache('api:users:list', () => apiFetch<any>('/api/users'), { ttlMs: 90000, tag: 'users', forceRefresh }),
