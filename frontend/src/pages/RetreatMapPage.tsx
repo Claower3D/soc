@@ -1253,37 +1253,39 @@ export function RetreatMapPage() {
                   </span>
                 </button>
 
-                <button
-                  className="locate-map-btn"
-                  onClick={() => handleCenterOnRetreat(selectedRetreat)}
-                  title="Показать центр на карте"
-                >
-                  <MapPin size={16} />
-                  <span>На карте</span>
-                </button>
-
-                <a
-                  href={`https://2gis.kz/search/${encodeURIComponent((selectedRetreat.locationAddress || '') + ' ' + (selectedRetreat.locationCity || ''))}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="locate-2gis-btn"
-                  title="Открыть в приложении или на сайте 2ГИС"
-                >
-                  <Navigation size={15} />
-                  <span>2ГИС</span>
-                </a>
-
-                {/* Кнопка удаления для создателя или админа */}
-                {(currentUser?.id === selectedRetreat.organizerId || currentUser?.role === 'admin') && (
+                <div className="bottom-aux-actions">
                   <button
-                    className="delete-retreat-btn"
-                    onClick={() => handleDeleteRetreat(selectedRetreat.id)}
-                    title="Удалить ретрит"
+                    className="locate-map-btn"
+                    onClick={() => handleCenterOnRetreat(selectedRetreat)}
+                    title="Показать центр на карте"
                   >
-                    <Trash2 size={15} />
-                    <span>Удалить ретрит</span>
+                    <MapPin size={15} />
+                    <span>На карте</span>
                   </button>
-                )}
+
+                  <a
+                    href={`https://2gis.kz/search/${encodeURIComponent((selectedRetreat.locationAddress || '') + ' ' + (selectedRetreat.locationCity || ''))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="locate-2gis-btn"
+                    title="Открыть в приложении или на сайте 2ГИС"
+                  >
+                    <Navigation size={15} />
+                    <span>2ГИС</span>
+                  </a>
+
+                  {/* Кнопка удаления для создателя или админа */}
+                  {(currentUser?.id === selectedRetreat.organizerId || currentUser?.role === 'admin') && (
+                    <button
+                      className="delete-retreat-btn"
+                      onClick={() => handleDeleteRetreat(selectedRetreat.id)}
+                      title="Удалить ретрит"
+                    >
+                      <Trash2 size={15} />
+                      <span>Удалить</span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </aside>

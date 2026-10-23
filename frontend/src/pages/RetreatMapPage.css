@@ -1166,25 +1166,27 @@
 
 .bottom-action-buttons {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: 100%;
 }
 
 .book-spot-btn {
-  flex: 1;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  padding: 0.75rem 1rem;
+  height: 44px;
+  padding: 0 1rem;
   background: #2563EB;
   color: #FFFFFF;
   border: none;
   border-radius: 12px;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
   transition: all 0.15s ease;
 }
 
@@ -1199,36 +1201,64 @@
   box-shadow: none;
 }
 
-.locate-map-btn {
+.bottom-aux-actions {
   display: flex;
   align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.bottom-aux-actions .locate-map-btn,
+.bottom-aux-actions .locate-2gis-btn,
+.bottom-aux-actions .delete-retreat-btn {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 0.35rem;
-  padding: 0.75rem 0.85rem;
+  padding: 0 0.45rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  box-sizing: border-box;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.bottom-aux-actions .locate-map-btn {
   border: 1px solid #CBD5E1;
-  border-radius: 12px;
   background: #FFFFFF;
   color: #334155;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
 }
 
-.locate-map-btn:hover {
-  background: #F1F5F9;
+.bottom-aux-actions .locate-map-btn:hover {
+  background: #F8FAFC;
+  border-color: #94A3B8;
 }
 
-.delete-retreat-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.75rem 0.85rem;
+.bottom-aux-actions .locate-2gis-btn {
+  background: #00A859;
+  color: #FFFFFF !important;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0, 168, 89, 0.25);
+}
+
+.bottom-aux-actions .locate-2gis-btn:hover {
+  background: #00934d;
+}
+
+.bottom-aux-actions .delete-retreat-btn {
   border: 1px solid #FCA5A5;
-  border-radius: 12px;
   background: #FEF2F2;
   color: #DC2626;
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
+}
+
+.bottom-aux-actions .delete-retreat-btn:hover {
+  background: #FEE2E2;
 }
 
 /* -------------------------------------------------------------------------
@@ -2130,29 +2160,7 @@
   transform: translateY(-1px);
 }
 
-.locate-2gis-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  background: #00A859;
-  color: #FFFFFF !important;
-  border: none;
-  border-radius: 10px;
-  padding: 0 1rem;
-  height: 44px;
-  font-size: 0.88rem;
-  font-weight: 700;
-  text-decoration: none;
-  transition: all 0.15s ease;
-  box-shadow: 0 2px 6px rgba(0, 168, 89, 0.25);
-}
 
-.locate-2gis-btn:hover {
-  background: #00934d;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(0, 168, 89, 0.35);
-}
 
 /* Автодополнение адресов 2ГИС / Геокодер */
 .address-autocomplete-group {
