@@ -15,9 +15,15 @@ import {
   unmarkChatDeleted,
   isChatDeleted
 } from '../utils/conferenceManager';
+import { useSEO } from '../utils/seo';
 import './MessengerPage.css';
 
 export function MessengerPage() {
+  useSEO({
+    title: 'Мессенджер и осознанное общение',
+    description: 'Личные сообщения, групповые чаты и общение с единомышленниками на платформе New Age Unity.',
+  });
+
   const { currentUser, isAuthenticated, allAccounts } = useAuth();
   const [searchParams] = useSearchParams();
   const requestedChatId = searchParams.get('chat') || searchParams.get('id');

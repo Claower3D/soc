@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCurrency } from '../context/CurrencyContext';
 import { cacheService } from '../utils/cacheService';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
+import { useSEO } from '../utils/seo';
 import './MarketplacePage.css';
 
 const CATEGORIES = [
@@ -25,6 +26,11 @@ const CATEGORIES = [
 ];
 
 export function MarketplacePage() {
+  useSEO({
+    title: 'Маркетплейс осознанных товаров и услуг',
+    description: 'Магазин товаров для саморазвития, книг, минералов, артефактов и цифровых продуктов на New Age Unity.',
+  });
+
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { formatPrice } = useCurrency();

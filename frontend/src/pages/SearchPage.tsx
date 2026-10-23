@@ -18,6 +18,7 @@ import {
 } from '../utils/followStorage';
 import { getAvatarUrl, handleAvatarError } from '../utils/avatar';
 import { formatLastSeen } from '../utils/onlineStatus';
+import { useSEO } from '../utils/seo';
 import './SearchPage.css';
 
 type SearchTab = 'all' | 'accounts' | 'videos' | 'posts';
@@ -29,6 +30,11 @@ export function SearchPage() {
 
   const queryParam = searchParams.get('q') || '';
   const tabParam = (searchParams.get('tab') as SearchTab) || 'all';
+
+  useSEO({
+    title: queryParam ? `Поиск: ${queryParam}` : 'Поиск по платформе',
+    description: 'Глобальный поиск людей, видео, публикаций и практик на платформе New Age Unity.',
+  });
 
   const [query, setQuery] = useState(queryParam);
   const [activeTab, setActiveTab] = useState<SearchTab>(tabParam);

@@ -21,9 +21,15 @@ import {
 } from '../utils/conferenceManager';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
+import { useSEO } from '../utils/seo';
 import './CallsPage.css';
 
 export function ConferencesPage() {
+  useSEO({
+    title: 'Онлайн-конференции и стримы',
+    description: 'Интерактивные видеоконференции, закрытые клубы и эфиры в высоком качестве на платформе New Age Unity.',
+  });
+
   const navigate = useNavigate();
   const { currentUser: authUser, isAuthenticated, openAuthModal } = useAuth();
   const effectiveUser = authUser || currentUser;

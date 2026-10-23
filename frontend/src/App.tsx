@@ -35,7 +35,18 @@ import './styles/theme.css';
 import './App.css';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SplashIntro, shouldShowSplash } from './components/SplashIntro';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { trackPageView } from './utils/analytics';
+
+function GoogleAnalyticsTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    trackPageView(location.pathname + location.search);
+  }, [location.pathname, location.search]);
+
+  return null;
+}
 
 function AppContent() {
   const { isAuthModalOpen, closeAuthModal, authModalMode, isAuthenticated } = useAuth();
@@ -116,6 +127,7 @@ function App() {
   const [showSplash, setShowSplash] = useState(() => shouldShowSplash());
   return (
     <BrowserRouter>
+      <GoogleAnalyticsTracker />
       {showSplash && <SplashIntro onFinish={() => setShowSplash(false)} />}
       <LanguageProvider>
         <CurrencyProvider>

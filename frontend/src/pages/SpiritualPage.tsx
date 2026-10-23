@@ -25,6 +25,7 @@ import { KarmaTreeWidget } from '../components/KarmaTreeWidget';
 import { MasterBookingModal } from '../components/MasterBookingModal';
 import { ConsciousnessClassModal } from '../components/ConsciousnessClassModal';
 import { DailyHoroscopeSection } from '../components/DailyHoroscopeSection';
+import { useSEO } from '../utils/seo';
 import './SpiritualPage.css';
 
 type TabType = 'all' | 'horoscope' | 'meditation' | 'yoga' | 'affirmations' | 'breathing' | 'sounds' | 'wisdom' | 'courses' | 'tarot' | 'astrology' | 'calendar' | 'livezen' | 'consciousness';
@@ -200,6 +201,11 @@ export function SpiritualPage() {
 
   const currentPracticeCard = SPIRITUAL_PRACTICES_CARDS.find(c => c.id === activeTab);
   const CurrentPracticeIcon = currentPracticeCard ? currentPracticeCard.icon : Flower2;
+
+  useSEO({
+    title: currentPracticeCard ? `${currentPracticeCard.title} — Духовные практики` : 'Духовные практики, Астрология, Медитации',
+    description: currentPracticeCard ? currentPracticeCard.description : 'Комплексный раздел самопознания и духовного роста: астрология, Human Design, медитации, йога, таро, сакральный календарь на New Age Unity.',
+  });
 
   const handleTabChange = (newTab: TabType) => {
     if (newTab === 'all') {

@@ -9,6 +9,7 @@ import { UploadVideoModal } from '../components/UploadVideoModal';
 import { type Video } from '../data/mock';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useSEO } from '../utils/seo';
 import './VideoPage.css';
 
 type VideoCategoryTab = 'all' | 'streams' | 'videos' | 'movies' | 'series' | 'kids' | 'dev' | 'gaming' | 'music';
@@ -17,6 +18,11 @@ export const DEFAULT_VIDEOS: Video[] = [];
 
 
 export function VideoPage() {
+  useSEO({
+    title: 'Видео и трансляции',
+    description: 'Видео, лекции, сакральные стримы и образовательные материалы на платформе New Age Unity.',
+  });
+
   const { isAuthenticated, openAuthModal } = useAuth();
   const [videoList, setVideoList] = useState<Video[]>([]);
   const [isLoading, setIsLoading] = useState(true);

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { trackPageView } from './analytics';
 
 export interface SEOProps {
   title?: string;
@@ -100,6 +101,9 @@ export function useSEO({
     setMetaTag('name', 'twitter:description', description);
     setMetaTag('name', 'twitter:image', fullImage);
     setMetaTag('name', 'twitter:url', canonicalUrl);
+
+    // 6. Google Analytics 4 page view tracking
+    trackPageView(currentPath, finalTitle);
 
   }, [title, description, keywords, image, url, type, author, publishedTime, noindex]);
 }

@@ -31,6 +31,7 @@ import { ConsciousnessClassModal } from '../components/ConsciousnessClassModal';
 import { QrScannerModal } from '../components/QrScannerModal';
 import { BusinessAccountModal } from '../components/BusinessAccountModal';
 import { useCurrency } from '../context/CurrencyContext';
+import { useSEO } from '../utils/seo';
 import { 
   getStoredFollowingIds, 
   isUserFollowed, 
@@ -355,6 +356,13 @@ export function ProfilePage() {
 
   // For compatibility with legacy code expecting `user`
   const user: User = activeUser;
+
+  useSEO({
+    title: activeUser?.name ? `${activeUser.name} (@${activeUser.username || activeUser.id})` : 'Профиль пользователя',
+    description: activeUser?.bio || `Профиль пользователя ${activeUser?.name || ''} на платформе New Age Unity. Публикации, видео, подкасты и духовный путь.`,
+    image: activeUser?.avatar,
+    type: 'profile',
+  });
 
   const [followingIds, setFollowingIds] = useState<string[]>(() => getStoredFollowingIds(currentUser?.id));
   const [socialRevision, setSocialRevision] = useState(0);

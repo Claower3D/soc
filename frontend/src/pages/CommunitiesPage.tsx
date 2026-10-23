@@ -16,6 +16,7 @@ import { api } from '../api';
 import { CreateCommunityModal } from '../components/CreateCommunityModal';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
+import { useSEO } from '../utils/seo';
 import './CommunitiesPage.css';
 
 const CATEGORIES = [
@@ -30,6 +31,11 @@ const CATEGORIES = [
 ];
 
 export const CommunitiesPage: React.FC = () => {
+  useSEO({
+    title: 'Сообщества и клубы единомышленников',
+    description: 'Тематические клубы, группы по интересам, духовные и творческие сообщества на New Age Unity.',
+  });
+
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const [communities, setCommunities] = useState<Community[]>([]);
