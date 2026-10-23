@@ -12,6 +12,16 @@ import { api } from '../api';
 import { useAuth } from '../context/AuthContext';
 import './RetreatMapPage.css';
 
+const FAKE_RETREAT_IDS = new Set([
+  'ret_karaganda_yoga',
+  'ret_karaganda_mindful',
+  'ret_almaty_kolsai',
+  'ret_sochi_krasnaya',
+  'ret_bali_ubud',
+  'ret_altai_shambhala',
+  'ret_turkey_oludeniz'
+]);
+
 export interface RetreatItem {
   id: string;
   title: string;
@@ -145,10 +155,16 @@ export function RetreatMapPage() {
         lng: userLocation?.lng
       });
       if (res?.retreats) {
-        setRetreats(res.retreats);
-        // Выбираем первый ретрит по умолчанию, если ничего не выбрано
-        if (!selectedRetreat && res.retreats.length > 0) {
-          setSelectedRetreat(res.retreats[0]);
+        const realRetreats = res.retreats.filter((r: RetreatItem) => 
+          !FAKE_RETREAT_IDS.has(r.id) && 
+          !r.organizerId?.startsWith('u_aliya_') && 
+          !r.organizerId?.startsWith('u_karaganda_')
+        );
+        setRetreats(realRetreats);
+        if (!selectedRetreat && realRetreats.length > 0) {
+          setSelectedRetreat(realRetreats[0]);
+        } else if (realRetreats.length === 0) {
+          setSelectedRetreat(null);
         }
       }
     } catch (err) {
@@ -174,15 +190,33 @@ export function RetreatMapPage() {
 
   // Категории для фильтра
   const categories = useMemo(() => [
-    { id: 'all', title: 'Все', icon: '✨' },
-    { id: 'yoga', title: 'Йога', icon: '🧘' },
-    { id: 'meditation', title: 'Медитация', icon: '🌿' },
-    { id: 'art', title: 'Творчество', icon: '🎨' },
-    { id: 'soundhealing', title: 'Саундхилинг', icon: '🔔' },
-    { id: 'spiritual', title: 'Места силы', icon: '🏔' },
-    { id: 'vipassana', title: 'Випассана', icon: '🧘‍♀️' },
-    { id: 'nature', title: 'Природа', icon: '🌲' },
+    { id: 'all', title: 'Все' },
+    { id: 'yoga', title: 'Йога' },
+    { id: 'meditation', title: 'Медитация' },
+    { id: 'art', title: 'Творчество' },
+    { id: 'soundhealing', title: 'Саундхилинг' },
+    { id: 'spiritual', title: 'Места силы' },
+    { id: 'vipassana', title: 'Випассана' },
+    { id: 'nature', title: 'Природа' },
   ], []);
+
+  // Инвалидация размера карты при переключении табов и изменении размера окна
+  useEffect(() => {
+    const onResize = () => {
+      mapInstanceRef.current?.invalidateSize();
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    if (viewMode === 'map' && mapInstanceRef.current) {
+      const timer = setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [viewMode]);
 
   // Инициализация Leaflet карты
   useEffect(() => {
@@ -197,11 +231,16 @@ export function RetreatMapPage() {
       attributionControl: false
     });
 
-    // Светлый современный слой карты CartoDB Positron / OSM
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    // Надежный открытый слой OpenStreetMap без ограничений и ключей API
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      subdomains: 'abcd'
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
+
+    // Гарантированная перерисовка карты после загрузки
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
 
     const markersGroup = L.layerGroup().addTo(map);
     markersLayerRef.current = markersGroup;
@@ -523,7 +562,6 @@ export function RetreatMapPage() {
                   className={`category-pill ${selectedCategory === c.id ? 'active' : ''}`}
                   onClick={() => setSelectedCategory(c.id)}
                 >
-                  <span>{c.icon}</span>
                   <span>{c.title}</span>
                   <span className="category-count">{count}</span>
                 </button>
@@ -611,7 +649,7 @@ export function RetreatMapPage() {
                         </span>
                         {ret.distanceKm !== undefined && ret.distanceKm < 200 && (
                           <span className="distance-badge-chip">
-                            📍 Близко ({Math.round(ret.distanceKm)} км)
+                            Близко ({Math.round(ret.distanceKm)} км)
                           </span>
                         )}
                         <button
@@ -624,7 +662,7 @@ export function RetreatMapPage() {
 
                       <div className="thumb-bottom-info">
                         <span className="thumb-location-pill">
-                          📍 {ret.locationCity}
+                          {ret.locationCity}
                         </span>
                         <span className="thumb-price-pill">
                           {formatPrice(ret.price, ret.currency)}
@@ -648,7 +686,7 @@ export function RetreatMapPage() {
 
                       <div className="card-footer-meta">
                         <span className="date-badge">
-                          📅 {formatDateRange(ret.startDate, ret.endDate)}
+                          {formatDateRange(ret.startDate, ret.endDate)}
                         </span>
                         <span className="duration-badge">{ret.durationDays} дн.</span>
                       </div>
@@ -739,7 +777,7 @@ export function RetreatMapPage() {
                     <p>{ret.description.slice(0, 110)}...</p>
                     <div className="catalog-card-foot">
                       <strong>{formatPrice(ret.price, ret.currency)}</strong>
-                      <span>📍 {ret.locationCity}</span>
+                      <span>{ret.locationCity}</span>
                     </div>
                   </div>
                 </div>
@@ -771,7 +809,7 @@ export function RetreatMapPage() {
                   </div>
                   <div className="event-info-col">
                     <h4>{ret.title}</h4>
-                    <span className="event-place">📍 {ret.locationAddress}</span>
+                    <span className="event-place">{ret.locationAddress}</span>
                   </div>
                   <div className="event-price-col">
                     <strong>{formatPrice(ret.price, ret.currency)}</strong>
@@ -867,7 +905,7 @@ export function RetreatMapPage() {
                       <ChevronRight size={18} />
                     </button>
                     <div className="gallery-counter-badge">
-                      📷 {activePhotoIdx + 1}/{selectedRetreat.images.length} фото
+                      {activePhotoIdx + 1}/{selectedRetreat.images.length} фото
                     </div>
                   </>
                 )}
@@ -881,7 +919,7 @@ export function RetreatMapPage() {
                 </span>
                 <span className="drawer-badge-tag">{selectedRetreat.categoryTitle}</span>
                 {selectedRetreat.badge && (
-                  <span className="drawer-premium-tag">✨ {selectedRetreat.badge}</span>
+                  <span className="drawer-premium-tag"><Sparkles size={13} style={{ marginRight: 4 }} />{selectedRetreat.badge}</span>
                 )}
               </div>
 
@@ -924,7 +962,7 @@ export function RetreatMapPage() {
                     <span>Вы организатор этого ретрита</span>
                   </div>
                   <button className="view-bookings-btn" onClick={handleOpenBookingsList}>
-                    📋 Заявки на бронь ({selectedRetreat.bookedSpots})
+                    Заявки на бронь ({selectedRetreat.bookedSpots})
                   </button>
                 </div>
               )}
