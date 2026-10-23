@@ -422,6 +422,9 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 		return nil, fmt.Errorf("ошибка создания таблиц в БД: %w", err)
 	}
 
+	// Инициализация таблиц карты ретритов и онлайн-бронирования
+	_ = ensureRetreatsTables(conn)
+
 	// Очистка битых/осиротевших связей (если пользователь был удален)
 	_, _ = conn.Exec(`
 		DELETE FROM user_relationships 
@@ -1164,6 +1167,9 @@ func main() {
 	// Загрузка постоянных данных из дискового хранилища
 	store.loadFromDisk()
 
+	// Инициализация хранилища ретритов и очистка от любых тестовых заявок
+	initRetreatStore("data")
+
 	// Инициализация подключения к PostgreSQL (если предоставлена DATABASE_URL на Railway)
 	initDB()
 
@@ -1189,6 +1195,16 @@ func main() {
 	mux.HandleFunc("GET /api/communities", handleCommunities)
 	mux.HandleFunc("GET /api/wallet", handleWallet)
 	mux.HandleFunc("GET /api/admin/stats", handleAdminStats)
+
+	// Карта ретритов (Retreat Map PRO) и онлайн-бронирование
+	mux.HandleFunc("GET /api/retreats", handleGetRetreats)
+	mux.HandleFunc("GET /api/retreats/{id}", handleGetRetreatByID)
+	mux.HandleFunc("POST /api/retreats", handleCreateRetreat)
+	mux.HandleFunc("DELETE /api/retreats/{id}", handleDeleteRetreat)
+	mux.HandleFunc("POST /api/retreats/{id}/book", handleBookRetreat)
+	mux.HandleFunc("GET /api/retreats/{id}/bookings", handleGetRetreatBookings)
+	mux.HandleFunc("GET /api/my-bookings", handleGetMyBookings)
+	mux.HandleFunc("PUT /api/retreats/bookings/{id}/status", handleUpdateBookingStatus)
 
 	// Auth эндпоинты (JWT) с защитой от перебора (Rate Limiting: 15 запросов в минуту)
 	authLimiter := newIPRateLimiter(15, 1*time.Minute)

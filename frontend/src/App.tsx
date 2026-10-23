@@ -18,7 +18,7 @@ import { VideoEditorPage } from './pages/VideoEditorPage';
 import { WalletPage } from './pages/WalletPage';
 import { AdminPage } from './pages/AdminPage';
 import { SpiritualPage } from './pages/SpiritualPage';
-import { MusicPage } from './pages/MusicPage';
+import { RetreatMapPage } from './pages/RetreatMapPage';
 import { GamesPage } from './pages/GamesPage';
 import { FoodDeliveryPage } from './pages/FoodDeliveryPage';
 import { DatingPage } from './pages/DatingPage';
@@ -88,7 +88,8 @@ function AppContent() {
             <Route path="/conferences" element={<ConferencesPage />} />
             <Route path="/calls" element={<Navigate to="/conferences" replace />} />
             <Route path="/podcasts" element={<PodcastsPage />} />
-            <Route path="/music" element={<MusicPage />} />
+            <Route path="/retreats" element={<RetreatMapPage />} />
+            <Route path="/music" element={<Navigate to="/retreats" replace />} />
             <Route path="/games" element={<GamesPage />} />
             <Route path="/food" element={<FoodDeliveryPage />} />
             <Route path="/delivery" element={<Navigate to="/food" replace />} />

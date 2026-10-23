@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   ShoppingBag, Users, Film, Wallet, ShieldAlert, 
   ArrowRight, Sparkles, TrendingUp, Compass, Flower2,
-  Music, Gamepad2, UtensilsCrossed, HeartHandshake
+  Gamepad2, UtensilsCrossed, HeartHandshake, MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { GuestLockPrompt } from '../components/GuestLockPrompt';
@@ -33,15 +33,15 @@ const SERVICES: ServiceItem[] = [
     stats: '15 000+ анкет'
   },
   {
-    id: 'music',
-    title: 'Музыка и Плейлисты',
-    category: 'Аудио и Стриминг',
-    description: 'Миллионы треков, персональные рекомендации, горячие чарты, сакральные частоты 432 Гц и плейлисты фокуса.',
-    icon: Music,
-    route: '/music',
-    badge: 'Новинка',
-    colorGradient: 'linear-gradient(135deg, #EC4899, #8B5CF6)',
-    stats: '50 000+ треков'
+    id: 'retreats',
+    title: 'Карта ретритов',
+    category: 'Практики и Путешествия',
+    description: 'Интерактивная карта духовных заездов, йога-туров, саундхилинга и випассаны по всему миру с онлайн-бронированием мест.',
+    icon: MapPin,
+    route: '/retreats',
+    badge: 'PRO',
+    colorGradient: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+    stats: 'Ретриты мира'
   },
   {
     id: 'games',

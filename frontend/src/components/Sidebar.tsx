@@ -5,7 +5,7 @@ import {
   User as UserIcon, Tv, ShoppingBag, Users, Film, Wallet, ShieldAlert,
   ChevronDown, ChevronRight, Layers, ExternalLink,
   Flower2, Activity, Sunrise, Wind, Waves, BookOpen, Sparkles, GraduationCap, Lock,
-  Compass, Calendar as CalendarIcon, Bot, Brain, Music, Gamepad2, UtensilsCrossed, HeartHandshake
+  Compass, Calendar as CalendarIcon, Bot, Brain, Gamepad2, UtensilsCrossed, HeartHandshake, MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from '../context/LanguageContext';
@@ -79,9 +79,18 @@ export function Sidebar() {
           <span className="nav-label">{t('nav.video')}</span>
         </NavLink>
 
-        <NavLink to="/music" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Music className="nav-icon" size={19} />
-          <span className="nav-label">Музыка</span>
+        <NavLink to="/retreats" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <MapPin className="nav-icon" size={19} style={{ color: '#8b5cf6' }} />
+          <span className="nav-label">Карта ретритов</span>
+          <span className="nav-badge-hot" style={{
+            fontSize: '9px',
+            background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+            color: '#fff',
+            padding: '1px 5px',
+            borderRadius: '10px',
+            marginLeft: 'auto',
+            fontWeight: 800
+          }}>PRO</span>
         </NavLink>
 
         <NavLink to="/dating" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>

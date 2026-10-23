@@ -994,3 +994,65 @@ CREATE TABLE IF NOT EXISTS client_cache_sync (
 
 CREATE INDEX IF NOT EXISTS idx_cache_sync_user ON client_cache_sync(user_id);
 
+-- =============================================================================
+-- 14. КАРТА РЕТРИТОВ И БРОНИРОВАНИЕ (RETREATS & BOOKINGS)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS retreats (
+    id VARCHAR(64) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    organizer_id VARCHAR(64) NOT NULL,
+    organizer_name VARCHAR(255) DEFAULT '',
+    organizer_avatar TEXT DEFAULT '',
+    organizer_title VARCHAR(255) DEFAULT '',
+    organizer_verified BOOLEAN DEFAULT FALSE,
+    category VARCHAR(100) DEFAULT 'yoga',
+    category_title VARCHAR(100) DEFAULT 'Йога & Пранаяма',
+    badge VARCHAR(100) DEFAULT '',
+    status VARCHAR(30) DEFAULT 'upcoming',
+    location_city VARCHAR(150) DEFAULT '',
+    location_address TEXT DEFAULT '',
+    country VARCHAR(100) DEFAULT '',
+    latitude DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    longitude DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+    price NUMERIC(12, 2) DEFAULT 0,
+    currency VARCHAR(10) DEFAULT 'KZT',
+    duration_days INT DEFAULT 2,
+    start_date VARCHAR(50) DEFAULT '',
+    end_date VARCHAR(50) DEFAULT '',
+    rating NUMERIC(3, 2) DEFAULT 4.95,
+    reviews_count INT DEFAULT 0,
+    images JSONB DEFAULT '[]'::jsonb,
+    cover_image TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    program TEXT DEFAULT '',
+    included TEXT DEFAULT '',
+    max_spots INT DEFAULT 15,
+    booked_spots INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_retreats_category ON retreats(category);
+CREATE INDEX IF NOT EXISTS idx_retreats_status ON retreats(status);
+CREATE INDEX IF NOT EXISTS idx_retreats_city ON retreats(location_city);
+CREATE INDEX IF NOT EXISTS idx_retreats_geo ON retreats(latitude, longitude);
+
+CREATE TABLE IF NOT EXISTS retreat_bookings (
+    id VARCHAR(64) PRIMARY KEY,
+    retreat_id VARCHAR(64) NOT NULL,
+    user_id VARCHAR(64) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    phone VARCHAR(50) NOT NULL,
+    email VARCHAR(255) DEFAULT '',
+    seats_count INT DEFAULT 1,
+    comment TEXT DEFAULT '',
+    total_price NUMERIC(12, 2) DEFAULT 0,
+    currency VARCHAR(10) DEFAULT 'KZT',
+    status VARCHAR(30) DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_retreat_bookings_retreat ON retreat_bookings(retreat_id);
+CREATE INDEX IF NOT EXISTS idx_retreat_bookings_user ON retreat_bookings(user_id);
+

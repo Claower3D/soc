@@ -426,5 +426,28 @@ export const api = {
     delete: (id: string) => apiFetch<any>(`/api/notifications/${id}`, { method: 'DELETE' }),
     clearAll: () => apiFetch<any>('/api/notifications', { method: 'DELETE' }),
     sendTest: (type?: string) => apiFetch<any>('/api/notifications/test', { method: 'POST', body: JSON.stringify({ type }) })
+  },
+  retreats: {
+    list: (params?: { q?: string; category?: string; status?: string; sort?: string; radius?: string; lat?: number; lng?: number }) => {
+      const searchParams = new URLSearchParams();
+      if (params?.q) searchParams.set('q', params.q);
+      if (params?.category) searchParams.set('category', params.category);
+      if (params?.status) searchParams.set('status', params.status);
+      if (params?.sort) searchParams.set('sort', params.sort);
+      if (params?.radius) searchParams.set('radius', params.radius);
+      if (params?.lat !== undefined) searchParams.set('lat', String(params.lat));
+      if (params?.lng !== undefined) searchParams.set('lng', String(params.lng));
+      const qs = searchParams.toString();
+      return apiFetch<any>(`/api/retreats${qs ? `?${qs}` : ''}`);
+    },
+    get: (id: string) => apiFetch<any>(`/api/retreats/${id}`),
+    create: (data: any) => apiFetch<any>('/api/retreats', { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id: string) => apiFetch<any>(`/api/retreats/${id}`, { method: 'DELETE' }),
+    book: (retreatId: string, data: { fullName: string; phone: string; email?: string; seatsCount?: number; comment?: string }) =>
+      apiFetch<any>(`/api/retreats/${retreatId}/book`, { method: 'POST', body: JSON.stringify(data) }),
+    bookings: (retreatId: string) => apiFetch<any>(`/api/retreats/${retreatId}/bookings`),
+    myBookings: () => apiFetch<any>('/api/my-bookings'),
+    updateBookingStatus: (bookingId: string, status: string) =>
+      apiFetch<any>(`/api/retreats/bookings/${bookingId}/status`, { method: 'PUT', body: JSON.stringify({ status }) })
   }
 };
