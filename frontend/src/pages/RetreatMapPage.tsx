@@ -430,19 +430,6 @@ export function RetreatMapPage() {
       ========================================================================= */}
       <header className="retreat-map-header">
         <div className="retreat-header-left">
-          <div className="retreat-logo-badge">
-            <div className="retreat-logo-icon">M</div>
-            <div className="retreat-logo-info">
-              <div className="retreat-logo-title-row">
-                <span className="retreat-logo-text">Retreat Map</span>
-                <span className="retreat-pro-pill">PRO</span>
-              </div>
-              <span className="retreat-online-status">
-                <span className="online-green-dot" /> {retreats.length} ретритов онлайн
-              </span>
-            </div>
-          </div>
-
           {/* Быстрый поиск в шапке */}
           <div className="retreat-header-search-wrap">
             <Search size={16} className="header-search-icon" />
@@ -495,15 +482,6 @@ export function RetreatMapPage() {
             <Plus size={16} />
             <span>Создать ретрит</span>
           </button>
-
-          {currentUser?.avatar && (
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.name}
-              className="retreat-user-avatar"
-              onClick={() => navigate(`/profile/@${currentUser.username}`)}
-            />
-          )}
         </div>
       </header>
 
