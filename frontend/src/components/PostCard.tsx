@@ -1,3 +1,4 @@
+import { SharePostModal } from './SharePostModal';
 import { createPortal } from 'react-dom';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -34,6 +35,7 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
   const [location, setLocation] = useState(post.location || post.user?.location || '');
   // Menu and Modals state
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -100,29 +102,6 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
   const getPostUrl = () => {
     const origin = window.location.origin;
     return `${origin}/post/${post.id}`;
-  };
-  const handleShareNative = async (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const url = getPostUrl();
-    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-    if (isMobile && navigator.share) {
-      try {
-        await navigator.share({
-          title: `Публикация от @${post.user.username}`,
-          text: caption || 'Посмотрите публикацию в New Age Unity',
-          url: url,
-        });
-        return;
-      } catch (_) {}
-    }
-    if (navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(url);
-        showToast('Ссылка на публикацию скопирована');
-        return;
-      } catch (_) {}
-    }
-    showToast('Ссылка на публикацию скопирована');
   };
   const handleCopyLink = () => {
     const url = getPostUrl();
@@ -414,7 +393,7 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
                       className="post-dropdown-item" 
                       onClick={() => {
                         setShowMoreMenu(false);
-                        handleShareNative();
+                        setShowShareModal(true);
                       }}
                     >
                       <div className="post-dropdown-icon">
@@ -502,7 +481,7 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
                       className="post-dropdown-item" 
                       onClick={() => {
                         setShowMoreMenu(false);
-                        handleShareNative();
+                        setShowShareModal(true);
                       }}
                     >
                       <div className="post-dropdown-icon">
@@ -660,7 +639,11 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
             >
               <MessageCircle size={22} />
             </button>
-            <button className="action-btn" onClick={handleShareNative} title="Поделиться публикацией">
+            <button 
+              className="action-btn" 
+              onClick={() => setShowShareModal(true)} 
+              title="Поделиться публикацией"
+            >
               <Send size={22} />
             </button>
           </div>
@@ -1082,6 +1065,12 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
         </>,
         document.body
       )}
+          <SharePostModal 
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        post={post}
+        onToast={showToast}
+      />
     </article>
   );
 }

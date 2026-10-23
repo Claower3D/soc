@@ -1,8 +1,9 @@
+import { SharePostModal } from './SharePostModal';
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   X, Heart, MessageCircle, Send, Bookmark, 
-  Trash2, Reply, Smile, Check, MapPin, Headphones 
+  Trash2, Reply, Smile, MapPin, Headphones 
 } from 'lucide-react';
 import { type Post, type Comment } from '../data/mock';
 import { useAuth } from '../context/AuthContext';
@@ -28,9 +29,9 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
   const [comments, setComments] = useState<Comment[]>(post?.comments || []);
   const [likedComments, setLikedComments] = useState<Record<string, { liked: boolean; count: number }>>({});
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [saved, setSaved] = useState(post?.saved ?? false);
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+    const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
@@ -166,11 +167,7 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
     inputRef.current?.focus();
   };
 
-  const handleShare = () => {
-    navigator.clipboard?.writeText(window.location.href);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-  };
+
 
   const hasMedia = Boolean(post.image && post.image.trim() !== '');
 
@@ -404,10 +401,10 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
 
               <button 
                 className="modal-tool-btn" 
-                onClick={handleShare}
+                onClick={() => setShowShareModal(true)}
                 title="Поделиться"
               >
-                {copiedLink ? <Check size={24} color="#10B981" /> : <Send size={24} />}
+                <Send size={24} />
               </button>
             </div>
 
@@ -539,6 +536,13 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
             </div>
           </div>
         </div>
+      )}
+      {post && (
+        <SharePostModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          post={post}
+        />
       )}
     </div>
   );
