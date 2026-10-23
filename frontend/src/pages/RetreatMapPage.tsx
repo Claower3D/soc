@@ -476,25 +476,6 @@ export function RetreatMapPage() {
           ВЕРХНЯЯ ШАПКА RETREAT MAP PRO
       ========================================================================= */}
       <header className="retreat-map-header">
-        <div className="retreat-header-left">
-          {/* Быстрый поиск в шапке */}
-          <div className="retreat-header-search-wrap">
-            <Search size={16} className="header-search-icon" />
-            <input
-              type="text"
-              placeholder="Поиск по локации, стилю или дате..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="retreat-header-search-input"
-            />
-            {searchQuery && (
-              <button className="clear-search-btn" onClick={() => setSearchQuery('')}>
-                <X size={14} />
-              </button>
-            )}
-          </div>
-        </div>
-
         {/* Переключатель режимов просмотра */}
         <div className="retreat-view-toggle-bar">
           <button
