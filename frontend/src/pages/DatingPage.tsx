@@ -411,73 +411,181 @@ export const DatingPage: React.FC = () => {
 
   return (
     <div className="dating-page-container">
-      {/* Top Hero Banner */}
-      <div className="dating-hero-banner">
-        <div className="dating-hero-glow" />
-        <div className="dating-hero-content">
-          <div className="dating-hero-badge">
-            <Sparkles size={14} />
-            <span>Новый Модуль • Духовный Резонанс & Знакомства</span>
+      {/* Sleek Modern Top Header */}
+      <header className="dating-header-premium">
+        <div className="dating-header-brand">
+          <div className="dating-brand-badge">
+            <Sparkles size={13} className="sparkle-gold" />
+            <span>Духовный резонанс</span>
           </div>
-          <h1 className="dating-hero-title">New Age Знакомства</h1>
-          <p className="dating-hero-desc">
-            Найдите вторую половинку для создания семьи, верных друзей по интересам или односознавцев и однодуховцев для совместного пути и практик.
-          </p>
-
-          <div className="dating-hero-actions">
-            <button 
-              className="btn-create-my-profile"
-              onClick={() => setIsEditProfileOpen(true)}
-            >
-              <Edit3 size={16} />
-              <span>{myProfile ? 'Редактировать мою анкету' : 'Создать свою анкету'}</span>
-            </button>
-            {myProfile && (
-              <span className="my-profile-status-pill">
-                <Check size={14} />
-                <span>Анкета активна ({myProfile.name})</span>
-              </span>
-            )}
+          <div className="dating-title-wrap">
+            <h1 className="dating-page-title">Знакомства</h1>
+            <span className="dating-title-sub">Осознанные пары, единомышленники и совместные практики</span>
           </div>
         </div>
-      </div>
 
-      {/* Main View Mode Tabs (Лента / Сетка / Мэтчи / Моя анкета) */}
-      <div className="dating-nav-bar">
-        <div className="dating-modes-group">
+        <div className="dating-header-actions">
+          {myProfile ? (
+            <div 
+              className="dating-my-profile-badge" 
+              onClick={() => setIsEditProfileOpen(true)}
+              role="button"
+              tabIndex={0}
+              title="Редактировать анкету"
+            >
+              <div className="profile-badge-avatar">
+                <img src={myProfile.photos[0] || myProfile.avatar} alt={myProfile.name} />
+                <span className="profile-badge-online-dot" />
+              </div>
+              <div className="profile-badge-text">
+                <span className="profile-badge-name">{myProfile.name}</span>
+                <span className="profile-badge-status">
+                  <Check size={11} /> Анкета активна
+                </span>
+              </div>
+              <button 
+                className="btn-profile-edit-mini"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsEditProfileOpen(true);
+                }}
+                title="Редактировать анкету"
+              >
+                <Edit3 size={13} />
+              </button>
+            </div>
+          ) : (
+            <button 
+              className="btn-create-my-profile-premium"
+              onClick={() => setIsEditProfileOpen(true)}
+            >
+              <Edit3 size={15} />
+              <span>Создать анкету</span>
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Unified Modern Control Bar: Segmented Tabs + Quick Filters */}
+      <div className="dating-control-bar">
+        <div className="dating-segmented-tabs">
           <button 
-            className={`dating-mode-btn ${viewMode === 'feed' ? 'active' : ''}`}
+            className={`dating-tab-pill ${viewMode === 'feed' ? 'active' : ''}`}
             onClick={() => setViewMode('feed')}
           >
-            <Sparkles size={16} />
-            <span>Лента знакомств</span>
+            <Sparkles size={15} />
+            <span>Лента</span>
           </button>
 
           <button 
-            className={`dating-mode-btn ${viewMode === 'grid' ? 'active' : ''}`}
+            className={`dating-tab-pill ${viewMode === 'grid' ? 'active' : ''}`}
             onClick={() => setViewMode('grid')}
           >
-            <Users size={16} />
-            <span>Каталог анкет ({filteredProfiles.length})</span>
+            <Users size={15} />
+            <span>Каталог <span className="tab-count-badge">{filteredProfiles.length}</span></span>
           </button>
 
           <button 
-            className={`dating-mode-btn ${viewMode === 'matches' ? 'active' : ''}`}
+            className={`dating-tab-pill ${viewMode === 'matches' ? 'active' : ''}`}
             onClick={() => setViewMode('matches')}
           >
-            <Heart size={16} />
-            <span>Симпатии ({likedIds.length})</span>
+            <Heart size={15} />
+            <span>Симпатии <span className="tab-count-badge">{likedIds.length}</span></span>
           </button>
 
           {myProfile && (
             <button 
-              className={`dating-mode-btn ${viewMode === 'my_profile' ? 'active' : ''}`}
+              className={`dating-tab-pill ${viewMode === 'my_profile' ? 'active' : ''}`}
               onClick={() => setViewMode('my_profile')}
             >
               <span>Моя анкета</span>
             </button>
           )}
         </div>
+
+        <div className="dating-bar-tools">
+          <div className="dating-quick-search">
+            <Search size={14} className="search-icon" />
+            <input 
+              type="text"
+              value={searchQuery}
+              onChange={e => {
+                setSearchQuery(e.target.value);
+                setCurrentSwipeIndex(0);
+              }}
+              placeholder="Поиск по интересам, городу..."
+              className="quick-search-input"
+            />
+            {searchQuery && (
+              <button className="quick-search-clear" onClick={() => setSearchQuery('')}>
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          <div className="dating-quick-dropdowns">
+            <select 
+              value={genderFilter} 
+              onChange={e => {
+                setGenderFilter(e.target.value as any);
+                setCurrentSwipeIndex(0);
+              }}
+              className="premium-filter-select"
+            >
+              <option value="all">Пол: Все</option>
+              <option value="female">Девушки</option>
+              <option value="male">Парни</option>
+            </select>
+
+            <select 
+              value={selectedCity} 
+              onChange={e => {
+                setSelectedCity(e.target.value);
+                setCurrentSwipeIndex(0);
+              }}
+              className="premium-filter-select"
+            >
+              <option value="all">Все города</option>
+              {uniqueCities.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
+            <button 
+              className={`btn-toggle-filters-premium ${isFiltersOpen ? 'active' : ''}`}
+              onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+            >
+              <Filter size={14} />
+              <span>Фильтры</span>
+              {activeFiltersCount > 0 && (
+                <span className="premium-filter-count">{activeFiltersCount}</span>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Goals Filter Strip */}
+      <div className="dating-quick-goals-strip">
+        <button
+          className={`quick-goal-pill ${selectedGoalFilter === 'all' ? 'active' : ''}`}
+          onClick={() => { setSelectedGoalFilter('all'); setCurrentSwipeIndex(0); }}
+        >
+          <span>✨ Все цели</span>
+        </button>
+        {DATING_GOALS.map(goal => (
+          <button
+            key={goal.id}
+            className={`quick-goal-pill ${selectedGoalFilter === goal.id ? 'active' : ''}`}
+            onClick={() => { 
+              setSelectedGoalFilter(selectedGoalFilter === goal.id ? 'all' : goal.id); 
+              setCurrentSwipeIndex(0); 
+            }}
+          >
+            <span>{goal.icon}</span>
+            <span>{goal.shortLabel}</span>
+          </button>
+        ))}
       </div>
 
       {/* Collapsible / Expandable Advanced Filter Panel */}
@@ -725,68 +833,6 @@ export const DatingPage: React.FC = () => {
         </div>
       )}
 
-      {/* Secondary Search and Quick Dropdowns */}
-      <div className="dating-filters-bar">
-        <div className="dating-search-box">
-          <Search size={16} className="search-icon" />
-          <input 
-            type="text"
-            value={searchQuery}
-            onChange={e => {
-              setSearchQuery(e.target.value);
-              setCurrentSwipeIndex(0);
-            }}
-            placeholder="Поиск по имени, городу, увлечениям..."
-            className="dating-search-input"
-          />
-          {searchQuery && (
-            <button className="search-clear-btn" onClick={() => setSearchQuery('')}>
-              <X size={14} />
-            </button>
-          )}
-        </div>
-
-        <div className="filter-selects-row">
-          <button 
-            className={`quick-filter-toggle-btn ${isFiltersOpen ? 'open' : ''}`}
-            onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-          >
-            <Filter size={15} />
-            <span>{isFiltersOpen ? 'Скрыть параметры' : 'Параметры фильтра'}</span>
-            {activeFiltersCount > 0 && (
-              <span className="quick-filter-badge">{activeFiltersCount}</span>
-            )}
-          </button>
-
-          <select 
-            value={genderFilter} 
-            onChange={e => {
-              setGenderFilter(e.target.value as any);
-              setCurrentSwipeIndex(0);
-            }}
-            className="filter-dropdown"
-          >
-            <option value="all">Любой пол</option>
-            <option value="female">Девушки</option>
-            <option value="male">Парни</option>
-          </select>
-
-          <select 
-            value={selectedCity} 
-            onChange={e => {
-              setSelectedCity(e.target.value);
-              setCurrentSwipeIndex(0);
-            }}
-            className="filter-dropdown"
-          >
-            <option value="all">Все города</option>
-            {uniqueCities.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
       {/* ========================================================================= */}
       {/* MODE 1: SWIPE FEED (ЛЕНТА ОДНОЙ КАРТОЧКИ С 3D КОЛОДОЙ) */}
       {/* ========================================================================= */}
@@ -935,8 +981,19 @@ export const DatingPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Swipe Action Controls (Pass, Like, Inspect) with Cooldown */}
+                {/* Swipe Action Controls: 4 tactile luxury buttons */}
                 <div className={`swipe-controls-bar ${isSwiping ? 'controls-locked' : ''}`}>
+                  <button 
+                    type="button" 
+                    className="swipe-btn prev" 
+                    onClick={triggerSwipePrev}
+                    disabled={isSwiping}
+                    title="Вернуться назад"
+                  >
+                    <RotateCcw size={18} />
+                    <span>Назад</span>
+                  </button>
+
                   <button 
                     type="button" 
                     className={`swipe-btn pass ${isSwiping && swipeAnim === 'pass' ? 'btn-animating' : ''}`} 
@@ -944,8 +1001,8 @@ export const DatingPage: React.FC = () => {
                     disabled={isSwiping}
                     title="Пропустить анкету (стрелка влево)"
                   >
-                    <RotateCcw size={22} className={isSwiping && swipeAnim === 'pass' ? 'spin-fast' : ''} />
-                    <span>Пропустить</span>
+                    <X size={24} />
+                    <span>Пропуск</span>
                   </button>
 
                   <button 
@@ -956,7 +1013,7 @@ export const DatingPage: React.FC = () => {
                     title="Открыть полную анкету (стрелка вверх)"
                   >
                     <ChevronRight size={22} />
-                    <span>Подробнее</span>
+                    <span>Анкета</span>
                   </button>
 
                   <button 
@@ -966,8 +1023,8 @@ export const DatingPage: React.FC = () => {
                     disabled={isSwiping}
                     title="Поставить лайк (стрелка вправо)"
                   >
-                    <Heart size={24} className={likedIds.includes(activeSwipeCard.id) ? 'fill-current' : ''} />
-                    <span>{likedIds.includes(activeSwipeCard.id) ? 'Понравилось' : 'Лайк'}</span>
+                    <Heart size={26} className={likedIds.includes(activeSwipeCard.id) ? 'fill-current' : ''} />
+                    <span>{likedIds.includes(activeSwipeCard.id) ? 'Взаимно' : 'Лайк'}</span>
                   </button>
                 </div>
 
