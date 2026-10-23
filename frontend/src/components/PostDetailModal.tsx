@@ -181,14 +181,26 @@ export function PostDetailModal({ post, onClose, onLikePost, onUpdatePost, onDel
 
         {/* Left Side: Photo / Video */}
         {hasMedia && (
-          <div className="post-modal-media-col">
+          <div className="post-modal-media-col" draggable={false} onContextMenu={(e) => e.preventDefault()}>
             {(post.image && (post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/'))) || post.videoUrl ? (
-              <video src={post.videoUrl || post.image} controls autoPlay playsInline className="post-modal-photo" />
+              <video 
+                src={post.videoUrl || post.image} 
+                controls 
+                autoPlay 
+                playsInline 
+                className="post-modal-photo" 
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
+                onContextMenu={(e) => e.preventDefault()}
+              />
             ) : (
               <img 
                 src={post.image} 
                 alt={post.caption || 'Публикация'} 
                 className="post-modal-photo" 
+                draggable={false}
+                onDragStart={(e) => e.preventDefault()}
+                onContextMenu={(e) => e.preventDefault()}
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).style.display = 'none';
                 }}

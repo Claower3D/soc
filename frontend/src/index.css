@@ -14,3 +14,67 @@
 #root {
   min-height: 100vh;
 }
+
+/* =========================================================================
+   ЗАЩИТА ОТ ВЫДЕЛЕНИЯ МЕДИА И СИНЕЙ ПОДСВЕТКИ ПРИ НАЖАТИИ (ANDROID / IOS / WEB)
+   ========================================================================= */
+
+/* Убирает синюю подсветку при клике/тапе на телефонах */
+*,
+*::before,
+*::after {
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0) !important;
+}
+
+/* Полный запрет выделения и контекстного копирования для картинок, видео и медиа-контейнеров */
+img,
+video,
+canvas,
+picture,
+svg,
+.post-image,
+.post-image-container,
+.post-modal-photo,
+.post-modal-media-col,
+.card-thumb-img,
+.card-thumb-wrap,
+.gallery-main-img,
+.clip-video-player,
+.story-image,
+.avatar-img {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  -khtml-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+}
+
+/* Полное отключение синего фона выделения ::selection на медиа-элементах */
+img::selection,
+video::selection,
+canvas::selection,
+picture::selection,
+svg::selection,
+.post-image::selection,
+.post-image-container::selection,
+.post-modal-photo::selection,
+.post-modal-media-col::selection {
+  background: transparent !important;
+  color: inherit !important;
+}
+
+img::-moz-selection,
+video::-moz-selection,
+canvas::-moz-selection,
+picture::-moz-selection,
+svg::-moz-selection,
+.post-image::-moz-selection,
+.post-image-container::-moz-selection,
+.post-modal-photo::-moz-selection,
+.post-modal-media-col::-moz-selection {
+  background: transparent !important;
+  color: inherit !important;
+}

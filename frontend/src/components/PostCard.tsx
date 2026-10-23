@@ -589,14 +589,27 @@ export function PostCard({ post, onLike, onOpenModal, onDeletePost, onUpdatePost
           className="post-image-container"
           onClick={() => onOpenModal && onOpenModal(post)}
           onDoubleClick={handleDoubleClick}
+          draggable={false}
+          onDragStart={(e) => e.preventDefault()}
+          onContextMenu={(e) => e.preventDefault()}
         >
           {post.image.startsWith('data:video') || post.image.endsWith('.mp4') || post.image.includes('/videos/') || post.videoUrl ? (
-            <video src={post.videoUrl || post.image} controls className="post-image" />
+            <video 
+              src={post.videoUrl || post.image} 
+              controls 
+              className="post-image" 
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()}
+              onContextMenu={(e) => e.preventDefault()}
+            />
           ) : (
             <img 
               src={post.image} 
               alt={caption} 
               className="post-image" 
+              draggable={false}
+              onDragStart={(e) => e.preventDefault()}
+              onContextMenu={(e) => e.preventDefault()}
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = 'none';
               }}
