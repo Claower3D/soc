@@ -87,7 +87,7 @@ export function RetreatMapPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedRadius, setSelectedRadius] = useState<string>('all'); // 50, 100, 500, all
   const [sortBy, setSortBy] = useState<'nearby' | 'date' | 'rating' | 'price_asc' | 'price_desc'>('nearby');
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number }>({ lat: 49.8028, lng: 73.0877 });
 
   // Качественная расширенная фильтрация
   const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState(false);
@@ -117,6 +117,7 @@ export function RetreatMapPage() {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const radiusLayerRef = useRef<L.LayerGroup | null>(null);
 
   // Форма бронирования
   const [bookForm, setBookForm] = useState({
@@ -291,6 +292,8 @@ export function RetreatMapPage() {
 
     const markersGroup = L.layerGroup().addTo(map);
     markersLayerRef.current = markersGroup;
+    const radiusGroup = L.layerGroup().addTo(map);
+    radiusLayerRef.current = radiusGroup;
     mapInstanceRef.current = map;
 
     return () => {
@@ -351,11 +354,83 @@ export function RetreatMapPage() {
       markersGroup.addLayer(marker);
     });
 
-    // При первой загрузке или выборе региона центрируем карту
-    if (bounds.isValid() && selectedRadius !== 'all') {
+    // При загрузке без ограничения радиуса центрируем по меткам
+    if (bounds.isValid() && selectedRadius === 'all') {
       map.fitBounds(bounds, { padding: [50, 50], maxZoom: 13 });
     }
   }, [retreats, selectedRetreat, selectedRadius]);
+
+  // Перемещение центра округа кликом по карте
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    const onMapClick = (e: L.LeafletMouseEvent) => {
+      if (selectedRadius !== 'all') {
+        setUserLocation({ lat: e.latlng.lat, lng: e.latlng.lng });
+      }
+    };
+
+    map.on('click', onMapClick);
+    return () => {
+      map.off('click', onMapClick);
+    };
+  }, [selectedRadius]);
+
+  // Отрисовка визуального круга радиуса поиска (Округ) на карте
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const radiusGroup = radiusLayerRef.current;
+    if (!map || !radiusGroup) return;
+
+    radiusGroup.clearLayers();
+
+    if (selectedRadius === 'all') return;
+
+    const radiusKm = parseFloat(selectedRadius);
+    if (!radiusKm || isNaN(radiusKm)) return;
+
+    const center: [number, number] = [userLocation.lat, userLocation.lng];
+    const radiusMeters = radiusKm * 1000;
+
+    // Круг радиуса с подсветкой и пунктирной границей
+    const circle = L.circle(center, {
+      radius: radiusMeters,
+      color: '#4F46E5',
+      weight: 2.5,
+      dashArray: '7, 9',
+      fillColor: '#6366F1',
+      fillOpacity: 0.12
+    });
+
+    circle.bindTooltip(`Округ: ${radiusKm} км`, {
+      permanent: true,
+      direction: 'top',
+      className: 'radius-circle-tooltip'
+    });
+
+    // Маркер центра поиска округа
+    const centerIcon = L.divIcon({
+      className: 'radius-center-div-icon',
+      html: `
+        <div class="radius-center-pin" title="Центр округа (${radiusKm} км). Нажмите в любое место карты, чтобы переместить">
+          <div class="radius-pulse-ring"></div>
+          <div class="radius-center-dot"></div>
+          <div class="radius-center-label">Округ ${radiusKm} км</div>
+        </div>
+      `,
+      iconSize: [120, 36],
+      iconAnchor: [60, 18]
+    });
+
+    const centerMarker = L.marker(center, { icon: centerIcon });
+
+    radiusGroup.addLayer(circle);
+    radiusGroup.addLayer(centerMarker);
+
+    // Центрируем и масштабируем карту, чтобы круг полностью влез в экран
+    map.fitBounds(circle.getBounds(), { padding: [40, 40], maxZoom: 12 });
+  }, [selectedRadius, userLocation]);
 
   // Центрирование карты на выбранном ретрите
   const handleCenterOnRetreat = (ret: RetreatItem) => {
@@ -574,6 +649,7 @@ export function RetreatMapPage() {
                     {[
                       { id: '50', label: '50 км' },
                       { id: '100', label: '100 км' },
+                      { id: '250', label: '250 км' },
                       { id: '500', label: '500 км' },
                       { id: 'all', label: 'Весь мир' }
                     ].map((r) => (
@@ -869,6 +945,30 @@ export function RetreatMapPage() {
         {/* ЦЕНТРАЛЬНАЯ КАРТА */}
         <section className={`retreat-map-stage ${viewMode !== 'map' ? 'hidden' : ''}`}>
           <div ref={mapContainerRef} className="leaflet-map-canvas" />
+
+          {/* Плавающий переключатель радиуса округа на карте */}
+          <div className="map-floating-radius-widget">
+            <div className="floating-radius-label">
+              <Compass size={14} color="#4F46E5" />
+              <span>Округ:</span>
+            </div>
+            {[
+              { id: '50', label: '50 км' },
+              { id: '100', label: '100 км' },
+              { id: '250', label: '250 км' },
+              { id: '500', label: '500 км' },
+              { id: 'all', label: 'Весь мир' }
+            ].map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                className={`floating-radius-btn ${selectedRadius === r.id ? 'active' : ''}`}
+                onClick={() => setSelectedRadius(r.id)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
 
           {/* Плавающий информер в левом нижнем углу карты */}
           <div className="map-floating-status-pill">

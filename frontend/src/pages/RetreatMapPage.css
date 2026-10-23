@@ -2449,3 +2449,139 @@
   font-size: 0.85rem;
   font-weight: 600;
 }
+
+/* =========================================================================
+   ВИЗУАЛЬНЫЙ РАДИУС ОКРУГА НА КАРТЕ
+   ========================================================================= */
+.radius-center-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.radius-center-pin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.radius-center-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #4F46E5;
+  border: 2.5px solid #FFFFFF;
+  box-shadow: 0 0 10px rgba(79, 70, 229, 0.7);
+  z-index: 2;
+}
+
+.radius-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.4);
+  animation: radiusPulse 2s infinite ease-out;
+  z-index: 1;
+}
+
+@keyframes radiusPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+}
+
+.radius-center-label {
+  margin-top: 4px;
+  background: rgba(15, 23, 42, 0.88);
+  color: #FFFFFF;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(4px);
+  z-index: 3;
+}
+
+/* Тултип границы круга */
+.radius-circle-tooltip {
+  background: #4F46E5 !important;
+  color: #FFFFFF !important;
+  border: none !important;
+  border-radius: 999px !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  padding: 3px 9px !important;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.4) !important;
+}
+
+.radius-circle-tooltip::before {
+  border-top-color: #4F46E5 !important;
+}
+
+/* Плавающий переключатель радиуса округа на самой карте */
+.map-floating-radius-widget {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  padding: 0.3rem 0.5rem;
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  max-width: calc(100% - 28px);
+  overflow-x: auto;
+}
+
+.floating-radius-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #475569;
+  padding: 0 0.4rem 0 0.2rem;
+  flex-shrink: 0;
+}
+
+.floating-radius-btn {
+  border: none;
+  background: transparent;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.floating-radius-btn:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+.floating-radius-btn.active {
+  background: #4F46E5;
+  color: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.35);
+}
