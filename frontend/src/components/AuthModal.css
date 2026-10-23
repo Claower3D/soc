@@ -656,9 +656,9 @@
 }
 
 .religion-card.selected {
-  border-color: #F59E0B;
-  background: #FFFBEB;
-  box-shadow: 0 0 0 1.5px rgba(245, 158, 11, 0.3);
+  border-color: #6366F1;
+  background: rgba(99, 102, 241, 0.07);
+  box-shadow: 0 0 0 1.5px rgba(99, 102, 241, 0.3);
 }
 
 .religion-symbol-frame {
@@ -666,12 +666,12 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: #080C1C;
+  background: #EEF2FF;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 0.35rem;
-  border: 1.5px solid #F59E0B;
+  border: 1.5px solid rgba(99, 102, 241, 0.35);
   overflow: hidden;
 }
 

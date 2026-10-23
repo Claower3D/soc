@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="128" height="128">
 <defs>
-<radialGradient id="bg" cx="50%" cy="42%" r="72%"><stop offset="0" stop-color="#262C52"/><stop offset="1" stop-color="#080C1C"/></radialGradient>
-<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="10" x2="0" y2="54"><stop offset="0" stop-color="#FFF1BF"/><stop offset=".45" stop-color="#F7C04A"/><stop offset="1" stop-color="#B9770C"/></linearGradient>
-<filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.4" result="b"/><feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 .75 0 0 0  0 0 .2 0 0  0 0 0 .7 0" result="c"/><feMerge><feMergeNode in="c"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F5F3FF"/><stop offset="1" stop-color="#E0E7FF"/></linearGradient>
+<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="12" y1="10" x2="52" y2="54"><stop offset="0" stop-color="#6366F1"/><stop offset="1" stop-color="#A855F7"/></linearGradient>
+<filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="1.2" stdDeviation="1.2" flood-color="#6366F1" flood-opacity=".28"/></filter>
 
 </defs>
 <rect width="64" height="64" fill="url(#bg)"/>
-<g fill="url(#g)" stroke="url(#g)" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+<g fill="url(#g)" stroke="url(#g)" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" filter="url(#sh)">
 <circle cx="32" cy="15.5" r="3.6"/>
 <path d="M28.6 19.5 H35.4 L36.2 26 H27.8 Z"/>
 <circle cx="32" cy="30.5" r="5" fill="none" stroke-width="2.2"/>

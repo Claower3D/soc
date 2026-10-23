@@ -829,7 +829,7 @@ export function RegisterPage({ initialMode = 'register' }: RegisterPageProps) {
                         <strong>Священная вера или мировоззрение</strong>
                       </div>
                       <p className="section-subtext">
-                        Золотой сакральный символ отобразится рядом с вашим профилем
+                        Сакральный символ отобразится рядом с вашим профилем
                       </p>
 
                       <div className="beliefs-cards-scroll-grid">
