@@ -250,9 +250,9 @@ export function VideoPage() {
                   <div className="queue-thumb-wrap">
                     <img src={item.thumbnail} alt={item.title} />
                     <span className={`queue-badge ${item.isStream ? 'badge-live' : ''}`}>
-                      {item.isStream ? '🔴 LIVE' : item.duration}
+                      {item.isStream ? 'LIVE' : item.duration}
                     </span>
-                    {item.rating && <span className="queue-rating-badge">★ {item.rating}</span>}
+                    {item.rating && <span className="queue-rating-badge">{item.rating}</span>}
                     {item.isKids && <span className="queue-kids-badge">0+</span>}
                   </div>
                   <div className="queue-item-details">
@@ -282,7 +282,7 @@ export function VideoPage() {
       {isKidsModeActive && (
         <div className="kids-portal-banner">
           <div className="kids-banner-text">
-            <span className="balloon-icon">🎈</span>
+            <Baby size={22} className="balloon-icon" color="#ec4899" />
             <div>
               <strong>Включен Детский Режим «New Age Kids»</strong>
               <p>Отображаются исключительно проверенные развивающие мультфильмы и сказки (0+ / 6+). Без взрослого контента.</p>
@@ -315,12 +315,25 @@ export function VideoPage() {
         <div className="portal-actions-group">
           <button 
             type="button" 
-            className={`btn-filter-trigger ${ageFilter !== 'all' || sortBy !== 'recommended' ? 'has-active-filters' : ''}`}
+            className={`btn-filter-trigger ${activeCategory !== 'all' || ageFilter !== 'all' || sortBy !== 'recommended' ? 'has-active-filters' : ''}`}
             onClick={() => setShowFilterModal(!showFilterModal)}
-            title="Фильтры по годам, рейтингу и возрасту"
+            title="Фильтры и выбор категорий"
           >
             <SlidersHorizontal size={16} />
-            <span>Фильтры</span>
+            <span>
+              {activeCategory === 'streams' ? 'Фильтр: Стримы' :
+               activeCategory === 'videos' ? 'Фильтр: Видеоролики' :
+               activeCategory === 'movies' ? 'Фильтр: Фильмы' :
+               activeCategory === 'series' ? 'Фильтр: Сериалы' :
+               activeCategory === 'kids' ? 'Фильтр: Детское' :
+               activeCategory === 'dev' ? 'Фильтр: IT & Код' :
+               activeCategory === 'gaming' ? 'Фильтр: Игры' :
+               activeCategory === 'music' ? 'Фильтр: Музыка' :
+               'Фильтры'}
+            </span>
+            {(activeCategory !== 'all' || ageFilter !== 'all' || sortBy !== 'recommended') && (
+              <span className="filter-badge-dot" />
+            )}
           </button>
 
           <button 
@@ -367,19 +380,98 @@ export function VideoPage() {
           </div>
           <div className="filter-popover-body">
             <div className="filter-group">
+              <label className="filter-label">Категория контента</label>
+              <div className="filter-pills-row">
+                <button 
+                  type="button"
+                  className={`filter-pill-btn ${activeCategory === 'all' && !isKidsModeActive ? 'active' : ''}`}
+                  onClick={() => { setActiveCategory('all'); setIsKidsModeActive(false); }}
+                >
+                  <Compass size={13} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                  Все
+                </button>
+                <button 
+                  type="button"
+                  className={`filter-pill-btn ${activeCategory === 'streams' ? 'active' : ''}`}
+                  onClick={() => { setActiveCategory('streams'); setIsKidsModeActive(false); }}
+                >
+                  <Radio size={13} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                  Стримы (Twitch)
+                </button>
+                <button 
+                  type="button"
+                  className={`filter-pill-btn ${activeCategory === 'videos' ? 'active' : ''}`}
+                  onClick={() => { setActiveCategory('videos'); setIsKidsModeActive(false); }}
+                >
+                  <Flame size={13} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                  Видеоролики
+                </button>
+                <button 
+                  type="button"
+                  className={`filter-pill-btn ${activeCategory === 'movies' ? 'active' : ''}`}
+                  onClick={() => { setActiveCategory('movies'); setIsKidsModeActive(false); }}
+                >
+                  <Film size={13} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                  Фильмы
+                </button>
+                <button 
+                  type="button"
+                  className={`filter-pill-btn ${activeCategory === 'series' ? 'active' : ''}`}
+                  onClick={() => { setActiveCategory('series'); setIsKidsModeActive(false); }}
+                >
+                  <Tv size={13} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                  Сериалы
+                </button>
+                <button 
+                  type="button"
+                  className={`filter-pill-btn ${activeCategory === 'kids' || isKidsModeActive ? 'active' : ''}`}
+                  onClick={() => { setActiveCategory('kids'); setIsKidsModeActive(true); }}
+                >
+                  <Baby size={13} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                  Детское
+                </button>
+                <button 
+                  type="button"
+                  className={`filter-pill-btn ${activeCategory === 'dev' ? 'active' : ''}`}
+                  onClick={() => { setActiveCategory('dev'); setIsKidsModeActive(false); }}
+                >
+                  IT & Код
+                </button>
+                <button 
+                  type="button"
+                  className={`filter-pill-btn ${activeCategory === 'gaming' ? 'active' : ''}`}
+                  onClick={() => { setActiveCategory('gaming'); setIsKidsModeActive(false); }}
+                >
+                  <Gamepad2 size={13} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                  Игры
+                </button>
+                <button 
+                  type="button"
+                  className={`filter-pill-btn ${activeCategory === 'music' ? 'active' : ''}`}
+                  onClick={() => { setActiveCategory('music'); setIsKidsModeActive(false); }}
+                >
+                  <Music size={13} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                  Музыка
+                </button>
+              </div>
+            </div>
+
+            <div className="filter-group">
               <label className="filter-label">Сортировка</label>
               <div className="filter-pills-row">
                 <button 
+                  type="button"
                   className={`filter-pill-btn ${sortBy === 'recommended' ? 'active' : ''}`}
                   onClick={() => setSortBy('recommended')}
                 >
                   По популярности
                 </button>
                 <button 
+                  type="button"
                   className={`filter-pill-btn ${sortBy === 'rating' ? 'active' : ''}`}
                   onClick={() => setSortBy('rating')}
                 >
-                  По рейтингу ★
+                  По рейтингу
                 </button>
               </div>
             </div>
@@ -390,6 +482,7 @@ export function VideoPage() {
                 {['all', '0+', '6+', '12+', '16+', '18+'].map(rating => (
                   <button 
                     key={rating}
+                    type="button"
                     className={`filter-pill-btn ${ageFilter === rating ? 'active' : ''}`}
                     onClick={() => setAgeFilter(rating)}
                   >
@@ -398,84 +491,33 @@ export function VideoPage() {
                 ))}
               </div>
             </div>
+
+            <div className="filter-popover-footer">
+              <button 
+                type="button"
+                className="btn-reset-filters-inline"
+                onClick={() => {
+                  setActiveCategory('all');
+                  setSortBy('recommended');
+                  setAgeFilter('all');
+                  setIsKidsModeActive(false);
+                }}
+              >
+                Сбросить всё
+              </button>
+              <button 
+                type="button"
+                className="btn-apply-filters-inline"
+                onClick={() => setShowFilterModal(false)}
+              >
+                Применить
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Category Pills (YouTube Tabs) */}
-      <div className="portal-category-pills">
-        <button 
-          className={`category-pill ${activeCategory === 'all' ? 'active' : ''}`}
-          onClick={() => { setActiveCategory('all'); setIsKidsModeActive(false); }}
-        >
-          <Compass size={14} />
-          <span>Все</span>
-        </button>
-
-        <button 
-          className={`category-pill live-pill ${activeCategory === 'streams' ? 'active' : ''}`}
-          onClick={() => { setActiveCategory('streams'); setIsKidsModeActive(false); }}
-        >
-          <Radio size={14} />
-          <span>Стримы 🔴 (Twitch)</span>
-          <span className="live-count-chip">{liveStreams.length}</span>
-        </button>
-
-        <button 
-          className={`category-pill ${activeCategory === 'videos' ? 'active' : ''}`}
-          onClick={() => { setActiveCategory('videos'); setIsKidsModeActive(false); }}
-        >
-          <Flame size={14} />
-          <span>Видеоролики 🎥</span>
-        </button>
-
-        <button 
-          className={`category-pill ${activeCategory === 'movies' ? 'active' : ''}`}
-          onClick={() => { setActiveCategory('movies'); setIsKidsModeActive(false); }}
-        >
-          <Film size={14} />
-          <span>Фильмы 🎬</span>
-        </button>
-
-        <button 
-          className={`category-pill ${activeCategory === 'series' ? 'active' : ''}`}
-          onClick={() => { setActiveCategory('series'); setIsKidsModeActive(false); }}
-        >
-          <Tv size={14} />
-          <span>Сериалы 📺</span>
-        </button>
-
-        <button 
-          className={`category-pill kids-pill ${activeCategory === 'kids' || isKidsModeActive ? 'active' : ''}`}
-          onClick={() => { setActiveCategory('kids'); setIsKidsModeActive(true); }}
-        >
-          <Baby size={14} />
-          <span>Детское 🎈</span>
-        </button>
-
-        <button 
-          className={`category-pill ${activeCategory === 'dev' ? 'active' : ''}`}
-          onClick={() => { setActiveCategory('dev'); setIsKidsModeActive(false); }}
-        >
-          <span>IT & Код 💻</span>
-        </button>
-
-        <button 
-          className={`category-pill ${activeCategory === 'gaming' ? 'active' : ''}`}
-          onClick={() => { setActiveCategory('gaming'); setIsKidsModeActive(false); }}
-        >
-          <Gamepad2 size={14} />
-          <span>Игры 🎮</span>
-        </button>
-
-        <button 
-          className={`category-pill ${activeCategory === 'music' ? 'active' : ''}`}
-          onClick={() => { setActiveCategory('music'); setIsKidsModeActive(false); }}
-        >
-          <Music size={14} />
-          <span>Музыка 🎵</span>
-        </button>
-      </div>
+      
 
       {/* ========================================================================= */}
       {/* SECTION ROWS (IF BROWSE HOME LIKE YOUTUBE SCREENSHOT) */}
@@ -651,7 +693,7 @@ export function VideoPage() {
                     <div className="portal-card-thumb-wrap">
                       <img src={item.thumbnail} alt={item.title} />
                       <span className="card-duration-badge">{item.duration}</span>
-                      <span className="card-rating-badge">★ {item.rating}</span>
+                      <span className="card-rating-badge">{item.rating}</span>
                       <span className="card-age-badge">{item.ageRating}</span>
                     </div>
                     <div className="portal-card-body">
@@ -700,7 +742,7 @@ export function VideoPage() {
                     <div className="portal-card-thumb-wrap">
                       <img src={item.thumbnail} alt={item.title} />
                       <span className="card-duration-badge">{item.duration}</span>
-                      <span className="card-rating-badge">★ {item.rating}</span>
+                      <span className="card-rating-badge">{item.rating}</span>
                       <span className="card-age-badge">{item.ageRating}</span>
                     </div>
                     <div className="portal-card-body">
@@ -778,17 +820,30 @@ export function VideoPage() {
         <div className="portal-filtered-grid-container">
           <div className="filtered-header-bar">
             <h2 className="filtered-heading">
-              {activeCategory === 'streams' && '🔴 Прямые трансляции (Twitch Live)'}
-              {activeCategory === 'movies' && '🎬 Каталог фильмов'}
-              {activeCategory === 'series' && '📺 Каталог сериалов'}
-              {activeCategory === 'kids' && '🎈 Детский режим (Мультфильмы 0+ / 6+)'}
-              {activeCategory === 'dev' && '💻 IT & Программирование'}
-              {activeCategory === 'gaming' && '🎮 Игры и стримы'}
-              {activeCategory === 'music' && '🎵 Музыка и трансляции'}
-              {activeCategory === 'videos' && '🎥 Видеоролики'}
+              {activeCategory === 'streams' && 'Прямые трансляции (Twitch)'}
+              {activeCategory === 'movies' && 'Каталог фильмов'}
+              {activeCategory === 'series' && 'Каталог сериалов'}
+              {activeCategory === 'kids' && 'Детский режим (Мультфильмы 0+ / 6+)'}
+              {activeCategory === 'dev' && 'IT & Программирование'}
+              {activeCategory === 'gaming' && 'Игры и трансляции'}
+              {activeCategory === 'music' && 'Музыка'}
+              {activeCategory === 'videos' && 'Видеоролики'}
               {searchQuery && ` Результаты поиска: «${searchQuery}»`}
               <span className="filtered-count">({filteredVideos.length})</span>
             </h2>
+            {activeCategory !== 'all' && (
+              <button 
+                type="button" 
+                className="btn-reset-portal-filters"
+                style={{ padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}
+                onClick={() => {
+                  setActiveCategory('all');
+                  setIsKidsModeActive(false);
+                }}
+              >
+                Сбросить фильтр
+              </button>
+            )}
           </div>
 
           {filteredVideos.length === 0 ? (
@@ -820,9 +875,9 @@ export function VideoPage() {
                   <div className="portal-card-thumb-wrap">
                     <img src={item.thumbnail} alt={item.title} />
                     <span className={`card-duration-badge ${item.isStream ? 'badge-live' : ''}`}>
-                      {item.isStream ? '🔴 LIVE' : item.duration}
+                      {item.isStream ? 'LIVE' : item.duration}
                     </span>
-                    {item.rating && <span className="card-rating-badge">★ {item.rating}</span>}
+                    {item.rating && <span className="card-rating-badge">{item.rating}</span>}
                     {item.isKids && <span className="card-kids-rating-pill">{item.ageRating || '0+'}</span>}
                   </div>
                   <div className="portal-card-body">

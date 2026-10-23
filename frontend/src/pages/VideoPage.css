@@ -234,11 +234,13 @@
 }
 
 /* Filter Popover */
+
 .portal-filter-popover {
   position: absolute;
   top: 60px;
   right: 0;
-  width: 340px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -247,6 +249,59 @@
   z-index: 50;
   animation: fadeInDown 0.2s ease;
 }
+
+.filter-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  display: inline-block;
+  margin-left: 4px;
+}
+
+.filter-popover-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.btn-reset-filters-inline {
+  background: none;
+  border: 1px solid var(--color-border);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-reset-filters-inline:hover {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+}
+
+.btn-apply-filters-inline {
+  background: var(--color-accent);
+  border: none;
+  padding: 0.4rem 0.95rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-apply-filters-inline:hover {
+  background: var(--color-accent-hover);
+}
+
 
 @keyframes fadeInDown {
   from { opacity: 0; transform: translateY(-8px); }

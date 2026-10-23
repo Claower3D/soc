@@ -249,7 +249,7 @@ export function VideoPlayer({ video, onUpdateVideo, onDeleteVideo, isKidsMode }:
         {video.isSeries && (
           <div className="video-player-series-badge">
             <Tv size={14} />
-            <span>Сериал • {video.seriesInfo ? `${video.seriesInfo.seasonsCount} сезона` : ''} • ★ {video.rating}</span>
+            <span>Сериал • {video.seriesInfo ? `${video.seriesInfo.seasonsCount} сезона` : ''} • Рейтинг: {video.rating}</span>
           </div>
         )}
         {video.isKids && (
@@ -261,7 +261,7 @@ export function VideoPlayer({ video, onUpdateVideo, onDeleteVideo, isKidsMode }:
         {video.isMovie && (
           <div className="video-player-movie-badge">
             <Film size={15} />
-            <span>Фильм • {video.releaseYear} • Рейтинг: ★ {video.rating}</span>
+            <span>Фильм • {video.releaseYear} • Рейтинг: {video.rating}</span>
           </div>
         )}
       </div>
@@ -272,7 +272,7 @@ export function VideoPlayer({ video, onUpdateVideo, onDeleteVideo, isKidsMode }:
           <h1 className="video-title">{video.title}</h1>
           {video.rating && (
             <span className="movie-rating-chip" title="Рейтинг фильма">
-              ★ {video.rating}
+              {video.rating}
             </span>
           )}
         </div>
