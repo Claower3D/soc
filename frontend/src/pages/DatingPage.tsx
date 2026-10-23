@@ -565,29 +565,6 @@ export const DatingPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Goals Filter Strip */}
-      <div className="dating-quick-goals-strip">
-        <button
-          className={`quick-goal-pill ${selectedGoalFilter === 'all' ? 'active' : ''}`}
-          onClick={() => { setSelectedGoalFilter('all'); setCurrentSwipeIndex(0); }}
-        >
-          <span>✨ Все цели</span>
-        </button>
-        {DATING_GOALS.map(goal => (
-          <button
-            key={goal.id}
-            className={`quick-goal-pill ${selectedGoalFilter === goal.id ? 'active' : ''}`}
-            onClick={() => { 
-              setSelectedGoalFilter(selectedGoalFilter === goal.id ? 'all' : goal.id); 
-              setCurrentSwipeIndex(0); 
-            }}
-          >
-            <span>{goal.icon}</span>
-            <span>{goal.shortLabel}</span>
-          </button>
-        ))}
-      </div>
-
       {/* Collapsible / Expandable Advanced Filter Panel */}
       {isFiltersOpen && (
         <div className="dating-expanded-filter-panel">
@@ -619,10 +596,10 @@ export const DatingPage: React.FC = () => {
                 }}
                 className="filter-panel-select"
               >
-                <option value="all">✨ Все цели</option>
+                <option value="all">Все цели</option>
                 {DATING_GOALS.map(goal => (
                   <option key={goal.id} value={goal.id}>
-                    {goal.icon} {goal.label}
+                    {goal.label}
                   </option>
                 ))}
               </select>
@@ -823,9 +800,9 @@ export const DatingPage: React.FC = () => {
                 }}
                 className="filter-panel-select"
               >
-                <option value="all">✨ Любой класс сознания</option>
+                <option value="all">Любой класс сознания</option>
                 {[1,2,3,4,5,6,7,8,9,10,11].map(lvl => (
-                  <option key={lvl} value={String(lvl)}>Класс {lvl} {lvl >= 7 ? '★ Высоковибрационный' : ''}</option>
+                  <option key={lvl} value={String(lvl)}>Класс {lvl} {lvl >= 7 ? '(Высоковибрационный)' : ''}</option>
                 ))}
               </select>
             </div>
@@ -873,10 +850,9 @@ export const DatingPage: React.FC = () => {
                         <h3 className="side-card-name">{prevCard.name}, {prevCard.age}</h3>
                         {prevCard.verified && <ShieldCheck size={16} color="#38bdf8" />}
                       </div>
-                      <p className="side-card-location">{prevCard.city} • ⭐ {prevCard.zodiacSign}</p>
+                      <p className="side-card-location">{prevCard.city} • {prevCard.zodiacSign}</p>
                       {prevCard.goals[0] && (
                         <div className="side-card-goal-chip">
-                          {DATING_GOALS.find(x => x.id === prevCard.goals[0])?.icon}{' '}
                           {DATING_GOALS.find(x => x.id === prevCard.goals[0])?.shortLabel}
                         </div>
                       )}
@@ -947,7 +923,7 @@ export const DatingPage: React.FC = () => {
                           </>
                         )}
                         <span>•</span>
-                        <span>⭐ {activeSwipeCard.zodiacSign}</span>
+                        <span>{activeSwipeCard.zodiacSign}</span>
                         {activeSwipeCard.occupation && (
                           <>
                             <span>•</span>
@@ -963,7 +939,7 @@ export const DatingPage: React.FC = () => {
                           if (!g) return null;
                           return (
                             <span key={gId} className={`swipe-goal-tag ${g.badgeClass}`}>
-                              {g.icon} {g.shortLabel}
+                              {g.shortLabel}
                             </span>
                           );
                         })}
@@ -1066,10 +1042,9 @@ export const DatingPage: React.FC = () => {
                         <h3 className="side-card-name">{nextCard.name}, {nextCard.age}</h3>
                         {nextCard.verified && <ShieldCheck size={16} color="#38bdf8" />}
                       </div>
-                      <p className="side-card-location">{nextCard.city} • ⭐ {nextCard.zodiacSign}</p>
+                      <p className="side-card-location">{nextCard.city} • {nextCard.zodiacSign}</p>
                       {nextCard.goals[0] && (
                         <div className="side-card-goal-chip">
-                          {DATING_GOALS.find(x => x.id === nextCard.goals[0])?.icon}{' '}
                           {DATING_GOALS.find(x => x.id === nextCard.goals[0])?.shortLabel}
                         </div>
                       )}
@@ -1151,7 +1126,7 @@ export const DatingPage: React.FC = () => {
                           const g = DATING_GOALS.find(x => x.id === gId);
                           return g ? (
                             <span key={gId} className={`card-goal-chip ${g.badgeClass}`}>
-                              {g.icon} {g.shortLabel}
+                              {g.shortLabel}
                             </span>
                           ) : null;
                         })}
@@ -1291,7 +1266,7 @@ export const DatingPage: React.FC = () => {
               <div className="my-profile-meta-line">
                 <span><MapPin size={14} /> {myProfile.city}</span>
                 <span>•</span>
-                <span>⭐ {myProfile.zodiacSign}</span>
+                <span>{myProfile.zodiacSign}</span>
                 <span>•</span>
                 <span className="class-chip">Класс {myProfile.consciousnessLevel}</span>
               </div>
@@ -1301,7 +1276,7 @@ export const DatingPage: React.FC = () => {
                   const g = DATING_GOALS.find(x => x.id === gId);
                   return g ? (
                     <span key={gId} className={`swipe-goal-tag ${g.badgeClass}`}>
-                      {g.icon} {g.label}
+                      {g.label}
                     </span>
                   ) : null;
                 })}
@@ -1314,7 +1289,7 @@ export const DatingPage: React.FC = () => {
                   <h4>Достижения:</h4>
                   <ul>
                     {myProfile.achievements.map((item, i) => (
-                      <li key={i}>⭐ {item}</li>
+                      <li key={i}>• {item}</li>
                     ))}
                   </ul>
                 </div>
@@ -1325,7 +1300,7 @@ export const DatingPage: React.FC = () => {
                   <h4>Цели на будущее:</h4>
                   <ul>
                     {myProfile.lifeGoals.map((item, i) => (
-                      <li key={i}>🎯 {item}</li>
+                      <li key={i}>• {item}</li>
                     ))}
                   </ul>
                 </div>

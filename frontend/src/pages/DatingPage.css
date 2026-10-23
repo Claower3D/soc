@@ -366,48 +366,6 @@
   font-weight: 800;
 }
 
-/* Quick Goals Filter Strip */
-.dating-quick-goals-strip {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
-  scrollbar-width: thin;
-}
-
-.dating-quick-goals-strip::-webkit-scrollbar {
-  height: 3px;
-}
-
-.quick-goal-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.38rem 0.85rem;
-  border-radius: 9999px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-card);
-  color: var(--color-text-secondary);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s ease;
-}
-
-.quick-goal-pill:hover {
-  color: var(--color-text);
-  border-color: rgba(99, 102, 241, 0.35);
-}
-
-.quick-goal-pill.active {
-  background: rgba(99, 102, 241, 0.1);
-  color: var(--color-accent);
-  border-color: var(--color-accent);
-  font-weight: 700;
-}
-
 /* Expanded Filter Panel */
 .dating-expanded-filter-panel {
   background: var(--color-bg-card);
