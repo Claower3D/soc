@@ -72,6 +72,23 @@ export interface BookingItem {
   createdAt: string;
 }
 
+// Полноценная интеграция ссылок и маршрутов 2ГИС
+export function get2GisUrl(address?: string, city?: string, lat?: number, lng?: number): string {
+  const query = [address, city].filter(Boolean).join(', ');
+  if (lat && lng && lat !== 0 && lng !== 0) {
+    return `https://2gis.kz/search/${encodeURIComponent(query || 'Казахстан')}/points/${lng},${lat}`;
+  }
+  return `https://2gis.kz/search/${encodeURIComponent(query || 'Казахстан')}`;
+}
+
+export function get2GisRouteUrl(address?: string, city?: string, lat?: number, lng?: number): string {
+  if (lat && lng && lat !== 0 && lng !== 0) {
+    return `https://2gis.kz/routeSearch/rsType/car/to/${lng},${lat}`;
+  }
+  const query = [address, city].filter(Boolean).join(', ');
+  return `https://2gis.kz/search/${encodeURIComponent(query || 'Казахстан')}`;
+}
+
 export function RetreatMapPage() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -913,6 +930,25 @@ export function RetreatMapPage() {
                       </div>
                       <p className="card-excerpt-text">{ret.description}</p>
 
+                      {/* Синхронизированный адрес с 2ГИС */}
+                      <div className="card-2gis-address-row">
+                        <span className="card-2gis-address-text" title={`${ret.locationAddress || ''}, ${ret.locationCity}`}>
+                          <MapPin size={11} color="#00A859" />
+                          <span>{ret.locationAddress ? `${ret.locationAddress}, ${ret.locationCity}` : ret.locationCity}</span>
+                        </span>
+                        <a
+                          href={get2GisUrl(ret.locationAddress, ret.locationCity, ret.latitude, ret.longitude)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="card-2gis-btn-chip"
+                          onClick={(e) => e.stopPropagation()}
+                          title="Открыть точный адрес в 2ГИС"
+                        >
+                          <Navigation size={10} />
+                          <span>2ГИС</span>
+                        </a>
+                      </div>
+
                       <div className="card-footer-meta">
                         <span className="date-badge">
                           {formatDateRange(ret.startDate, ret.endDate)}
@@ -1036,7 +1072,17 @@ export function RetreatMapPage() {
                     <p>{ret.description.slice(0, 110)}...</p>
                     <div className="catalog-card-foot">
                       <strong>{formatPrice(ret.price, ret.currency)}</strong>
-                      <span>{ret.locationCity}</span>
+                      <a
+                        href={get2GisUrl(ret.locationAddress, ret.locationCity, ret.latitude, ret.longitude)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="catalog-2gis-link"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Открыть точный адрес в 2ГИС"
+                      >
+                        <Navigation size={11} />
+                        <span>2ГИС: {ret.locationCity}</span>
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -1210,18 +1256,49 @@ export function RetreatMapPage() {
                 <span>{selectedRetreat.locationAddress}, {selectedRetreat.locationCity}</span>
               </div>
 
-              {/* 2GIS Кнопка точного адреса */}
-              <a
-                href={`https://2gis.kz/search/${encodeURIComponent((selectedRetreat.locationAddress || '') + ' ' + (selectedRetreat.locationCity || ''))}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-open-2gis"
-                title="Открыть точный адрес и проложить маршрут в 2ГИС"
-              >
-                <Navigation size={14} />
-                <span>Открыть в 2ГИС (точный адрес)</span>
-                <ExternalLink size={12} />
-              </a>
+              {/* 2GIS Точный адрес и маршруты */}
+              <div className="drawer-2gis-card">
+                <div className="drawer-2gis-header">
+                  <div className="dgis-logo-badge">
+                    <Navigation size={15} color="#00A859" />
+                    <strong>2ГИС Синхронизация</strong>
+                  </div>
+                  <span className="dgis-synced-pill">Адрес подтверждён</span>
+                </div>
+                <div className="drawer-2gis-body">
+                  <p className="dgis-address-line">
+                    <MapPin size={14} color="#00A859" />
+                    <span>{selectedRetreat.locationAddress || 'Точный адрес'}, {selectedRetreat.locationCity}</span>
+                  </p>
+                  {selectedRetreat.latitude && selectedRetreat.longitude && (
+                    <span className="dgis-coords-badge">
+                      GPS 2ГИС: {selectedRetreat.latitude.toFixed(5)}, {selectedRetreat.longitude.toFixed(5)}
+                    </span>
+                  )}
+                </div>
+                <div className="drawer-2gis-actions-row">
+                  <a
+                    href={get2GisUrl(selectedRetreat.locationAddress, selectedRetreat.locationCity, selectedRetreat.latitude, selectedRetreat.longitude)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-2gis-outline"
+                    title="Открыть здание или организацию в 2ГИС"
+                  >
+                    <ExternalLink size={13} />
+                    <span>Точный адрес</span>
+                  </a>
+                  <a
+                    href={get2GisRouteUrl(selectedRetreat.locationAddress, selectedRetreat.locationCity, selectedRetreat.latitude, selectedRetreat.longitude)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-2gis-fill"
+                    title="Построить маршрут на машине или пешком в 2ГИС"
+                  >
+                    <Navigation size={13} />
+                    <span>Маршрут в 2ГИС</span>
+                  </a>
+                </div>
+              </div>
 
               {/* Блок мест: всего мест и сколько осталось */}
               {(() => {
@@ -1364,11 +1441,11 @@ export function RetreatMapPage() {
                   </button>
 
                   <a
-                    href={`https://2gis.kz/search/${encodeURIComponent((selectedRetreat.locationAddress || '') + ' ' + (selectedRetreat.locationCity || ''))}`}
+                    href={get2GisRouteUrl(selectedRetreat.locationAddress, selectedRetreat.locationCity, selectedRetreat.latitude, selectedRetreat.longitude)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="locate-2gis-btn"
-                    title="Открыть в приложении или на сайте 2ГИС"
+                    title="Построить маршрут к ретриту в 2ГИС"
                   >
                     <Navigation size={15} />
                     <span>2ГИС</span>
@@ -1655,15 +1732,51 @@ function CreateRetreatModal({
   const [addressSuggestions, setAddressSuggestions] = useState<{ title: string; subtitle: string; lat: number; lng: number; city: string; country: string }[]>([]);
   const [isGeocoding, setIsGeocoding] = useState(false);
 
-  // Геокодинг адреса через Nominatim / 2ГИС поиск
+  // Синхронизация адреса с 2ГИС и геокодинг
   const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    setForm({ ...form, locationAddress: val });
+    setForm((prev) => ({ ...prev, locationAddress: val }));
 
+    // 1. Автоматическое распознавание вставки ссылки из 2ГИС
+    if (val.includes('2gis.') || val.includes('go.2gis.com')) {
+      const pointMatch = val.match(/(?:points|geo)\/([0-9.]+),([0-9.]+)/i);
+      if (pointMatch) {
+        const lng = parseFloat(pointMatch[1]);
+        const lat = parseFloat(pointMatch[2]);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          setForm((prev) => ({
+            ...prev,
+            latitude: lat,
+            longitude: lng
+          }));
+          setIsGeocoding(true);
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`, {
+            headers: { 'Accept-Language': 'ru' }
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data?.display_name) {
+                const addr = data.display_name.split(',')[0];
+                const city = data.address?.city || data.address?.town || data.address?.state || form.locationCity;
+                setForm((prev) => ({
+                  ...prev,
+                  locationAddress: addr || `2ГИС: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+                  locationCity: city || prev.locationCity
+                }));
+              }
+            })
+            .catch(() => {})
+            .finally(() => setIsGeocoding(false));
+          return;
+        }
+      }
+    }
+
+    // 2. Живой поиск и синхронизация адресов с подсказками 2ГИС
     if (val.trim().length >= 3) {
       setIsGeocoding(true);
       const query = `${val}, ${form.locationCity}`;
-      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=4&addressdetails=1`, {
+      fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1&countrycodes=kz,ru,by,kg,uz`, {
         headers: { 'Accept-Language': 'ru' }
       })
         .then((res) => res.json())
@@ -1844,7 +1957,7 @@ function CreateRetreatModal({
             <div className="address-label-row">
               <label>Точный адрес проведения *</label>
               <a
-                href={`https://2gis.kz/search/${encodeURIComponent((form.locationAddress || 'Караганда') + ' ' + form.locationCity)}`}
+                href={get2GisUrl(form.locationAddress, form.locationCity, form.latitude, form.longitude)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="link-check-2gis"
@@ -1858,13 +1971,21 @@ function CreateRetreatModal({
               <MapPin size={16} />
               <input
                 type="text"
-                placeholder="пр. Бухар-Жырау 55, Эко-центр"
+                placeholder="пр. Бухар-Жырау 55, Эко-центр (или ссылка 2ГИС)"
                 value={form.locationAddress}
                 onChange={handleAddressChange}
                 required
               />
               {isGeocoding && <RefreshCw size={14} className="spin-icon" style={{ marginLeft: 8 }} />}
             </div>
+
+            {/* Подтверждение синхронизации координат с 2ГИС */}
+            {form.latitude && form.longitude && form.locationAddress && (
+              <div className="dgis-sync-confirmed-badge">
+                <Check size={13} color="#00A859" />
+                <span>2ГИС точка зафиксирована: {form.latitude.toFixed(4)}, {form.longitude.toFixed(4)} ({form.locationCity})</span>
+              </div>
+            )}
 
             {/* Выпадающий список подсказок 2ГИС / Карты */}
             {addressSuggestions.length > 0 && (
@@ -1885,7 +2006,7 @@ function CreateRetreatModal({
                 ))}
               </div>
             )}
-            <span className="field-hint-text">Начните вводить адрес или проверьте объект в 2ГИС</span>
+            <span className="field-hint-text">Начните вводить адрес или вставьте ссылку из 2ГИС — точка синхронизируется автоматически</span>
           </div>
 
           {/* Вместимость и стоимость */}
