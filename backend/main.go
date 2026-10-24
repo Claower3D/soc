@@ -1177,10 +1177,15 @@ func main() {
 	// Инициализация подключения к PostgreSQL (если предоставлена DATABASE_URL на Railway)
 	initDB()
 
+	// Инициализация автоматического резервного копирования (Яндекс Облако S3 каждые 12 часов)
+	initBackupScheduler()
+
 	mux := http.NewServeMux()
 
 	// API-маршруты
 	mux.HandleFunc("GET /api/health", handleHealth)
+	mux.HandleFunc("GET /api/admin/backup/status", handleAdminBackupStatus)
+	mux.HandleFunc("POST /api/admin/backup/trigger", handleAdminBackupTrigger)
 	mux.HandleFunc("GET /api/feed", handleFeed)
 	mux.HandleFunc("GET /api/posts", handleFeed)
 	mux.HandleFunc("GET /api/users/{id}/posts", handleUserPosts)
