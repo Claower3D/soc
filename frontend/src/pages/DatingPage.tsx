@@ -8,11 +8,11 @@ import {
   Navigation, Globe
 } from 'lucide-react';
 import { 
-  INITIAL_DATING_PROFILES, 
   DATING_GOALS, 
   type DatingProfile, 
   type DatingGoalType 
 } from '../data/datingData';
+import { api } from '../api';
 import { DatingProfileModal } from '../components/DatingProfileModal';
 import { EditDatingProfileModal } from '../components/EditDatingProfileModal';
 import { useAuth } from '../context/AuthContext';
@@ -33,14 +33,9 @@ export const DatingPage: React.FC = () => {
   // Mode: Лента свайпов, Каталог анкет, Мэтчи/лайки, Моя анкета
   const [viewMode, setViewMode] = useState<DatingViewMode>('feed');
 
-  // Профили
-  const [profiles, setProfiles] = useState<DatingProfile[]>(() => {
-    const saved = localStorage.getItem('newage_dating_all_profiles');
-    if (saved) {
-      try { return JSON.parse(saved); } catch { /* ignore */ }
-    }
-    return INITIAL_DATING_PROFILES;
-  });
+  // Реальные профили из базы данных (без тестовых фейковых анкет)
+  const [profiles, setProfiles] = useState<DatingProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Моя анкета
   const [myProfile, setMyProfile] = useState<DatingProfile | null>(() => {
@@ -55,10 +50,51 @@ export const DatingPage: React.FC = () => {
   const [likedIds, setLikedIds] = useState<string[]>(() => {
     const saved = localStorage.getItem('newage_dating_likes');
     if (saved) {
-      try { return JSON.parse(saved); } catch { /* ignore */ }
+      try { 
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed.filter((id: string) => !id.startsWith('dp-'));
+      } catch { /* ignore */ }
     }
-    return ['dp-1'];
+    return [];
   });
+
+  // Загрузка реальных анкет из базы данных (PostgreSQL / Backend API)
+  const loadDatingData = async () => {
+    setIsLoading(true);
+    try {
+      // Очистка старых локальных фейков
+      localStorage.removeItem('newage_dating_all_profiles');
+
+      const res = await api.dating.profiles();
+      if (res && res.data && Array.isArray(res.data.profiles)) {
+        setProfiles(res.data.profiles);
+      } else {
+        setProfiles([]);
+      }
+
+      if (isAuthenticated) {
+        const myRes = await api.dating.myProfile();
+        if (myRes && myRes.data && myRes.data.profile) {
+          setMyProfile(myRes.data.profile);
+          localStorage.setItem('newage_dating_my_profile', JSON.stringify(myRes.data.profile));
+        }
+
+        const likesRes = await api.dating.likes();
+        if (likesRes && likesRes.data && Array.isArray(likesRes.data.likedIds)) {
+          setLikedIds(likesRes.data.likedIds);
+          localStorage.setItem('newage_dating_likes', JSON.stringify(likesRes.data.likedIds));
+        }
+      }
+    } catch (err) {
+      console.warn('Dating API load info:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDatingData();
+  }, [isAuthenticated]);
 
   // Всплывающее окно взаимной симпатии (Мэтч!)
   const [mutualMatchProfile, setMutualMatchProfile] = useState<DatingProfile | null>(null);
@@ -228,9 +264,14 @@ export const DatingPage: React.FC = () => {
 
     // Если поставили лайк (а не убрали), регистрируем взаимную симпатию и открываем окно мэтча
     if (!isAlreadyLiked && targetProfile) {
-      // Имитируем ответную взаимную симпатию и создаем чат
-      setMutualMatchProfile(targetProfile);
-      createOrUpdateMatchChat(targetProfile);
+      api.dating.swipe(profileId, 'like').then(res => {
+        if (res?.data?.isMatch) {
+          setMutualMatchProfile(targetProfile);
+          createOrUpdateMatchChat(targetProfile);
+        }
+      }).catch(() => {});
+    } else {
+      api.dating.swipe(profileId, 'pass').catch(() => {});
     }
 
     // Переход к следующей карточке в режиме свайпа
@@ -302,6 +343,10 @@ export const DatingPage: React.FC = () => {
     setIsSwiping(true);
     setSwipeAnim('pass');
 
+    if (activeSwipeCard) {
+      api.dating.swipe(activeSwipeCard.id, 'pass').catch(() => {});
+    }
+
     setTimeout(() => {
       setCurrentSwipeIndex(prev => (prev + 1 < filteredProfiles.length ? prev + 1 : 0));
       setSwipeAnim(null);
@@ -342,8 +387,12 @@ export const DatingPage: React.FC = () => {
     });
 
     if (!isAlreadyLiked && targetProfile) {
-      setMutualMatchProfile(targetProfile);
-      createOrUpdateMatchChat(targetProfile);
+      api.dating.swipe(profileId, 'like').then(res => {
+        if (res?.data?.isMatch) {
+          setMutualMatchProfile(targetProfile);
+          createOrUpdateMatchChat(targetProfile);
+        }
+      }).catch(() => {});
     }
 
     setTimeout(() => {
@@ -381,19 +430,19 @@ export const DatingPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [viewMode, activeSwipeCard, isFiltersOpen, isEditProfileOpen, inspectedProfile, likedIds, filteredProfiles.length, isSwiping]);
 
-  const handleSaveMyProfile = (savedProfile: DatingProfile) => {
+  const handleSaveMyProfile = async (savedProfile: DatingProfile) => {
     setMyProfile(savedProfile);
     localStorage.setItem('newage_dating_my_profile', JSON.stringify(savedProfile));
 
-    // Обновляем общий пул анкет
-    setProfiles(prev => {
-      const exists = prev.some(p => p.id === savedProfile.id);
-      const updated = exists 
-        ? prev.map(p => p.id === savedProfile.id ? savedProfile : p)
-        : [savedProfile, ...prev];
-      localStorage.setItem('newage_dating_all_profiles', JSON.stringify(updated));
-      return updated;
-    });
+    try {
+      const res = await api.dating.saveMyProfile(savedProfile);
+      if (res?.data?.profile) {
+        setMyProfile(res.data.profile);
+      }
+    } catch (err) {
+      console.error('Failed to save dating profile to database:', err);
+    }
+    loadDatingData();
   };
 
   if (!isAuthenticated) {
@@ -815,7 +864,13 @@ export const DatingPage: React.FC = () => {
       {/* ========================================================================= */}
       {viewMode === 'feed' && (
         <div className="dating-feed-wrap">
-          {activeSwipeCard ? (
+          {isLoading ? (
+            <div className="dating-empty-card">
+              <Sparkles size={36} color="#8b5cf6" />
+              <h3>Подключение к базе данных...</h3>
+              <p>Загрузка анкет New Age...</p>
+            </div>
+          ) : activeSwipeCard ? (
             <div className="dating-deck-stage">
               {/* Ethereal background ambient glow */}
               <div className="dating-deck-ambient-glow" aria-hidden="true" />
@@ -1059,22 +1114,37 @@ export const DatingPage: React.FC = () => {
             </div>
           ) : (
             <div className="dating-empty-card">
-              <Sparkles size={36} color="#F59E0B" />
-              <h3>Анкеты по вашим фильтрам закончились</h3>
-              <p>Попробуйте сбросить фильтры или выбрать другой город/цель знакомства.</p>
-              <button 
-                className="btn-reset-filters"
-                onClick={() => {
-                  setSelectedGoalFilter('all');
-                  setGenderFilter('all');
-                  setSelectedCity('all');
-                  setConsciousnessFilter('all');
-                  setSearchQuery('');
-                  setCurrentSwipeIndex(0);
-                }}
-              >
-                Сбросить фильтры
-              </button>
+              <Sparkles size={40} color="#6366F1" />
+              <h3>{profiles.length === 0 ? 'В базе данных пока нет анкет' : 'Анкеты по вашим фильтрам закончились'}</h3>
+              <p>
+                {profiles.length === 0 
+                  ? 'Все тестовые фейковые профили удалены. База данных подключена и готова к регистрации реальных пользователей!'
+                  : 'Попробуйте сбросить фильтры или выбрать другой город/цель знакомства.'}
+              </p>
+              {profiles.length === 0 ? (
+                <button 
+                  className="btn-create-my-profile-premium"
+                  style={{ marginTop: '0.85rem' }}
+                  onClick={() => setIsEditProfileOpen(true)}
+                >
+                  <Edit3 size={15} />
+                  <span>{myProfile ? 'Редактировать мою анкету' : 'Создать свою анкету'}</span>
+                </button>
+              ) : (
+                <button 
+                  className="btn-reset-filters"
+                  onClick={() => {
+                    setSelectedGoalFilter('all');
+                    setGenderFilter('all');
+                    setSelectedCity('all');
+                    setConsciousnessFilter('all');
+                    setSearchQuery('');
+                    setCurrentSwipeIndex(0);
+                  }}
+                >
+                  Сбросить фильтры
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1087,8 +1157,23 @@ export const DatingPage: React.FC = () => {
         <div className="dating-grid-container">
           {filteredProfiles.length === 0 ? (
             <div className="dating-empty-card">
-              <h3>Ничего не найдено</h3>
-              <p>Попробуйте изменить параметры поиска или фильтры.</p>
+              <Users size={40} color="#6366F1" />
+              <h3>{profiles.length === 0 ? 'В базе данных пока нет анкет' : 'Ничего не найдено'}</h3>
+              <p>
+                {profiles.length === 0 
+                  ? 'Все фейковые профили удалены. Создайте первую реальную анкету в базе данных!'
+                  : 'Попробуйте изменить параметры поиска или фильтры.'}
+              </p>
+              {profiles.length === 0 && (
+                <button 
+                  className="btn-create-my-profile-premium"
+                  style={{ marginTop: '0.85rem' }}
+                  onClick={() => setIsEditProfileOpen(true)}
+                >
+                  <Edit3 size={15} />
+                  <span>{myProfile ? 'Редактировать анкету' : 'Создать свою анкету'}</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="dating-profiles-grid">

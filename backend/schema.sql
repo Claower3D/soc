@@ -1056,3 +1056,58 @@ CREATE TABLE IF NOT EXISTS retreat_bookings (
 CREATE INDEX IF NOT EXISTS idx_retreat_bookings_retreat ON retreat_bookings(retreat_id);
 CREATE INDEX IF NOT EXISTS idx_retreat_bookings_user ON retreat_bookings(user_id);
 
+-- =============================================================================
+-- 13. ЗНАКОМСТВА И РЕЗОНАНС (DATING & SOUL RESONANCE)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS dating_profiles (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    username VARCHAR(100) DEFAULT '',
+    age INT DEFAULT 18,
+    birth_date VARCHAR(50) DEFAULT '',
+    gender VARCHAR(30) DEFAULT 'male',
+    city VARCHAR(150) DEFAULT '',
+    country VARCHAR(100) DEFAULT '',
+    avatar TEXT DEFAULT '',
+    photos TEXT DEFAULT '[]',
+    goals TEXT DEFAULT '[]',
+    bio TEXT DEFAULT '',
+    occupation TEXT DEFAULT '',
+    interests TEXT DEFAULT '[]',
+    achievements TEXT DEFAULT '[]',
+    life_goals TEXT DEFAULT '[]',
+    consciousness_level INT DEFAULT 1,
+    consciousness_title VARCHAR(100) DEFAULT '',
+    zodiac_sign VARCHAR(50) DEFAULT '',
+    verified BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_dating_profiles_gender ON dating_profiles(gender);
+CREATE INDEX IF NOT EXISTS idx_dating_profiles_city ON dating_profiles(city);
+CREATE INDEX IF NOT EXISTS idx_dating_profiles_user ON dating_profiles(user_id);
+
+CREATE TABLE IF NOT EXISTS dating_likes (
+    id VARCHAR(64) PRIMARY KEY,
+    from_user_id VARCHAR(64) NOT NULL,
+    to_profile_id VARCHAR(64) NOT NULL,
+    action VARCHAR(20) DEFAULT 'like',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (from_user_id, to_profile_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dating_likes_from ON dating_likes(from_user_id);
+CREATE INDEX IF NOT EXISTS idx_dating_likes_to ON dating_likes(to_profile_id);
+
+CREATE TABLE IF NOT EXISTS dating_matches (
+    id VARCHAR(64) PRIMARY KEY,
+    user1_id VARCHAR(64) NOT NULL,
+    user2_id VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (user1_id, user2_id)
+);
+
+

@@ -9,6 +9,7 @@ import {
   DATING_GOALS, 
   POPULAR_INTERESTS_TAGS 
 } from '../data/datingData';
+import { useAuth } from '../context/AuthContext';
 import './EditDatingProfileModal.css';
 
 interface EditDatingProfileModalProps {
@@ -18,34 +19,27 @@ interface EditDatingProfileModalProps {
   initialProfile?: DatingProfile | null;
 }
 
-const SAMPLE_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
-];
-
 export const EditDatingProfileModal: React.FC<EditDatingProfileModalProps> = ({
   isOpen,
   onClose,
   onSave,
   initialProfile
 }) => {
-  const [name, setName] = useState(initialProfile?.name || 'Александр Новиков');
-  const [age, setAge] = useState(initialProfile?.age || 28);
-  const [gender, setGender] = useState<'male' | 'female' | 'other'>(initialProfile?.gender || 'male');
-  const [city, setCity] = useState(initialProfile?.city || 'Москва');
-  const [occupation, setOccupation] = useState(initialProfile?.occupation || 'Инженер & Практик');
-  const [bio, setBio] = useState(initialProfile?.bio || 'Ищу родственную душу для честного общения, гармоничных отношений и совместного духовного развития.');
+  const { currentUser } = useAuth();
+
+  const [name, setName] = useState(initialProfile?.name || currentUser?.name || '');
+  const [age, setAge] = useState(initialProfile?.age || 25);
+  const [gender, setGender] = useState<'male' | 'female' | 'other'>(initialProfile?.gender || (currentUser?.gender === 'female' ? 'female' : 'male'));
+  const [city, setCity] = useState(initialProfile?.city || currentUser?.location || '');
+  const [occupation, setOccupation] = useState(initialProfile?.occupation || '');
+  const [bio, setBio] = useState(initialProfile?.bio || currentUser?.bio || '');
   
-  const [avatar, setAvatar] = useState(initialProfile?.avatar || SAMPLE_AVATARS[1]);
-  const [photos, setPhotos] = useState<string[]>(initialProfile?.photos || [SAMPLE_AVATARS[1]]);
+  const [avatar, setAvatar] = useState(initialProfile?.avatar || currentUser?.avatar || '');
+  const [photos, setPhotos] = useState<string[]>(initialProfile?.photos || (currentUser?.avatar ? [currentUser.avatar] : []));
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
 
   const [selectedGoals, setSelectedGoals] = useState<DatingGoalType[]>(
-    initialProfile?.goals || ['love', 'spiritual', 'friends']
+    initialProfile?.goals || ['love', 'friends']
   );
 
   const [selectedInterests, setSelectedInterests] = useState<string[]>(
@@ -97,7 +91,9 @@ export const EditDatingProfileModal: React.FC<EditDatingProfileModalProps> = ({
   const handleAddPhoto = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPhotoUrl.trim()) return;
-    setPhotos([...photos, newPhotoUrl.trim()]);
+    const url = newPhotoUrl.trim();
+    setPhotos([...photos, url]);
+    if (!avatar) setAvatar(url);
     setNewPhotoUrl('');
   };
 
@@ -135,8 +131,8 @@ export const EditDatingProfileModal: React.FC<EditDatingProfileModalProps> = ({
       age: Number(age) || 25,
       gender,
       city: city.trim() || 'Москва',
-      avatar: avatar || photos[0] || SAMPLE_AVATARS[0],
-      photos: photos.length > 0 ? photos : [avatar || SAMPLE_AVATARS[0]],
+      avatar: avatar || photos[0] || currentUser?.avatar || '/default-avatar.svg',
+      photos: photos.length > 0 ? photos : (avatar ? [avatar] : []),
       goals: selectedGoals.length > 0 ? selectedGoals : ['love'],
       bio: bio.trim(),
       occupation: occupation.trim(),
@@ -327,27 +323,6 @@ export const EditDatingProfileModal: React.FC<EditDatingProfileModalProps> = ({
                 <Plus size={15} />
                 <span>Добавить фото</span>
               </button>
-            </div>
-
-            {/* Quick Pick Avatars */}
-            <div className="sample-avatars-pick">
-              <span className="pick-label">Или выберите готовое фото:</span>
-              <div className="pick-avatars-list">
-                {SAMPLE_AVATARS.map((url, idx) => (
-                  <img 
-                    key={idx}
-                    src={url}
-                    alt=""
-                    className="sample-avatar-item"
-                    onClick={() => {
-                      if (!photos.includes(url)) {
-                        setPhotos([...photos, url]);
-                      }
-                      setAvatar(url);
-                    }}
-                  />
-                ))}
-              </div>
             </div>
           </div>
 

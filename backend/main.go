@@ -424,6 +424,7 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 
 	// Инициализация таблиц карты ретритов и онлайн-бронирования
 	_ = ensureRetreatsTables(conn)
+	_ = ensureDatingTables(conn)
 
 	// Очистка битых/осиротевших связей (если пользователь был удален)
 	_, _ = conn.Exec(`
@@ -1169,6 +1170,7 @@ func main() {
 
 	// Инициализация хранилища ретритов и очистка от любых тестовых заявок
 	initRetreatStore("data")
+	initDatingStore("data")
 
 	// Инициализация подключения к PostgreSQL (если предоставлена DATABASE_URL на Railway)
 	initDB()
@@ -1205,6 +1207,14 @@ func main() {
 	mux.HandleFunc("GET /api/retreats/{id}/bookings", handleGetRetreatBookings)
 	mux.HandleFunc("GET /api/my-bookings", handleGetMyBookings)
 	mux.HandleFunc("PUT /api/retreats/bookings/{id}/status", handleUpdateBookingStatus)
+
+	// Знакомства и Духовный Резонанс (Dating & Soul Resonance)
+	mux.HandleFunc("GET /api/dating/profiles", handleGetDatingProfiles)
+	mux.HandleFunc("GET /api/dating/my-profile", handleGetMyDatingProfile)
+	mux.HandleFunc("POST /api/dating/my-profile", handleSaveMyDatingProfile)
+	mux.HandleFunc("DELETE /api/dating/my-profile", handleDeleteMyDatingProfile)
+	mux.HandleFunc("POST /api/dating/swipe", handleSwipeDatingProfile)
+	mux.HandleFunc("GET /api/dating/likes", handleGetDatingLikes)
 
 	// Auth эндпоинты (JWT) с защитой от перебора (Rate Limiting: 15 запросов в минуту)
 	authLimiter := newIPRateLimiter(15, 1*time.Minute)

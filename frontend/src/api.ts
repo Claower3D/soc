@@ -449,5 +449,21 @@ export const api = {
     myBookings: () => apiFetch<any>('/api/my-bookings'),
     updateBookingStatus: (bookingId: string, status: string) =>
       apiFetch<any>(`/api/retreats/bookings/${bookingId}/status`, { method: 'PUT', body: JSON.stringify({ status }) })
+  },
+  dating: {
+    profiles: (params?: { q?: string; city?: string; gender?: string }) => {
+      const sp = new URLSearchParams();
+      if (params?.q) sp.set('q', params.q);
+      if (params?.city) sp.set('city', params.city);
+      if (params?.gender) sp.set('gender', params.gender);
+      const qs = sp.toString();
+      return apiFetch<any>(`/api/dating/profiles${qs ? `?${qs}` : ''}`);
+    },
+    myProfile: () => apiFetch<any>('/api/dating/my-profile'),
+    saveMyProfile: (profile: any) => apiFetch<any>('/api/dating/my-profile', { method: 'POST', body: JSON.stringify(profile) }),
+    deleteMyProfile: () => apiFetch<any>('/api/dating/my-profile', { method: 'DELETE' }),
+    swipe: (profileId: string, action: 'like' | 'pass') =>
+      apiFetch<any>('/api/dating/swipe', { method: 'POST', body: JSON.stringify({ profileId, action }) }),
+    likes: () => apiFetch<any>('/api/dating/likes')
   }
 };
