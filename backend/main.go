@@ -1165,7 +1165,34 @@ func rateLimitMiddleware(limiter *IPRateLimiter, next http.HandlerFunc) http.Han
 // MAIN & ROUTES
 // =========================================================================
 
+// loadDotEnv считывает переменные окружения из .env файлов, если они есть
+func loadDotEnv() {
+	paths := []string{".env", filepath.Join("backend", ".env")}
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				k := strings.TrimSpace(parts[0])
+				v := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+				if os.Getenv(k) == "" {
+					os.Setenv(k, v)
+				}
+			}
+		}
+	}
+}
+
 func main() {
+	loadDotEnv()
+
 	// Загрузка постоянных данных из дискового хранилища
 	store.loadFromDisk()
 
