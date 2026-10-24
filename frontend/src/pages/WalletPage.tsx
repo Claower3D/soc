@@ -31,7 +31,6 @@ import {
   X
 } from 'lucide-react';
 import {
-  currentUser,
   type WalletTransaction
 } from '../data/mock';
 import { api } from '../api';
@@ -361,7 +360,7 @@ const CATALOG_CATEGORIES = [
 ];
 
 export const WalletPage: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
   const { formatPrice } = useCurrency();
 
   const [balance, setBalance] = useState(0);
