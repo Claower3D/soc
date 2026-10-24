@@ -13,17 +13,9 @@ import {
   Send,
   Share2,
   Copy,
-  TrendingUp,
   HeartHandshake,
-  EyeOff,
-  Compass,
   Headphones,
-  UserCheck,
-  MapPin,
   Briefcase,
-  ShoppingBag,
-  Bot,
-  Film,
   Search,
   QrCode,
   Zap,
@@ -42,7 +34,7 @@ import './WalletPage.css';
 // Модель платной услуги в каталоге цен
 export interface CatalogServiceItem {
   id: string;
-  category: 'subscriptions' | 'dating' | 'spiritual' | 'business' | 'studio_ai';
+  category: 'subscriptions' | 'dating' | 'spiritual' | 'business';
   title: string;
   subtitle: string;
   description: string;
@@ -57,9 +49,9 @@ export interface CatalogServiceItem {
   perks: string[];
 }
 
-// Первоначальный статический прейскурант платформы New Age
+// 4 Ключевые флагманские услуги платформы New Age
 const DEFAULT_SERVICES_CATALOG: CatalogServiceItem[] = [
-  // 1. Подписки & Статусы
+  // 1. Премиум VIP
   {
     id: 'sub_premium_month',
     category: 'subscriptions',
@@ -79,48 +71,7 @@ const DEFAULT_SERVICES_CATALOG: CatalogServiceItem[] = [
       '0% комиссии на любые покупки и переводы внутри сети',
       'Экспорт видео в 4K 60fps без водяного знака',
       'Безлимитные свайпы и лайки в Знакомствах',
-      'Доступ к закрытым конференциям и трансляциям до 500 чел.'
-    ]
-  },
-  {
-    id: 'sub_vip_year',
-    category: 'subscriptions',
-    title: 'New Age VIP Элита (1 год)',
-    subtitle: 'Полный доступ ко всей экосистеме с выгодой 35%',
-    description: 'Все привилегии Premium на 12 месяцев + персональный VIP-символ инкрустации, приоритет техподдержки, скидка 15% на ретриты.',
-    price: 3490,
-    oldPrice: 4788,
-    currency: 'RUB',
-    period: 'в год',
-    badge: 'ВЫГОДА 35%',
-    badgeType: 'discount',
-    icon: 'Sparkles',
-    popular: true,
-    perks: [
-      'Все возможности Premium на 365 дней',
-      'Эксклюзивный инкрустированный VIP-бейдж',
-      'Скидка 15% на бронирование любых ретритов и туров',
-      'Приоритетное обслуживание в техподдержке 24/7',
-      'Доступ в закрытый клуб основателей New Age'
-    ]
-  },
-  {
-    id: 'status_verified',
-    category: 'subscriptions',
-    title: 'Официальная верификация (Галочка)',
-    subtitle: 'Подтверждение подлинности автора или бренда',
-    description: 'Официальная галочка автора/эксперта. Защита от клонирования, высший приоритет в поиске и рекомендациях.',
-    price: 990,
-    currency: 'RUB',
-    period: 'навсегда',
-    badge: 'СТАТУС',
-    badgeType: 'status',
-    icon: 'ShieldCheck',
-    perks: [
-      'Официальный верификационный знак подлинности',
-      'Высшая позиция в глобальном поиске людей',
-      'Доверие аудитории и защита от фейков',
-      'Доступ к расширенной статистике охватов контента'
+      'Доступ к закрытым конференциям и трансляциям'
     ]
   },
 
@@ -137,71 +88,13 @@ const DEFAULT_SERVICES_CATALOG: CatalogServiceItem[] = [
     period: 'на 7 дней',
     badge: 'ТОП ВЫБОР',
     badgeType: 'hit',
-    icon: 'TrendingUp',
+    icon: 'HeartHandshake',
     popular: true,
     perks: [
       '1-е место в ленте свайпов по вашему городу',
-      'В 8 раз больше просмотров и лайков',
+      'В 8 раз больше просмотров и взаимных симпатий',
       'Неоновое сияние карточки в общем каталоге',
       'Уведомления о тех, кто открывал ваш профиль'
-    ]
-  },
-  {
-    id: 'dating_super_resonance',
-    category: 'dating',
-    title: 'Пакет «Супер-Резонанс» (10 шт)',
-    subtitle: 'Суперлайк с личным сообщением на экран',
-    description: 'Ваша симпатия и текст выводятся на весь экран избранного человека сразу же, даже до взаимного свайпа.',
-    price: 450,
-    currency: 'RUB',
-    period: '10 суперлайков',
-    badge: '+300% ОТКЛИК',
-    badgeType: 'pro',
-    icon: 'HeartHandshake',
-    perks: [
-      '10 персональных суперлайков без срока сгорания',
-      'Доставка сообщения прямо на экран получателю',
-      'Выделение в списке входящих симпатий золотой рамкой',
-      'Шанс взаимности вырастает в 3 раза'
-    ]
-  },
-  {
-    id: 'dating_incognito_30d',
-    category: 'dating',
-    title: 'Режим «Невидимка / Инкогнито»',
-    subtitle: 'Анонимный просмотр анкет на 30 дней',
-    description: 'Смотрите анкеты без следов в гостях. Скрывайте точное время последнего визита и онлайн-статус.',
-    price: 350,
-    currency: 'RUB',
-    period: 'на 30 дней',
-    badge: 'ПРИВАТНОСТЬ',
-    badgeType: 'pro',
-    icon: 'EyeOff',
-    perks: [
-      'Просмотр анкет без фиксации в гостях',
-      'Скрытие времени последнего входа в сеть',
-      'Скрытие онлайн-статуса в поиске',
-      'Включение и выключение в 1 клик в настройках'
-    ]
-  },
-  {
-    id: 'dating_matrix_report',
-    category: 'dating',
-    title: 'Матрица Судьбы & Чакры пары',
-    subtitle: 'Глубокий астро-нумерологический разбор',
-    description: 'Персональный отчет совместимости: кармические узлы пары, энергетический резонанс 7 чакр и точки финансового роста.',
-    price: 490,
-    oldPrice: 890,
-    currency: 'RUB',
-    period: '1 расчет',
-    badge: 'ЭЗОТЕРИКА',
-    badgeType: 'new',
-    icon: 'Compass',
-    perks: [
-      'Точный расчет по датам рождения обоих партнеров',
-      'График энергетического резонанса 7 чакр',
-      'Кармические узлы и задачи воплощения пары',
-      'Красочный PDF-отчет для сохранения на память'
     ]
   },
 
@@ -211,7 +104,7 @@ const DEFAULT_SERVICES_CATALOG: CatalogServiceItem[] = [
     category: 'spiritual',
     title: 'PRO Доступ: Частоты 432–963 Гц',
     subtitle: 'Безлимитная библиотека саундхилинга и медитаций',
-    description: '120+ медитаций в lossless качестве без сжатия, сессии дыхания пранаяма, саундхилинг поющими чашами и бинауральные ритмы.',
+    description: '120+ медитаций в lossless качестве без сжатия, сессии глубокой пранаямы, тибетские чаши и частоты Сольфеджио.',
     price: 590,
     currency: 'RUB',
     period: 'в месяц',
@@ -223,44 +116,6 @@ const DEFAULT_SERVICES_CATALOG: CatalogServiceItem[] = [
       'Оффлайн-загрузка треков в мобильное приложение',
       'Дыхательные практики пранаямы с метрономом',
       'Регулярные еженедельные обновления библиотеки'
-    ]
-  },
-  {
-    id: 'spiritual_master_consult',
-    category: 'spiritual',
-    title: 'Индивидуальная сессия с Мастером',
-    subtitle: '60 минут онлайн-разбора с сертифицированным экспертом',
-    description: 'Натальная карта, распаковка призвания, таро-сессия или энерготерапия с проверенным духовным наставником.',
-    price: 2900,
-    currency: 'RUB',
-    period: 'сессия 60 мин',
-    badge: 'МАСТЕР',
-    badgeType: 'status',
-    icon: 'UserCheck',
-    perks: [
-      '60 минут персонального видеозвонка в высоком качестве',
-      'Глубокий анализ текущего запроса и жизненных ситуаций',
-      'Персональная аудио-настройка после консультации',
-      'Гарантия безопасности сделки через New Age Escrow'
-    ]
-  },
-  {
-    id: 'spiritual_retreat_deposit',
-    category: 'spiritual',
-    title: 'Бронь места на Духовном Ретрите',
-    subtitle: 'Гарантия участия и бронь коттеджа/номера',
-    description: 'Внесение депозита за бронирование места на выбранном духовном ретрите или йога-туре через кошелёк New Age Pay.',
-    price: 5000,
-    currency: 'RUB',
-    period: 'депозит заезда',
-    badge: 'РЕТРИТ',
-    badgeType: 'hit',
-    icon: 'MapPin',
-    perks: [
-      'Фиксация минимальной цены раннего бронирования',
-      'Включение в закрытый чат участников заезда',
-      'Организация группового трансфера из аэропорта',
-      'Бесплатная отмена за 14 дней до старта заезда'
     ]
   },
 
@@ -282,69 +137,9 @@ const DEFAULT_SERVICES_CATALOG: CatalogServiceItem[] = [
     perks: [
       'Брендированная страница витрины и каталог товаров',
       'Прием платежей через СБП, карты и криптовалюту',
-      'Автоматическая выгрузка чеков и учет остатков на складе',
-      'Панель CRM для работы с заказами и клиентами',
+      'CRM-система учета заказов и остатков на складе',
+      '0% эквайринга на первый месяц работы',
       'Интеграция доставки СДЭК и курьерских служб'
-    ]
-  },
-  {
-    id: 'biz_market_top_7d',
-    category: 'business',
-    title: 'Закрепление товара в ТОП Маркета',
-    subtitle: 'Первое место на главной странице на 7 дней',
-    description: 'Выделение товара стильной неоновой рамкой на главной странице Маркетплейса, показ в рекомендациях к смежным покупкам.',
-    price: 390,
-    currency: 'RUB',
-    period: 'на 7 дней',
-    badge: 'ХИТ ПРОДАЖ',
-    badgeType: 'discount',
-    icon: 'ShoppingBag',
-    perks: [
-      'Закрепление в блоке рекомендуемых товаров',
-      'Неоновый контур карточки товара',
-      'Увеличение конверсии в заказы до 4.5 раз',
-      'Подробная статистика переходов и добавлений в корзину'
-    ]
-  },
-
-  // 5. AI Гуру & Видеостудия
-  {
-    id: 'ai_guru_unlimited',
-    category: 'studio_ai',
-    title: 'Безлимитный AI Гуру / Ассистент',
-    subtitle: 'Нейросеть персонального духовного и жизненного развития',
-    description: 'Безлимитные запросы к продвинутой модели: толкование снов, составление практик дня, генерация персонализированных медитаций.',
-    price: 490,
-    currency: 'RUB',
-    period: 'в месяц',
-    badge: 'AI 2.0',
-    badgeType: 'new',
-    icon: 'Bot',
-    popular: true,
-    perks: [
-      'Безлимитный диалог без ограничений по токенам',
-      'Глубокий анализ психологических и духовных запросов',
-      'Персональный подбор медитаций и дыхательных техник',
-      'Мгновенные ответы и сохранение дневника осознанности'
-    ]
-  },
-  {
-    id: 'studio_4k_pack',
-    category: 'studio_ai',
-    title: 'Облачный 4K Рендеринг Видеостудии',
-    subtitle: 'Пакет на 50 ультра-быстрых экспортов видео',
-    description: 'Рендеринг ваших роликов и Reels на мощных серверах New Age в разрешении 4K 60 FPS без водяных знаков и без нагрева телефона.',
-    price: 690,
-    currency: 'RUB',
-    period: 'пакет 50 видео',
-    badge: 'PRO STUDIO',
-    badgeType: 'pro',
-    icon: 'Film',
-    perks: [
-      'Рендеринг в 4K UHD 60fps за 20 секунд',
-      'Полное отсутствие водяных знаков',
-      'Сжатие без потери качества для Reels и Shorts',
-      'Не расходует заряд батареи смартфона'
     ]
   }
 ];
@@ -352,11 +147,10 @@ const DEFAULT_SERVICES_CATALOG: CatalogServiceItem[] = [
 // Категории каталога
 const CATALOG_CATEGORIES = [
   { id: 'all', label: 'Все услуги' },
-  { id: 'subscriptions', label: 'Премиум & Статусы', icon: Crown },
-  { id: 'dating', label: 'Знакомства & Резонанс', icon: HeartHandshake },
-  { id: 'spiritual', label: 'Практики & Ретриты', icon: Headphones },
-  { id: 'business', label: 'Бизнес & Маркет', icon: Briefcase },
-  { id: 'studio_ai', label: 'AI & Студия', icon: Bot },
+  { id: 'subscriptions', label: 'Премиум VIP', icon: Crown },
+  { id: 'dating', label: 'Знакомства', icon: HeartHandshake },
+  { id: 'spiritual', label: 'Практики & Звук', icon: Headphones },
+  { id: 'business', label: 'Бизнес PRO', icon: Briefcase },
 ];
 
 export const WalletPage: React.FC = () => {
@@ -509,7 +303,6 @@ export const WalletPage: React.FC = () => {
       setTimeout(() => setPurchaseSuccessMessage(null), 4000);
     } catch (err) {
       console.error('Deposit error:', err);
-      // Fallback
       setBalance(prev => prev + val);
       setIsDepositOpen(false);
     }
@@ -632,19 +425,9 @@ export const WalletPage: React.FC = () => {
   const renderServiceIcon = (iconName: string) => {
     switch (iconName) {
       case 'Crown': return <Crown size={22} />;
-      case 'Sparkles': return <Sparkles size={22} />;
-      case 'ShieldCheck': return <ShieldCheck size={22} />;
-      case 'TrendingUp': return <TrendingUp size={22} />;
       case 'HeartHandshake': return <HeartHandshake size={22} />;
-      case 'EyeOff': return <EyeOff size={22} />;
-      case 'Compass': return <Compass size={22} />;
       case 'Headphones': return <Headphones size={22} />;
-      case 'UserCheck': return <UserCheck size={22} />;
-      case 'MapPin': return <MapPin size={22} />;
       case 'Briefcase': return <Briefcase size={22} />;
-      case 'ShoppingBag': return <ShoppingBag size={22} />;
-      case 'Bot': return <Bot size={22} />;
-      case 'Film': return <Film size={22} />;
       default: return <Sparkles size={22} />;
     }
   };
@@ -727,7 +510,7 @@ export const WalletPage: React.FC = () => {
           <div className="card-bottom-row">
             <div className="card-holder-info">
               <span className="holder-label">ВЛАДЕЛЕЦ КАРТЫ</span>
-              <span className="holder-name">@{currentUser?.username || 'alex_guru'}</span>
+              <span className="holder-name">@{currentUser?.username || 'claower'}</span>
             </div>
             <div className="card-number-box">
               <span className="number-label">НОМЕР СЧЕТА</span>
@@ -839,7 +622,7 @@ export const WalletPage: React.FC = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* ГЛАВНАЯ СЕКЦИЯ: КАТАЛОГ ЦЕН И УСЛУГ ПЛАТФОРМЫ */}
+      {/* ГЛАВНАЯ СЕКЦИЯ: КАТАЛОГ ЦЕН И УСЛУГ ПЛАТФОРМЫ (4 ФЛАГМАНСКИЕ УСЛУГИ) */}
       {/* ========================================================================= */}
       <section id="pricing-catalog-section" className="pricing-catalog-section">
         <div className="section-header-row">
@@ -850,7 +633,7 @@ export const WalletPage: React.FC = () => {
             <div>
               <h2 className="section-heading">Каталог цен и услуг платформы</h2>
               <p className="section-subtext">
-                Официальный прейскурант New Age. Подключайте премиум-статусы, буст анкеты, ретриты и доступ к практикам в 1 клик с баланса
+                4 ключевые флагманские услуги New Age: Премиум-статус, Буст в знакомствах, Библиотека медитаций и Бизнес PRO
               </p>
             </div>
           </div>
@@ -862,7 +645,7 @@ export const WalletPage: React.FC = () => {
               type="text"
               value={catalogSearch}
               onChange={e => setCatalogSearch(e.target.value)}
-              placeholder="Поиск по услугам (буст, саундхилинг, CRM, AI)..."
+              placeholder="Поиск по услугам (буст, саундхилинг, CRM, VIP)..."
               className="catalog-search-input"
             />
             {catalogSearch && (
@@ -899,8 +682,8 @@ export const WalletPage: React.FC = () => {
           })}
         </div>
 
-        {/* Сетка карточек услуг каталога */}
-        <div className="catalog-cards-grid">
+        {/* Сетка карточек каталога (4 карточки) */}
+        <div className="catalog-cards-grid four-cards-layout">
           {filteredCatalog.map(item => {
             const isPurchased = activeServiceIds.includes(item.id);
             return (
@@ -1000,12 +783,12 @@ export const WalletPage: React.FC = () => {
           <div className="referral-link-box">
             <span className="link-label">Ваша персональная ссылка:</span>
             <div className="link-input-group">
-              <code className="referral-code-text">https://newage.network/join?ref={currentUser?.username || 'alex_guru'}</code>
+              <code className="referral-code-text">https://newage.network/join?ref={currentUser?.username || 'claower'}</code>
               <button
                 type="button"
                 className="btn-copy-ref-link"
                 onClick={() => {
-                  navigator.clipboard?.writeText(`https://newage.network/join?ref=${currentUser?.username || 'alex_guru'}`);
+                  navigator.clipboard?.writeText(`https://newage.network/join?ref=${currentUser?.username || 'claower'}`);
                   alert('Партнерская ссылка скопирована в буфер обмена!');
                 }}
               >

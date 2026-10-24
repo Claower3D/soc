@@ -789,11 +789,17 @@ body.dark .wallet-page-modern {
   color: #ffffff;
 }
 
-/* Сетка карточек каталога */
+/* Сетка карточек каталога (4 флагманские услуги) */
 .catalog-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 18px;
+}
+
+@media (max-width: 1100px) {
+  .catalog-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 620px) {
