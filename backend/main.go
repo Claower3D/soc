@@ -1518,6 +1518,21 @@ func isOriginAllowed(origin string) bool {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Принудительный редирект с незащищенного HTTP на HTTPS на продакшне
+		proto := r.Header.Get("X-Forwarded-Proto")
+		if proto == "http" && r.Host != "" && !strings.Contains(r.Host, "localhost") && !strings.Contains(r.Host, "127.0.0.1") {
+			target := "https://" + r.Host + r.URL.RequestURI()
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
+			return
+		}
+
+		// Заголовки безопасности и HSTS (форсирование HTTPS в браузерах)
+		if r.Host != "" && !strings.Contains(r.Host, "localhost") && !strings.Contains(r.Host, "127.0.0.1") {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+		}
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+
 		origin := r.Header.Get("Origin")
 		if origin != "" && isOriginAllowed(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
