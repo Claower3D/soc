@@ -456,7 +456,7 @@ body.dark .wallet-page-modern {
 /* Кнопки на карте */
 .card-quick-actions {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   z-index: 1;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
@@ -465,7 +465,19 @@ body.dark .wallet-page-modern {
 
 @media (max-width: 580px) {
   .card-quick-actions {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .btn-card-act {
+    padding: 8px 6px;
+    font-size: 0.78rem;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 380px) {
+  .card-quick-actions {
+    grid-template-columns: 1fr;
     gap: 8px;
   }
 }

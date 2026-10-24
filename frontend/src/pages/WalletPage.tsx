@@ -188,11 +188,6 @@ export const WalletPage: React.FC = () => {
   const [donateAuthor, setDonateAuthor] = useState('alex_dev');
   const [donateMessage, setDonateMessage] = useState('Благодарю за полезные практики и видеоуроки!');
 
-  const [isWithdrawOpen, setIsWithdrawOpen] = useState(false);
-  const [withdrawAmount, setWithdrawAmount] = useState('1000');
-  const [withdrawMethod, setWithdrawMethod] = useState<'sbp' | 'card'>('sbp');
-  const [withdrawTarget, setWithdrawTarget] = useState('+7 (999) 000-00-00');
-
   // Модальное окно покупки услуги из каталога
   const [purchasingService, setPurchasingService] = useState<CatalogServiceItem | null>(null);
   const [purchaseSuccessMessage, setPurchaseSuccessMessage] = useState<string | null>(null);
@@ -346,32 +341,6 @@ export const WalletPage: React.FC = () => {
     } catch (err) {
       console.error('Donation error:', err);
     }
-  };
-
-  // Обработчик вывода
-  const handleWithdrawSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = Number(withdrawAmount);
-    if (!val || val <= 0) return;
-    if (balance < val) {
-      alert('Недостаточно средств для вывода.');
-      return;
-    }
-
-    setBalance(prev => prev - val);
-    const newTx: WalletTransaction = {
-      id: `tx-with-${Date.now()}`,
-      type: 'withdrawal',
-      amount: -val,
-      description: `Вывод на ${withdrawMethod === 'sbp' ? 'СБП ' + withdrawTarget : 'карту ' + withdrawTarget}`,
-      date: 'Сегодня, только что',
-      status: 'completed',
-      recipientOrSender: withdrawTarget
-    };
-    setTransactions([newTx, ...transactions]);
-    setIsWithdrawOpen(false);
-    setPurchaseSuccessMessage(`Заявка на вывод ${formatPrice(val)} принята в обработку банком!`);
-    setTimeout(() => setPurchaseSuccessMessage(null), 4500);
   };
 
   // Обработчик покупки услуги из каталога
@@ -540,14 +509,6 @@ export const WalletPage: React.FC = () => {
             >
               <Plus size={16} />
               <span>Пополнить</span>
-            </button>
-            <button
-              type="button"
-              className="btn-card-act transfer"
-              onClick={() => setIsWithdrawOpen(true)}
-            >
-              <ArrowUpRight size={16} />
-              <span>Вывести</span>
             </button>
             <button
               type="button"
@@ -811,7 +772,7 @@ export const WalletPage: React.FC = () => {
             </div>
             <div>
               <h2 className="section-heading">История финансовых операций</h2>
-              <p className="section-subtext">Все транзакции: пополнения баланса, покупка услуг, донаты и вывод средств</p>
+              <p className="section-subtext">Все транзакции: пополнения баланса, покупка услуг и донаты</p>
             </div>
           </div>
 
@@ -1000,105 +961,7 @@ export const WalletPage: React.FC = () => {
         </div>
       )}
 
-      {/* 2. Модальное окно вывода средств */}
-      {isWithdrawOpen && (
-        <div className="wallet-modal-overlay" onClick={() => setIsWithdrawOpen(false)}>
-          <div className="wallet-modal-card" onClick={e => e.stopPropagation()}>
-            <div className="modal-header-row">
-              <div className="modal-title-wrap">
-                <ArrowUpRight size={20} className="text-violet" />
-                <h3>Вывод средств с баланса</h3>
-              </div>
-              <button
-                type="button"
-                className="btn-close-modal"
-                onClick={() => setIsWithdrawOpen(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <p className="modal-subtext">Вывод на карты РФ и через Систему быстрых платежей (СБП)</p>
-
-            <form onSubmit={handleWithdrawSubmit} className="modal-inner-form">
-              <div className="form-group-block">
-                <label className="group-label">Куда перевести:</label>
-                <div className="deposit-methods-grid">
-                  <button
-                    type="button"
-                    className={`method-select-btn ${withdrawMethod === 'sbp' ? 'active' : ''}`}
-                    onClick={() => {
-                      setWithdrawMethod('sbp');
-                      setWithdrawTarget('+7 (999) 000-00-00');
-                    }}
-                  >
-                    <QrCode size={18} />
-                    <span>По номеру телефона (СБП)</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={`method-select-btn ${withdrawMethod === 'card' ? 'active' : ''}`}
-                    onClick={() => {
-                      setWithdrawMethod('card');
-                      setWithdrawTarget('2200 •••• •••• 1234');
-                    }}
-                  >
-                    <CreditCard size={18} />
-                    <span>На банковскую карту</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="form-group-block">
-                <label className="group-label">
-                  {withdrawMethod === 'sbp' ? 'Номер телефона (СБП):' : 'Номер банковской карты:'}
-                </label>
-                <input
-                  type="text"
-                  value={withdrawTarget}
-                  onChange={e => setWithdrawTarget(e.target.value)}
-                  required
-                  className="modal-number-input"
-                />
-              </div>
-
-              <div className="form-group-block">
-                <div className="balance-hint-row">
-                  <label className="group-label">Сумма вывода (₽):</label>
-                  <span className="balance-hint">Доступно: {formatPrice(balance)}</span>
-                </div>
-                <input
-                  type="number"
-                  value={withdrawAmount}
-                  onChange={e => setWithdrawAmount(e.target.value)}
-                  min="100"
-                  max={balance}
-                  required
-                  className="modal-number-input"
-                />
-              </div>
-
-              <div className="modal-actions-row">
-                <button
-                  type="button"
-                  className="btn-modal-cancel"
-                  onClick={() => setIsWithdrawOpen(false)}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="btn-modal-submit"
-                  disabled={balance < Number(withdrawAmount)}
-                >
-                  Вывести {formatPrice(Number(withdrawAmount || 0))}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Модальное окно доната автору */}
+      {/* 2. Модальное окно доната автору */}
       {isDonateOpen && (
         <div className="wallet-modal-overlay" onClick={() => setIsDonateOpen(false)}>
           <div className="wallet-modal-card" onClick={e => e.stopPropagation()}>
