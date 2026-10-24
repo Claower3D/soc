@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Bell, Sparkles, Wind, Heart, X, CheckCircle2 } from 'lucide-react';
-import { spiritualAudio } from '../utils/spiritualAudio';
 import { api } from '../api';
 
 export interface AppNotification {
@@ -145,7 +144,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   const showToast = useCallback((title: string, message: string, category: ToastItem['category'], link?: string) => {
-    spiritualAudio.playCrystalChime();
 
     const newToast: ToastItem = {
       id: `toast-${Date.now()}-${Math.random()}`,
@@ -163,7 +161,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       try {
         new Notification(title, {
           body: message,
-          icon: '/favicon.ico'
+          icon: '/favicon.ico',
+          silent: true
         });
       } catch { /* fallback */ }
     }
