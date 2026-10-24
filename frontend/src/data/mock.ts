@@ -681,7 +681,7 @@ export interface CommunityEvent {
 
 export interface WalletTransaction {
   id: string;
-  type: 'deposit' | 'withdrawal' | 'purchase' | 'sale' | 'donation_sent' | 'donation_received' | 'subscription';
+  type: 'deposit' | 'withdrawal' | 'purchase' | 'sale' | 'donation_sent' | 'donation_received' | 'subscription' | 'transfer';
   amount: number;
   description: string;
   date: string;

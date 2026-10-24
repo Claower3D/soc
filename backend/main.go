@@ -425,6 +425,7 @@ func connectAndMigrate(dbURL string) (*sql.DB, error) {
 	// Инициализация таблиц карты ретритов и онлайн-бронирования
 	_ = ensureRetreatsTables(conn)
 	_ = ensureDatingTables(conn)
+	ensureWalletTables(conn)
 
 	// Очистка битых/осиротевших связей (если пользователь был удален)
 	_, _ = conn.Exec(`
@@ -1171,6 +1172,7 @@ func main() {
 	// Инициализация хранилища ретритов и очистка от любых тестовых заявок
 	initRetreatStore("data")
 	initDatingStore("data")
+	initWalletStore("data")
 
 	// Инициализация подключения к PostgreSQL (если предоставлена DATABASE_URL на Railway)
 	initDB()
@@ -1196,6 +1198,9 @@ func main() {
 	mux.HandleFunc("GET /api/marketplace", handleMarketplace)
 	mux.HandleFunc("GET /api/communities", handleCommunities)
 	mux.HandleFunc("GET /api/wallet", handleWallet)
+	mux.HandleFunc("POST /api/wallet/deposit", handleWalletDeposit)
+	mux.HandleFunc("POST /api/wallet/pay", handleWalletPay)
+	mux.HandleFunc("POST /api/wallet/transfer", handleWalletTransfer)
 	mux.HandleFunc("GET /api/admin/stats", handleAdminStats)
 
 	// Карта ретритов (Retreat Map PRO) и онлайн-бронирование
@@ -2502,46 +2507,6 @@ func handleCommunities(w http.ResponseWriter, r *http.Request) {
 	}
 	globalCache.Set("api:communities", communities, 30*time.Second, "communities")
 	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: communities})
-}
-
-func handleWallet(w http.ResponseWriter, r *http.Request) {
-	token := extractBearerToken(r)
-	claims, err := parseAndValidateJWT(token)
-	if err != nil {
-		writeJSON(w, http.StatusUnauthorized, Response{Status: "error", Message: "Авторизация требуется"})
-		return
-	}
-	if db != nil {
-		var balance float64
-		var currency string
-		err := db.QueryRow("SELECT balance, currency FROM wallet_accounts WHERE user_id = $1", claims.UserID).Scan(&balance, &currency)
-		if err != nil {
-			// Create wallet if not exists
-			db.Exec("INSERT INTO wallet_accounts (user_id, balance, currency) VALUES ($1, 0, 'RUB') ON CONFLICT DO NOTHING", claims.UserID)
-			balance = 0
-			currency = "RUB"
-		}
-		// Get recent transactions
-		txRows, _ := db.Query(`
-			SELECT id, type, amount, currency, description, created_at
-			FROM wallet_transactions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20
-		`, claims.UserID)
-		var transactions []map[string]interface{}
-		if txRows != nil {
-			defer txRows.Close()
-			for txRows.Next() {
-				var tid, txType, txCurrency, txDesc string
-				var txAmount float64
-				var txDate time.Time
-				if txRows.Scan(&tid, &txType, &txAmount, &txCurrency, &txDesc, &txDate) == nil {
-					transactions = append(transactions, map[string]interface{}{"id": tid, "type": txType, "amount": txAmount, "currency": txCurrency, "description": txDesc, "date": txDate.Format("02.01.2006")})
-				}
-			}
-		}
-		writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"balance": balance, "currency": currency, "transactions": transactions}})
-		return
-	}
-	writeJSON(w, http.StatusOK, Response{Status: "ok", Data: map[string]interface{}{"balance": 0, "currency": "RUB", "transactions": []interface{}{}}})
 }
 
 // requireAdmin проверяет JWT и роль admin для защищённых эндпоинтов

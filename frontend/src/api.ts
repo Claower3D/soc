@@ -415,7 +415,13 @@ export const api = {
   },
   wallet: {
     balance: () => apiFetch<any>('/api/wallet'),
-    transactions: () => apiFetch<any>('/api/wallet/transactions')
+    transactions: () => apiFetch<any>('/api/wallet/transactions'),
+    deposit: (amount: number, method: string = 'sbp') =>
+      apiFetch<any>('/api/wallet/deposit', { method: 'POST', body: JSON.stringify({ amount, method }) }),
+    pay: (serviceId: string, amount: number, title: string) =>
+      apiFetch<any>('/api/wallet/pay', { method: 'POST', body: JSON.stringify({ serviceId, amount, title }) }),
+    transfer: (recipientUsername: string, amount: number, note: string = '', isDonation: boolean = false) =>
+      apiFetch<any>('/api/wallet/transfer', { method: 'POST', body: JSON.stringify({ recipientUsername, amount, note, isDonation }) })
   },
   geo: {
     detect: () => apiFetch<any>('/api/geo/detect')
